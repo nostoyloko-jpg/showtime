@@ -1,0 +1,494 @@
+/* Tests de core.js — sin dependencias.
+ * Ordenador:  node tests/core.test.js        (o con otra zona: TZ=America/New_York node tests/core.test.js)
+ * Navegador:  abrir tests/index.html con doble clic
+ */
+(function () {
+  'use strict';
+  const C = (typeof module !== 'undefined' && module.exports) ? require('../core.js') : window.ShowtimeCore;
+
+  // ── Mini ejecutor ─────────────────────────────────────────────────────
+  const tests = [];
+  function test(name, fn) { tests.push([name, fn]); }
+  function fmt(v) { try { return JSON.stringify(v); } catch (e) { return String(v); } }
+  function eq(a, b, msg) { if (a !== b) throw new Error((msg ? msg + ': ' : '') + 'esperaba ' + fmt(b) + ', salió ' + fmt(a)); }
+  function deq(a, b, msg) { if (fmt(a) !== fmt(b)) throw new Error((msg ? msg + ': ' : '') + 'esperaba ' + fmt(b) + ', salió ' + fmt(a)); }
+  function ok(v, msg) { if (!v) throw new Error(msg || 'esperaba verdadero'); }
+
+  // ── Datos: copia de referencia/ejemplo-festival.json ──────────────────
+  const FEST = {
+    event: { nombre: 'Festival de Ejemplo', fechaInicio: '2026-07-10', fechaFin: '2026-07-11', dayCutoff: '06:00', callMins: 15 },
+    escenarios: [ { id: 'esc1', nombre: 'Principal', color: '#e94560' }, { id: 'esc2', nombre: 'Carpa', color: '#4fc3f7' } ],
+    artists: [
+      { id: 1, nombre: 'Los Ejemplos', color: '#e94560', escenarioId: 'esc1', fecha: '2026-07-10', inicio: '21:00', fin: '22:15', notas: 'Intro con playback',
+        soundcheckFecha: '2026-07-10', soundcheckInicio: '16:00', soundcheckFin: '16:45', soundcheckCall: '15:30', soundcheckNotas: 'Backline propio' },
+      { id: 2, nombre: 'Banda Demo', color: '#4fc3f7', escenarioId: 'esc2', fecha: '2026-07-10', inicio: '21:30', fin: '22:30', notas: '',
+        soundcheckFecha: '2026-07-10', soundcheckInicio: '17:00', soundcheckFin: '17:40', soundcheckCall: '16:40', soundcheckNotas: '' },
+      { id: 3, nombre: 'Cabeza de Cartel', color: '#1de9b6', escenarioId: 'esc1', fecha: '2026-07-10', inicio: '23:30', fin: '01:15', notas: 'Pirotecnia al final',
+        soundcheckFecha: '2026-07-10', soundcheckInicio: '18:00', soundcheckFin: '19:00', soundcheckCall: '17:30', soundcheckNotas: '' },
+      { id: 4, nombre: 'DJ de Cierre', color: '#c77dff', escenarioId: 'esc2', fecha: '2026-07-11', inicio: '02:00', fin: '04:00', notas: 'Cuenta como jornada del 10 (antes de las 06:00)',
+        soundcheckFecha: '', soundcheckInicio: '', soundcheckFin: '', soundcheckCall: '', soundcheckNotas: '' }
+    ]
+  };
+  // 2026-07-10 = día 9687 desde 2000-01-01 (a mano: 26 años, 7 bisiestos → 9497; ene–jun 181 → 9678; +9)
+  const D10 = 9687 * 1440, D11 = 9688 * 1440;
+  const at = (base, hm) => base + C.parseHM(hm);
+  const SHOW = C.buildBlocks(FEST, { mode: 'show', day: 'all' });
+  const byName = n => SHOW.find(b => b.name === n);
+
+  // ── Formato básico ────────────────────────────────────────────────────
+  test('parseHM acepta y rechaza', () => {
+    eq(C.parseHM('21:00'), 1260); eq(C.parseHM('7:05'), 425); eq(C.parseHM('00:00'), 0);
+    eq(C.parseHM('24:00'), null); eq(C.parseHM('12:60'), null); eq(C.parseHM(''), null);
+    eq(C.parseHM('ab'), null); eq(C.parseHM(null), null); eq(C.parseHM('21'), null);
+  });
+  test('fmtHM da la hora del día de un absoluto', () => {
+    eq(C.fmtHM(at(D10, '21:05')), '21:05'); eq(C.fmtHM(at(D11, '01:15')), '01:15');
+    eq(C.fmtHM(at(D10, '21:05') + 0.9), '21:05'); eq(C.fmtHM(-60), '23:00'); eq(C.fmtHM(null), '—');
+  });
+
+  // ── Minutos absolutos ─────────────────────────────────────────────────
+  test('dayIndex: origen, fecha conocida, bisiesto y fechas imposibles', () => {
+    eq(C.dayIndex('2000-01-01'), 0); eq(C.dayIndex('2026-07-10'), 9687);
+    eq(C.dayIndex('2024-02-29') - C.dayIndex('2024-02-28'), 1);
+    eq(C.dayIndex('2026-02-30'), null); eq(C.dayIndex(''), null); eq(C.dayIndex('10/07/2026'), null);
+  });
+  test('isoOfDay y shiftDate (también cambio de mes y de año)', () => {
+    eq(C.isoOfDay(9687), '2026-07-10'); eq(C.shiftDate('2026-07-01', -1), '2026-06-30');
+    eq(C.shiftDate('2027-01-01', -1), '2026-12-31'); eq(C.shiftDate('basura', -1), 'basura');
+  });
+  test('toAbs con fecha = días×1440 + hora; sin fecha, solo hora del día', () => {
+    eq(C.toAbs('2026-07-10', '21:00'), D10 + 1260);
+    eq(C.toAbs('', '21:00'), 1260); eq(C.toAbs('2026-07-10', ''), null);
+  });
+  test('cambio de hora (Madrid 29-mar y 25-oct 2026): los días siguen midiendo 1440', () => {
+    eq(C.toAbs('2026-03-29', '00:00') - C.toAbs('2026-03-28', '00:00'), 1440);
+    eq(C.toAbs('2026-10-25', '00:00') - C.toAbs('2026-10-24', '00:00'), 1440);
+    eq(C.nowAbs(new Date(2026, 2, 29, 12, 0, 0)), C.toAbs('2026-03-29', '12:00'));
+    eq(C.nowAbs(new Date(2026, 9, 25, 12, 0, 0)), C.toAbs('2026-10-25', '12:00'));
+  });
+  test('nowAbs está en la MISMA escala que los bloques (y lleva segundos)', () => {
+    eq(C.nowAbs(new Date(2026, 6, 10, 21, 30, 0)), at(D10, '21:30'));
+    eq(C.nowAbs(new Date(2026, 6, 11, 1, 50, 30)), at(D11, '01:50') + 0.5);
+    ok(C.nowAbs(new Date(2026, 6, 11, 1, 50)) > at(D10, '23:30'), 'madrugada va después de la noche anterior, no a las 13:30');
+  });
+
+  // ── Cruce de medianoche ───────────────────────────────────────────────
+  test('adjustEnd: 23:30–01:15 dura 105 min, no −1335', () => {
+    const si = at(D10, '23:30'), sf = C.adjustEnd(si, C.toAbs('2026-07-10', '01:15'));
+    eq(sf - si, 105); eq(sf, at(D11, '01:15'));
+    eq(C.adjustEnd(100, 200), 200); eq(C.adjustEnd(null, 200), 200); eq(C.adjustEnd(100, null), null);
+  });
+  test('buildBlocks: el cabeza de cartel termina al día siguiente', () => {
+    const b = byName('Cabeza de Cartel');
+    eq(b.si, at(D10, '23:30')); eq(b.sf, at(D11, '01:15'));
+  });
+
+  // ── Día de festival ───────────────────────────────────────────────────
+  test('festivalDateOf: el DJ de las 02:00 del 11 es jornada del 10', () => {
+    eq(C.festivalDateOf(FEST, FEST.artists[3], false), '2026-07-10');
+    eq(C.festivalDateOf(FEST, FEST.artists[0], false), '2026-07-10');
+  });
+  test('festivalDateOf: justo en la hora de corte ya es el día nuevo; corte propio', () => {
+    eq(C.festivalDateOf(FEST, { fecha: '2026-07-11', inicio: '06:00' }), '2026-07-11');
+    eq(C.festivalDateOf(FEST, { fecha: '2026-07-11', inicio: '05:59' }), '2026-07-10');
+    eq(C.festivalDateOf({ event: { dayCutoff: '05:00' } }, { fecha: '2026-07-11', inicio: '05:30' }), '2026-07-11');
+    eq(C.festivalDateOf({ event: { dayCutoff: 'xx' } }, { fecha: '2026-07-11', inicio: '05:30' }), '2026-07-10', 'corte inválido → 06:00');
+  });
+  test('festivalDateOf soundcheck: usa soundcheckFecha y, si falta, fecha; sin fecha → vacío', () => {
+    eq(C.festivalDateOf(FEST, { fecha: '2026-07-11', soundcheckFecha: '', soundcheckInicio: '03:00' }, true), '2026-07-10');
+    eq(C.festivalDateOf(FEST, { fecha: '2026-07-11', soundcheckFecha: '2026-07-12', soundcheckInicio: '16:00' }, true), '2026-07-12');
+    eq(C.festivalDateOf(FEST, { fecha: '', inicio: '21:00' }, false), '');
+  });
+  test('festivalDays: jornadas del selector', () => {
+    deq(C.festivalDays(FEST, 'show'), ['2026-07-10']); deq(C.festivalDays(FEST, 'sc'), ['2026-07-10']);
+  });
+  test('filtro de día: el 10 incluye al DJ de madrugada, el 11 queda vacío; el dibujo usa la hora real', () => {
+    const d10 = C.buildBlocks(FEST, { mode: 'show', day: '2026-07-10' });
+    eq(d10.length, 4); eq(d10[3].name, 'DJ de Cierre'); eq(d10[3].si, at(D11, '02:00'));
+    eq(C.buildBlocks(FEST, { mode: 'show', day: '2026-07-11' }).length, 0);
+  });
+
+  // ── Conversión ────────────────────────────────────────────────────────
+  test('buildBlocks show: orden, escenario, color, notas, sin CALL', () => {
+    deq(SHOW.map(b => b.name), ['Los Ejemplos', 'Banda Demo', 'Cabeza de Cartel', 'DJ de Cierre']);
+    const b = SHOW[1];
+    eq(b.stage, 'Carpa'); eq(b.stageId, 'esc2'); eq(b.stageColor, '#4fc3f7'); eq(b.call, ''); eq(b.callAbs, null); eq(b.id, 2);
+    eq(SHOW[0].notes, 'Intro con playback');
+  });
+  test('buildBlocks soundcheck: entran los que tienen inicio o CALL', () => {
+    const sc = C.buildBlocks(FEST, { mode: 'sc', day: 'all' });
+    deq(sc.map(b => b.name), ['Los Ejemplos', 'Banda Demo', 'Cabeza de Cartel']);
+    eq(sc[0].call, '15:30'); eq(sc[0].callAbs, at(D10, '15:30')); eq(sc[0].notes, 'Backline propio');
+    const solo = C.buildBlocks({ artists: [{ nombre: 'X', fecha: '2026-07-10', soundcheckCall: '14:00' }] }, { mode: 'sc' });
+    eq(solo.length, 1); eq(solo[0].si, null); eq(solo[0].callAbs, at(D10, '14:00'));
+  });
+  test('color: sin color propio, el de la lista por posición', () => {
+    const f = { artists: [{ nombre: 'A', fecha: '2026-07-10', inicio: '10:00' }, { nombre: 'B', fecha: '2026-07-10', inicio: '11:00' }] };
+    deq(C.buildBlocks(f, {}).map(b => b.color), [C.ARTIST_COLORS[0], C.ARTIST_COLORS[1]]);
+  });
+  test('sin inicio va al final, no al principio', () => {
+    const f = { artists: [{ nombre: 'SinHora', fecha: '2026-07-10', fin: '10:00' }, { nombre: 'A', fecha: '2026-07-10', inicio: '12:00' }] };
+    deq(C.buildBlocks(f, {}).map(b => b.name), ['A', 'SinHora']);
+  });
+
+  // ── CALL tras medianoche (arreglo ESPEC §8) ───────────────────────────
+  test('callAbsFor: CALL normal, CALL antes de medianoche para show después, y al revés', () => {
+    eq(C.callAbsFor(at(D10, '16:00'), '15:30'), at(D10, '15:30'));
+    eq(C.callAbsFor(at(D11, '00:30'), '23:30'), at(D10, '23:30'), 'víspera, no un día tarde');
+    eq(C.callAbsFor(at(D10, '23:50'), '00:10'), at(D11, '00:10'));
+    eq(C.callAbsFor(null, '14:00', '2026-07-10'), at(D10, '14:00'));
+    eq(C.callAbsFor(at(D10, '16:00'), ''), null);
+  });
+  test('buildBlocks: soundcheck a las 00:30 con CALL 23:30 → CALL la víspera', () => {
+    const f = { artists: [{ nombre: 'Noche', fecha: '2026-07-11', soundcheckInicio: '00:30', soundcheckFin: '01:00', soundcheckCall: '23:30' }] };
+    const b = C.buildBlocks(f, { mode: 'sc' })[0];
+    eq(b.callAbs, at(D10, '23:30')); ok(b.callAbs < b.si);
+  });
+
+  // ── En escena / Siguiente ─────────────────────────────────────────────
+  test('en escena: varios a la vez (dos escenarios)', () => {
+    deq(C.playingNow(SHOW, at(D10, '21:45')).map(b => b.name), ['Los Ejemplos', 'Banda Demo']);
+    deq(C.playingNow(SHOW, at(D10, '20:00')), []);
+  });
+  test('en escena: inicio incluido, fin excluido', () => {
+    ok(C.isPlaying(byName('Los Ejemplos'), at(D10, '21:00')));
+    ok(!C.isPlaying(byName('Los Ejemplos'), at(D10, '22:15')));
+  });
+  test('en escena tras medianoche: el cabeza suena a las 00:30 y le quedan 45 min', () => {
+    deq(C.playingNow(SHOW, at(D11, '00:30')).map(b => b.name), ['Cabeza de Cartel']);
+    const p = C.progress(byName('Cabeza de Cartel'), at(D11, '00:30'));
+    eq(p.remaining, 45); eq(Math.round(p.pct), 57);
+  });
+  test('sin fin se suponen 60 min', () => {
+    const b = { name: 'X', si: 1000, sf: null };
+    ok(C.isPlaying(b, 1059)); ok(!C.isPlaying(b, 1060)); eq(C.blockEnd(b), 1060);
+  });
+  test('siguiente: uno por escenario', () => {
+    deq(C.nextPerStage(SHOW, at(D10, '20:00')).map(b => b.name), ['Los Ejemplos', 'Banda Demo']);
+    deq(C.nextPerStage(SHOW, at(D10, '22:40')).map(b => b.name), ['Cabeza de Cartel', 'DJ de Cierre']);
+    deq(C.nextPerStage(SHOW, at(D11, '05:00')), []);
+  });
+  test('siguiente: sin escenarios, todos cuentan como un grupo → solo el próximo', () => {
+    const f = { artists: [1, 2, 3].map(i => ({ nombre: 'A' + i, fecha: '2026-07-10', inicio: (10 + i) + ':00' })) };
+    deq(C.nextPerStage(C.buildBlocks(f, {}), at(D10, '09:00')).map(b => b.name), ['A1']);
+  });
+  test('siguiente: máximo 4', () => {
+    const f = { artists: [1, 2, 3, 4, 5, 6].map(i => ({ nombre: 'A' + i, escenarioId: 'e' + i, fecha: '2026-07-10', inicio: (10 + i) + ':00' })) };
+    f.escenarios = f.artists.map(a => ({ id: a.escenarioId, nombre: a.escenarioId }));
+    eq(C.nextPerStage(C.buildBlocks(f, {}), at(D10, '09:00')).length, 4);
+  });
+
+  test('changeover: hueco con el anterior del mismo escenario (cruza medianoche)', () => {
+    eq(C.changeoverBefore(SHOW, byName('Cabeza de Cartel')).mins, 75, '22:15 → 23:30');
+    eq(C.changeoverBefore(SHOW, byName('Cabeza de Cartel')).prev.name, 'Los Ejemplos');
+    eq(C.changeoverBefore(SHOW, byName('DJ de Cierre')).mins, 210, '22:30 → 02:00');
+    eq(C.changeoverBefore(SHOW, byName('Los Ejemplos')), null, 'primero de su escenario');
+  });
+
+  test('changeover activo: escenario entre bandas, con banda que entra y tiempo restante', () => {
+    const c = C.changeoversNow(SHOW, at(D10, '22:20'));
+    eq(c.length, 1, 'Carpa sigue sonando (Banda Demo hasta 22:30)');
+    eq(c[0].stage, 'Principal'); eq(c[0].prev.name, 'Los Ejemplos'); eq(c[0].next.name, 'Cabeza de Cartel');
+    eq(c[0].remaining, 70); eq(c[0].total, 75); eq(Math.round(c[0].pct), 7);
+    deq(C.changeoversNow(SHOW, at(D10, '22:40')).map(x => x.stage + '→' + x.next.name), ['Principal→Cabeza de Cartel', 'Carpa→DJ de Cierre']);
+  });
+  test('changeover: no hay antes de la primera banda del escenario, ni si suena alguien, ni al final', () => {
+    deq(C.changeoversNow(SHOW, at(D10, '21:10')), [], 'Principal suena; Carpa aún no ha tenido banda');
+    deq(C.changeoversNow(SHOW, at(D11, '05:00')), []);
+    const r = C.changeoversNow(SHOW, at(D10, '23:29') + 0.5);
+    eq(r[0].remaining, 0.5, 'cuenta atrás con segundos');
+  });
+
+  // ── CALL por margen ───────────────────────────────────────────────────
+  test('CALL: sale con 10 min de margen; no con 16; sí justo en 15', () => {
+    deq(C.callList(SHOW, at(D10, '20:50'), 15).map(b => b.name), ['Los Ejemplos']);
+    deq(C.callList(SHOW, at(D10, '20:44'), 15), []);
+    deq(C.callList(SHOW, at(D10, '20:45'), 15).map(b => b.name), ['Los Ejemplos']);
+  });
+  test('CALL: abierto tarde (faltan 2 min) sigue saliendo; a la hora en punto ya no (está en escena)', () => {
+    deq(C.callList(SHOW, at(D10, '20:58'), 15).map(b => b.name), ['Los Ejemplos']);
+    deq(C.callList(SHOW, at(D10, '21:00'), 15), []);
+  });
+  test('CALL: OK lo quita (Set o array de claves)', () => {
+    const k = C.callKey(byName('Los Ejemplos'));
+    eq(k, 'Los Ejemplos@' + at(D10, '21:00'));
+    deq(C.callList(SHOW, at(D10, '20:50'), 15, new Set([k])), []);
+    deq(C.callList(SHOW, at(D10, '20:50'), 15, [k]), []);
+  });
+  test('CALL: tras medianoche y con callMins propio', () => {
+    deq(C.callList(SHOW, at(D11, '01:50'), 15).map(b => b.name), ['DJ de Cierre']);
+    deq(C.callList(SHOW, at(D10, '21:10'), 30).map(b => b.name), ['Banda Demo']);
+  });
+
+  // ── CALL en cascada (soundcheck con hora de CALL escrita) ──────────────
+  const SC = C.buildBlocks(FEST, { mode: 'sc', day: 'all' });
+  test('CALL cascada: con hora escrita, salta a esa hora exacta (no inicio − 15)', () => {
+    deq(C.callList(SC, at(D10, '15:29'), 15), []);
+    deq(C.callList(SC, at(D10, '15:30'), 15).map(b => b.name), ['Los Ejemplos']);
+    deq(C.callList(SC, at(D10, '15:59'), 15).map(b => b.name), ['Los Ejemplos']);
+    deq(C.callList(SC, at(D10, '16:00'), 15), [], 'al empezar la prueba deja de avisar');
+    deq(C.callList(SC, at(D10, '16:39'), 15), []);
+    deq(C.callList(SC, at(D10, '16:40'), 15).map(b => b.name), ['Banda Demo']);
+  });
+  test('CALL cascada: casilla vacía, «—» o inválida → inicio − minutos globales', () => {
+    const mk = call => C.buildBlocks({ artists: [{ nombre: 'X', fecha: '2026-07-10', soundcheckInicio: '16:00', soundcheckCall: call }] }, { mode: 'sc' });
+    ['', '—', 'xx'].forEach(c => {
+      const bl = mk(c);
+      eq(C.callAt(bl[0], 15), at(D10, '15:45'), 'call «' + c + '»');
+      deq(C.callList(bl, at(D10, '15:44'), 15), []);
+      eq(C.callList(bl, at(D10, '15:45'), 15).length, 1);
+    });
+  });
+  test('CALL cascada: hora escrita posterior al inicio (error de datos) → se ignora', () => {
+    const bl = C.buildBlocks({ artists: [{ nombre: 'X', fecha: '2026-07-10', soundcheckInicio: '16:00', soundcheckCall: '16:30' }] }, { mode: 'sc' });
+    eq(C.callAt(bl[0], 15), at(D10, '15:45'));
+  });
+  test('CALL cascada: CALL 23:30 para prueba 00:30 avisa desde las 23:30 de la víspera', () => {
+    const bl = C.buildBlocks({ artists: [{ nombre: 'N', fecha: '2026-07-11', soundcheckInicio: '00:30', soundcheckCall: '23:30' }] }, { mode: 'sc' });
+    eq(C.callList(bl, at(D10, '23:30'), 15).length, 1);
+    eq(C.callList(bl, at(D10, '23:29'), 15).length, 0);
+  });
+
+  // ── Barras de abajo ───────────────────────────────────────────────────
+  test('barras: empiezan en el que suena', () => {
+    const r = C.pickBlocks(SHOW, at(D10, '21:45'), 3);
+    ok(r.playing); deq(r.list.map(b => b.name), ['Los Ejemplos', 'Banda Demo', 'Cabeza de Cartel']);
+  });
+  test('barras: sin nadie sonando, empiezan en el siguiente; huecos a null', () => {
+    const r = C.pickBlocks(SHOW, at(D10, '22:40'), 3);
+    ok(!r.playing); eq(r.list[0].name, 'Cabeza de Cartel'); eq(r.list[1].name, 'DJ de Cierre'); eq(r.list[2], null);
+  });
+  test('barras: con todo terminado → FIN DE JORNADA, barras vacías', () => {
+    const r = C.pickBlocks(SHOW, at(D11, '05:00'), 2);
+    ok(!r.playing); ok(r.ended); deq(r.list, [null, null]);
+    ok(!C.pickBlocks(SHOW, at(D10, '20:00'), 1).ended, 'antes de empezar no es fin');
+    ok(!C.pickBlocks([], at(D10, '20:00'), 1).ended, 'sin datos no es fin');
+  });
+  test('etiquetas de las barras', () => {
+    eq(C.stripLabel(0, true), 'AHORA'); eq(C.stripLabel(0, false), 'SIGUIENTE');
+    eq(C.stripLabel(1, true), 'SIGUIENTE'); eq(C.stripLabel(2, true), 'EN 2º LUGAR');
+    eq(C.stripLabel(1, false), 'EN 2º LUGAR', 'sin nadie sonando no se repite SIGUIENTE'); eq(C.stripLabel(2, false), 'EN 3º LUGAR');
+  });
+
+  // ── Edición explícita (Panel de Control) ─────────────────────────────
+  test('normHM: formatos aceptados, vacío/«—» y errores', () => {
+    eq(C.normHM('21:30'), '21:30'); eq(C.normHM('2130'), '21:30'); eq(C.normHM('21.30'), '21:30'); eq(C.normHM('9:05'), '09:05');
+    eq(C.normHM(''), ''); eq(C.normHM('—'), ''); eq(C.normHM('-'), '');
+    eq(C.normHM('25:00'), null); eq(C.normHM('21:7'), null); eq(C.normHM('abc'), null);
+  });
+  test('editArtist: cambia solo el campo pedido, en un estado NUEVO', () => {
+    const r = C.editArtist(FEST, 1, 'show', 'inicio', '2105');
+    ok(r.ok); ok(r.changed); eq(r.value, '21:05');
+    eq(r.state.artists[0].inicio, '21:05'); eq(FEST.artists[0].inicio, '21:00', 'el original no se toca');
+    eq(r.state.artists[0].fin, '22:15');
+    const r2 = C.editArtist(FEST, 1, 'sc', 'call', '15:10');
+    eq(r2.state.artists[0].soundcheckCall, '15:10'); eq(r2.state.artists[0].inicio, '21:00');
+    ok(!C.editArtist(FEST, 1, 'show', 'inicio', '21:00').changed, 'mismo valor → sin cambio');
+  });
+  test('editArtist: rechaza horas malas, inicio vacío, fecha mala y artista inexistente', () => {
+    ok(!C.editArtist(FEST, 1, 'show', 'inicio', '').ok);
+    ok(!C.editArtist(FEST, 1, 'show', 'fin', '99:99').ok);
+    ok(!C.editArtist(FEST, 1, 'show', 'fecha', '2026-02-30').ok);
+    ok(!C.editArtist(FEST, 999, 'show', 'inicio', '21:00').ok);
+    ok(C.editArtist(FEST, 1, 'show', 'fin', '').ok, 'fin vacío se permite');
+  });
+  test('editArtist: CALL de show (campo Showtime) entra en la cascada; «—» lo borra', () => {
+    const s = C.editArtist(FEST, 2, 'show', 'call', '21:00').state;
+    const b = C.buildBlocks(s, { mode: 'show' }).find(x => x.name === 'Banda Demo');
+    eq(b.call, '21:00'); eq(C.callAt(b, 15), at(D10, '21:00'));
+    const s2 = C.editArtist(s, 2, 'show', 'call', '—').state;
+    eq(C.buildBlocks(s2, { mode: 'show' }).find(x => x.name === 'Banda Demo').call, '');
+  });
+  test('editArtist soundcheck: fecha vacía usa la del show; al editarla se escribe soundcheckFecha', () => {
+    eq(C.fieldValue(FEST.artists[3], 'sc', 'fecha'), '2026-07-11');
+    const r = C.editArtist(FEST, 4, 'sc', 'fecha', '2026-07-10');
+    eq(r.state.artists[3].soundcheckFecha, '2026-07-10'); eq(r.state.artists[3].fecha, '2026-07-11');
+  });
+  test('STANDBY manual: lo marca el regidor y cambia el CHANGEOVER por STANDBY', () => {
+    const r = C.setStandby(FEST, 3, 'show', true);
+    ok(r.ok); ok(r.changed); eq(r.state.artists[2].showtimeStandby, true); ok(!FEST.artists[2].showtimeStandby);
+    const c = C.changeoversNow(C.buildBlocks(r.state, { mode: 'show' }), at(D10, '22:20'));
+    ok(c[0].standby); eq(c[0].next.name, 'Cabeza de Cartel');
+    ok(!C.changeoversNow(SHOW, at(D10, '22:20'))[0].standby, 'sin marcar → CHANGEOVER');
+    const off = C.setStandby(r.state, 3, 'show', false);
+    ok(!('showtimeStandby' in off.state.artists[2]));
+    eq(C.setStandby(r.state, 3, 'sc', true).state.artists[2].showtimeStandby, true, 'el de show no se toca');
+    eq(C.setStandby(r.state, 3, 'sc', true).state.artists[2].showtimeStandbySC, true);
+  });
+  test('modifiedFields / countModified: marca lo cambiado respecto al importado', () => {
+    let s = C.editArtist(FEST, 1, 'show', 'inicio', '21:05').state;
+    s = C.editArtist(s, 1, 'show', 'notas', 'Nuevo').state;
+    s = C.setStandby(s, 3, 'show', true).state;
+    s = C.editArtist(s, 2, 'sc', 'fin', '17:50').state;
+    deq(C.modifiedFields(FEST, s, 'show'), { 1: ['inicio', 'notas'], 3: ['standby'] });
+    deq(C.modifiedFields(FEST, s, 'sc'), { 2: ['fin'] });
+    eq(C.countModified(FEST, s), 4); eq(C.countModified(FEST, FEST), 0);
+  });
+
+  test('demoFestival: válido, sin avisos y relativo a la hora dada', () => {
+    const d = C.demoFestival(at(D10, '22:00'));
+    const r = C.validateProject(d); ok(r.ok); deq(r.warnings, []);
+    deq(C.playingNow(C.buildBlocks(d, {}), at(D10, '22:00')).map(b => b.name), ['Los Ejemplos', 'Banda Demo']);
+  });
+
+  // ── Editor propio: festival, escenarios y bandas ─────────────────────
+  const mkFest = () => {
+    let s = C.newFestival({ nombre: 'Fiesta', fechaInicio: '2026-07-10', fechaFin: '2026-07-11' }).state;
+    s = C.addStage(s, 'Principal').state; s = C.addStage(s, 'Carpa', '#4FC3F7').state;
+    return s;
+  };
+  test('newFestival / checkEvent: valores por defecto y errores', () => {
+    const r = C.newFestival({ nombre: '  Fiesta  ', fechaInicio: '2026-07-10', fechaFin: '2026-07-11' });
+    ok(r.ok); eq(r.state.event.nombre, 'Fiesta'); eq(r.state.event.dayCutoff, '06:00'); eq(r.state.event.callMins, 15);
+    deq(r.state.artists, []); deq(C.eventDays(r.state), ['2026-07-10', '2026-07-11']);
+    ok(!C.newFestival({ nombre: '', fechaInicio: '2026-07-10' }).ok);
+    ok(!C.newFestival({ nombre: 'X', fechaInicio: '2026-07-11', fechaFin: '2026-07-10' }).ok, 'fin antes que inicio');
+    ok(!C.newFestival({ nombre: 'X', fechaInicio: '2026-07-10', dayCutoff: '29:00' }).ok);
+    ok(!C.newFestival({ nombre: 'X', fechaInicio: '2026-07-10', callMins: 0 }).ok);
+    eq(C.newFestival({ nombre: 'X', fechaInicio: '2026-07-10' }).state.event.fechaFin, '2026-07-10', 'un solo día');
+  });
+  test('escenarios: añadir, nombre repetido, color, mover, borrar solo si está vacío', () => {
+    const s = mkFest();
+    deq(s.escenarios.map(e => e.id + ':' + e.nombre), ['esc1:Principal', 'esc2:Carpa']);
+    eq(s.escenarios[1].color, '#4fc3f7');
+    ok(!C.addStage(s, 'principal').ok, 'repetido sin distinguir mayúsculas');
+    eq(C.moveStage(s, 'esc2', -1).state.escenarios[0].id, 'esc2');
+    ok(!C.moveStage(s, 'esc1', -1).ok);
+    eq(C.updateStage(s, 'esc1', { nombre: 'Grande', color: '#123456' }).state.escenarios[0].nombre, 'Grande');
+    ok(!C.updateStage(s, 'esc1', { nombre: 'Carpa' }).ok);
+    const s2 = C.addArtist(s, 'show', { nombre: 'A', escenarioId: 'esc1', jornada: '2026-07-10', inicio: '20:00', fin: '21:00' }).state;
+    ok(!C.removeStage(s2, 'esc1').ok, 'con bandas no'); ok(C.removeStage(s2, 'esc2').ok);
+  });
+  test('addArtist: crea con su horario; duración calcula el fin; errores por campo', () => {
+    const s = mkFest();
+    const r = C.addArtist(s, 'show', { nombre: 'Banda', escenarioId: 'esc1', jornada: '2026-07-10', inicio: '2130', duracion: '75', call: '21:00', notas: ' ojo ' });
+    ok(r.ok); eq(r.id, 1);
+    const a = r.state.artists[0];
+    eq(a.fecha, '2026-07-10'); eq(a.inicio, '21:30'); eq(a.fin, '22:45'); eq(a.showtimeCall, '21:00'); eq(a.notas, 'ojo');
+    eq(C.buildBlocks(r.state, {}).length, 1);
+    eq(C.addArtist(r.state, 'show', { nombre: 'Otra', escenarioId: 'esc2', jornada: '2026-07-10', inicio: '22:00' }).id, 2);
+    eq(C.addArtist(s, 'show', { nombre: '', escenarioId: 'esc1', jornada: '2026-07-10', inicio: '21:00' }).field, 'nombre');
+    eq(C.addArtist(s, 'show', { nombre: 'X', escenarioId: '', jornada: '2026-07-10', inicio: '21:00' }).field, 'escenario');
+    eq(C.addArtist(s, 'show', { nombre: 'X', escenarioId: 'esc1', jornada: '', inicio: '21:00' }).field, 'jornada');
+    eq(C.addArtist(s, 'show', { nombre: 'X', escenarioId: 'esc1', jornada: '2026-07-10', inicio: '' }).field, 'inicio');
+    eq(C.addArtist(s, 'show', { nombre: 'X', escenarioId: 'esc1', jornada: '2026-07-10', inicio: '21:00', fin: '22:00', duracion: '30' }).field, 'fin', 'fin y duración no cuadran');
+    ok(C.addArtist(s, 'show', { nombre: 'X', escenarioId: 'esc1', jornada: '2026-07-10', inicio: '21:00', fin: '21:30', duracion: '30' }).ok, 'si cuadran, vale');
+  });
+  test('addArtist: JORNADA + hora de madrugada → fecha real del día siguiente (hora de corte)', () => {
+    const r = C.addArtist(mkFest(), 'show', { nombre: 'DJ', escenarioId: 'esc2', jornada: '2026-07-10', inicio: '02:00', duracion: '120' });
+    const a = r.state.artists[0];
+    eq(a.fecha, '2026-07-11'); eq(a.fin, '04:00');
+    eq(C.festivalDateOf(r.state, a, false), '2026-07-10', 'sigue siendo jornada del 10');
+    eq(C.buildBlocks(r.state, { day: '2026-07-10' })[0].si, at(D11, '02:00'));
+  });
+  test('addArtist soundcheck: escribe los campos de prueba, no los de show', () => {
+    const a = C.addArtist(mkFest(), 'sc', { nombre: 'B', escenarioId: 'esc1', jornada: '2026-07-10', inicio: '16:00', fin: '16:40', call: '15:30' }).state.artists[0];
+    eq(a.soundcheckFecha, '2026-07-10'); eq(a.soundcheckInicio, '16:00'); eq(a.soundcheckCall, '15:30'); ok(!a.inicio && !a.fecha);
+  });
+  test('editArtist inicio: cruzar medianoche mantiene la jornada y ajusta la fecha', () => {
+    const s = C.editArtist(FEST, 3, 'show', 'inicio', '00:10').state;   // Cabeza: 23:30 vie → 00:10
+    eq(s.artists[2].fecha, '2026-07-11'); eq(C.festivalDateOf(s, s.artists[2], false), '2026-07-10');
+    const back = C.editArtist(s, 3, 'show', 'inicio', '23:45').state;
+    eq(back.artists[2].fecha, '2026-07-10');
+  });
+  test('editArtist jornada, nombre, escenario y color', () => {
+    let s = C.editArtist(FEST, 4, 'show', 'jornada', '2026-07-11').state;   // DJ 02:00 → jornada del 11
+    eq(s.artists[3].fecha, '2026-07-12');
+    s = C.editArtist(s, 1, 'show', 'nombre', '  Nuevo  Nombre ').state; eq(s.artists[0].nombre, 'Nuevo Nombre');
+    ok(!C.editArtist(s, 1, 'show', 'nombre', '  ').ok);
+    eq(C.editArtist(s, 1, 'show', 'escenario', 'esc2').state.artists[0].escenarioId, 'esc2');
+    ok(!C.editArtist(s, 1, 'show', 'escenario', 'nope').ok);
+    eq(C.editArtist(s, 1, 'show', 'color', '#ABCDEF').state.artists[0].color, '#abcdef');
+    ok(!('color' in C.editArtist(s, 1, 'show', 'color', '').state.artists[0]));
+  });
+  test('editArtist inicio sin jornada: lo pide antes (no se inventa la fecha)', () => {
+    const s = C.addArtist(mkFest(), 'sc', { nombre: 'B', escenarioId: 'esc1', jornada: '2026-07-10', inicio: '16:00' }).state;
+    const r = C.editArtist(s, 1, 'show', 'inicio', '21:00');
+    ok(!r.ok); eq(r.error, 'Elige primero la jornada.');
+    const s2 = C.editArtist(s, 1, 'show', 'jornada', '2026-07-10').state;
+    const r2 = C.editArtist(s2, 1, 'show', 'inicio', '21:00'); ok(r2.ok); eq(r2.state.artists[0].fecha, '2026-07-10');
+  });
+  test('jornadaOf: soundcheck sin datos propios no hereda la del show; con hora sí (formato Synapse)', () => {
+    const s = C.addArtist(mkFest(), 'show', { nombre: 'A', escenarioId: 'esc1', jornada: '2026-07-10', inicio: '00:10' }).state;
+    eq(C.jornadaOf(s, s.artists[0], 'show'), '2026-07-10');
+    eq(C.jornadaOf(s, s.artists[0], 'sc'), '', 'la elige el regidor');
+    ok(!C.editArtist(s, 1, 'sc', 'inicio', '16:00').ok);
+    eq(C.jornadaOf(FEST, { fecha: '2026-07-11', soundcheckInicio: '03:00' }, 'sc'), '2026-07-10');
+  });
+
+  test('varios días: el hueco entre la última del viernes y la primera del sábado NO es changeover', () => {
+    let s = mkFest();
+    s = C.addArtist(s, 'show', { nombre: 'Vie', escenarioId: 'esc1', jornada: '2026-07-10', inicio: '23:00', fin: '01:00' }).state;
+    s = C.addArtist(s, 'show', { nombre: 'Sab', escenarioId: 'esc1', jornada: '2026-07-11', inicio: '20:00', fin: '21:00' }).state;
+    s = C.addArtist(s, 'show', { nombre: 'Sab2', escenarioId: 'esc1', jornada: '2026-07-11', inicio: '21:30', fin: '22:30' }).state;
+    const all = C.buildBlocks(s, { day: 'all' });
+    eq(all[1].jornada, '2026-07-11');
+    eq(C.changeoverBefore(all, all[1]), null, 'primera del sábado: sin cambio previo');
+    eq(C.changeoverBefore(all, all[2]).mins, 30);
+    deq(C.changeoversNow(all, at(D11, '12:00')), [], 'el sábado a mediodía no hay CHANGEOVER de 8 h');
+  });
+  test('duplicateArtist: copia escenario, color y notas; hora nueva y otra jornada', () => {
+    let s = mkFest();
+    s = C.addArtist(s, 'show', { nombre: 'Banda', escenarioId: 'esc2', jornada: '2026-07-10', inicio: '21:00', fin: '22:00', notas: 'Backline propio', color: '#123456' }).state;
+    const r = C.duplicateArtist(s, 1, 'show', { jornada: '2026-07-11', inicio: '19:00', duracion: '45' });
+    ok(r.ok); eq(r.id, 2);
+    const b = r.state.artists[1];
+    eq(b.nombre, 'Banda'); eq(b.escenarioId, 'esc2'); eq(b.color, '#123456'); eq(b.notas, 'Backline propio');
+    eq(b.fecha, '2026-07-11'); eq(b.inicio, '19:00'); eq(b.fin, '19:45');
+    ok(!C.duplicateArtist(s, 1, 'show', { jornada: '2026-07-11', inicio: '' }).ok, 'la hora la pone el regidor');
+  });
+  test('nextJornadaAfter: aviso solo cuando la jornada elegida terminó y hay otra con bandas', () => {
+    let s = mkFest();
+    s = C.addArtist(s, 'show', { nombre: 'Vie', escenarioId: 'esc1', jornada: '2026-07-10', inicio: '23:00', fin: '01:00' }).state;
+    s = C.addArtist(s, 'show', { nombre: 'Sab', escenarioId: 'esc1', jornada: '2026-07-11', inicio: '20:00', fin: '21:00' }).state;
+    eq(C.nextJornadaAfter(s, 'show', '2026-07-10', at(D11, '00:30')), null, 'aún suena');
+    deq(C.nextJornadaAfter(s, 'show', '2026-07-10', at(D11, '01:30')), { done: '2026-07-10', next: '2026-07-11' });
+    eq(C.nextJornadaAfter(s, 'show', '2026-07-11', at(D11, '23:00')), null, 'última jornada');
+    eq(C.nextJornadaAfter(s, 'show', 'all', at(D11, '01:30')), null);
+  });
+
+  test('removeArtist y diffSummary (nuevas, borradas, campos, festival)', () => {
+    let s = C.removeArtist(FEST, 2).state;
+    eq(s.artists.length, 3); eq(FEST.artists.length, 4);
+    s = C.addArtist(Object.assign(s, {}), 'show', { nombre: 'Nueva', escenarioId: 'esc1', jornada: '2026-07-10', inicio: '20:00' }).state;
+    s = C.editArtist(s, 1, 'show', 'inicio', '21:05').state;
+    s = C.updateEvent(s, { nombre: 'Otro' }).state;
+    const d = C.diffSummary(FEST, s);
+    eq(d.added, 1); eq(d.removed, 1); eq(d.fields, 1); eq(d.festival, 1); eq(d.total, 4);
+    deq(C.newArtistIds(FEST, s), [5]);
+    eq(C.diffSummary(FEST, FEST).total, 0);
+  });
+
+  // ── Importar ──────────────────────────────────────────────────────────
+  test('validateProject: acepta el ejemplo sin avisos y no modifica el original', () => {
+    const r = C.validateProject(FEST);
+    ok(r.ok); deq(r.errors, []); deq(r.warnings, []);
+    ok(r.state !== FEST); r.state.artists[0].nombre = 'cambiado'; eq(FEST.artists[0].nombre, 'Los Ejemplos');
+  });
+  test('validateProject: JSON roto, sin artistas, horas y escenarios malos', () => {
+    ok(!C.validateProject('{roto').ok); ok(!C.validateProject({ event: {} }).ok);
+    const r = C.validateProject({ artists: [{ nombre: 'Z', fecha: '2026-07-10', inicio: '25:00', escenarioId: 'nope' }] });
+    ok(r.ok); eq(r.warnings.length, 2);
+    const r2 = C.validateProject(JSON.stringify({ artists: [{ nombre: 'Y', inicio: '21:00' }] }));
+    ok(r2.ok); eq(r2.warnings.length, 1, 'show sin fecha');
+  });
+
+  // ── Ejecutar ──────────────────────────────────────────────────────────
+  let pass = 0; const fails = [];
+  tests.forEach(([name, fn]) => {
+    try { fn(); pass++; } catch (e) { fails.push([name, e.message]); }
+  });
+  const summary = pass + '/' + tests.length + ' tests OK' + (fails.length ? ' — ' + fails.length + ' FALLAN' : '');
+  if (typeof module !== 'undefined' && module.exports) {
+    fails.forEach(([n, m]) => console.log('✗ ' + n + '\n    ' + m));
+    console.log(summary);
+    if (fails.length) process.exitCode = 1;
+  } else {
+    window.__TEST_RESULT__ = { pass, total: tests.length, fails };
+    const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+    document.getElementById('out').innerHTML =
+      '<h1 class="' + (fails.length ? 'bad' : 'good') + '">' + summary + '</h1>' +
+      fails.map(([n, m]) => '<p class="bad"><b>✗ ' + esc(n) + '</b><br>' + esc(m) + '</p>').join('') +
+      tests.filter(([n]) => !fails.some(f => f[0] === n)).map(([n]) => '<p class="good">✓ ' + esc(n) + '</p>').join('');
+  }
+})();

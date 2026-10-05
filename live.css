@@ -1,0 +1,189 @@
+/* Showtime — live.css · Pantalla Live
+   Fondo SIEMPRE oscuro. Estilos (mismos nombres que Stage Master):
+   Clásico (sin atributo) · Escenario (alto contraste) · Neutro · Raycast  →  body[data-lv="…"]
+   Los colores de artista y escenario son datos: no se tocan. */
+
+:root{
+  --bg:#0d0f14; --bg2:#0a0c10; --panel:rgba(255,255,255,.03); --panel-line:rgba(255,255,255,.08);
+  --accent:#e94560; --text:#fff; --muted:rgba(255,255,255,.55); --dim:rgba(255,255,255,.32);
+  --call:#ffb347; --line:rgba(255,255,255,.08); --hover:rgba(233,69,96,.5);
+  --btn-bg:rgba(255,255,255,.08); --btn-line:rgba(255,255,255,.18); --btn-text:#fff;
+  --info-w:340px; --top-h:50vh;
+  --num:'tnum' 1;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+  overflow:hidden;height:100vh;display:flex;flex-direction:column;user-select:none;-webkit-user-select:none}
+.ic{width:18px;height:18px;display:block}
+.num,#clk,.tmeta,.trem,.atime,#zlbl,#offlbl{font-variant-numeric:tabular-nums;font-feature-settings:var(--num)}
+
+/* ── Parte de arriba ─────────────────────────────────────────────── */
+#top{flex:0 0 var(--top-h);display:flex;align-items:stretch;padding:14px 2vw;background:var(--bg2);border-bottom:2px solid var(--accent);min-height:90px;overflow:hidden}
+.tpanel{flex:1 1 0;container-type:inline-size;min-width:0;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--panel-line);border-radius:10px;padding:12px 16px;overflow:hidden}
+.tpanel-h{font-size:min(5cqw,2vh);letter-spacing:.25em;font-weight:800;text-transform:uppercase;margin-bottom:8px;flex-shrink:0;color:var(--dim)}
+#panel-now .tpanel-h{color:var(--accent)}
+#panel-call .tpanel-h{color:var(--call)}
+.tpanel-b{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:8px;justify-content:center}
+.tempty{font-size:min(10cqw,4vh);font-weight:900;color:var(--dim)}
+.tempty.fin{font-size:min(7cqw,3.4vh);letter-spacing:.08em}
+.vsplit{flex:0 0 10px;cursor:col-resize;position:relative;transition:background .12s;touch-action:none}
+.vsplit:hover,.vsplit.active{background:var(--hover)}
+.vsplit::after{content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:2px;height:28px;background:rgba(255,255,255,.2);border-radius:1px}
+.trow{border-left:4px solid var(--c,#888);padding-left:12px;min-width:0}
+.tname{font-size:min(11cqw,4.4vh);font-weight:900;line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Nombres de artista en las tarjetas: hasta 2 líneas; si aún no caben, live.js reduce la letra (fitNames). */
+.tname.fit{white-space:normal;text-overflow:clip;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow-wrap:normal;font-size:calc(min(11cqw,4.4vh) * var(--fs,1))}
+.tname.fit.measuring{display:block;-webkit-line-clamp:none;line-clamp:none;overflow:visible;height:auto}
+.tmeta{font-size:min(5cqw,2vh);color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tstage{font-weight:800;letter-spacing:1px}
+.tbadge{display:inline-flex;align-items:center;gap:.45em;margin-top:6px;padding:2px 10px;border-radius:6px;max-width:100%;
+  font-size:min(5cqw,2vh);font-weight:800;letter-spacing:.04em;white-space:nowrap;overflow:hidden;
+  color:var(--text);background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.22)}
+.tbadge .ic{width:1.1em;height:1.1em;flex:0 0 auto}
+.tbadge.warn{color:var(--call);background:color-mix(in srgb,var(--call) 12%,transparent);border-color:color-mix(in srgb,var(--call) 45%,transparent)}
+/* Escenario en cambio (changeover) dentro de EN ESCENA */
+.trow.co{border-left-style:dashed}
+.trow.co .tname{display:flex;align-items:center;gap:.3em;color:var(--c)}
+.trow.co .tname .ic{width:.85em;height:.85em;flex:0 0 auto}
+.trow.co .tmeta b{color:var(--text);font-weight:800}
+.trow.co .tmeta.entra{white-space:normal;text-overflow:clip;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2}
+.trow.co .trem{font-size:min(8cqw,3.2vh);color:var(--text)}
+/* STANDBY (marcado a mano por el regidor) */
+.trow.co.sb{border-left-style:dotted}
+.trow.co.sb .tname{color:var(--muted)}
+.tbadge.sb{color:var(--muted);border-style:dashed}
+/* Aviso visible (sin festival, día sin datos): se enseña, no se corrige solo */
+#banner{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:150;max-width:80vw;background:var(--call);color:#000;
+  font-weight:900;letter-spacing:.06em;padding:8px 18px;border-radius:8px;font-size:clamp(12px,1.5vw,20px);text-align:center;box-shadow:0 4px 18px rgba(0,0,0,.5)}
+#banner[hidden]{display:none}
+body[data-lv="escenario"] .tbadge{color:#fff;border-color:rgba(255,214,0,.6)}
+.trem{font-size:min(5.5cqw,2.1vh);font-weight:800;margin-top:3px}
+.tbar{height:4px;background:rgba(255,255,255,.1);border-radius:2px;margin-top:6px;overflow:hidden}
+.tbar>div{height:100%;border-radius:2px;transition:width 1s linear}
+
+/* Reloj medido contra su propia celda (cq*), con tope en vh. */
+#clkbox{flex:0 0 26%;min-width:110px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;padding-right:10px;container-type:inline-size;overflow:hidden}
+#clk{font-size:min(30cqw,13vh);font-weight:900;line-height:.9;letter-spacing:-.02em;white-space:nowrap}
+#dat{font-size:min(5.5cqw,2vh);color:var(--dim);letter-spacing:.2em;text-transform:uppercase;margin-top:8px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+#evn{font-size:min(6cqw,2.1vh);font-weight:900;color:var(--accent);letter-spacing:.15em;margin-top:8px;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+#evn-mode{color:var(--muted)}
+
+/* CALL */
+@keyframes callblink{0%,100%{opacity:1}50%{opacity:.25}}
+#panel-call .trow{display:flex;align-items:center;gap:10px}
+#panel-call .callmain{flex:1;min-width:0;animation:callblink 1.1s ease-in-out infinite}
+.callok{flex:0 0 auto;align-self:center;min-width:56px;min-height:44px;padding:8px 14px;border-radius:7px;border:1px solid color-mix(in srgb,var(--call) 55%,transparent);
+  background:color-mix(in srgb,var(--call) 16%,transparent);color:var(--call);font:inherit;font-size:min(4.5cqw,1.9vh);font-weight:900;letter-spacing:1px;cursor:pointer;touch-action:manipulation}
+.callok:hover,.callok:active{background:var(--call);color:#111}
+#panel-call.hot{border-color:color-mix(in srgb,var(--call) 60%,transparent);box-shadow:0 0 0 1px color-mix(in srgb,var(--call) 25%,transparent) inset}
+
+/* ── Barras ──────────────────────────────────────────────────────── */
+#hsplit{height:9px;flex-shrink:0;cursor:ns-resize;background:rgba(255,255,255,.05);position:relative;transition:background .15s;touch-action:none}
+#hsplit:hover,#hsplit.active{background:var(--hover)}
+#hsplit::after{content:'';position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:36px;height:2px;background:rgba(255,255,255,.25);border-radius:1px}
+#bot{flex:1 1 auto;display:flex;flex-direction:column;min-height:0;overflow-y:auto;overflow-x:hidden;cursor:grab;touch-action:pan-y}
+#bot.dragging{cursor:grabbing}
+#bot::-webkit-scrollbar{width:9px}
+#bot::-webkit-scrollbar-thumb{background:rgba(255,255,255,.18);border-radius:5px}
+.strip{display:flex;align-items:stretch;min-height:0;overflow:hidden;position:relative}
+.strip+.strip{border-top:1px solid var(--line)}
+.striph{position:absolute;left:0;right:0;bottom:-4px;height:9px;cursor:ns-resize;z-index:50;transition:background .12s;touch-action:none}
+.striph:hover,.striph.active{background:var(--hover)}
+
+/* Panel de información: maquetación por LÍNEAS FIJAS, medida contra el alto de la propia barra
+   (container queries). Nada se monta: el CALL va en la línea de la etiqueta y, si falta sitio,
+   se ocultan primero las notas y luego la hora. (Arreglo ESPEC §8.) */
+.info{width:var(--info-w);min-width:120px;max-width:72vw;flex-shrink:0;overflow:hidden;container-type:size;
+  display:flex;flex-direction:column;justify-content:center;gap:min(3cqh,8px);padding:0 clamp(12px,8cqw,36px)}
+.ihead{display:flex;align-items:center;gap:10px;min-width:0;white-space:nowrap}
+.lbl{flex:0 0 auto;font-size:clamp(9px,9cqh,13px);letter-spacing:3px;text-transform:uppercase;font-weight:700;color:var(--dim)}
+.strip.first .lbl{color:var(--accent)}
+.acall{flex:0 1 auto;min-width:0;display:flex;align-items:center;gap:5px;font-size:clamp(9px,9cqh,14px);font-weight:800;letter-spacing:1.5px;color:var(--call);
+  overflow:hidden;text-overflow:ellipsis;padding:1px 7px;border-radius:5px;border:1px solid color-mix(in srgb,var(--call) 45%,transparent)}
+.acall .ic{width:1.1em;height:1.1em;flex:0 0 auto}
+.acall[hidden]{display:none}
+.aname{font-size:clamp(14px,min(24cqh,11cqw),56px);font-weight:900;line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.atime{font-size:clamp(11px,min(12cqh,6cqw),24px);color:var(--muted);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.atime .astage{font-weight:800;letter-spacing:1px}
+.anotes{font-size:clamp(10px,min(9cqh,5cqw),17px);color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.anotes:empty{display:none}
+@container (max-height:90px){ .anotes{display:none} }
+@container (max-height:66px){ .atime{display:none} }
+
+.cvsw{flex:1;position:relative;overflow:hidden}
+canvas{position:absolute;inset:0;width:100%;height:100%}
+.drag-handle{width:6px;background:rgba(255,255,255,.06);cursor:col-resize;flex-shrink:0;transition:background .15s;position:relative;touch-action:none}
+.drag-handle:hover,.drag-handle.active{background:var(--hover)}
+.drag-handle::after{content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:2px;height:24px;background:rgba(255,255,255,.2);border-radius:1px}
+
+/* ── Controles ───────────────────────────────────────────────────── */
+.iconbtn{width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;border:1px solid var(--btn-line);background:var(--btn-bg);color:var(--btn-text);cursor:pointer;padding:0;touch-action:manipulation}
+.iconbtn:hover:not(:disabled){filter:brightness(1.35)}
+.iconbtn:disabled{opacity:.3;cursor:default}
+#close{position:fixed;top:14px;right:14px;z-index:100;opacity:.55}
+#close:hover{opacity:1}
+#close[hidden]{display:none}
+#zoomctl{position:fixed;right:14px;bottom:14px;z-index:200;display:flex;align-items:center;gap:6px;background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.15);border-radius:9px;padding:5px 8px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+#zlbl{font-size:11px;color:rgba(255,255,255,.75);min-width:52px;text-align:center}
+#offlbl{font-size:11px;color:var(--call);text-align:center;font-weight:700}
+#offlbl:empty{display:none}
+#syncbtn{opacity:.35}
+#syncbtn.off{opacity:1;border-color:var(--call);color:var(--call);background:color-mix(in srgb,var(--call) 18%,transparent)}
+#wake{color:var(--muted);display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:3px 8px;margin-right:2px;border:1px solid rgba(255,255,255,.18);border-radius:999px;white-space:nowrap}
+#wake .ic{width:13px;height:13px}
+#wake[hidden]{display:none}
+
+/* Pantallas táctiles: tiradores y botones más grandes. */
+@media (pointer:coarse){
+  .iconbtn{width:44px;height:44px}
+  .ic{width:22px;height:22px}
+  .vsplit{flex-basis:18px}
+  #hsplit{height:16px}
+  .drag-handle{width:14px}
+  .striph{height:16px;bottom:-8px}
+}
+
+/* ── Estilo Raycast ──────────────────────────────────────────────── */
+body[data-lv="raycast"]{--bg:#000;--bg2:#000;--panel:#0d0e11;--panel-line:rgba(255,255,255,.12);--accent:#ff6363;--muted:#b4b5b7;--dim:#8e8f92;--call:#ffc533;
+  --line:rgba(255,255,255,.1);--hover:rgba(255,99,99,.5)}
+body[data-lv="raycast"] #top{border-bottom:1px solid rgba(255,255,255,.14)}
+body[data-lv="raycast"] .tpanel{box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+body[data-lv="raycast"] #panel-next .tpanel-h{color:var(--muted)}
+body[data-lv="raycast"] .tpanel-h{display:flex;align-items:center;gap:10px;letter-spacing:.18em;position:relative}
+body[data-lv="raycast"] .tpanel-h::before{content:"";flex:0 0 auto;width:min(9cqw,3.4vh);height:min(9cqw,3.4vh);border-radius:24%;background:linear-gradient(145deg,var(--t1),var(--t2));box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 1px 2px rgba(0,0,0,.4)}
+body[data-lv="raycast"] .tpanel-h::after{content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);width:min(9cqw,3.4vh);height:min(9cqw,3.4vh);background:#fff;-webkit-mask:var(--m) center/58% no-repeat;mask:var(--m) center/58% no-repeat}
+body[data-lv="raycast"] #panel-now .tpanel-h{--t1:#ff7a7a;--t2:#e5484d;--m:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='7' y='2' width='6' height='10' rx='3'/%3E%3Cpath d='M4 8.5v1a6 6 0 0 0 12 0v-1'/%3E%3Cpath d='M10 15.5v3M7 18.5h6'/%3E%3C/svg%3E")}
+body[data-lv="raycast"] #panel-next .tpanel-h{--t1:#60a5fa;--t2:#2563eb;--m:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 10h11M11 6l4 4-4 4'/%3E%3C/svg%3E")}
+body[data-lv="raycast"] #panel-call .tpanel-h{--t1:#fbbf24;--t2:#d97706;--m:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5.5 13.5V9a4.5 4.5 0 0 1 9 0v4.5l1.5 2h-12z'/%3E%3Cpath d='M8.5 17.5a1.6 1.6 0 0 0 3 0'/%3E%3C/svg%3E")}
+body[data-lv="raycast"] .trem{display:inline-block;padding:1px 8px;border-radius:6px;background:color-mix(in srgb,currentColor 14%,transparent);border:1px solid color-mix(in srgb,currentColor 32%,transparent)}
+body[data-lv="raycast"] .tbar{background:rgba(255,255,255,.08);height:3px}
+body[data-lv="raycast"] .iconbtn{background:linear-gradient(180deg,#1b1c20,#121316);border:1px solid rgba(255,255,255,.14);border-bottom-width:2px;border-radius:7px;box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 1px 2px rgba(0,0,0,.4)}
+body[data-lv="raycast"] #zoomctl{background:rgba(0,0,0,.8);border-color:rgba(255,255,255,.14);border-radius:10px}
+body[data-lv="raycast"] .callok{border-radius:7px}
+
+/* ── Estilo Neutro ───────────────────────────────────────────────── */
+body[data-lv="neutro"]{--bg:#121213;--bg2:#121213;--panel:#1a1a1c;--panel-line:rgba(255,255,255,.08);--accent:#8ab4f8;--text:#e6e7e9;--muted:#9ea2aa;--dim:#8a8f98;
+  --line:rgba(255,255,255,.07);--hover:rgba(138,180,248,.5);--btn-bg:#232326;--btn-line:rgba(255,255,255,.12);--btn-text:#e6e7e9}
+body[data-lv="neutro"] #top{border-bottom:1px solid rgba(255,255,255,.08)}
+body[data-lv="neutro"] .tpanel{border-radius:8px}
+body[data-lv="neutro"] #zoomctl{background:rgba(26,26,28,.9);border-color:rgba(255,255,255,.1);border-radius:8px}
+
+/* ── Estilo Escenario (alto contraste, para el sol) ──────────────── */
+body[data-lv="escenario"]{--bg:#000;--bg2:#000;--panel:#000;--panel-line:rgba(255,214,0,.45);--accent:#FFD600;--muted:#fff;--dim:rgba(255,255,255,.75);--call:#FFC107;
+  --line:rgba(255,214,0,.3);--hover:rgba(255,214,0,.6);--btn-bg:#000;--btn-line:rgba(255,214,0,.6);--btn-text:#FFD600;font-weight:700}
+body[data-lv="escenario"] #clk{color:#FFD600}
+body[data-lv="escenario"] #dat{color:#fff;font-weight:800}
+body[data-lv="escenario"] #evn{color:#FFC107}
+body[data-lv="escenario"] .tpanel{border-radius:8px}
+body[data-lv="escenario"] .tpanel-h,body[data-lv="escenario"] .lbl{color:#FFD600}
+body[data-lv="escenario"] .tempty{color:rgba(255,255,255,.5)}
+body[data-lv="escenario"] .tmeta,body[data-lv="escenario"] .atime{color:#fff;font-weight:800}
+body[data-lv="escenario"] .anotes{color:rgba(255,255,255,.8);font-weight:700}
+body[data-lv="escenario"] .trem{color:#FFD600!important;font-weight:900}
+body[data-lv="escenario"] .tbar{background:rgba(255,214,0,.2)}
+body[data-lv="escenario"] .tbar>div{background:#FFD600!important}
+body[data-lv="escenario"] #hsplit{background:rgba(255,214,0,.15)}
+body[data-lv="escenario"] #zoomctl{background:#000;border-color:#FFD600}
+body[data-lv="escenario"] #zlbl{color:#fff}
+body[data-lv="escenario"] .callok:hover,body[data-lv="escenario"] .callok:active{background:#FFD600;color:#000}

@@ -1,0 +1,131 @@
+/* Showtime — datos.js
+ * Estado compartido entre el Panel de Control y la Pantalla Live, y sincronización.
+ *
+ * Guarda en el navegador (localStorage) y avisa a las otras ventanas por tres vías:
+ *   1) mensaje directo entre ventanas (window.opener / ventana abierta) — funciona incluso
+ *      con doble clic en Firefox, donde cada archivo local tiene su propio almacenamiento;
+ *   2) BroadcastChannel('showtime');
+ *   3) evento 'storage' (respaldo).
+ * Los mensajes llevan los datos completos, así que no dependen de compartir almacenamiento.
+ */
+(function (root) {
+  'use strict';
+
+  const APP = 'showtime';
+  const K = {
+    festival: 'showtime.festival',     // proyecto Stage Master importado (con ajustes)
+    config:   'showtime.config',       // { mode, day, style, callMins }
+    callDone: 'showtime.callDone',     // [callKey, ...] avisos marcados con OK
+    original: 'showtime.original'      // copia del festival tal como se importó (para marcar cambios)
+  };
+  const STYLES = ['clasico', 'escenario', 'neutro', 'raycast'];
+  const DEFAULT_CONFIG = { mode: 'show', day: 'all', style: 'clasico', callMins: null };
+
+  function read(key, fallback) {
+    try { const v = localStorage.getItem(key); return v === null ? fallback : JSON.parse(v); }
+    catch (e) { return fallback; }
+  }
+  function write(key, value) {
+    try { localStorage.setItem(key, JSON.stringify(value)); return true; } catch (e) { return false; }
+  }
+
+  function normStyle(v) {
+    if (v === 'oled') v = 'raycast';          // nombres antiguos de Stage Master
+    if (v === 'ambar') v = 'escenario';
+    return STYLES.indexOf(v) >= 0 ? v : 'clasico';
+  }
+  function normConfig(c) {
+    const o = Object.assign({}, DEFAULT_CONFIG, c || {});
+    o.mode = (o.mode === 'sc' || o.mode === 'soundcheck') ? 'sc' : 'show';
+    o.style = normStyle(o.style);
+    o.day = o.day || 'all';
+    o.callMins = Number.isFinite(o.callMins) && o.callMins > 0 ? o.callMins : null;
+    return o;
+  }
+
+  // ── Lectura / escritura ──────────────────────────────────────────────
+  function getFestival() { return read(K.festival, null); }
+  function getConfig() { return normConfig(read(K.config, null)); }
+  function getOriginal() { return read(K.original, null); }
+  function setOriginal(f) { write(K.original, f); }
+  function getCallDone() { const a = read(K.callDone, []); return Array.isArray(a) ? a : []; }
+
+  /** Minutos de aviso efectivos: los de la configuración o, si no hay, los del festival. */
+  function callMinsOf(festival, config) {
+    if (config && config.callMins) return config.callMins;
+    const v = festival && festival.event && Number(festival.event.callMins);
+    return Number.isFinite(v) && v > 0 ? v : 15;
+  }
+
+  /** Quita avisos de hace más de 2 días (la clave termina en @minutosAbsolutos). */
+  function pruneCallDone(list, nowAbs) {
+    return list.filter(k => {
+      const m = Number(String(k).split('@').pop());
+      return !Number.isFinite(m) || m > nowAbs - 2880;
+    });
+  }
+
+  // ── Sincronización ───────────────────────────────────────────────────
+  let bc = null;
+  try { bc = new BroadcastChannel(APP); } catch (e) { bc = null; }
+  const peers = new Set();               // ventanas abiertas por esta (p. ej. la Live)
+  const listeners = [];
+
+  function addPeer(win) { if (win) peers.add(win); }
+
+  function send(msg) {
+    const m = Object.assign({ app: APP }, msg);
+    if (bc) { try { bc.postMessage(m); } catch (e) {} }
+    const targets = Array.from(peers);
+    if (root.opener && !root.opener.closed) targets.push(root.opener);
+    targets.forEach(w => {
+      if (!w || w.closed) { peers.delete(w); return; }
+      try { w.postMessage(m, '*'); } catch (e) {}
+    });
+  }
+
+  /** Aplica un mensaje recibido: lo guarda aquí y avisa a quien escuche. */
+  function receive(m) {
+    if (!m || m.app !== APP) return;
+    if (m.type === 'festival') write(K.festival, m.festival);
+    else if (m.type === 'config') write(K.config, normConfig(m.config));
+    else if (m.type === 'callDone') write(K.callDone, m.callDone || []);
+    else if (m.type === 'hello') { send({ type: 'snapshot', festival: getFestival(), config: getConfig(), callDone: getCallDone() }); return; }
+    else if (m.type === 'snapshot') {
+      if (m.festival) write(K.festival, m.festival);
+      if (m.config) write(K.config, normConfig(m.config));
+      if (m.callDone) write(K.callDone, m.callDone);
+    } else return;
+    listeners.forEach(fn => { try { fn(m.type); } catch (e) { console.error(e); } });
+  }
+
+  if (bc) bc.onmessage = e => receive(e.data);
+  root.addEventListener('message', e => receive(e.data));
+  root.addEventListener('storage', e => {
+    const type = e.key === K.festival ? 'festival' : e.key === K.config ? 'config' : e.key === K.callDone ? 'callDone' : null;
+    if (type) listeners.forEach(fn => { try { fn(type); } catch (err) { console.error(err); } });
+  });
+
+  function onChange(fn) { listeners.push(fn); }
+
+  // ── Cambios que se propagan ──────────────────────────────────────────
+  function setFestival(f) { write(K.festival, f); send({ type: 'festival', festival: f }); }
+  function setConfig(patch) {
+    const c = normConfig(Object.assign(getConfig(), patch || {}));
+    write(K.config, c); send({ type: 'config', config: c }); return c;
+  }
+  function markCallDone(key, nowAbs) {
+    const list = pruneCallDone(getCallDone(), nowAbs || 0);
+    if (list.indexOf(key) < 0) list.push(key);
+    write(K.callDone, list); send({ type: 'callDone', callDone: list }); return list;
+  }
+  /** Pide los datos a las otras ventanas (útil al abrir la Live con doble clic en Firefox). */
+  function hello() { send({ type: 'hello' }); }
+
+  root.ShowtimeDatos = {
+    KEYS: K, STYLES, normStyle, normConfig,
+    getFestival, getConfig, getCallDone, callMinsOf, getOriginal, setOriginal,
+    setFestival, setConfig, markCallDone, pruneCallDone,
+    onChange, addPeer, send, hello
+  };
+})(window);

@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Showtime · Pantalla Live</title>
+<link rel="stylesheet" href="live.css">
+</head>
+<body>
+
+<!-- Iconos SVG (sin emojis: se ven igual en cualquier sistema) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-x" viewBox="0 0 20 20"><path d="M5 5l10 10M15 5L5 15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-now" viewBox="0 0 20 20"><path d="M15.5 10a5.5 5.5 0 1 1-1.6-3.9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M15.5 3.5v3.2h-3.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 20 20"><path d="M10 4.5v11M4.5 10h11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+  <symbol id="i-minus" viewBox="0 0 20 20"><path d="M4.5 10h11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+  <symbol id="i-full" viewBox="0 0 20 20"><path d="M3.5 7.5v-4h4M16.5 7.5v-4h-4M3.5 12.5v4h4M16.5 12.5v4h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-unfull" viewBox="0 0 20 20"><path d="M7.5 3.5v4h-4M12.5 3.5v4h4M7.5 16.5v-4h-4M12.5 16.5v-4h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-screen" viewBox="0 0 20 20"><rect x="2.5" y="3.5" width="15" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M7 17h6M10 13.5V17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-swap" viewBox="0 0 20 20"><path d="M4 7.5h11.5M12.5 4.5l3 3-3 3M16 12.5H4.5M7.5 9.5l-3 3 3 3" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 20 20"><path d="M7.5 5v10M12.5 5v10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 20 20"><path d="M5.5 13.5V9a4.5 4.5 0 0 1 9 0v4.5l1.5 2h-12z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8.5 17.5a1.6 1.6 0 0 0 3 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+</svg>
+
+<div id="banner" role="status" hidden></div>
+
+<button id="close" class="iconbtn" title="Cerrar la Pantalla Live" hidden><svg class="ic"><use href="#i-x"/></svg></button>
+
+<div id="top">
+  <div id="clkbox">
+    <div id="clk">00:00</div>
+    <div id="dat"></div>
+    <div id="evn"><span id="evn-mode"></span><span id="evn-name"></span></div>
+  </div>
+  <div class="vsplit" data-vs="0" title="Arrastra para ajustar el ancho"></div>
+  <div id="panel-now" class="tpanel">
+    <div class="tpanel-h">EN ESCENA</div>
+    <div class="tpanel-b" id="now-list"><div class="tempty">—</div></div>
+  </div>
+  <div class="vsplit" data-vs="1" title="Arrastra para ajustar el ancho"></div>
+  <div id="panel-next" class="tpanel">
+    <div class="tpanel-h">SIGUIENTE</div>
+    <div class="tpanel-b" id="next-list"><div class="tempty">—</div></div>
+  </div>
+  <div class="vsplit" data-vs="2" title="Arrastra para ajustar el ancho"></div>
+  <div id="panel-call" class="tpanel">
+    <div class="tpanel-h">CALL</div>
+    <div class="tpanel-b" id="call-list"></div>
+  </div>
+</div>
+<div id="hsplit" title="Arrastra para ver más artistas"></div>
+<div id="bot"></div>
+
+<div id="zoomctl">
+  <span id="wake" title="Mientras esta ventana esté abierta, el equipo no apagará la pantalla ni entrará en reposo" hidden><svg class="ic"><use href="#i-screen"/></svg>Sin reposo</span>
+  <button id="syncbtn" class="iconbtn" title="Volver al momento actual"><svg class="ic"><use href="#i-now"/></svg></button>
+  <span id="offlbl"></span>
+  <button id="zmin" class="iconbtn" title="Más tiempo visible"><svg class="ic"><use href="#i-plus"/></svg></button>
+  <span id="zlbl"></span>
+  <button id="zmax" class="iconbtn" title="Menos tiempo visible"><svg class="ic"><use href="#i-minus"/></svg></button>
+  <button id="fullbtn" class="iconbtn" title="Pantalla completa (F)"><svg class="ic"><use href="#i-full"/></svg></button>
+</div>
+
+<script src="core.js"></script>
+<script src="datos.js"></script>
+<script src="live.js"></script>
+</body>
+</html>

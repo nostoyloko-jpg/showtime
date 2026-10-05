@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Showtime · Panel de Control</title>
+<link rel="stylesheet" href="control.css">
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-in" viewBox="0 0 20 20"><path d="M10 3v9M6.5 8.5 10 12l3.5-3.5M4 14.5V16h12v-1.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-out" viewBox="0 0 20 20"><path d="M10 12V3M6.5 6.5 10 3l3.5 3.5M4 14.5V16h12v-1.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 20 20"><path d="M7 5 3.5 8.5 7 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 8.5h7.5a4.5 4.5 0 0 1 0 9H8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-screen" viewBox="0 0 20 20"><rect x="2.5" y="3.5" width="15" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M7 17h6M10 13.5V17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-swap" viewBox="0 0 20 20"><path d="M4 7.5h11.5M12.5 4.5l3 3-3 3M16 12.5H4.5M7.5 9.5l-3 3 3 3" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 20 20"><path d="M7.5 5v10M12.5 5v10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 20 20"><path d="M10 4.5v11M4.5 10h11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 20 20"><path d="M4 6h12M8 6V4.5h4V6M6 6l.8 10h6.4L14 6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></g></symbol>
+  <symbol id="i-stage" viewBox="0 0 20 20"><path d="M3 15.5h14M4.5 15.5V9h11v6.5M3 9l7-4.5L17 9" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 20 20"><rect x="7" y="7" width="9.5" height="9.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M13 7V4.5A1 1 0 0 0 12 3.5H4.5a1 1 0 0 0-1 1V12a1 1 0 0 0 1 1H7" fill="none" stroke="currentColor" stroke-width="1.7"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 20 20"><circle cx="10" cy="10" r="3.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M10 2.5v2M10 15.5v2M2.5 10h2M15.5 10h2M4.7 4.7l1.4 1.4M13.9 13.9l1.4 1.4M4.7 15.3l1.4-1.4M13.9 6.1l1.4-1.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+</svg>
+
+<header class="bar">
+  <div class="brand">SHOWTIME</div>
+  <div class="fest"><span id="fest-name">Sin evento</span><span id="mods" class="chip warn" hidden></span></div>
+  <div class="grow"></div>
+  <input id="file" type="file" accept=".json,application/json" hidden>
+  <div class="filebar" role="group" aria-label="Archivo">
+    <button id="btn-new" class="btn" title="Crear un evento nuevo"><svg class="ic"><use href="#i-plus"/></svg>Nuevo evento</button>
+    <button id="btn-open" class="btn" title="Abrir un evento guardado (.json de Showtime o de Synapse)"><svg class="ic"><use href="#i-in"/></svg>Abrir</button>
+    <button id="btn-export" class="btn" title="Guardar el evento como archivo .json (copia de seguridad)"><svg class="ic"><use href="#i-out"/></svg>Exportar</button>
+  </div>
+  <span class="sep"></span>
+  <button id="btn-undo" class="btn"><svg class="ic"><use href="#i-undo"/></svg><span>Deshacer</span></button>
+  <button id="btn-live" class="btn primary"><svg class="ic"><use href="#i-screen"/></svg>Abrir Pantalla Live</button>
+  <span id="live-state" class="state off" title="Estado de la Pantalla Live abierta desde este Panel">Live cerrada</span>
+  <span class="sep"></span>
+  <button id="btn-cfg" class="btn" aria-controls="cfg" aria-expanded="false"><svg class="ic"><use href="#i-gear"/></svg>Configuración</button>
+</header>
+
+<section class="tools">
+  <div class="seg" role="group" aria-label="Modo">
+    <button id="mode-show" data-mode="show">Show</button>
+    <button id="mode-sc" data-mode="sc">Soundcheck</button>
+  </div>
+  <nav id="days" class="days" role="tablist" aria-label="Jornadas"></nav>
+  <div class="grow"></div>
+  <span id="wake" class="wake" title="Mientras Showtime esté abierto, este equipo no apagará la pantalla ni entrará en reposo" hidden><svg class="ic"><use href="#i-screen"/></svg>Sin reposo</span>
+  <div id="clock" class="clock">--:--:--</div>
+</section>
+
+<div id="warn" class="warnbar" role="status" hidden></div>
+<div id="daybar" class="daybar" role="status" hidden><span id="daybar-txt"></span><button id="daybar-btn" class="btn primary"></button></div>
+
+<main id="main">
+  <aside class="live">
+    <div class="card"><h3 class="h-now">En escena</h3><div id="v-now"></div></div>
+    <div class="card"><h3>Siguiente</h3><div id="v-next"></div></div>
+    <div class="card" id="card-call"><h3 class="h-call">CALL</h3><div id="v-call"></div></div>
+  </aside>
+  <section class="list">
+    <div class="list-h">
+      <h2 id="list-title">Artistas</h2>
+      <span class="hint">Intro o salir de la casilla: aplica · Esc: descarta · Jornada = día del evento (lo de antes de la hora de corte cuenta como la noche anterior)</span>
+    </div>
+    <div class="tblwrap">
+      <table id="tbl">
+        <thead><tr>
+          <th>Escenario</th><th>Banda</th><th>Jornada</th><th>Inicio</th><th>Fin</th><th>CALL</th><th>Notas</th><th>Hueco previo</th><th></th>
+        </tr></thead>
+        <tbody id="tbody"></tbody>
+        <tbody id="tbody-sin"></tbody>
+        <tfoot id="addrow">
+          <tr class="add">
+            <td><select id="add-escenario" data-f="escenario"></select></td>
+            <td><input id="add-nombre" data-f="nombre" type="text" placeholder="Nombre de la banda" autocomplete="off" spellcheck="false"></td>
+            <td><select id="add-jornada" data-f="jornada"></select></td>
+            <td class="t"><input id="add-inicio" data-f="inicio" type="text" placeholder="21:00" autocomplete="off"></td>
+            <td class="t2"><input id="add-fin" data-f="fin" type="text" placeholder="fin" autocomplete="off"><input id="add-duracion" data-f="duracion" type="text" inputmode="numeric" placeholder="min" title="Duración en minutos (calcula el fin)" autocomplete="off"></td>
+            <td class="t"><input id="add-call" data-f="call" type="text" placeholder="—" autocomplete="off"></td>
+            <td class="n"><input id="add-notas" data-f="notas" type="text" placeholder="Notas" autocomplete="off"></td>
+            <td colspan="2"><button id="btn-add" class="btn primary"><svg class="ic"><use href="#i-plus"/></svg>Añadir banda</button></td>
+          </tr>
+          <tr class="add-msg"><td colspan="9"><span id="add-hint" class="hint"></span><span id="add-err" class="err"></span></td></tr>
+        </tfoot>
+      </table>
+    </div>
+    <p id="sinhora" class="hint"></p>
+  </section>
+</main>
+
+<section id="empty" class="empty" hidden>
+  <h2>Sin evento cargado</h2>
+  <p>Crea el evento aquí (escenarios y bandas), o abre un JSON guardado de Showtime o de Synapse.</p>
+  <div class="row">
+    <button id="btn-new2" class="btn primary"><svg class="ic"><use href="#i-plus"/></svg>Nuevo evento</button>
+    <button id="btn-import2" class="btn"><svg class="ic"><use href="#i-in"/></svg>Abrir JSON</button>
+    <button id="btn-demo" class="btn">Evento de demostración</button>
+  </div>
+</section>
+
+<!-- Configuración: ajustes (evento, escenarios, estilos). Archivo va en la barra superior. -->
+<div id="cfg-back" class="cfg-back" hidden></div>
+<aside id="cfg" class="cfg" aria-label="Configuración" hidden>
+  <div class="cfg-h"><h2>Configuración</h2><button id="cfg-close" class="iconsq" title="Cerrar (Esc)">✕</button></div>
+  <section class="cfg-s" id="cfg-s-fest">
+    <h3>Evento</h3>
+    <div id="cfg-fest"></div>
+  </section>
+  <section class="cfg-s" id="cfg-s-stages">
+    <h3>Escenarios</h3>
+    <div id="cfg-stages"></div>
+  </section>
+  <section class="cfg-s" id="cfg-s-styles">
+    <h3>Estilos</h3>
+    <div class="form">
+      <label for="cfg-style-panel">Este panel</label><select id="cfg-style-panel"><option value="clasico">Clásico</option><option value="escenario">Escenario (alto contraste)</option><option value="neutro">Neutro</option><option value="raycast">Raycast</option></select>
+      <label for="cfg-style-live">Pantalla Live</label><select id="cfg-style-live"><option value="clasico">Clásico</option><option value="escenario">Escenario (alto contraste)</option><option value="neutro">Neutro</option><option value="raycast">Raycast</option></select>
+      <div class="note">Van por separado: el portátil y el monitor de escenario suelen tener luz distinta.</div>
+    </div>
+  </section>
+</aside>
+
+<div id="drop" class="drop" hidden><div>Suelta aquí el JSON del evento</div></div>
+
+<div id="modal" class="modal" hidden>
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <h2 id="modal-title"></h2>
+    <div id="modal-body"></div>
+    <div id="modal-actions" class="row end"></div>
+  </div>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+
+<script src="core.js"></script>
+<script src="datos.js"></script>
+<script src="control.js"></script>
+</body>
+</html>

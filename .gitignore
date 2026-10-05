@@ -1,0 +1,9 @@
+# Material de partida (código extraído de Synapse y ejemplos): no se publica
+referencia/
+stage-live/
+# Parche antiguo de Synapse (sustituido por parches/synapse-live-completo)
+parches/synapse-live/
+# Carpetas y archivos de sistema / herramientas
+Claude outputs/
+.DS_Store
+*.antes-*
