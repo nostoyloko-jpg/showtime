@@ -21,7 +21,8 @@ Las reglas generales (idioma, tono, permisos, commits, varias IAs) están en el 
 | `live.html` · `live.js` · `live.css` | Pantalla Live |
 | `core.js` | Reglas de tiempo y edición, puras (sin DOM). Las usan las dos pantallas |
 | `datos.js` | Estado compartido (localStorage) y sincronización entre ventanas |
-| `tests/core.test.js` · `tests/index.html` | Tests de `core.js` (node o navegador) |
+| `importar.js` | «Pegar horario»: lee tablas (TSV/CSV) y texto libre, vista previa y alta. Puro, con tests |
+| `tests/core.test.js` · `tests/importar.test.js` · `tests/index.html` | Tests (node o navegador) |
 | `parches/synapse-live-completo/` | Parche que pone en Synapse Live el mismo código que la Pantalla Live de Showtime |
 | `referencia/` | Material de partida (código extraído de Synapse, ejemplos). **No se publica ni se toca** |
 
@@ -35,7 +36,7 @@ Las reglas generales (idioma, tono, permisos, commits, varias IAs) están en el 
 - Los manejadores van con `addEventListener` (no `onclick` en el HTML). `let`/`const` declarados antes de usarse.
 
 ## Reglas de trabajo
-- **Después de cualquier cambio**: `node tests/core.test.js` (todo en verde) y **abrir `index.html` y la Pantalla Live** desde el botón del Panel: que pinten y que la consola no tenga errores.
+- **Después de cualquier cambio**: `node tests/core.test.js` y `node tests/importar.test.js` (todo en verde) y **abrir `index.html` y la Pantalla Live** desde el botón del Panel: que pinten y que la consola no tenga errores.
 - Fondo **siempre oscuro**. Estilos con los mismos nombres que Synapse: Clásico, Escenario (alto contraste), Neutro, Raycast.
 - Vocabulario del oficio: CALL, soundcheck, changeover, standby, jornada.
 

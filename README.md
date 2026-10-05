@@ -7,4 +7,6 @@ App web de **regiduría** para eventos en directo (festivales, galas, conciertos
 
 Funciona sin internet y sin instalar nada: abrir `index.html` en el navegador (o usar la versión publicada en GitHub Pages). Los eventos se guardan en el navegador y se exportan como `.json`.
 
-Tests de las reglas de tiempo: `node tests/core.test.js` o abrir `tests/index.html`.
+- **Pegar horario**: pega celdas de Excel/Numbers/Sheets o texto (PDF, WhatsApp, correo), o arrastra un `.csv` / `.tsv`; vista previa editable antes de importar.
+
+Tests: `node tests/core.test.js`, `node tests/importar.test.js` o abrir `tests/index.html`.

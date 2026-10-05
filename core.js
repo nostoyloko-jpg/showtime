@@ -97,18 +97,46 @@
   }
 
   function isSC(mode) { return mode === 'sc' || mode === 'soundcheck'; }
+  /** Vista «Jornada completa»: shows, soundchecks, tareas e hitos juntos. */
+  function isAll(mode) { return mode === 'all'; }
 
-  /** ¿Entra el artista en este modo? Show: inicio o fin. Soundcheck: inicio o CALL. */
+  // ── Tipos de entrada (los elige el regidor; nunca se deducen solos) ────
+  // banda: show y/o soundcheck, con changeover, CALL y solapes.
+  // tarea: operativa del día (comidas, montajes…): barra en la Live, sin solapes, changeover ni CALL.
+  // hito:  momento puntual (puertas, curfew…): línea vertical en la Live; no tiene fin.
+  // Tareas e hitos guardan su horario en los campos del show (fecha, inicio, fin, notas).
+  const TIPOS = ['banda', 'tarea', 'hito'];
+  function tipoOf(artist) { const t = artist && artist.showtimeTipo; return t === 'tarea' || t === 'hito' ? t : 'banda'; }
+  /** ¿Bloque de banda (show o soundcheck)? Los bloques sin «kind» (antiguos) cuentan como banda. */
+  function isBand(b) { return !!b && (!b.kind || b.kind === 'show' || b.kind === 'sc'); }
+
+  /** ¿Entra el artista en esta vista? Show: inicio o fin. Soundcheck: inicio o CALL.
+   *  Jornada completa: cualquier horario (y tareas/hitos con inicio). Tareas e hitos solo salen en Jornada completa. */
   function entersMode(artist, mode) {
+    const t = tipoOf(artist);
+    if (isAll(mode)) return t === 'banda' ? !!(artist.inicio || artist.fin || artist.soundcheckInicio || artist.soundcheckCall) : !!artist.inicio;
+    if (t !== 'banda') return false;
     return isSC(mode) ? !!(artist.soundcheckInicio || artist.soundcheckCall) : !!(artist.inicio || artist.fin);
   }
 
-  /** Jornadas presentes en los datos de un modo (para el selector de día), ordenadas. */
+  /** Entradas de una vista: [{ a, sc, kind }]. En Jornada completa una banda puede salir dos veces (show y soundcheck). */
+  function entriesOf(state, mode) {
+    const out = [];
+    ((state && state.artists) || []).forEach(a => {
+      const t = tipoOf(a);
+      if (t !== 'banda') { if (isAll(mode) && a.inicio) out.push({ a, sc: false, kind: t }); return; }
+      const show = !!(a.inicio || a.fin), sc = !!(a.soundcheckInicio || a.soundcheckCall);
+      if (show && !isSC(mode)) out.push({ a, sc: false, kind: 'show' });
+      if (sc && (isSC(mode) || isAll(mode))) out.push({ a, sc: true, kind: 'sc' });
+    });
+    return out;
+  }
+
+  /** Jornadas presentes en los datos de una vista (para el selector de día), ordenadas. */
   function festivalDays(state, mode) {
     const set = new Set();
-    ((state && state.artists) || []).forEach(a => {
-      if (!entersMode(a, mode)) return;
-      const d = festivalDateOf(state, a, isSC(mode));
+    entriesOf(state, mode).forEach(e => {
+      const d = festivalDateOf(state, e.a, e.sc);
       if (d) set.add(d);
     });
     return Array.from(set).sort();
@@ -148,24 +176,25 @@
 
   // ── De proyecto Stage Master a bloques ────────────────────────────────
   /**
-   * opts: { mode: 'show' | 'sc', day: 'all' | 'YYYY-MM-DD' }
+   * opts: { mode: 'show' | 'sc' | 'all', day: 'all' | 'YYYY-MM-DD' }
    * Devuelve los bloques ordenados por inicio absoluto (sin inicio, al final).
+   * Cada bloque lleva kind: 'show' | 'sc' | 'tarea' | 'hito' y key = id:kind (única en la vista).
    */
   function buildBlocks(state, opts) {
     const o = opts || {};
-    const sc = isSC(o.mode);
     const day = o.day || 'all';
-    let arr = ((state && state.artists) || []).filter(a => entersMode(a, o.mode));
-    if (day !== 'all') arr = arr.filter(a => festivalDateOf(state, a, sc) === day);
+    let arr = entriesOf(state, isAll(o.mode) ? 'all' : isSC(o.mode) ? 'sc' : 'show');
+    if (day !== 'all') arr = arr.filter(e => festivalDateOf(state, e.a, e.sc) === day);
 
-    const blocks = arr.map(a => {
+    const blocks = arr.map(e => {
+      const a = e.a, sc = e.sc, kind = e.kind, band = kind === 'show' || kind === 'sc';
       const f = sc ? (a.soundcheckFecha || a.fecha) : a.fecha;
       const si = toAbs(f, sc ? a.soundcheckInicio : a.inicio);
-      const sf = adjustEnd(si, toAbs(f, sc ? a.soundcheckFin : a.fin));
-      const call = (sc ? a.soundcheckCall : a[FIELDS.show.call]) || '';
+      const sf = kind === 'hito' ? null : adjustEnd(si, toAbs(f, sc ? a.soundcheckFin : a.fin));
+      const call = band ? ((sc ? a.soundcheckCall : a[FIELDS.show.call]) || '') : '';
       const esc = getEscenario(state, a.escenarioId);
       return {
-        id: a.id,
+        id: a.id, kind: kind, key: a.id + ':' + kind,
         si: si, sf: sf,
         name: a.nombre || '',
         color: artistColor(state, a),
@@ -175,7 +204,7 @@
         stage: esc ? (esc.nombre || '') : '',
         stageId: esc ? esc.id : '',
         stageColor: esc ? (esc.color || '') : '',
-        standby: !!a[FIELDS[sc ? 'sc' : 'show'].standby],   // hueco ANTES de este bloque marcado a mano como STANDBY
+        standby: band && !!a[FIELDS[sc ? 'sc' : 'show'].standby],   // hueco ANTES de este bloque marcado a mano como STANDBY
         jornada: festivalDateOf(state, a, sc)                 // día del festival (con la hora de corte)
       };
     });
@@ -190,6 +219,7 @@
 
   // ── Quién está, quién viene, a quién avisar ───────────────────────────
   function blockEnd(b) {
+    if (b.kind === 'hito') return b.si;
     return (b.sf !== null && b.sf !== undefined) ? b.sf : b.si + DEFAULT_DURATION;
   }
 
@@ -201,13 +231,23 @@
 
   /** En escena: todos los que suenan ahora (puede haber varios escenarios). */
   function playingNow(blocks, now) {
-    return blocks.filter(b => isPlaying(b, now));
+    return blocks.filter(b => isBand(b) && isPlaying(b, now));
+  }
+
+  /** Tareas en curso ahora (operativa del día; no son de escenario). */
+  function tasksNow(blocks, now) {
+    return blocks.filter(b => b.kind === 'tarea' && isPlaying(b, now));
+  }
+
+  /** Hitos de una jornada (o de todas), en cualquier vista: líneas de referencia en la Live. */
+  function hitosOf(state, day) {
+    return buildBlocks(state, { mode: 'all', day: day || 'all' }).filter(b => b.kind === 'hito' && hasStart(b));
   }
 
   /** Siguiente: el próximo de cada escenario (sin escenario cuenta como un grupo), hasta max. */
   function nextPerStage(blocks, now, max) {
     const lim = max || MAX_NEXT;
-    const up = blocks.filter(b => hasStart(b) && b.si > now).sort((a, b) => a.si - b.si);
+    const up = blocks.filter(b => isBand(b) && hasStart(b) && b.si > now).sort((a, b) => a.si - b.si);
     const seen = new Set(), out = [];
     for (const b of up) {
       const key = stageKey(b);
@@ -224,12 +264,13 @@
   /** Changeover antes de un bloque: hueco desde el final del anterior del MISMO escenario.
    *  Devuelve { prev, mins } o null si es el primero de su escenario. mins < 0 = solapan. */
   /** Solo dentro de la MISMA jornada: la primera banda de cada día no tiene cambio previo. */
+  /** Solo entre BANDAS (show o soundcheck): tareas e hitos no tienen changeover ni solapan. */
   function changeoverBefore(blocks, b) {
-    if (!hasStart(b)) return null;
+    if (!hasStart(b) || !isBand(b)) return null;
     const k = stageKey(b);
     let prev = null;
     blocks.forEach(x => {
-      if (x === b || !hasStart(x) || stageKey(x) !== k || x.si >= b.si) return;
+      if (x === b || !isBand(x) || !hasStart(x) || stageKey(x) !== k || x.si >= b.si) return;
       if ((x.jornada || '') !== (b.jornada || '')) return;
       if (!prev || x.si > prev.si) prev = x;
     });
@@ -241,9 +282,9 @@
    *  de los bloques. remaining/total en minutos (con fracción, para cuenta atrás con segundos). */
   function changeoversNow(blocks, now) {
     const out = [], seen = new Set();
-    const busy = new Set(blocks.filter(b => isPlaying(b, now)).map(stageKey));
+    const busy = new Set(blocks.filter(b => isBand(b) && isPlaying(b, now)).map(stageKey));
     blocks.forEach(b => {
-      if (!hasStart(b) || b.si <= now) return;
+      if (!isBand(b) || !hasStart(b) || b.si <= now) return;
       const k = stageKey(b);
       if (seen.has(k) || busy.has(k)) return;
       seen.add(k);                                   // b = el próximo de su escenario
@@ -289,6 +330,7 @@
   function callList(blocks, now, callMins, done) {
     const d = done instanceof Set ? done : new Set(done || []);
     return blocks.filter(b => {
+      if (!isBand(b)) return false;
       const at = callAt(b, callMins);
       if (at === null) return false;
       if (!(now >= at && now < b.si)) return false;
@@ -298,19 +340,27 @@
 
   /** Barras de abajo: desde el que suena (primero en orden) o, si no suena nadie, desde el siguiente.
    *  Si ya ha pasado todo: ended = true y barras vacías («FIN DE JORNADA»). */
+  /** Los hitos no tienen barra (son líneas). Desde el primero, se saltan los que ya han terminado
+   *  (con varios escenarios o tareas largas, un bloque posterior puede acabar antes). */
   function pickBlocks(blocks, now, n) {
+    const bl = blocks.filter(b => b.kind !== 'hito');
     let cur = null, nxt = null;
-    for (let i = 0; i < blocks.length; i++) {
-      const b = blocks[i];
+    for (let i = 0; i < bl.length; i++) {
+      const b = bl[i];
       if (!hasStart(b)) continue;
       if (isPlaying(b, now)) { cur = b; break; }
       if (b.si > now && !nxt) nxt = b;
     }
     const start = cur || nxt;
-    const ended = !start && blocks.some(hasStart);
-    const idx = start ? blocks.indexOf(start) : -1;
+    const ended = !start && bl.some(hasStart);
+    const idx = start ? bl.indexOf(start) : -1;
     const list = [];
-    for (let i = 0; i < n; i++) list.push(idx >= 0 && idx + i < blocks.length ? blocks[idx + i] : null);
+    if (idx >= 0) for (let i = idx; i < bl.length && list.length < n; i++) {
+      const b = bl[i];
+      if (b !== start && hasStart(b) && blockEnd(b) <= now) continue;
+      list.push(b);
+    }
+    while (list.length < n) list.push(null);
     return { list: list, playing: !!cur, ended: ended };
   }
 
@@ -319,6 +369,21 @@
   function stripLabel(i, playing) {
     if (playing) return i === 0 ? 'AHORA' : i === 1 ? 'SIGUIENTE' : 'EN ' + i + 'º LUGAR';
     return i === 0 ? 'SIGUIENTE' : 'EN ' + (i + 1) + 'º LUGAR';
+  }
+
+  /** Etiquetas de las barras según el ESTADO de cada bloque (no su posición):
+   *  banda sonando → AHORA · tarea en curso → TAREA · EN CURSO · tarea pendiente → TAREA · HH:MM
+   *  bandas que vienen → SIGUIENTE, EN 2º LUGAR, EN 3º LUGAR… (solo cuentan las bandas). */
+  function stripLabels(list, now) {
+    let k = 0;
+    return list.map(b => {
+      if (!b) return '';
+      if (b.kind === 'tarea') return isPlaying(b, now) ? 'TAREA · EN CURSO' : 'TAREA · ' + fmtHM(b.si);
+      if (isPlaying(b, now)) return 'AHORA';
+      const l = k === 0 ? 'SIGUIENTE' : 'EN ' + (k + 1) + 'º LUGAR';
+      k++;
+      return l;
+    });
   }
 
   // ── Edición (siempre explícita: devuelve un estado NUEVO, nunca toca el original) ──
@@ -334,7 +399,7 @@
   }
 
   function modeKey(mode) { return isSC(mode) ? 'sc' : 'show'; }
-  const SHARED_KEYS = ['nombre', 'escenario', 'color'];          // iguales en show y soundcheck
+  const SHARED_KEYS = ['nombre', 'escenario', 'color', 'tipo'];  // iguales en show y soundcheck
   const MODE_KEYS = ['fecha', 'inicio', 'fin', 'call', 'notas', 'standby'];
 
   /** Valor efectivo de un campo (en soundcheck la fecha cae a la del show si falta). */
@@ -342,6 +407,7 @@
     if (key === 'nombre') return String(artist.nombre || '');
     if (key === 'escenario') return String(artist.escenarioId || '');
     if (key === 'color') return String(artist.color || '');
+    if (key === 'tipo') return tipoOf(artist);
     const F = FIELDS[modeKey(mode)];
     if (key === 'standby') return !!artist[F.standby];
     if (key === 'fecha' && isSC(mode)) return artist[F.fecha] || artist.fecha || '';
@@ -400,6 +466,19 @@
       if (value === null) return { ok: false, error: 'Color no válido.' };
       before = a.color || '';
       if (value) a.color = value; else delete a.color;
+    } else if (key === 'tipo') {
+      value = String(raw || '').trim();
+      if (TIPOS.indexOf(value) < 0) return { ok: false, error: 'Tipo no válido.' };
+      before = tipoOf(a);
+      if (value === before) return { ok: true, state: state, changed: false, value: value, before: before };
+      // Desde la fila de soundcheck, una tarea/hito se lleva ese horario (si no hay horario de show que pisar).
+      if (value !== 'banda' && isSC(mode)) {
+        if (a.inicio || a.fin) return { ok: false, error: 'Tiene también horario de show: cambia el tipo desde la fila del show.' };
+        const S = FIELDS.sc;
+        a.fecha = a[S.fecha] || a.fecha || ''; a.inicio = a[S.inicio] || ''; a.fin = a[S.fin] || ''; a.notas = a[S.notas] || a.notas || '';
+        [S.fecha, S.inicio, S.fin, S.call, S.notas, S.standby].forEach(k => { delete a[k]; });
+      }
+      if (value === 'banda') delete a.showtimeTipo; else a.showtimeTipo = value;
     } else if (key === 'jornada') {
       value = String(raw || '').trim();
       if (dayIndex(value) === null) return { ok: false, error: 'Elige la jornada.' };
@@ -536,18 +615,20 @@
    *  d: { nombre, escenarioId, jornada, inicio, fin, duracion, call, notas, color }.
    *  Si se da duración (min), el fin se calcula: inicio + duración. Si se dan fin y duración, deben cuadrar. */
   function addArtist(state, mode, d) {
+    const tipo = TIPOS.indexOf(d.tipo) >= 0 ? d.tipo : 'banda';
+    if (tipo !== 'banda' || isAll(mode)) mode = (tipo === 'banda' && isSC(d.modo)) ? 'sc' : 'show';   // tareas e hitos: campos del show
     const nombre = normName(d.nombre);
-    if (!nombre) return { ok: false, error: 'Pon el nombre de la banda.', field: 'nombre' };
+    if (!nombre) return { ok: false, error: tipo === 'banda' ? 'Pon el nombre de la banda.' : 'Pon el nombre (p. ej. ' + (tipo === 'hito' ? 'Puertas' : 'Comida técnicos') + ').', field: 'nombre' };
     const esc = String(d.escenarioId || '');
     if (esc && !getEscenario(state, esc)) return { ok: false, error: 'Ese escenario no existe.', field: 'escenario' };
-    if ((state.escenarios || []).length && !esc) return { ok: false, error: 'Elige el escenario.', field: 'escenario' };
+    if (tipo === 'banda' && (state.escenarios || []).length && !esc) return { ok: false, error: 'Elige el escenario.', field: 'escenario' };
     const jor = String(d.jornada || '').trim();
     if (dayIndex(jor) === null) return { ok: false, error: 'Elige la jornada.', field: 'jornada' };
     const ini = normHM(d.inicio);
     if (!ini) return { ok: false, error: ini === '' ? 'Pon la hora de inicio.' : 'Hora de inicio no válida (HH:MM).', field: 'inicio' };
-    let fin = normHM(d.fin);
+    let fin = tipo === 'hito' ? '' : normHM(d.fin);
     if (fin === null) return { ok: false, error: 'Hora de fin no válida (HH:MM).', field: 'fin' };
-    const durRaw = String(d.duracion == null ? '' : d.duracion).trim();
+    const durRaw = tipo === 'hito' ? '' : String(d.duracion == null ? '' : d.duracion).trim();
     if (durRaw !== '') {
       const dur = Math.round(Number(durRaw));
       if (!(dur >= 1 && dur <= 1440) || !/^\d+$/.test(durRaw)) return { ok: false, error: 'Duración en minutos (1–1440).', field: 'duracion' };
@@ -555,7 +636,7 @@
       if (fin && fin !== byDur) return { ok: false, error: 'El fin (' + fin + ') no cuadra con la duración (' + byDur + '). Deja uno de los dos.', field: 'fin' };
       fin = byDur;
     }
-    const call = normHM(d.call);
+    const call = tipo === 'banda' ? normHM(d.call) : '';
     if (call === null) return { ok: false, error: 'Hora de CALL no válida (HH:MM).', field: 'call' };
     const color = d.color ? normColor(d.color) : '';
     if (color === null) return { ok: false, error: 'Color no válido.', field: 'color' };
@@ -566,6 +647,7 @@
     const id = (ids.length ? Math.max.apply(null, ids) : 0) + 1;
     const F = FIELDS[modeKey(mode)];
     const a = { id, nombre, escenarioId: esc };
+    if (tipo !== 'banda') a.showtimeTipo = tipo;
     if (color) a.color = color;
     a[F.fecha] = fechaFor(next, jor, ini);
     a[F.inicio] = ini;
@@ -584,7 +666,7 @@
     const a = state.artists[i];
     return addArtist(state, mode, {
       nombre: d.nombre != null && String(d.nombre).trim() ? d.nombre : a.nombre,
-      escenarioId: a.escenarioId || '', color: a.color || '',
+      escenarioId: a.escenarioId || '', color: a.color || '', tipo: tipoOf(a),
       notas: fieldValue(a, mode, 'notas'),
       jornada: d.jornada, inicio: d.inicio, fin: d.fin, duracion: d.duracion, call: d.call
     });
@@ -714,10 +796,10 @@
   const API = {
     DEFAULT_CUTOFF, DEFAULT_CALL_MINS, DEFAULT_DURATION, MAX_NEXT, ARTIST_COLORS,
     pad2, parseHM, fmtHM, dayIndex, isoOfDay, shiftDate, toAbs, adjustEnd, nowAbs,
-    cutoffMins, festivalDateOf, entersMode, festivalDays,
+    cutoffMins, festivalDateOf, entersMode, festivalDays, TIPOS, tipoOf, isBand, isAll, entriesOf, tasksNow, hitosOf,
     getEscenario, artistColor, callAbsFor, buildBlocks,
     blockEnd, isPlaying, playingNow, nextPerStage, progress, changeoverBefore, changeoversNow, callKey, callAt, callList,
-    pickBlocks, stripLabel, validateProject,
+    pickBlocks, stripLabel, stripLabels, validateProject,
     demoFestival, FIELDS, normHM, fieldValue, editArtist, setStandby, modifiedFields, countModified,
     fechaFor, jornadaOf, eventDays, checkEvent, newFestival, updateEvent, STAGE_COLORS,
     addStage, updateStage, moveStage, removeStage, stageUse, addArtist, removeArtist, duplicateArtist, nextJornadaAfter, newArtistIds, diffSummary

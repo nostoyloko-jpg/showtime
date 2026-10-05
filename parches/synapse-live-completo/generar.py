@@ -2,7 +2,7 @@ import json, re, sys, datetime
 import os
 SRC=os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..') + os.sep
 html=open(SRC+'live.html').read()
-body=html[html.index('<body>')+len('<body>'):html.index('<script src="core.js"></script>')].strip()
+body=html[html.index('<body>')+len('<body>'):html.index('<script src="core.js')].strip()
 css=open(SRC+'live.css').read()
 core=open(SRC+'core.js').read()
 live=open(SRC+'live.js').read()

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Showtime · Pantalla Live</title>
-<link rel="stylesheet" href="live.css">
+<link rel="stylesheet" href="live.css?v=20261006">
 </head>
 <body>
 
@@ -12,6 +12,7 @@
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <symbol id="i-x" viewBox="0 0 20 20"><path d="M5 5l10 10M15 5L5 15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
   <symbol id="i-now" viewBox="0 0 20 20"><path d="M15.5 10a5.5 5.5 0 1 1-1.6-3.9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M15.5 3.5v3.2h-3.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 20 20"><path d="M4 5.5h7M15 5.5h1M4 10h2M10 10h6M4 14.5h8M16 14.5h0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="13" cy="5.5" r="1.9" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="8" cy="10" r="1.9" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="14" cy="14.5" r="1.9" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
   <symbol id="i-plus" viewBox="0 0 20 20"><path d="M10 4.5v11M4.5 10h11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
   <symbol id="i-minus" viewBox="0 0 20 20"><path d="M4.5 10h11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
   <symbol id="i-full" viewBox="0 0 20 20"><path d="M3.5 7.5v-4h4M16.5 7.5v-4h-4M3.5 12.5v4h4M16.5 12.5v4h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
@@ -51,18 +52,27 @@
 <div id="hsplit" title="Arrastra para ver más artistas"></div>
 <div id="bot"></div>
 
-<div id="zoomctl">
+<!-- Controles plegados: un icono; al dejar el cursor encima (o al tocarlo) se despliegan -->
+<div id="zoomctl" class="dock">
+  <div id="dockbody">
   <span id="wake" title="Mientras esta ventana esté abierta, el equipo no apagará la pantalla ni entrará en reposo" hidden><svg class="ic"><use href="#i-screen"/></svg>Sin reposo</span>
   <button id="syncbtn" class="iconbtn" title="Volver al momento actual"><svg class="ic"><use href="#i-now"/></svg></button>
   <span id="offlbl"></span>
+  <button id="rmin" class="iconbtn" title="Filas más bajas (todas por igual)"><svg class="ic"><use href="#i-minus"/></svg></button>
+  <button id="rlbl" class="txtbtn" title="Alto de las filas. Clic: automático">alto auto</button>
+  <button id="rmax" class="iconbtn" title="Filas más altas (todas por igual)"><svg class="ic"><use href="#i-plus"/></svg></button>
+  <span class="zsep"></span>
   <button id="zmin" class="iconbtn" title="Más tiempo visible"><svg class="ic"><use href="#i-plus"/></svg></button>
   <span id="zlbl"></span>
   <button id="zmax" class="iconbtn" title="Menos tiempo visible"><svg class="ic"><use href="#i-minus"/></svg></button>
   <button id="fullbtn" class="iconbtn" title="Pantalla completa (F)"><svg class="ic"><use href="#i-full"/></svg></button>
+  </div>
+  <span id="docktag" title="La línea de tiempo está desplazada"></span>
+  <button id="dockbtn" class="iconbtn" title="Controles (zoom, volver a ahora, pantalla completa)" aria-expanded="false"><svg class="ic"><use href="#i-sliders"/></svg></button>
 </div>
 
-<script src="core.js"></script>
-<script src="datos.js"></script>
-<script src="live.js"></script>
+<script src="core.js?v=20261006"></script>
+<script src="datos.js?v=20261006"></script>
+<script src="live.js?v=20261006"></script>
 </body>
 </html>

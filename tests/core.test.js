@@ -473,6 +473,87 @@
     ok(r2.ok); eq(r2.warnings.length, 1, 'show sin fecha');
   });
 
+  // ── Tipos de entrada y vista Jornada completa ──────────────────────
+  const DIA = JSON.parse(JSON.stringify(FEST));
+  DIA.artists.push(
+    { id: 10, nombre: 'Puertas', showtimeTipo: 'hito', escenarioId: '', fecha: '2026-07-10', inicio: '19:30', fin: '', notas: '' },
+    { id: 11, nombre: 'Curfew', showtimeTipo: 'hito', escenarioId: '', fecha: '2026-07-11', inicio: '04:30', fin: '05:00', notas: '' },
+    { id: 12, nombre: 'Comida técnicos', showtimeTipo: 'tarea', escenarioId: 'esc1', fecha: '2026-07-10', inicio: '14:00', fin: '23:59', notas: '' }
+  );
+  const ALL = C.buildBlocks(DIA, { mode: 'all', day: '2026-07-10' });
+
+  test('tipos: tipoOf y entersMode (tareas e hitos solo en Jornada completa)', () => {
+    eq(C.tipoOf(DIA.artists[0]), 'banda'); eq(C.tipoOf(DIA.artists[4]), 'hito'); eq(C.tipoOf({ showtimeTipo: 'raro' }), 'banda');
+    ok(!C.entersMode(DIA.artists[6], 'show')); ok(!C.entersMode(DIA.artists[6], 'sc')); ok(C.entersMode(DIA.artists[6], 'all'));
+    eq(C.buildBlocks(DIA, { mode: 'show', day: 'all' }).length, 4, 'Shows: solo conciertos');
+    eq(C.buildBlocks(DIA, { mode: 'sc', day: 'all' }).length, 3, 'Soundchecks: solo pruebas');
+  });
+  test('Jornada completa: shows + soundchecks + tareas + hitos, en orden y con kind/key', () => {
+    eq(ALL.length, 4 + 3 + 1 + 2, 'el curfew de las 04:30 es de la jornada del 10');
+    deq(ALL.slice(0, 3).map(b => b.kind), ['tarea', 'sc', 'sc']);
+    ok(ALL.every(b => b.key === b.id + ':' + b.kind));
+    eq(new Set(ALL.map(b => b.key)).size, ALL.length, 'claves únicas aunque una banda salga dos veces');
+    const p = ALL.find(b => b.name === 'Puertas'); eq(p.sf, null, 'un hito no tiene fin'); eq(C.blockEnd(p), p.si);
+    deq(C.festivalDays(DIA, 'all'), ['2026-07-10']);
+  });
+  test('tareas e hitos no dan solapes, changeover, CALL ni EN ESCENA', () => {
+    const t = ALL.find(b => b.kind === 'tarea');
+    eq(C.changeoverBefore(ALL, t), null);
+    const sc1 = ALL.find(b => b.kind === 'sc' && b.name === 'Los Ejemplos');
+    eq(C.changeoverBefore(ALL, sc1), null, 'la tarea del mismo escenario no cuenta como banda anterior');
+    deq(C.playingNow(ALL, at(D10, '15:00')), [], 'a las 15:00 solo hay una tarea');
+    deq(C.tasksNow(ALL, at(D10, '15:00')).map(b => b.name), ['Comida técnicos']);
+    ok(C.callList(ALL, at(D10, '19:25'), 15, []).every(b => C.isBand(b)));
+    ok(C.nextPerStage(ALL, at(D10, '15:00')).every(b => C.isBand(b)));
+  });
+  test('Jornada completa: changeover entre soundcheck y show del mismo escenario', () => {
+    const sh = ALL.find(b => b.kind === 'show' && b.name === 'Los Ejemplos');
+    const co = C.changeoverBefore(ALL, sh);
+    eq(co.prev.name, 'Cabeza de Cartel'); eq(co.prev.kind, 'sc'); eq(co.mins, 120);
+  });
+  test('pickBlocks: sin hitos y saltando lo que ya terminó', () => {
+    const r = C.pickBlocks(ALL, at(D10, '16:30'), 4);
+    eq(r.list[0].name, 'Comida técnicos', 'la tarea larga va primero (empezó antes)');
+    eq(r.list[1].name, 'Los Ejemplos'); ok(r.list.every(b => !b || b.kind !== 'hito'));
+    const r2 = C.pickBlocks(ALL, at(D10, '19:10'), 3);
+    deq(r2.list.map(b => b && b.name), ['Comida técnicos', 'Los Ejemplos', 'Banda Demo'], 'los soundchecks ya terminados no salen');
+  });
+  test('hitosOf: hitos de la jornada en cualquier vista', () => {
+    deq(C.hitosOf(DIA, '2026-07-10').map(b => b.name), ['Puertas', 'Curfew']);
+    deq(C.hitosOf(DIA, '2026-07-11'), []);
+  });
+  test('addArtist: hito sin fin ni escenario, tarea sin CALL', () => {
+    const s0 = C.newFestival({ nombre: 'X', fechaInicio: '2026-07-10' }).state;
+    const s1 = C.addStage(s0, 'Principal').state;
+    const h = C.addArtist(s1, 'all', { tipo: 'hito', nombre: 'Puertas', jornada: '2026-07-10', inicio: '19:30', fin: '20:00', call: '19:00' });
+    ok(h.ok, h.error); const a = h.state.artists[0];
+    eq(a.showtimeTipo, 'hito'); eq(a.fin, ''); eq(a.showtimeCall, ''); eq(a.escenarioId, '');
+    const t = C.addArtist(h.state, 'all', { tipo: 'tarea', nombre: 'Montaje', jornada: '2026-07-10', inicio: '10:00', duracion: '90', call: '09:45' });
+    ok(t.ok, t.error); eq(t.state.artists[1].fin, '11:30'); eq(t.state.artists[1].showtimeCall, '');
+    ok(!C.addArtist(s1, 'all', { nombre: 'Banda', jornada: '2026-07-10', inicio: '21:00' }).ok, 'una banda sigue pidiendo escenario');
+    const sc = C.addArtist(s1, 'all', { nombre: 'Banda', modo: 'sc', escenarioId: s1.escenarios[0].id, jornada: '2026-07-10', inicio: '16:00' });
+    eq(sc.state.artists[0].soundcheckInicio, '16:00', 'en Jornada completa, modo elegido: soundcheck');
+  });
+  test('editArtist tipo: explícito, y desde la fila de soundcheck se lleva su horario', () => {
+    const r = C.editArtist(DIA, 1, 'show', 'tipo', 'tarea');
+    ok(r.ok && r.changed); eq(r.state.artists[0].showtimeTipo, 'tarea');
+    eq(C.editArtist(r.state, 1, 'show', 'tipo', 'banda').state.artists[0].showtimeTipo, undefined);
+    ok(!C.editArtist(DIA, 1, 'sc', 'tipo', 'tarea').ok, 'con show y soundcheck: desde la fila del show');
+    const s = JSON.parse(JSON.stringify(DIA)); s.artists[0].inicio = ''; s.artists[0].fin = '';
+    const r2 = C.editArtist(s, 1, 'sc', 'tipo', 'tarea'); ok(r2.ok, r2.error);
+    const a = r2.state.artists[0]; eq(a.inicio, '16:00'); eq(a.fin, '16:45'); eq(a.soundcheckInicio, undefined);
+    ok(!C.editArtist(DIA, 1, 'show', 'tipo', 'otro').ok);
+    eq(C.diffSummary(DIA, r.state).fields, 1, 'el tipo cuenta como cambio');
+  });
+
+  test('stripLabels: por estado; las tareas no corren puestos', () => {
+    const r = C.pickBlocks(ALL, at(D10, '16:30'), 4);
+    deq(C.stripLabels(r.list, at(D10, '16:30')), ['TAREA · EN CURSO', 'AHORA', 'SIGUIENTE', 'EN 2º LUGAR']);
+    const s = C.pickBlocks(SHOW, at(D10, '21:45'), 3);
+    deq(C.stripLabels(s.list, at(D10, '21:45')), ['AHORA', 'AHORA', 'SIGUIENTE'], 'dos escenarios sonando: los dos AHORA');
+    deq(C.stripLabels([null], 0), ['']);
+  });
+
   // ── Ejecutar ──────────────────────────────────────────────────────────
   let pass = 0; const fails = [];
   tests.forEach(([name, fn]) => {

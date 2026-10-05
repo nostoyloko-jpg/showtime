@@ -14,7 +14,7 @@
   const APP = 'showtime';
   const K = {
     festival: 'showtime.festival',     // proyecto Stage Master importado (con ajustes)
-    config:   'showtime.config',       // { mode, day, style, callMins }
+    config:   'showtime.config',       // { mode: show|sc|all, day, style, callMins }
     callDone: 'showtime.callDone',     // [callKey, ...] avisos marcados con OK
     original: 'showtime.original'      // copia del festival tal como se importó (para marcar cambios)
   };
@@ -36,7 +36,7 @@
   }
   function normConfig(c) {
     const o = Object.assign({}, DEFAULT_CONFIG, c || {});
-    o.mode = (o.mode === 'sc' || o.mode === 'soundcheck') ? 'sc' : 'show';
+    o.mode = (o.mode === 'sc' || o.mode === 'soundcheck') ? 'sc' : o.mode === 'all' ? 'all' : 'show';
     o.style = normStyle(o.style);
     o.day = o.day || 'all';
     o.callMins = Number.isFinite(o.callMins) && o.callMins > 0 ? o.callMins : null;

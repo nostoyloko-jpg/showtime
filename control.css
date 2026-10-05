@@ -141,7 +141,7 @@ td.gap.mod .gapbtn{box-shadow:0 0 0 2px rgba(255,197,51,.45)}
 /* ── Editor propio (2b+) ── */
 .sep{width:1px;height:24px;background:var(--line2);margin:0 2px}
 .err{color:var(--err);font-weight:700;margin-left:10px}
-td.name{min-width:215px}
+td.name{min-width:190px}
 td.name input[type=text]{min-width:140px;flex:1}
 td.name .nm{display:flex;align-items:center;gap:6px}
 td.name input[type=text]{font-weight:800}
@@ -149,7 +149,25 @@ input[type=color]{width:26px;height:26px;padding:0;border:1px solid var(--line2)
 input[type=color]::-webkit-color-swatch-wrapper{padding:2px}
 input[type=color]::-webkit-color-swatch{border:0;border-radius:4px}
 input[type=color]::-moz-color-swatch{border:0;border-radius:4px}
-td.stage select{width:108px;border-left:4px solid var(--sc,#555)}
+td.stage select{width:auto;min-width:var(--escw,120px);max-width:280px;border-left:4px solid var(--sc,#555)}
+/* Tipo de entrada: Show · Soundcheck · Tarea · Hito */
+td.tp select{width:104px;font-weight:800;font-size:11px;padding-left:6px;padding-right:0}
+select.tipo-sc{color:#c9b6ff}
+select.tipo-tarea{color:var(--tarea,#7dd3fc)}
+select.tipo-hito{color:var(--call)}
+tr.k-tarea td.tp,tr.k-hito td.tp{box-shadow:inset 3px 0 0 var(--k)}
+tr.k-tarea{--k:#7dd3fc}
+tr.k-hito{--k:var(--call)}
+tr.k-sc{--k:#c9b6ff}
+tr.k-sc td.tp{box-shadow:inset 3px 0 0 var(--k)}
+tr.k-tarea td.name input[type=text]{font-weight:600}
+tr.k-hito td.name input[type=text]{color:var(--call)}
+tfoot tr.add input:disabled{opacity:.35}
+.imp-lbl{color:var(--muted);font-weight:600}
+.imp-prev td.tp select{width:118px}
+.imp-prev td.tp .hint{font-size:11px;margin-top:2px;white-space:nowrap}
+.v-row.tarea{border-left-color:#7dd3fc;opacity:.9}
+.v-row.tarea .v-name{color:#7dd3fc}
 td.f select{width:112px}
 td.f .real{display:block;font-size:11px;color:var(--call);margin-top:2px;white-space:nowrap}
 td.t2{white-space:nowrap}
@@ -233,3 +251,69 @@ body[data-ps="escenario"] thead th,body[data-ps="escenario"] tfoot tr.add td,bod
 /* Escenario (alto contraste, para el sol): sin transparencias */
 body[data-ps="escenario"]{--glass-bg:#000;--glass-line:rgba(255,214,0,.55);--glass-blur:none}
 body[data-ps="escenario"] .cfg-h{background:#000}
+
+/* ── Pegar horario ── */
+.imp-box{max-width:min(1240px,96vw);width:100%;max-height:94vh;display:flex;flex-direction:column;gap:10px;overflow:hidden}
+.imp-head{display:flex;align-items:center;justify-content:space-between}
+.imp-head h2{margin:0}
+.imp-src{display:flex;gap:12px;align-items:stretch}
+.imp-src textarea{flex:1;min-height:96px;max-height:180px;resize:vertical;border-radius:8px;border:1px solid var(--line2);background:var(--field);color:var(--text);font:13px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;padding:8px 10px}
+.imp-src textarea:focus{outline:none;border-color:var(--accent)}
+.imp-side{width:210px;display:flex;flex-direction:column;gap:6px}
+.imp-kind{font-size:12px;font-weight:700;color:var(--muted)}
+.imp-opts{display:flex;flex-wrap:wrap;gap:14px;align-items:center}
+.imp-opts label{display:inline-flex;align-items:center;gap:8px;color:var(--muted);font-weight:600}
+.imp-opts label[hidden]{display:none}
+.imp-map{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px}
+.imp-map:empty{display:none}
+.imp-col{min-width:150px;max-width:220px;border:1px solid var(--line2);border-radius:8px;padding:6px 8px;background:var(--panel)}
+.imp-col .h{font-size:11px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.imp-col .ex{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:2px 0 6px}
+.imp-col select{width:100%}
+.imp-col.ign{opacity:.6}
+.imp-new{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;font-size:13px}
+.imp-new:empty{display:none}
+.imp-new b{color:var(--call)}
+.imp-new label{display:inline-flex;gap:6px;align-items:center}
+.imp-prevwrap{flex:1;min-height:120px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.imp-prev{width:100%;border-collapse:collapse;font-size:13px}
+.imp-prev th{position:sticky;top:0;background:var(--head);text-align:left;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:7px 5px;white-space:nowrap;z-index:1}
+.imp-prev td{padding:3px 4px;border-bottom:1px solid var(--line);vertical-align:middle}
+.imp-prev td input[type=text]{height:28px;width:100%;min-width:60px;border-radius:5px;border:1px solid transparent;background:transparent;color:var(--text);font:inherit;padding:0 5px}
+.imp-prev td input[type=text]:hover{border-color:var(--line2)}
+.imp-prev td input[type=text]:focus{outline:none;border-color:var(--accent);background:var(--field)}
+.imp-prev td.t input{width:62px;text-align:center;font-weight:700}
+.imp-prev td.b{min-width:160px}
+.imp-prev td.st{white-space:nowrap;font-weight:800;font-size:12px}
+.imp-prev td.av{font-size:12px;color:var(--muted);min-width:220px}
+.imp-prev td.av div{line-height:1.25}
+.imp-prev td.av .e{color:var(--err)}
+.imp-prev tr.st-ok td.st{color:var(--ok)}
+.imp-prev tr.st-warn td.st{color:var(--call)}
+.imp-prev tr.st-err td.st{color:var(--err)}
+.imp-prev tr.st-ok{box-shadow:inset 3px 0 0 var(--ok)}
+.imp-prev tr.st-warn{box-shadow:inset 3px 0 0 var(--call)}
+.imp-prev tr.st-err{box-shadow:inset 3px 0 0 var(--err);background:rgba(255,107,107,.05)}
+.imp-prev tr.off td:not(.chk){opacity:.45}
+.imp-prev td.vacio{padding:18px;color:var(--dim)}
+.imp-ign{font-size:12px;color:var(--muted)}
+.imp-ign ul{margin:6px 0 0 18px}
+.imp-foot{display:flex;align-items:center;gap:8px}
+.imp-sum{font-size:13px;font-weight:700;color:var(--muted)}
+.imp-sum .ok{color:var(--ok)} .imp-sum .warn{color:var(--call)} .imp-sum .err{color:var(--err)}
+.imp-box.drag{outline:3px dashed var(--accent);outline-offset:-6px}
+@media (max-width:900px){ .imp-src{flex-direction:column} .imp-side{width:auto;flex-direction:row;align-items:center;flex-wrap:wrap} }
+/* Portátil (≤1600 px): columna de En escena más estrecha y casillas más compactas para que quepa la tabla */
+@media (max-width:1600px){
+  main{grid-template-columns:minmax(220px,260px) minmax(0,1fr)}
+  td.name{min-width:170px}
+  td.name input[type=text]{min-width:110px}
+  td.n input{min-width:90px}
+  td.tp select{width:100px}
+  td.f select{width:108px}
+  td.t2 input{width:56px}
+  td.t2 input + input{width:44px}
+  thead th,tbody td,tfoot td{padding-left:3px;padding-right:3px}
+  .gapbtn{padding:0 8px}
+}
+.imp-prev td.e input{min-width:150px}

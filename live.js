@@ -12,13 +12,14 @@
   // ── Preferencias de ESTA pantalla (otra luz, otro monitor: van aparte del Panel) ──
   const P = {
     zoom: 'showtime.live.zoom', topH: 'showtime.live.topH', topCols: 'showtime.live.topCols',
-    stripH: 'showtime.live.stripH', infoW: 'showtime.live.infoW'
+    stripH: 'showtime.live.stripH', infoW: 'showtime.live.infoW', rowH: 'showtime.live.rowH'
   };
   function pget(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } }
   function pset(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
 
   // ── Estado (declarado ANTES de cualquier uso: `let` no se eleva) ──────
-  let FEST = null, CONFIG = null, BLOCKS = [], CALL_MINS = 15, CALL_DONE = new Set(), DEMO = false;
+  let FEST = null, CONFIG = null, BLOCKS = [], HITOS = [], CALL_MINS = 15, CALL_DONE = new Set(), DEMO = false;
+  const VIEW_TXT = { all: ['JORNADA COMPLETA', 'ENTRADAS'], show: ['SHOW', 'SHOWS'], sc: ['SOUNDCHECK', 'SOUNDCHECKS'] };
   let NOFEST = false, DAY_MISSING = '';   // estados que se ENSEÑAN, nunca se corrigen solos
   let TIME_OFFSET = 0;
   let ACCENT = '#e94560', CALLC = '#ffb347';
@@ -26,7 +27,10 @@
   let zIdx = (() => { const v = pget(P.zoom, 3); return (v >= 0 && v < ZOOM_STEPS.length) ? v : 3; })();
   let VISIBLE = ZOOM_STEPS[zIdx];
   const NX = 64;                 // px desde la izquierda donde va la aguja
-  const STRIP_MIN_H = 110;       // alto mínimo legible de una barra
+  const STRIP_MIN_H = 110;       // alto de una barra en automático (luego cada una se ajusta a mano)
+  // Alto de TODAS las filas (− / +). 0 = automático (reparte el alto con filas de al menos 110 px).
+  const ROW_STEPS = [44, 56, 70, 90, 110, 140, 180, 230];
+  let ROW_H = (() => { const v = parseInt(pget(P.rowH, 0)); return ROW_STEPS.indexOf(v) >= 0 ? v : 0; })();
   let STRIP_H = pget(P.stripH, {}) || {};
   let stripCount = 0;
 
@@ -46,19 +50,22 @@
 
     CONFIG = Dt.getConfig();
     if (URLP.get('estilo')) CONFIG.style = Dt.normStyle(URLP.get('estilo'));
-    if (URLP.get('modo')) CONFIG.mode = /^(sc|soundcheck)$/.test(URLP.get('modo')) ? 'sc' : 'show';
+    if (URLP.get('modo')) CONFIG.mode = /^(sc|soundcheck)$/.test(URLP.get('modo')) ? 'sc' : /^(all|jornada|todo)$/.test(URLP.get('modo')) ? 'all' : 'show';
+    const vt = VIEW_TXT[CONFIG.mode] || VIEW_TXT.show;
 
     // Día elegido sin datos: se AVISA; no se cambia de día por cuenta propia.
     const day = CONFIG.day || 'all';
     DAY_MISSING = (!NOFEST && day !== 'all' && C.festivalDays(FEST, CONFIG.mode).indexOf(day) < 0) ? day : '';
     BLOCKS = (NOFEST || DAY_MISSING) ? [] : C.buildBlocks(FEST, { mode: CONFIG.mode, day: day });
+    // Hitos (puertas, curfew…): líneas de referencia en cualquier vista
+    HITOS = (NOFEST || !C.hitosOf) ? [] : C.hitosOf(FEST, day);
     CALL_MINS = Dt.callMinsOf(FEST, CONFIG);
     CALL_DONE = new Set(Dt.getCallDone());
 
     $('evn-name').textContent = NOFEST ? 'SIN EVENTO' : (DEMO ? 'DEMO · ' : '') + ((FEST.event && FEST.event.nombre) || '');
-    $('evn-mode').textContent = (CONFIG.mode === 'sc' ? 'SOUNDCHECK' : 'SHOW') + ' · ';
+    $('evn-mode').textContent = vt[0] + ' · ';
     const msg = NOFEST ? 'SIN EVENTO CARGADO · ábrelo en el Panel de Control'
-      : DAY_MISSING ? 'EL ' + fmtDay(DAY_MISSING) + ' NO TIENE ' + (CONFIG.mode === 'sc' ? 'SOUNDCHECKS' : 'SHOWS') + ' · elige otro día'
+      : DAY_MISSING ? 'EL ' + fmtDay(DAY_MISSING) + ' NO TIENE ' + vt[1] + ' · elige otro día'
       : '';
     $('banner').textContent = msg;
     $('banner').hidden = !msg;
@@ -84,7 +91,8 @@
     $('syncbtn').classList.toggle('off', Math.abs(m) > 0.5);
     const r = Math.round(m), a = Math.abs(r);
     $('offlbl').textContent = r === 0 ? '' : (r > 0 ? '+' : '-') + (a >= 60 ? Math.floor(a / 60) + 'h' + (a % 60 ? ' ' + (a % 60) + 'm' : '') : a + ' min');
-    requestAnimationFrame(redraw);
+    $('docktag').textContent = $('offlbl').textContent;     // plegado, se sigue viendo que está desplazada
+    requestAnimationFrame(tick);
   }
   function zoomLbl() { const m = VISIBLE; return m < 90 ? m + ' min' : Math.floor(m / 60) + 'h' + (m % 60 ? ' ' + (m % 60) + 'm' : ''); }
   function setZoom(d) {
@@ -98,7 +106,40 @@
   }
 
   // ── Dibujo de una barra ──────────────────────────────────────────────
-  function drawStrip(cv, block, nowMins, ended) {
+  /** Curfew y similares: en ámbar (solo color; no cambia nada). */
+  function hitoHot(name) { return /curfew|toque de queda|l[ií]mite|fin de (sonido|evento|jornada)/i.test(name || ''); }
+
+  /** Hitos: línea vertical en todas las barras; en la primera, la píldora «19:30 PUERTAS». */
+  function drawHitos(ctx, W, H, xOf, withPill, FONT) {
+    HITOS.forEach(h => {
+      const x = xOf(h.si);
+      if (x < -200 || x > W + 2) return;
+      const col = hitoHot(h.name) ? CALLC : 'rgba(255,255,255,.85)';
+      ctx.save();
+      ctx.strokeStyle = col; ctx.globalAlpha = 0.8; ctx.lineWidth = 2; ctx.setLineDash([6, 4]);
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+      ctx.restore();
+      if (!withPill) return;
+      const txt = C.fmtHM(h.si) + '  ' + h.name.toUpperCase();
+      ctx.save();
+      ctx.font = 'bold 13px ' + FONT;
+      const tw = ctx.measureText(txt).width, pw = tw + 26, ph = 22, py = 3;   // arriba, en la cabecera (tapa la hora de la rejilla junto a ella)
+      let px = x - 1;
+      if (px + pw > W - 4) px = Math.max(4, x - pw + 1);           // cerca del borde: la píldora a la izquierda de la línea
+      ctx.fillStyle = col; ctx.globalAlpha = 0.95;
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(px, py, pw, ph, 11); else ctx.rect(px, py, pw, ph);
+      ctx.fill();
+      ctx.globalAlpha = 1; ctx.fillStyle = '#0b0c0f'; ctx.textBaseline = 'middle';
+      // banderita
+      ctx.beginPath(); ctx.moveTo(px + 9, py + 5); ctx.lineTo(px + 9, py + ph - 5); ctx.moveTo(px + 9, py + 5); ctx.lineTo(px + 16, py + 8); ctx.lineTo(px + 9, py + 11);
+      ctx.strokeStyle = '#0b0c0f'; ctx.lineWidth = 1.6; ctx.stroke();
+      ctx.fillText(txt, px + 20, py + ph / 2 + 1);
+      ctx.restore();
+    });
+  }
+
+  function drawStrip(cv, block, nowMins, ended, idx) {
     if (!cv) return;
     const W = cv.offsetWidth, H = cv.offsetHeight;
     if (!W || !H) return;
@@ -113,7 +154,9 @@
     const leftMins = (nowMins + TIME_OFFSET) - NX / pxM;
     const xOf = m => (m - leftMins) * pxM;
 
-    // Rejilla cada 5 min, etiquetas cada 10
+    // Barra baja (muchas filas): rejilla con menos texto y la barra ocupando casi todo el alto
+    const compact = H < 72;
+    // Rejilla cada 5 min, etiquetas cada 10 (en compacto, solo las medias y las horas)
     const startM = Math.ceil(leftMins / 5) * 5;
     for (let mi = startM; mi <= leftMins + VISIBLE + 5; mi += 5) {
       const x = xOf(mi);
@@ -122,10 +165,10 @@
       ctx.strokeStyle = i60 ? 'rgba(255,255,255,.35)' : i30 ? 'rgba(255,255,255,.18)' : i15 ? 'rgba(255,255,255,.08)' : 'rgba(255,255,255,.03)';
       ctx.lineWidth = i60 ? 2 : i30 ? 1.2 : 0.8;
       ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
-      if (i10) {
+      if (compact ? i30 : i10) {
         ctx.fillStyle = i60 ? '#fff' : i30 ? 'rgba(255,255,255,.75)' : 'rgba(255,255,255,.45)';
-        ctx.font = (i60 ? 'bold 16px ' : i30 ? 'bold 13px ' : '11px ') + FONT;
-        ctx.fillText(C.fmtHM(mi), x + 5, i60 ? 22 : i30 ? 18 : 14);
+        ctx.font = (compact ? (i60 ? 'bold 11px ' : '10px ') : i60 ? 'bold 16px ' : i30 ? 'bold 13px ' : '11px ') + FONT;
+        ctx.fillText(C.fmtHM(mi), x + 4, compact ? 10 : i60 ? 22 : i30 ? 18 : 14);
       }
     }
 
@@ -143,37 +186,47 @@
       }
     }
 
-    if (block && block.si !== null && block.sf !== null) {
-      const x1 = xOf(block.si), x2 = xOf(block.sf);
-      const bh = H * 0.52, by = (H - bh) / 2, bw = x2 - x1;
+    if (block && block.si !== null && (block.sf !== null || block.kind === 'tarea')) {
+      const task = block.kind === 'tarea';
+      const end = C.blockEnd(block);
+      const x1 = xOf(block.si), x2 = xOf(end);
+      const bh = compact ? Math.max(12, H - 22) * (task ? 0.8 : 1) : H * (task ? 0.36 : 0.52);
+      const by = compact ? 14 + (Math.max(12, H - 22) - bh) / 2 : (H - bh) / 2, bw = x2 - x1;
+      const col = safeColor(task ? (block.stageColor || '#7dd3fc') : block.color, '#888');
       ctx.save();
-      ctx.globalAlpha = 0.92;
-      ctx.fillStyle = safeColor(block.color, '#888');
       const r = Math.min(10, bh / 2);
       ctx.beginPath();
       if (ctx.roundRect) ctx.roundRect(x1, by, bw, bh, r); else ctx.rect(x1, by, bw, bh);
-      ctx.fill();
+      if (task) {
+        // Tarea: barra más fina, contorno y relleno suave (operativa, no actuación)
+        ctx.globalAlpha = 0.22; ctx.fillStyle = col; ctx.fill();
+        ctx.globalAlpha = 0.9; ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.setLineDash([8, 5]); ctx.stroke(); ctx.setLineDash([]);
+      } else { ctx.globalAlpha = 0.92; ctx.fillStyle = col; ctx.fill(); }
       ctx.globalAlpha = 1;
       if (bw > 50) {
-        ctx.fillStyle = 'rgba(255,255,255,.95)';
-        ctx.font = 'bold 16px ' + FONT;
+        ctx.fillStyle = task ? col : 'rgba(255,255,255,.95)';
+        ctx.font = 'bold ' + (compact ? 12 : task ? 14 : 16) + 'px ' + FONT;
         ctx.textBaseline = 'middle';
         ctx.beginPath(); ctx.rect(Math.max(0, x1) + 8, by, Math.min(W, x2) - Math.max(0, x1) - 16, bh); ctx.clip();
-        ctx.fillText(block.name.toUpperCase(), Math.max(x1, 0) + 12, by + bh / 2);
+        ctx.fillText((task ? 'TAREA · ' : block.kind === 'sc' && CONFIG.mode === 'all' ? 'SOUNDCHECK · ' : '') + block.name.toUpperCase(), Math.max(x1, 0) + 12, by + bh / 2);
       }
       ctx.restore();
-      const dur = Math.max(0, Math.round(block.sf - block.si));
-      ctx.fillStyle = 'rgba(255,255,255,.35)';
-      ctx.font = '11px ' + FONT;
-      ctx.textAlign = 'right';
-      ctx.fillText(dur + ' min', Math.min(W - 6, x2 - 2), by - 4);
-      ctx.textAlign = 'left';
+      const dur = Math.max(0, Math.round(end - block.si));
+      if (!compact) {
+        ctx.fillStyle = 'rgba(255,255,255,.35)';
+        ctx.font = '11px ' + FONT;
+        ctx.textAlign = 'right';
+        ctx.fillText(dur + ' min', Math.min(W - 6, x2 - 2), by - 4);
+        ctx.textAlign = 'left';
+      }
     } else if (!ended) {
       ctx.fillStyle = 'rgba(255,255,255,.12)';
       ctx.font = '14px ' + FONT;
       ctx.textBaseline = 'middle';
-      ctx.fillText('Sin evento', NX + 16, H / 2);
+      if (!compact) ctx.fillText('Sin evento', NX + 16, H / 2);
     }
+
+    drawHitos(ctx, W, H, xOf, idx === 0, FONT);
 
     // Aguja en «ahora»
     const nx = xOf(nowMins);
@@ -182,7 +235,7 @@
     ctx.beginPath(); ctx.moveTo(nx, 0); ctx.lineTo(nx, H); ctx.stroke();
     ctx.shadowBlur = 0;
     ctx.fillStyle = ACCENT;
-    ctx.beginPath(); ctx.arc(nx, 10, 7, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(nx, compact ? 5 : 10, compact ? 4 : 7, 0, Math.PI * 2); ctx.fill();
   }
 
   // ── Panel de información de cada barra ──────────────────────────────
@@ -191,9 +244,10 @@
     if (!s) return;
     s.querySelector('.lbl').textContent = label;
     const nm = s.querySelector('.aname'), tm = s.querySelector('.atime'), nt = s.querySelector('.anotes'), cl = s.querySelector('.acall');
-    if (!block) { nm.textContent = '—'; tm.textContent = ''; nt.textContent = ''; cl.hidden = true; return; }
+    if (!block) { nm.textContent = '—'; tm.textContent = ''; nt.textContent = ''; cl.hidden = true; s.classList.remove('task'); return; }
     nm.textContent = block.name.toUpperCase();
-    tm.textContent = C.fmtHM(block.si) + '–' + C.fmtHM(block.sf);
+    s.classList.toggle('task', block.kind === 'tarea');
+    tm.textContent = (block.kind === 'sc' && CONFIG.mode === 'all' ? 'SOUNDCHECK  ·  ' : '') + C.fmtHM(block.si) + '–' + C.fmtHM(C.blockEnd(block));
     if (block.stage) {
       tm.appendChild(document.createTextNode('  ·  '));
       const sp = document.createElement('span');
@@ -203,6 +257,10 @@
       tm.appendChild(sp);
     }
     nt.textContent = block.notes || '';
+    if (block.kind === 'tarea' && C.isPlaying(block, Math.floor(C.nowAbs()))) {
+      const p = C.progress(block, Math.floor(C.nowAbs()));
+      nt.textContent = 'quedan ' + p.remaining + ' min' + (block.notes ? '  ·  ' + block.notes : '');
+    }
     if (block.call && block.callAbs !== null) {
       cl.hidden = false;
       cl.querySelector('span').textContent = 'CALL ' + C.fmtHM(block.callAbs);
@@ -210,12 +268,37 @@
   }
 
   // ── Barras dinámicas ─────────────────────────────────────────────────
-  function visibleCount() { const h = $('bot').clientHeight; return Math.max(1, Math.floor(h / STRIP_MIN_H)); }
+  /** Filas que llenan la pantalla (para no dejar huecos): según el alto elegido o el automático. */
+  function autoCount() { const h = $('bot').clientHeight; return Math.max(1, Math.floor(h / (ROW_H || STRIP_MIN_H))); }
+  /** Alto actual de una fila (el elegido o el automático). */
+  function curRowH() { const h = $('bot').clientHeight; return ROW_H || Math.max(STRIP_MIN_H, Math.floor(h / autoCount())); }
+  /** − / +: un paso más bajo o más alto para todas las filas por igual. */
+  function stepRowH(dir) {
+    const cur = curRowH();
+    const next = dir > 0 ? ROW_STEPS.find(v => v > cur) : ROW_STEPS.slice().reverse().find(v => v < cur);
+    if (next) setRowH(next);
+  }
+  function setRowH(v) {
+    ROW_H = ROW_STEPS.indexOf(v) >= 0 ? v : 0;
+    pset(P.rowH, ROW_H);
+    STRIP_H = {}; pset(P.stripH, STRIP_H);          // fuera los altos a mano: todas iguales
+    $('rlbl').textContent = ROW_H ? 'alto ' + ROW_H : 'alto auto';
+    $('rmin').disabled = curRowH() <= ROW_STEPS[0];
+    $('rmax').disabled = curRowH() >= ROW_STEPS[ROW_STEPS.length - 1];
+    buildStrips(visibleCount()); tick();
+  }
+  /** Una barra por cada entrada que queda (todo el horario, como siempre), al menos las que llenan el alto.
+   *  Las que ya terminaron salen y las demás suben solas. Si no caben, la lista hace scroll. */
+  function visibleCount() {
+    const at = Math.floor(C.nowAbs()) + Math.round(TIME_OFFSET);
+    const left = C.pickBlocks(BLOCKS, at, 500).list.filter(Boolean).length;
+    return Math.max(autoCount(), left);
+  }
 
   function buildStrips(n) {
     const bot = $('bot');
     bot.innerHTML = '';
-    const baseH = Math.max(STRIP_MIN_H, Math.floor(bot.clientHeight / Math.max(1, n)));
+    const baseH = curRowH();
     for (let i = 0; i < n; i++) {
       const s = document.createElement('div');
       s.className = 'strip' + (i === 0 ? ' first' : '');
@@ -292,14 +375,30 @@
     return pad2(Math.floor(s / 60)) + ':' + pad2(s % 60);
   }
 
+  /** Tarjetas de arriba: tipo y horario en una línea, escenario completo en otra (todo fluye, sin «…»). */
+  const KIND_CARD = { show: 'SHOW', sc: 'SOUNDCHECK', tarea: 'TAREA' };
+  function metaHtml(b, col) {
+    const k = b.kind || 'show';
+    return '<div class="tmeta tkline"><span class="tkind ' + k + '">' + (KIND_CARD[k] || 'SHOW') + '</span>&nbsp;&nbsp;&middot;&nbsp;&nbsp;' +
+      C.fmtHM(b.si) + '–' + C.fmtHM(C.blockEnd(b)) + '</div>' +
+      (b.stage ? '<div class="tmeta"><span class="tstage" style="color:' + col + '">' + esc(b.stage.toUpperCase()) + '</span></div>' : '');
+  }
+
   // EN ESCENA: banda que suena (con minutos restantes)
   function playingHtml(b, nowInt) {
     const col = safeColor(b.stageColor || b.color, '#888');
     const p = C.progress(b, nowInt);
     return '<div class="trow" style="--c:' + col + '"><div class="tname fit">' + esc(b.name.toUpperCase()) + '</div>' +
-      '<div class="tmeta">' + C.fmtHM(b.si) + '–' + C.fmtHM(b.sf) + stageHtml(b.stage, col) + '</div>' +
+      metaHtml(b, col) +
       '<div class="trem" style="color:' + col + '">' + (p.remaining > 0 ? p.remaining + ' min restantes' : 'Finalizado') + '</div>' +
       '<div class="tbar"><div style="width:' + p.pct + '%;background:' + col + '"></div></div></div>';
+  }
+
+  // EN ESCENA: tarea en curso (operativa del día, solo en Jornada completa)
+  function taskHtml(b, nowInt) {
+    const p = C.progress(b, nowInt);
+    return '<div class="trow tarea"><div class="tname fit">' + esc(b.name.toUpperCase()) + '</div>' + metaHtml(b, '#7dd3fc') +
+      '<div class="trem" style="color:#7dd3fc">quedan ' + p.remaining + ' min</div></div>';
   }
 
   // EN ESCENA: escenario en cambio (o en STANDBY si el regidor lo ha marcado), banda que entra y cuenta atrás
@@ -325,7 +424,7 @@
         ? '<div class="tbadge sb"><svg class="ic"><use href="#i-pause"/></svg>Standby: ' + co.mins + ' min</div>'
         : '<div class="tbadge"><svg class="ic"><use href="#i-swap"/></svg>Cambio: ' + co.mins + ' min</div>';
     return '<div class="trow" style="--c:' + col + '"><div class="tname fit">' + esc(b.name.toUpperCase()) + '</div>' +
-      '<div class="tmeta">' + C.fmtHM(b.si) + '–' + C.fmtHM(b.sf) + stageHtml(b.stage, col) + '</div>' + badge + '</div>';
+      metaHtml(b, col) + badge + '</div>';
   }
 
   /** Orden de escenarios: el del festival; sin escenario, al final. */
@@ -337,12 +436,14 @@
   function renderTopPanels(nowMins, nowInt, ended) {
     const playing = C.playingNow(BLOCKS, nowInt).map(b => ({ o: stageOrder(b.stageId), h: playingHtml(b, nowInt) }));
     const changing = C.changeoversNow(BLOCKS, nowMins).map(co => ({ o: stageOrder(co.stageId), h: changeoverHtml(co) }));
-    const scene = playing.concat(changing).sort((a, b) => a.o - b.o);   // sort estable: misma posición, primero el que suena
+    const tasks = (C.tasksNow ? C.tasksNow(BLOCKS, nowInt) : []).map(b => ({ o: 1000, h: taskHtml(b, nowInt) }));
+    const scene = playing.concat(changing).concat(tasks).sort((a, b) => a.o - b.o);   // sort estable: misma posición, primero el que suena
     const next = C.nextPerStage(BLOCKS, nowInt);
     const calls = C.callList(BLOCKS, nowInt, CALL_MINS, CALL_DONE);
     const fin = '<div class="tempty fin">FIN DE JORNADA</div>', none = '<div class="tempty">—</div>';
     const empty = NOFEST ? '<div class="tempty fin">SIN EVENTO CARGADO</div>' : DAY_MISSING ? '<div class="tempty fin">DÍA SIN DATOS</div>' : (ended ? fin : none);
-    $('now-list').innerHTML = scene.length ? scene.map(x => x.h).join('') : empty;
+    const idle = (NOFEST || DAY_MISSING || ended) ? empty : '<div class="tempty idle">— SIN ACTIVIDAD —</div>';
+    $('now-list').innerHTML = scene.length ? scene.map(x => x.h).join('') : idle;
     $('next-list').innerHTML = next.length ? next.map(nextHtml).join('') : none;
     $('call-list').innerHTML = calls.map(b => {
       const col = safeColor(b.stageColor || b.color, CALLC);
@@ -366,7 +467,7 @@
       el.style.overflowWrap = '';
       const fits = () => {
         const lh = parseFloat(getComputedStyle(el).lineHeight) || 1;
-        return el.scrollHeight <= lh * 2 + 2 && el.scrollWidth <= el.clientWidth + 1;
+        return el.scrollHeight <= lh * 3 + 2 && el.scrollWidth <= el.clientWidth + 1;
       };
       let s = 1;
       el.style.setProperty('--fs', s);
@@ -375,6 +476,29 @@
       if (el.scrollWidth > el.clientWidth + 1) el.style.overflowWrap = 'anywhere';
       el.classList.remove('measuring');
     });
+    // Si el contenido de una tarjeta no cabe en su alto, se reduce toda la letra de esa tarjeta (hasta el 55 %)
+    document.querySelectorAll('#top .tpanel-b').forEach(box => {
+      let ps = 1;
+      box.style.setProperty('--ps', ps);
+      while (ps > 0.55 && box.scrollHeight > box.clientHeight + 1) { ps = Math.round((ps - 0.05) * 100) / 100; box.style.setProperty('--ps', ps); }
+    });
+  }
+
+  /** Barras: desde «ahora» o, si el regidor ha desplazado la línea de tiempo, desde la hora que está mirando.
+   *  Desplazado, las etiquetas dicen qué es y a qué hora empieza (AHORA/SIGUIENTE solo valen para el momento real).
+   *  Los paneles de arriba (EN ESCENA, SIGUIENTE, CALL) siguen siempre la hora real. */
+  const KIND_TXT = { show: 'SHOW', sc: 'SOUNDCHECK', tarea: 'TAREA' };
+  function pickView(nowInt, n) {
+    const off = Math.round(TIME_OFFSET);
+    if (Math.abs(off) < 1) {
+      const r = C.pickBlocks(BLOCKS, nowInt, n);
+      r.labels = C.stripLabels ? C.stripLabels(r.list, nowInt) : r.list.map((b, i) => C.stripLabel(i, r.playing));
+      return r;
+    }
+    const at = nowInt + off;
+    const r = C.pickBlocks(BLOCKS, at, n);
+    r.labels = r.list.map(b => b ? (KIND_TXT[b.kind] || 'SHOW') + ' · ' + C.fmtHM(b.si) : '');
+    return r;
   }
 
   // ── Bucle principal ──────────────────────────────────────────────────
@@ -386,19 +510,20 @@
 
     const n = visibleCount();
     if (n !== stripCount) buildStrips(n);
-    const r = C.pickBlocks(BLOCKS, nowInt, n);
+    const r = pickView(nowInt, n);
+    const labels = r.labels;
     r.list.forEach((b, i) => {
-      setInfo(i, b, r.ended ? (i === 0 ? 'FIN DE JORNADA' : '') : C.stripLabel(i, r.playing));
+      setInfo(i, b, r.ended ? (i === 0 ? 'FIN DE JORNADA' : '') : labels[i]);
       const cv = document.querySelector('.strip[data-i="' + i + '"] canvas');
-      drawStrip(cv, b, nowMins, r.ended);
+      drawStrip(cv, b, nowMins, r.ended, i);
     });
     renderTopPanels(nowMins, nowInt, r.ended);
   }
 
   function redraw() {
     const nowMins = C.nowAbs(), nowInt = Math.floor(nowMins);
-    const r = C.pickBlocks(BLOCKS, nowInt, stripCount || visibleCount());
-    r.list.forEach((b, i) => drawStrip(document.querySelector('.strip[data-i="' + i + '"] canvas'), b, nowMins, r.ended));
+    const r = pickView(nowInt, stripCount || visibleCount());
+    r.list.forEach((b, i) => drawStrip(document.querySelector('.strip[data-i="' + i + '"] canvas'), b, nowMins, r.ended, i));
   }
 
   // ── Interacción ──────────────────────────────────────────────────────
@@ -492,6 +617,19 @@
   // Como en Stage Master: «+» = más minutos visibles, «−» = menos.
   $('zmin').addEventListener('click', () => setZoom(1));
   $('zmax').addEventListener('click', () => setZoom(-1));
+
+  $('rmax').addEventListener('click', () => stepRowH(1));
+  $('rmin').addEventListener('click', () => stepRowH(-1));
+  $('rlbl').addEventListener('click', () => setRowH(0));
+
+  // Controles plegables: el cursor encima un momento los despliega; al irse, se pliegan. Al tocar, abre/cierra.
+  (function initDock() {
+    const dock = $('zoomctl'); let tOpen = 0, tClose = 0;
+    const set = on => { dock.classList.toggle('open', on); $('dockbtn').setAttribute('aria-expanded', String(on)); };
+    dock.addEventListener('pointerenter', e => { if (e.pointerType !== 'mouse') return; clearTimeout(tClose); tOpen = setTimeout(() => set(true), 250); });
+    dock.addEventListener('pointerleave', e => { if (e.pointerType !== 'mouse') return; clearTimeout(tOpen); tClose = setTimeout(() => set(false), 600); });
+    $('dockbtn').addEventListener('click', () => { clearTimeout(tOpen); set(!dock.classList.contains('open')); });
+  })();
   if (window.opener) { $('close').hidden = false; $('close').addEventListener('click', () => window.close()); }
 
   // Pantalla completa (botón o tecla F)
@@ -528,6 +666,7 @@
   // ── Arranque ─────────────────────────────────────────────────────────
   load();
   setZoom(0);
+  setRowH(ROW_H);
   tick();
   setInterval(tick, 1000);
   window.addEventListener('resize', () => requestAnimationFrame(tick));
