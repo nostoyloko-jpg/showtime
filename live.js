@@ -671,4 +671,6 @@
   setInterval(tick, 1000);
   window.addEventListener('resize', () => requestAnimationFrame(tick));
   if (window.opener || !Dt.getFestival()) Dt.hello();   // pide los datos al Panel que la abrió (o a uno abierto)
+  // Si el Panel se recarga, pierde la referencia a esta ventana: el «ping» hace que la recupere y le reenvíe todo.
+  if (window.opener && Dt.ping) setInterval(Dt.ping, 2000);
 })();

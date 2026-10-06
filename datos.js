@@ -68,10 +68,11 @@
   // ── Sincronización ───────────────────────────────────────────────────
   let bc = null;
   try { bc = new BroadcastChannel(APP); } catch (e) { bc = null; }
-  const peers = new Set();               // ventanas abiertas por esta (p. ej. la Live)
-  const listeners = [];
+  const peers = new Set();               // ventanas abiertas por esta (p. ej. la Live) o que nos han escrito
+  const listeners = [], peerListeners = [];
 
   function addPeer(win) { if (win) peers.add(win); }
+  function snapshot() { return { app: APP, type: 'snapshot', festival: getFestival(), config: getConfig(), callDone: getCallDone() }; }
 
   function send(msg) {
     const m = Object.assign({ app: APP }, msg);
@@ -100,13 +101,30 @@
   }
 
   if (bc) bc.onmessage = e => receive(e.data);
-  root.addEventListener('message', e => receive(e.data));
+  // Mensaje directo de otra ventana: si no la conocíamos (p. ej. el Panel se recargó y perdió la Live),
+  // se apunta como compañera y se le manda el estado completo. Así los cambios vuelven a llegarle al momento.
+  root.addEventListener('message', e => {
+    const m = e.data;
+    if (!m || m.app !== APP) return;
+    const src = e.source;
+    if (src && src !== root && src !== root.opener && !peers.has(src)) {
+      peers.add(src);
+      peerListeners.forEach(fn => { try { fn(src); } catch (err) { console.error(err); } });
+      if (m.type === 'ping' || m.type === 'hello') { try { src.postMessage(snapshot(), '*'); } catch (err) {} }
+    }
+    if (m.type === 'ping') return;
+    if (m.type === 'hello' && src && src !== root) { try { src.postMessage(snapshot(), '*'); } catch (err) {} return; }
+    receive(m);
+  });
   root.addEventListener('storage', e => {
     const type = e.key === K.festival ? 'festival' : e.key === K.config ? 'config' : e.key === K.callDone ? 'callDone' : null;
     if (type) listeners.forEach(fn => { try { fn(type); } catch (err) { console.error(err); } });
   });
 
   function onChange(fn) { listeners.push(fn); }
+  function onPeer(fn) { peerListeners.push(fn); }
+  /** La Live se presenta cada pocos segundos a la ventana que la abrió (barato; solo cuenta la primera vez). */
+  function ping() { if (root.opener && !root.opener.closed) { try { root.opener.postMessage({ app: APP, type: 'ping' }, '*'); } catch (e) {} } }
 
   // ── Cambios que se propagan ──────────────────────────────────────────
   function setFestival(f) { write(K.festival, f); send({ type: 'festival', festival: f }); }
@@ -126,6 +144,6 @@
     KEYS: K, STYLES, normStyle, normConfig,
     getFestival, getConfig, getCallDone, callMinsOf, getOriginal, setOriginal,
     setFestival, setConfig, markCallDone, pruneCallDone,
-    onChange, addPeer, send, hello
+    onChange, onPeer, addPeer, send, hello, ping
   };
 })(window);

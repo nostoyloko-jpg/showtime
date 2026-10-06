@@ -694,6 +694,8 @@
     tick();
   }
   $('btn-live').addEventListener('click', openLive);
+  // La Live que se abrió antes de recargar el Panel se vuelve a presentar sola: se recupera para el estado y la sincronización.
+  if (Dt.onPeer) Dt.onPeer(w => { if (!liveWin || liveWin.closed) { liveWin = w; tick(); } });
 
   // ── Abrir / Exportar ─────────────────────────────────────────────────
   function readFile(file) {
