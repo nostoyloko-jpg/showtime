@@ -212,3 +212,10 @@ body[data-lv="escenario"] .callok:hover,body[data-lv="escenario"] .callok:active
 body[data-lv="escenario"] .txtbtn{color:#fff}
 .trow.tarea{border-left-style:dashed;border-left-color:#7dd3fc}
 .trow.tarea .tname{color:#7dd3fc}
+/* Desfase por zona (2c-B) */
+#drift{display:flex;flex-direction:column;gap:3px;margin-top:8px}
+#drift:empty{display:none}
+.dz{font-size:clamp(10px,1.5vh,15px);font-weight:900;letter-spacing:.08em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dz.absorb{color:var(--call)}
+.dz.over{color:#ff3b30}
+.dz.early{color:#10b981}

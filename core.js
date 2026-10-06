@@ -10,6 +10,7 @@
 
   const DEFAULT_CUTOFF = '06:00';
   const DEFAULT_CALL_MINS = 15;
+  const DEFAULT_CO_MIN = 15;            // changeover mínimo (min) del evento
   const DEFAULT_DURATION = 60;          // si un bloque no tiene fin
   const MAX_NEXT = 4;                   // «Siguiente»: máximo de filas
   const ARTIST_COLORS = ['#e94560','#4fc3f7','#1de9b6','#ffb347','#c77dff','#ff9a3c','#84fab0','#f77f00','#a8edea','#fed6e3'];
@@ -106,6 +107,10 @@
   // hito:  momento puntual (puertas, curfew…): línea vertical en la Live; no tiene fin.
   // Tareas e hitos guardan su horario en los campos del show (fecha, inicio, fin, notas).
   const TIPOS = ['banda', 'tarea', 'hito'];
+  /** LED de la columna DELAY: rojo = fija (no se mueve con los retrasos). Por defecto, verde. */
+  function isFija(artist) { return !!(artist && artist.showtimeFija); }
+  /** LED forzado a verde: se mueve aunque su categoría esté bloqueada en Retrasos. */
+  function isLibre(artist) { return !!(artist && artist.showtimeLibre); }
   function tipoOf(artist) { const t = artist && artist.showtimeTipo; return t === 'tarea' || t === 'hito' ? t : 'banda'; }
   /** ¿Bloque de banda (show o soundcheck)? Los bloques sin «kind» (antiguos) cuentan como banda. */
   function isBand(b) { return !!b && (!b.kind || b.kind === 'show' || b.kind === 'sc'); }
@@ -170,8 +175,8 @@
   // ── Campos del proyecto por modo ──────────────────────────────────────
   // Los de Stage Master y, con prefijo «showtime», los que añade Showtime (Stage Master los ignora).
   const FIELDS = {
-    show: { fecha: 'fecha', inicio: 'inicio', fin: 'fin', call: 'showtimeCall', notas: 'notas', standby: 'showtimeStandby' },
-    sc:   { fecha: 'soundcheckFecha', inicio: 'soundcheckInicio', fin: 'soundcheckFin', call: 'soundcheckCall', notas: 'soundcheckNotas', standby: 'showtimeStandbySC' }
+    show: { fecha: 'fecha', inicio: 'inicio', fin: 'fin', call: 'showtimeCall', notas: 'notas', standby: 'showtimeStandby', real: 'showtimeReal' },
+    sc:   { fecha: 'soundcheckFecha', inicio: 'soundcheckInicio', fin: 'soundcheckFin', call: 'soundcheckCall', notas: 'soundcheckNotas', standby: 'showtimeStandbySC', real: 'showtimeRealSC' }
   };
 
   // ── De proyecto Stage Master a bloques ────────────────────────────────
@@ -189,13 +194,22 @@
     const blocks = arr.map(e => {
       const a = e.a, sc = e.sc, kind = e.kind, band = kind === 'show' || kind === 'sc';
       const f = sc ? (a.soundcheckFecha || a.fecha) : a.fecha;
-      const si = toAbs(f, sc ? a.soundcheckInicio : a.inicio);
-      const sf = kind === 'hito' ? null : adjustEnd(si, toAbs(f, sc ? a.soundcheckFin : a.fin));
+      const psi = toAbs(f, sc ? a.soundcheckInicio : a.inicio);
+      const psf = kind === 'hito' ? null : adjustEnd(psi, toAbs(f, sc ? a.soundcheckFin : a.fin));
+      // Horas REALES (opcionales: «Empezar» / «Terminar»). Sin ellas, todo va en hora (real = teórica).
+      const real = kind !== 'hito' ? (a[FIELDS[sc ? 'sc' : 'show'].real] || null) : null;
+      const ri = real && Number.isFinite(real.i) ? real.i : null;
+      const rf = real && Number.isFinite(real.f) ? real.f : null;
+      const dur = (psi !== null && psf !== null) ? psf - psi : null;
+      const si = ri !== null ? ri : psi;                                   // inicio efectivo
+      const sf = kind === 'hito' ? null : rf !== null ? rf : (ri !== null && dur !== null ? ri + dur : psf);   // fin efectivo (previsto)
+      const delta = rf !== null && psf !== null ? rf - psf : ri !== null && psi !== null ? ri - psi : null;
       const call = band ? ((sc ? a.soundcheckCall : a[FIELDS.show.call]) || '') : '';
       const esc = getEscenario(state, a.escenarioId);
       return {
         id: a.id, kind: kind, key: a.id + ':' + kind,
-        si: si, sf: sf,
+        si: si, sf: sf, psi: psi, psf: psf, ri: ri, rf: rf, delta: delta,
+        fija: isFija(a), libre: isLibre(a),
         name: a.nombre || '',
         color: artistColor(state, a),
         notes: (sc ? a.soundcheckNotas : a.notas) || '',
@@ -399,7 +413,7 @@
   }
 
   function modeKey(mode) { return isSC(mode) ? 'sc' : 'show'; }
-  const SHARED_KEYS = ['nombre', 'escenario', 'color', 'tipo'];  // iguales en show y soundcheck
+  const SHARED_KEYS = ['nombre', 'escenario', 'color', 'tipo', 'fija'];  // iguales en show y soundcheck
   const MODE_KEYS = ['fecha', 'inicio', 'fin', 'call', 'notas', 'standby'];
 
   /** Valor efectivo de un campo (en soundcheck la fecha cae a la del show si falta). */
@@ -408,6 +422,7 @@
     if (key === 'escenario') return String(artist.escenarioId || '');
     if (key === 'color') return String(artist.color || '');
     if (key === 'tipo') return tipoOf(artist);
+    if (key === 'fija') return isFija(artist) ? 'si' : isLibre(artist) ? 'libre' : '';
     const F = FIELDS[modeKey(mode)];
     if (key === 'standby') return !!artist[F.standby];
     if (key === 'fecha' && isSC(mode)) return artist[F.fecha] || artist.fecha || '';
@@ -459,7 +474,7 @@
       before = a.nombre || ''; a.nombre = value;
     } else if (key === 'escenario') {
       value = String(raw || '');
-      if (value && !getEscenario(next, value)) return { ok: false, error: 'Ese escenario no existe.' };
+      if (value && !getEscenario(next, value)) return { ok: false, error: 'Esa zona no existe.' };
       before = a.escenarioId || ''; a.escenarioId = value;
     } else if (key === 'color') {
       value = String(raw || '') === '' ? '' : normColor(raw);
@@ -517,6 +532,36 @@
     return { ok: true, state: next, changed: !!state.artists[i][k] !== !!on };
   }
 
+  /** LED de la columna DELAY. Rojo (on) = no se mueve con los retrasos. No bloquea la edición. */
+  function setFija(state, id, on) {
+    const i = findArtistIndex(state, id);
+    if (i < 0) return { ok: false, error: 'Entrada no encontrada.' };
+    const next = clone(state);
+    if (on) next.artists[i].showtimeFija = true; else delete next.artists[i].showtimeFija;
+    if (on) delete next.artists[i].showtimeLibre;
+    return { ok: true, state: next, changed: isFija(state.artists[i]) !== !!on };
+  }
+
+  /** LED de una entrada concreta, por encima de su categoría: 'lock' (rojo) · 'free' (verde aunque su categoría esté bloqueada) · null (sigue a su categoría). */
+  function setDelayFlag(state, id, flag) {
+    const i = findArtistIndex(state, id);
+    if (i < 0) return { ok: false, error: 'Entrada no encontrada.' };
+    const next = clone(state), a = next.artists[i];
+    delete a.showtimeFija; delete a.showtimeLibre;
+    if (flag === 'lock') a.showtimeFija = true; else if (flag === 'free') a.showtimeLibre = true;
+    return { ok: true, state: next, changed: JSON.stringify(state.artists[i]) !== JSON.stringify(a) };
+  }
+  /** ¿Se mueve con los retrasos? Rojo individual > verde individual > categoría. */
+  function movesWithDelay(b, cats) { return b.fija ? false : b.libre ? true : typeof cats === 'function' ? !!cats(b) : !!(cats && cats[b.kind]); }
+
+  /** Changeover mínimo de una zona: el suyo o, si no tiene, el del evento. */
+  function coMinFor(state, stageId) {
+    const e = getEscenario(state, stageId);
+    if (e && Number.isFinite(e.coMin) && e.coMin >= 0) return e.coMin;
+    const v = Number(state && state.event && state.event.coMin);
+    return Number.isFinite(v) && v >= 0 ? v : DEFAULT_CO_MIN;
+  }
+
   // ── Festival, escenarios y bandas creados en Showtime ─────────────────
   /** Días de la jornada del evento (de fechaInicio a fechaFin, máx. 31). */
   function eventDays(state) {
@@ -541,7 +586,9 @@
     if (!cut) return { ok: false, error: 'Hora de corte no válida (HH:MM).' };
     const cm = Math.round(Number(ev.callMins == null || ev.callMins === '' ? DEFAULT_CALL_MINS : ev.callMins));
     if (!(cm >= 1 && cm <= 180)) return { ok: false, error: 'Aviso CALL: entre 1 y 180 minutos.' };
-    return { ok: true, event: { nombre, fechaInicio: fi, fechaFin: ff, dayCutoff: cut, callMins: cm } };
+    const co = Math.round(Number(ev.coMin == null || ev.coMin === '' ? DEFAULT_CO_MIN : ev.coMin));
+    if (!(co >= 0 && co <= 180)) return { ok: false, error: 'Changeover mínimo: entre 0 y 180 minutos.' };
+    return { ok: true, event: { nombre, fechaInicio: fi, fechaFin: ff, dayCutoff: cut, callMins: cm, coMin: co } };
   }
 
   function newFestival(ev) {
@@ -562,9 +609,9 @@
 
   function addStage(state, nombre, color) {
     const n = normName(nombre);
-    if (!n) return { ok: false, error: 'Pon un nombre al escenario.' };
+    if (!n) return { ok: false, error: 'Pon un nombre a la zona.' };
     const esc = (state.escenarios || []);
-    if (esc.some(e => String(e.nombre || '').toLowerCase() === n.toLowerCase())) return { ok: false, error: 'Ya hay un escenario con ese nombre.' };
+    if (esc.some(e => String(e.nombre || '').toLowerCase() === n.toLowerCase())) return { ok: false, error: 'Ya hay una zona con ese nombre.' };
     let k = esc.length + 1, id;
     do { id = 'esc' + k++; } while (esc.some(e => e.id === id));
     const next = clone(state);
@@ -575,18 +622,27 @@
 
   function updateStage(state, id, patch) {
     const i = (state.escenarios || []).findIndex(e => e.id === id);
-    if (i < 0) return { ok: false, error: 'Escenario no encontrado.' };
+    if (i < 0) return { ok: false, error: 'Zona no encontrada.' };
     const next = clone(state), e = next.escenarios[i];
     if (patch.nombre !== undefined) {
       const n = normName(patch.nombre);
       if (!n) return { ok: false, error: 'El nombre no puede quedar vacío.' };
-      if (next.escenarios.some((x, j) => j !== i && String(x.nombre || '').toLowerCase() === n.toLowerCase())) return { ok: false, error: 'Ya hay un escenario con ese nombre.' };
+      if (next.escenarios.some((x, j) => j !== i && String(x.nombre || '').toLowerCase() === n.toLowerCase())) return { ok: false, error: 'Ya hay una zona con ese nombre.' };
       e.nombre = n;
     }
     if (patch.color !== undefined) {
       const c = normColor(patch.color);
       if (!c) return { ok: false, error: 'Color no válido.' };
       e.color = c;
+    }
+    if (patch.coMin !== undefined) {                    // '' = usar el del evento
+      const raw = String(patch.coMin == null ? '' : patch.coMin).trim();
+      if (raw === '') delete e.coMin;
+      else {
+        const v = Math.round(Number(raw));
+        if (!/^\d+$/.test(raw) || v > 180) return { ok: false, error: 'Changeover mínimo: entre 0 y 180 minutos (vacío = el del evento).' };
+        e.coMin = v;
+      }
     }
     return { ok: true, state: next, changed: JSON.stringify(state.escenarios[i]) !== JSON.stringify(e) };
   }
@@ -603,9 +659,9 @@
 
   function removeStage(state, id) {
     const i = (state.escenarios || []).findIndex(e => e.id === id);
-    if (i < 0) return { ok: false, error: 'Escenario no encontrado.' };
+    if (i < 0) return { ok: false, error: 'Zona no encontrada.' };
     const n = stageUse(state, id);
-    if (n) return { ok: false, error: 'Tiene ' + n + (n === 1 ? ' banda' : ' bandas') + '. Muévelas a otro escenario o bórralas antes.' };
+    if (n) return { ok: false, error: 'Tiene ' + n + (n === 1 ? ' banda' : ' bandas') + '. Muévelas a otra zona o bórralas antes.' };
     const next = clone(state);
     next.escenarios.splice(i, 1);
     return { ok: true, state: next, changed: true };
@@ -620,8 +676,8 @@
     const nombre = normName(d.nombre);
     if (!nombre) return { ok: false, error: tipo === 'banda' ? 'Pon el nombre de la banda.' : 'Pon el nombre (p. ej. ' + (tipo === 'hito' ? 'Puertas' : 'Comida técnicos') + ').', field: 'nombre' };
     const esc = String(d.escenarioId || '');
-    if (esc && !getEscenario(state, esc)) return { ok: false, error: 'Ese escenario no existe.', field: 'escenario' };
-    if (tipo === 'banda' && (state.escenarios || []).length && !esc) return { ok: false, error: 'Elige el escenario.', field: 'escenario' };
+    if (esc && !getEscenario(state, esc)) return { ok: false, error: 'Esa zona no existe.', field: 'escenario' };
+    if (tipo === 'banda' && (state.escenarios || []).length && !esc) return { ok: false, error: 'Elige la zona.', field: 'escenario' };
     const jor = String(d.jornada || '').trim();
     if (dayIndex(jor) === null) return { ok: false, error: 'Elige la jornada.', field: 'jornada' };
     const ini = normHM(d.inicio);
@@ -687,6 +743,154 @@
     const next = clone(state);
     const gone = next.artists.splice(i, 1)[0];
     return { ok: true, state: next, removed: gone };
+  }
+
+  // ── Regiduría en vivo (2c-B): horas reales, desfase Δ/A, cascada y márgenes ──
+  const MARGIN_WARN = 15;   // min: aviso ámbar cuando un hito queda a menos de esto
+
+  /** Registra la hora REAL de inicio ('i') o de fin ('f') de una banda en un modo. abs = minutos absolutos.
+   *  Solo mide: no mueve nada. abs null = borrar. */
+  function setReal(state, id, mode, which, abs) {
+    const i = findArtistIndex(state, id);
+    if (i < 0) return { ok: false, error: 'Entrada no encontrada.' };
+    if (tipoOf(state.artists[i]) === 'hito') return { ok: false, error: 'Un hito no tiene hora real.' };
+    const next = clone(state), a = next.artists[i], k = FIELDS[modeKey(mode)].real;
+    const r = Object.assign({}, a[k] || {});
+    if (abs === null || abs === undefined) delete r[which]; else r[which] = Math.floor(abs);
+    if (which === 'i' && (abs === null || abs === undefined)) delete r.f;
+    if (r.i === undefined && r.f === undefined) delete a[k]; else a[k] = r;
+    return { ok: true, state: next };
+  }
+
+  /** Jornada (día del evento) en la que cae un instante absoluto, con la hora de corte. */
+  function jornadaOfAbs(state, abs) {
+    const d = Math.floor(abs / 1440), t = abs - d * 1440;
+    return isoOfDay(t < cutoffMins(state) ? d - 1 : d);
+  }
+
+  /** Desfase por zona. Para cada zona, la última banda con hora real registrada (en su jornada) da Δ.
+   *  A = changeover programado hasta la siguiente banda − changeover mínimo de la zona.
+   *  status: 'early' (Δ<0) · 'ontime' (Δ=0) · 'absorb' (0<Δ≤A) · 'overflow' (Δ>A; overflow = Δ−A).
+   *  Comportamiento pasivo: si la siguiente ya debería haber empezado y no se ha registrado, se da por en hora. */
+  function driftByZone(state, blocks, now) {
+    const bands = blocks.filter(b => isBand(b) && b.psi !== null);
+    const zones = {};
+    bands.forEach(b => { const k = b.stageId || ''; (zones[k] = zones[k] || []).push(b); });
+    const out = [];
+    Object.keys(zones).forEach(k => {
+      const list = zones[k].slice().sort((x, y) => x.psi - y.psi);
+      let last = null;
+      list.forEach(b => { if (b.delta !== null && (!last || b.psi > last.psi)) last = b; });
+      if (!last) return;
+      const next = list.find(b => b.psi > last.psi && b.jornada === last.jornada) || null;
+      // Pasivo: si la anterior acabó a tiempo para que la siguiente empiece en hora y ya es su hora, se da por en hora
+      if (next && next.ri === null && now !== undefined && now >= next.psi && last.rf !== null && last.rf <= next.psi) return;
+      const coMin = coMinFor(state, k);
+      const A = next ? Math.max(0, (next.psi - last.psf) - coMin) : Infinity;
+      const d = last.delta;
+      let status = d < 0 ? 'early' : d === 0 ? 'ontime' : d <= A ? 'absorb' : 'overflow';
+      const esc = getEscenario(state, k);
+      out.push({ zoneId: k, zone: esc ? esc.nombre : '', color: esc ? esc.color : '', block: last, next: next,
+        delta: d, A: A === Infinity ? null : A, coMin: coMin, status: status, overflow: status === 'overflow' ? d - A : 0 });
+    });
+    return out;
+  }
+
+  /** Mueve en cascada `minutes` las entradas que cumplan TODO esto:
+   *  - de la jornada de `fromAbs`, con inicio programado >= fromAbs (y > afterAbs si se da), sin hora real de inicio;
+   *  - de las zonas `zone` ('all' = todas; un id; o lista de ids, '' = sin zona);
+   *  - de una categoría autorizada en `cats` ({ show, sc, tarea, hito }, o función (bloque) → bool, p. ej. por zona);
+   *  - con DELAY en verde (las de LED rojo no se mueven; NO hacen de tope: lo verde de después sí se mueve).
+   *  Devuelve { state, moved:[...], kept:[...entradas rojas afectadas], clashes:[...] }. No toca el original. */
+  function shiftEntries(state, opts) {
+    const o = opts || {};
+    const mins = Math.round(Number(o.minutes) || 0);
+    const cats = o.cats || {};
+    const jor = o.day || jornadaOfAbs(state, o.fromAbs);
+    const all = buildBlocks(state, { mode: 'all', day: jor });
+    // Zonas: 'all' (o vacío) = todas; un id; o una lista de ids ('' = entradas sin zona)
+    const zs = Array.isArray(o.zone) ? o.zone : (o.zone === 'all' || !o.zone ? null : [o.zone]);
+    const inScope = b => b.psi !== null && b.psi >= o.fromAbs && (o.afterAbs === undefined || b.psi > o.afterAbs) && b.ri === null &&
+      (!zs || zs.indexOf(b.stageId || '') >= 0);
+    const cand = all.filter(inScope);
+    const move = cand.filter(b => movesWithDelay(b, cats));
+    const kept = cand.filter(b => !movesWithDelay(b, cats));
+    let next = clone(state);
+    const moved = [];
+    move.forEach(b => {
+      const i = findArtistIndex(next, b.id); if (i < 0) return;
+      const a = next.artists[i], F = FIELDS[b.kind === 'sc' ? 'sc' : 'show'];
+      const ns = b.psi + mins;
+      a[F.fecha] = isoOfDay(Math.floor(ns / 1440));
+      a[F.inicio] = fmtHM(ns);
+      if (b.kind !== 'hito' && b.psf !== null) a[F.fin] = fmtHM(b.psf + mins);
+      moved.push({ id: b.id, key: b.key, kind: b.kind, name: b.name, stage: b.stage, from: b.psi, to: ns, fromEnd: b.psf, toEnd: b.psf !== null ? b.psf + mins : null });
+    });
+    // Choques: lo movido invade una entrada en rojo (o un hito en rojo) de su zona que antes no invadía
+    const after = buildBlocks(next, { mode: 'all', day: jor });
+    const fixed = after.filter(b => b.psi !== null && !movesWithDelay(b, cats) && moved.every(m => m.key !== b.key));
+    const clashes = [];
+    moved.forEach(m => {
+      const mb = after.find(b => b.key === m.key); if (!mb) return;
+      fixed.forEach(f => {
+        if (f.key === m.key || f.kind === 'tarea' || mb.kind === 'tarea') return;   // las tareas conviven: no hay choque
+        if (f.stageId && mb.stageId && f.stageId !== mb.stageId) return;
+        if (f.stageId && !mb.stageId) return;
+        const ov = (s1, e1, s2, e2) => s1 < e2 && s2 < e1;
+        const fEnd = f.kind === 'hito' ? f.psi : blockEnd(f);
+        const mEnd = mb.kind === 'hito' ? mb.psi : blockEnd(mb);
+        const nowOv = f.kind === 'hito' ? (mb.psi < f.psi && mEnd > f.psi) : mb.kind === 'hito' ? (f.psi < mb.psi && fEnd > mb.psi) : ov(mb.psi, mEnd, f.psi, fEnd);
+        const was = f.kind === 'hito' ? (m.from < f.psi && (m.fromEnd !== null ? m.fromEnd : m.from) > f.psi) : mb.kind === 'hito' ? (f.psi < m.from && fEnd > m.from) : ov(m.from, m.fromEnd !== null ? m.fromEnd : m.from + DEFAULT_DURATION, f.psi, fEnd);
+        if (nowOv && !was) clashes.push({ name: m.name, with: f.name, at: f.psi });
+      });
+    });
+    return { ok: true, state: next, moved: moved, kept: kept.map(b => ({ name: b.name, kind: b.kind, stage: b.stage, at: b.psi })), clashes: clashes, jornada: jor };
+  }
+
+  /** Márgenes de los hitos: para cada hito, la última banda que debía acabar antes de él (de su zona; sin zona, de cualquiera),
+   *  con su fin PROYECTADO (retraso acumulado incluido: lo que se ha registrado y el desborde que arrastra).
+   *  level: 'ok' · 'tight' (margen < 15) · 'over' (rebasado). Solo avisa. */
+  function hitoMargins(state, blocks, now) {
+    const proj = projectBands(state, blocks, now);
+    const out = [];
+    blocks.filter(b => b.kind === 'hito' && b.psi !== null).forEach(h => {
+      let best = null;
+      blocks.forEach(b => {
+        if (!isBand(b) || b.psf === null || b.jornada !== h.jornada) return;
+        if (h.stageId && b.stageId !== h.stageId) return;
+        if (b.psf > h.psi || b.psi >= h.psi) return;
+        if (!best || b.psf > best.psf) best = b;
+      });
+      if (!best) return;
+      const end = proj[best.key] ? proj[best.key].pe : blockEnd(best);
+      const margin = Math.round(h.psi - end);
+      out.push({ hito: h, band: best, projEnd: end, margin: margin, level: margin < 0 ? 'over' : margin < MARGIN_WARN ? 'tight' : 'ok' });
+    });
+    return out;
+  }
+
+  /** Proyección por zona: una banda futura no puede empezar antes de que acabe la anterior (con su retraso) + el changeover mínimo.
+   *  Solo se arrastra retraso real registrado; sin registros, todo coincide con el horario. */
+  function projectBands(state, blocks, now) {
+    const res = {}, zones = {};
+    blocks.filter(b => isBand(b) && b.psi !== null).forEach(b => { const k = (b.stageId || '') + '|' + b.jornada; (zones[k] = zones[k] || []).push(b); });
+    Object.keys(zones).forEach(k => {
+      const list = zones[k].sort((x, y) => x.psi - y.psi);
+      let prevEnd = null, prevLate = false;
+      const coMin = coMinFor(state, k.split('|')[0]);
+      list.forEach(b => {
+        const dur = b.psf !== null ? b.psf - b.psi : DEFAULT_DURATION;
+        let ps;
+        if (b.ri !== null) ps = b.ri;
+        else if (prevLate && prevEnd + coMin > b.psi) ps = prevEnd + coMin;   // no pudo empezar antes de que acabara la anterior
+        else ps = b.psi;
+        const pe = b.rf !== null ? b.rf : ps + dur;
+        res[b.key] = { ps: ps, pe: pe };
+        prevLate = pe > (b.psf !== null ? b.psf : b.psi + dur);
+        prevEnd = pe;
+      });
+    });
+    return res;
   }
 
   // ── Cambios respecto a la última importación / exportación ────────────
@@ -794,7 +998,8 @@
   }
 
   const API = {
-    DEFAULT_CUTOFF, DEFAULT_CALL_MINS, DEFAULT_DURATION, MAX_NEXT, ARTIST_COLORS,
+    DEFAULT_CUTOFF, DEFAULT_CALL_MINS, DEFAULT_DURATION, DEFAULT_CO_MIN, isFija, setFija, coMinFor,
+    MARGIN_WARN, isLibre, setDelayFlag, movesWithDelay, setReal, jornadaOfAbs, driftByZone, shiftEntries, hitoMargins, projectBands, MAX_NEXT, ARTIST_COLORS,
     pad2, parseHM, fmtHM, dayIndex, isoOfDay, shiftDate, toAbs, adjustEnd, nowAbs,
     cutoffMins, festivalDateOf, entersMode, festivalDays, TIPOS, tipoOf, isBand, isAll, entriesOf, tasksNow, hitosOf,
     getEscenario, artistColor, callAbsFor, buildBlocks,

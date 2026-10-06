@@ -190,11 +190,11 @@
   }
 
   const KEYS = ['banda', 'tipo', 'escenario', 'jornada', 'inicio', 'fin', 'duracion', 'call', 'notas', 'ignorar'];
-  const KEY_LABEL = { banda: 'Banda', tipo: 'Tipo', escenario: 'Escenario', jornada: 'Jornada', inicio: 'Inicio', fin: 'Fin', duracion: 'Duración (min)', call: 'CALL', notas: 'Notas', ignorar: 'Ignorar columna' };
+  const KEY_LABEL = { banda: 'Banda', tipo: 'Tipo', escenario: 'Zona', jornada: 'Jornada', inicio: 'Inicio', fin: 'Fin', duracion: 'Duración (min)', call: 'CALL', notas: 'Notas', ignorar: 'Ignorar columna' };
   const HEADERS = {
     tipo: ['tipo', 'type', 'categoria', 'category', 'clase', 'kind'],
     banda: ['artista', 'artistas', 'artist', 'banda', 'band', 'grupo', 'nombre', 'name', 'act', 'line up', 'lineup'],
-    escenario: ['escenario', 'stage', 'sala', 'room', 'lugar', 'espacio'],
+    escenario: ['zona', 'escenario', 'stage', 'sala', 'room', 'lugar', 'espacio', 'area', 'zone'],
     jornada: ['dia', 'fecha', 'jornada', 'day', 'date'],
     inicio: ['inicio', 'hora', 'start', 'begin', 'desde', 'empieza', 'comienzo', 'hora inicio', 'horario', 'show'],
     fin: ['fin', 'end', 'finish', 'hasta', 'termina', 'hora fin', 'final'],
@@ -438,12 +438,12 @@
         if (!stage) {
           stageNew = r.escenario;
           if (!seenNew[norm(r.escenario)]) { seenNew[norm(r.escenario)] = true; newStages.push(r.escenario); }
-          if (o.createStages && o.createStages[norm(r.escenario)] === false) errs.push('El escenario «' + r.escenario + '» no existe (marca «crear» o cámbialo)');
-          else warns.push('Escenario nuevo: ' + r.escenario);
+          if (o.createStages && o.createStages[norm(r.escenario)] === false) errs.push('La zona «' + r.escenario + '» no existe (marca «crear» o cámbiala)');
+          else warns.push('Zona nueva: ' + r.escenario);
         }
       } else if (!band) { /* tareas e hitos: escenario opcional */ }
       else if (o.defaultStageId) stage = C.getEscenario(state, o.defaultStageId);
-      else if ((state.escenarios || []).length) errs.push('Falta el escenario (elige uno por defecto o una columna)');
+      else if ((state.escenarios || []).length) errs.push('Falta la zona (elige una por defecto o una columna)');
       // Jornada
       const jornada = r.jornada || o.defaultJornada || '';
       if (!jornada) errs.push('Falta la jornada (elige una por defecto)');

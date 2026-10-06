@@ -189,9 +189,9 @@ tfoot input.bad,tfoot select.bad{border-color:var(--err)!important;background:rg
 .form input{width:100%}
 .form input[type=date]{height:32px;border-radius:6px;border:1px solid var(--line2);background:var(--field);color:var(--text);font:inherit;padding:0 8px;color-scheme:dark}
 .form .note{grid-column:1/-1;font-size:12px;color:var(--dim)}
-.stg{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)}
-.stg input[type=text]{flex:1}
-.stg .use{font-size:12px;color:var(--dim);min-width:64px;text-align:right}
+.stg{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)}
+.stg input[type=text]{flex:1;min-width:0}
+.stg .use{font-size:11px;color:var(--dim);min-width:0;text-align:right;white-space:nowrap}
 .iconsq{width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;border:1px solid var(--line2);background:#16181d;color:var(--text);cursor:pointer;font-weight:900}
 .iconsq:disabled{opacity:.3;cursor:default}
 .modal-box.wide{max-width:640px}
@@ -317,3 +317,128 @@ body[data-ps="escenario"] .cfg-h{background:#000}
   .gapbtn{padding:0 8px}
 }
 .imp-prev td.e input{min-width:150px}
+
+/* ── 2c-B · Columna DELAY: LED de rack ─────────────────────────────── */
+th.dl,td.dl{width:44px;text-align:center;padding-left:4px!important;padding-right:4px!important}
+.led{width:22px;height:22px;border:0;padding:0;background:transparent;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;border-radius:50%}
+.led::before{content:'';width:8px;height:8px;border-radius:50%;background:#10b981;box-shadow:0 0 4px #10b981,0 0 10px rgba(16,185,129,.55)}
+.led.red::before{background:#ff3b30;box-shadow:0 0 4px #ff3b30,0 0 10px rgba(255,59,48,.6)}
+.led:hover{background:rgba(255,255,255,.06)}
+.led:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+@media (pointer:coarse){ .led{width:40px;height:40px} }
+/* Changeover mínimo por zona (Configuración) */
+.stg .comin{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);white-space:nowrap}
+.stg .comin input{width:56px;height:30px;text-align:center}
+/* Punto de estado (importador) */
+.ic.dot{width:12px;height:12px;vertical-align:-1px;margin-right:3px}
+.stg-meta{flex-basis:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;padding-left:34px}
+
+/* ── 2c-B · Menús de la barra (cristal Raycast) ─────────────────────── */
+.menus{display:flex;align-items:center;gap:4px;margin-left:8px}
+.menu{position:relative}
+.mbtn{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 10px;border-radius:7px;border:1px solid transparent;background:transparent;color:var(--text);font:inherit;font-weight:700;cursor:pointer;white-space:nowrap}
+.mbtn:hover,.menu.open .mbtn{background:rgba(255,255,255,.06);border-color:var(--line2)}
+.mbtn .mlbl{color:var(--muted);font-weight:600}
+.mbtn b{font-weight:800}
+.mbtn .chev{width:14px;height:14px;opacity:.7;transition:transform .15s}
+.menu.open .mbtn .chev{transform:rotate(180deg)}
+.mdot{width:7px;height:7px;border-radius:50%;background:#10b981;box-shadow:0 0 6px #10b981}
+.mdot[hidden]{display:none}
+.mpanel{display:none;position:absolute;top:calc(100% + 6px);left:0;z-index:60;min-width:200px;padding:6px;border-radius:10px;
+  background:var(--glass-bg);-webkit-backdrop-filter:var(--glass-blur);backdrop-filter:var(--glass-blur);border:1px solid var(--glass-line);
+  box-shadow:0 12px 40px rgba(0,0,0,.45),0 2px 8px rgba(0,0,0,.3)}
+.menu.open .mpanel{display:block}
+/* puente invisible para que el cursor no «caiga» entre el botón y el panel */
+.mpanel::before{content:'';position:absolute;left:0;right:0;top:-8px;height:8px}
+.mpanel.wide{min-width:340px}
+.mitem{display:flex;align-items:center;gap:9px;width:100%;height:34px;padding:0 10px;border:0;border-radius:6px;background:transparent;color:var(--text);font:inherit;font-weight:600;text-align:left;cursor:pointer;white-space:nowrap}
+.mitem:hover:not(:disabled){background:rgba(255,255,255,.07)}
+.mitem:disabled{opacity:.4;cursor:default}
+.mitem.on{color:var(--accent)}
+.mitem.on::after{content:'';margin-left:auto;width:6px;height:6px;border-radius:50%;background:var(--accent)}
+.msep{height:1px;background:var(--glass-line);margin:6px 2px}
+.mhead{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:800;padding:6px 8px 8px}
+.mnote{font-size:12px;color:var(--dim);padding:8px 8px 2px;line-height:1.35;white-space:normal}
+.mpanel .days{flex-direction:column;gap:2px;max-height:60vh;overflow:auto}
+.mpanel .days button{width:100%;text-align:left;border:0;height:32px}
+.mpanel .days button.on{background:rgba(255,255,255,.08);color:var(--accent);border:0}
+.dtog{display:flex;flex-wrap:wrap;gap:6px;padding:0 6px}
+.dtog button{height:30px;padding:0 11px;border-radius:999px;border:1px solid var(--line2);background:transparent;color:var(--muted);font:inherit;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:7px}
+.dtog button::before{content:'';width:12px;height:12px;border-radius:3px;border:1.5px solid currentColor;box-sizing:border-box}
+.dtog button.on{color:var(--text);border-color:#10b981;background:rgba(16,185,129,.12)}
+.dtog button.on::before{background:#10b981;border-color:#10b981;box-shadow:inset 0 0 0 2px #0c0e12}
+/* barra de estado (desfases) */
+.drift{display:flex;flex-wrap:wrap;gap:8px;align-items:center;min-height:28px}
+body[data-ps="escenario"] .mpanel{box-shadow:none}
+/* ── 2c-B · Regiduría en vivo ────────────────────────────────────────── */
+.dchip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:999px;font-size:12px;font-weight:800;border:1px solid var(--line2);color:var(--muted);white-space:nowrap}
+.dchip .ic{width:14px;height:14px}
+.dchip.absorb{color:var(--call);border-color:rgba(255,197,51,.5);background:rgba(255,197,51,.08)}
+.dchip.over{color:#ff6b62;border-color:rgba(255,59,48,.6);background:rgba(255,59,48,.12)}
+.dchip.early{color:#34d399;border-color:rgba(16,185,129,.5);background:rgba(16,185,129,.1)}
+.dchip.ok{color:var(--muted)}
+.realc{display:block;font-size:11px;font-weight:700;color:var(--muted);margin-top:2px;white-space:nowrap}
+.realc.late{color:var(--call)}
+.realc.early{color:#34d399}
+.livebtn{color:#10b981}
+.livebtn.on{color:#ff6b62}
+.mchip{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:800;color:var(--muted);white-space:nowrap}
+.mchip .ic{width:14px;height:14px}
+.mchip.tight{color:var(--call)}
+.mchip.over{color:#ff6b62}
+/* Ventana de retraso */
+.dw{display:flex;flex-direction:column;gap:12px}
+.dw-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.dw-l{width:80px;color:var(--muted);font-weight:700}
+.dw-mins{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.dtb{height:32px;min-width:52px;padding:0 10px;border-radius:7px;border:1px solid var(--line2);background:transparent;color:var(--text);font:inherit;font-weight:800;cursor:pointer}
+.dtb.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.dw-n{display:inline-flex;align-items:center;gap:6px;color:var(--muted);font-weight:700;margin-left:6px}
+.dw-n input{width:70px;text-align:center}
+.dw-prev{max-height:42vh;overflow:auto;border-top:1px solid var(--glass-line);padding-top:10px}
+.dw-t{width:100%;border-collapse:collapse;font-size:13px}
+.dw-t th{text-align:left;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:4px 6px;border-bottom:1px solid var(--line)}
+.dw-t td{padding:5px 6px;border-bottom:1px solid var(--line)}
+.dw-t td.dim{color:var(--muted)}
+.dw-t td.t{font-variant-numeric:tabular-nums;font-weight:700;white-space:nowrap}
+.dw-t td.to{color:var(--call)}
+.dw-t tr.kept td{opacity:.75}
+.led.sm{width:auto;height:auto;margin-right:6px;vertical-align:1px;cursor:default}
+.errbox .ic{width:14px;height:14px;vertical-align:-2px;margin-right:6px}
+/* Barra en una sola línea: el nombre del evento se recorta antes que nada */
+.bar{flex-wrap:nowrap}
+#fest-name{max-width:22vw}
+.fest{flex:0 1 auto;min-width:60px}
+#btn-live .state{margin-left:2px;gap:0}
+#btn-live .state::before{width:8px;height:8px;background:rgba(255,255,255,.45)}
+#btn-live .state.on::before{background:#10b981;box-shadow:0 0 6px #10b981}
+@media (max-width:1180px){ .mbtn .mlbl{display:none} #btn-cfg{font-size:0;gap:0;padding:0 9px} #btn-cfg .ic{font-size:14px} }
+.rowbtns .delbtn{width:28px}
+@media (max-width:1600px){
+  td.n input{min-width:64px}
+  td.f select{width:102px}
+  td.tp select{width:96px}
+  .gapbtn{padding:0 7px;font-size:11px;gap:4px}
+  td.t input{width:62px}
+}
+@media (max-width:1600px){
+  td.name{min-width:150px}
+  td.name input[type=text]{min-width:96px}
+  th.dl,td.dl{width:34px}
+  .gapbtn .ic{display:none}
+}
+#mods{white-space:nowrap}
+/* Zona tecleable (lista de zonas existentes; escribir una nueva la crea) */
+td.stage input[type=text]{width:var(--escw,140px);min-width:120px;max-width:260px;border-left:4px solid var(--sc,#555);font-weight:700;font-size:12px}
+#add-escenario{width:var(--escw,140px);min-width:120px}
+.mzone{display:flex;align-items:center;gap:10px;padding:10px 8px 0}
+.mzone span{color:var(--muted);font-weight:700;font-size:13px}
+.mzone select{flex:1;height:30px}
+/* «Bloquear retraso»: marcado = bloqueado (rojo) */
+#delay-cats button.on,.dtog.block button.on{color:var(--text);border-color:#ff3b30;background:rgba(255,59,48,.12)}
+#delay-cats button.on::before,.dtog.block button.on::before{background:#ff3b30;border-color:#ff3b30;box-shadow:inset 0 0 0 2px #0c0e12}
+#m-delay .mdot{background:#ff3b30;box-shadow:0 0 6px #ff3b30}
+.led.own{box-shadow:0 0 0 1px rgba(255,255,255,.18)}
+.mzone.top{padding:0 6px 10px}
+#delay-cats button.inh{opacity:.55;cursor:not-allowed}
+.dw-hint{font-size:12px}

@@ -40,6 +40,15 @@
     o.style = normStyle(o.style);
     o.day = o.day || 'all';
     o.callMins = Number.isFinite(o.callMins) && o.callMins > 0 ? o.callMins : null;
+    // Categorías BLOQUEADAS para los retrasos, por zona: { all: {…}, <idZona>: {…}, '': sin zona }. Por defecto nada: todo se mueve.
+    let db = o.delayBlock || {};
+    if (db.show !== undefined || db.sc !== undefined || db.tarea !== undefined || db.hito !== undefined) db = { all: db };   // formato anterior (solo global)
+    const cb = x => ({ show: !!(x && x.show === true), sc: !!(x && x.sc === true), tarea: !!(x && x.tarea === true), hito: !!(x && x.hito === true) });
+    o.delayBlock = {};
+    Object.keys(db).forEach(k => { o.delayBlock[k] = cb(db[k]); });
+    if (!o.delayBlock.all) o.delayBlock.all = cb({});
+    delete o.delayCats;
+    o.delayZone = typeof o.delayZone === 'string' ? o.delayZone : 'all';   // zona que se está editando en el menú Retrasos
     return o;
   }
 

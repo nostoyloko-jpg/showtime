@@ -18,7 +18,7 @@
   function pset(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
 
   // ── Estado (declarado ANTES de cualquier uso: `let` no se eleva) ──────
-  let FEST = null, CONFIG = null, BLOCKS = [], HITOS = [], CALL_MINS = 15, CALL_DONE = new Set(), DEMO = false;
+  let FEST = null, CONFIG = null, BLOCKS = [], HITOS = [], ALLB = [], MARG = {}, CALL_MINS = 15, CALL_DONE = new Set(), DEMO = false;
   const VIEW_TXT = { all: ['JORNADA COMPLETA', 'ENTRADAS'], show: ['SHOW', 'SHOWS'], sc: ['SOUNDCHECK', 'SOUNDCHECKS'] };
   let NOFEST = false, DAY_MISSING = '';   // estados que se ENSEÑAN, nunca se corrigen solos
   let TIME_OFFSET = 0;
@@ -59,6 +59,7 @@
     BLOCKS = (NOFEST || DAY_MISSING) ? [] : C.buildBlocks(FEST, { mode: CONFIG.mode, day: day });
     // Hitos (puertas, curfew…): líneas de referencia en cualquier vista
     HITOS = (NOFEST || !C.hitosOf) ? [] : C.hitosOf(FEST, day);
+    ALLB = NOFEST ? [] : C.buildBlocks(FEST, { mode: 'all', day: day });   // para desfases y márgenes (todas las categorías)
     CALL_MINS = Dt.callMinsOf(FEST, CONFIG);
     CALL_DONE = new Set(Dt.getCallDone());
 
@@ -106,21 +107,22 @@
   }
 
   // ── Dibujo de una barra ──────────────────────────────────────────────
-  /** Curfew y similares: en ámbar (solo color; no cambia nada). */
-  function hitoHot(name) { return /curfew|toque de queda|l[ií]mite|fin de (sonido|evento|jornada)/i.test(name || ''); }
+  /** Color de un hito según su margen con el retraso actual (sin palabras mágicas: solo cuenta la hora). */
+  function hitoColor(h) { const m = MARG[h.key]; return !m ? 'rgba(255,255,255,.85)' : m.level === 'over' ? '#ff3b30' : m.level === 'tight' ? CALLC : 'rgba(255,255,255,.85)'; }
+  function hitoTag(h) { const m = MARG[h.key]; return !m || m.level === 'ok' ? '' : m.level === 'over' ? '  ·  REBASADO +' + (-m.margin) + ' MIN' : '  ·  MARGEN ' + m.margin + ' MIN'; }
 
   /** Hitos: línea vertical en todas las barras; en la primera, la píldora «19:30 PUERTAS». */
   function drawHitos(ctx, W, H, xOf, withPill, FONT) {
     HITOS.forEach(h => {
       const x = xOf(h.si);
       if (x < -200 || x > W + 2) return;
-      const col = hitoHot(h.name) ? CALLC : 'rgba(255,255,255,.85)';
+      const col = hitoColor(h);
       ctx.save();
       ctx.strokeStyle = col; ctx.globalAlpha = 0.8; ctx.lineWidth = 2; ctx.setLineDash([6, 4]);
       ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
       ctx.restore();
       if (!withPill) return;
-      const txt = C.fmtHM(h.si) + '  ' + h.name.toUpperCase();
+      const txt = C.fmtHM(h.si) + '  ' + h.name.toUpperCase() + hitoTag(h);
       ctx.save();
       ctx.font = 'bold 13px ' + FONT;
       const tw = ctx.measureText(txt).width, pw = tw + 26, ph = 22, py = 3;   // arriba, en la cabecera (tapa la hora de la rejilla junto a ella)
@@ -130,10 +132,10 @@
       ctx.beginPath();
       if (ctx.roundRect) ctx.roundRect(px, py, pw, ph, 11); else ctx.rect(px, py, pw, ph);
       ctx.fill();
-      ctx.globalAlpha = 1; ctx.fillStyle = '#0b0c0f'; ctx.textBaseline = 'middle';
+      ctx.globalAlpha = 1; ctx.fillStyle = col === '#ff3b30' ? '#fff' : '#0b0c0f'; ctx.textBaseline = 'middle';
       // banderita
       ctx.beginPath(); ctx.moveTo(px + 9, py + 5); ctx.lineTo(px + 9, py + ph - 5); ctx.moveTo(px + 9, py + 5); ctx.lineTo(px + 16, py + 8); ctx.lineTo(px + 9, py + 11);
-      ctx.strokeStyle = '#0b0c0f'; ctx.lineWidth = 1.6; ctx.stroke();
+      ctx.strokeStyle = col === '#ff3b30' ? '#fff' : '#0b0c0f'; ctx.lineWidth = 1.6; ctx.stroke();
       ctx.fillText(txt, px + 20, py + ph / 2 + 1);
       ctx.restore();
     });
@@ -501,6 +503,21 @@
     return r;
   }
 
+  /** Desfase por zona bajo el nombre del evento (ámbar absorbiendo · rojo desborde · verde adelanto). */
+  function renderDrift(nowInt) {
+    MARG = {};
+    if (NOFEST || !C.driftByZone) { $('drift').innerHTML = ''; return; }
+    C.hitoMargins(FEST, ALLB, nowInt).forEach(m => { MARG[m.hito.key] = m; });
+    const zs = C.driftByZone(FEST, ALLB, nowInt).filter(z => z.status !== 'ontime');
+    const h = zs.map(z => {
+      const nm = esc((z.zone || 'SIN ZONA').toUpperCase());
+      if (z.status === 'overflow') return '<div class="dz over">' + nm + ' · +' + z.delta + ' MIN · BUFFER AGOTADO (+' + z.overflow + ')</div>';
+      if (z.status === 'absorb') return '<div class="dz absorb">' + nm + ' · +' + z.delta + ' MIN · ABSORBIENDO</div>';
+      return '<div class="dz early">' + nm + ' · −' + (-z.delta) + ' MIN</div>';
+    }).join('');
+    if ($('drift').innerHTML !== h) $('drift').innerHTML = h;
+  }
+
   // ── Bucle principal ──────────────────────────────────────────────────
   function tick() {
     const d = new Date();
@@ -508,6 +525,7 @@
     $('clk').textContent = pad2(d.getHours()) + ':' + pad2(d.getMinutes());
     $('dat').textContent = d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }).toUpperCase();
 
+    renderDrift(nowInt);
     const n = visibleCount();
     if (n !== stripCount) buildStrips(n);
     const r = pickView(nowInt, n);

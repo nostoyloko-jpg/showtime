@@ -16,7 +16,7 @@
   const UNDO_MAX = 30;
   let liveWin = null;
   let pendingRender = false;       // si llegan datos mientras se edita una casilla, se pinta al salir
-  const KEY_LABEL = { nombre: 'nombre', escenario: 'escenario', color: 'color', tipo: 'tipo', jornada: 'jornada', fecha: 'fecha', inicio: 'inicio', fin: 'fin', call: 'CALL', notas: 'notas' };
+  const KEY_LABEL = { nombre: 'nombre', escenario: 'zona', color: 'color', tipo: 'tipo', jornada: 'jornada', fecha: 'fecha', inicio: 'inicio', fin: 'fin', call: 'CALL', notas: 'notas' };
   const TIPO_TXT = { banda: 'banda', tarea: 'tarea', hito: 'hito' };
   // Vistas: Jornada completa (todo) · Shows · Soundchecks
   const VIEW = { all: { title: 'Jornada completa', what: 'entradas' }, show: { title: 'Shows', what: 'shows' }, sc: { title: 'Soundchecks', what: 'soundchecks' } };
@@ -82,11 +82,12 @@
   }
 
   function compute() {
-    if (!FEST) { BLOCKS = []; ALL_MODE = []; DAY_MISSING = ''; return; }
+    if (!FEST) { BLOCKS = []; ALL_MODE = []; DAY_MISSING = ''; MARGINS = []; return; }
     const day = CONFIG.day || 'all';
     DAY_MISSING = (day !== 'all' && C.festivalDays(FEST, CONFIG.mode).indexOf(day) < 0) ? day : '';
     BLOCKS = DAY_MISSING ? [] : C.buildBlocks(FEST, { mode: CONFIG.mode, day: day });
     ALL_MODE = C.buildBlocks(FEST, { mode: CONFIG.mode, day: 'all' });
+    MARGINS = C.hitoMargins(FEST, C.buildBlocks(FEST, { mode: 'all', day: 'all' }), Math.floor(C.nowAbs()));
   }
 
   /** Aplica un festival nuevo hecho por el regidor: guarda deshacer, sincroniza y pinta. */
@@ -128,8 +129,8 @@
     $('fest-name').textContent = has ? ((FEST.event && FEST.event.nombre) || 'Evento sin nombre') : 'Sin evento';
     const d = has && ORIG ? C.diffSummary(ORIG, FEST) : { total: 0 };
     $('mods').hidden = !d.total;
-    $('mods').textContent = d.total + (d.total === 1 ? ' cambio sin exportar' : ' cambios sin exportar');
-    $('mods').title = d.total ? [d.added && d.added + ' banda(s) nueva(s)', d.removed && d.removed + ' borrada(s)', d.fields && d.fields + ' casilla(s) cambiada(s)', d.festival && 'datos del evento o escenarios'].filter(Boolean).join(' · ') : '';
+    $('mods').textContent = d.total + ' sin exportar';
+    $('mods').title = d.total ? [d.added && d.added + ' banda(s) nueva(s)', d.removed && d.removed + ' borrada(s)', d.fields && d.fields + ' casilla(s) cambiada(s)', d.festival && 'datos del evento o zonas'].filter(Boolean).join(' · ') : '';
     renderTools();
     renderWarn();
     if (!$('cfg').hidden) renderConfig();
@@ -137,7 +138,10 @@
   }
 
   function renderTools() {
-    document.querySelectorAll('.tools .seg button[data-mode]').forEach(b => b.classList.toggle('on', b.dataset.mode === CONFIG.mode));
+    document.querySelectorAll('#m-view [data-mode]').forEach(b => { b.classList.toggle('on', b.dataset.mode === CONFIG.mode); b.setAttribute('aria-checked', String(b.dataset.mode === CONFIG.mode)); });
+    $('view-lbl').textContent = viewOf().title;
+    $('day-lbl').textContent = CONFIG.day === 'all' ? 'Todas' : fmtDay(CONFIG.day);
+    renderDelayCats();
     // Pestañas de jornadas: «Todas» + de la primera a la última del festival (las vacías, atenuadas)
     const days = jornadaOptions();
     const withData = FEST ? C.festivalDays(FEST, CONFIG.mode) : [];
@@ -151,7 +155,7 @@
   function renderWarn() {
     const w = $('warn');
     let msg = '';
-    if (FEST && !(FEST.escenarios || []).length) msg = 'Este evento no tiene escenarios. Créalos en Configuración › Escenarios antes de añadir bandas (o añade bandas sin escenario).';
+    if (FEST && !(FEST.escenarios || []).length) msg = 'Este evento no tiene zonas. Créalas en Configuración › Zonas o desde la columna Zona de cualquier fila.';
     else if (DAY_MISSING) msg = 'El ' + fmtDay(DAY_MISSING) + ' todavía no tiene ' + viewOf().what + '. La Pantalla Live lo está avisando.';
     w.textContent = msg; w.hidden = !msg;
   }
@@ -159,10 +163,25 @@
   // Opciones de escenario para un <select>
   function stageOptions(selected, allowNone, noneLabel) {
     const st = (FEST.escenarios || []);
-    let h = (allowNone || !st.length || !selected) ? '<option value=""' + (!selected ? ' selected' : '') + '>' + (noneLabel || (st.length ? '— elige —' : '— sin escenario —')) + '</option>' : '';
+    let h = (allowNone || !st.length || !selected) ? '<option value=""' + (!selected ? ' selected' : '') + '>' + (noneLabel || (st.length ? '— elige —' : '— sin zona —')) + '</option>' : '';
     h += st.map(e => '<option value="' + esc(e.id) + '"' + (e.id === selected ? ' selected' : '') + '>' + esc(e.nombre) + '</option>').join('');
     return h;
   }
+  /** Zona tecleada → { state, id, created }. Vacío = sin zona. Si no existe, se crea (explícito: el regidor la ha escrito). */
+  function resolveZone(state, name) {
+    const n = String(name || '').replace(/\s+/g, ' ').trim();
+    if (!n) return { ok: true, state: state, id: '', created: false };
+    const hit = (state.escenarios || []).find(e => String(e.nombre).toLowerCase() === n.toLowerCase());
+    if (hit) return { ok: true, state: state, id: hit.id, created: false };
+    const r = C.addStage(state, n);
+    if (!r.ok) return r;
+    return { ok: true, state: r.state, id: r.id, created: true, name: n };
+  }
+  function zonesDatalist() {
+    const h = (FEST && FEST.escenarios || []).map(e => '<option value="' + esc(e.nombre) + '"></option>').join('');
+    if ($('zones-dl').innerHTML !== h) $('zones-dl').innerHTML = h;
+  }
+
   function jornadaSelect(value, attrs) {
     const opts = jornadaOptions();
     if (value && opts.indexOf(value) < 0) opts.push(value);
@@ -175,6 +194,88 @@
     const t = C.tipoOf(a);
     const lbl = { banda: mode === 'sc' ? 'Soundcheck' : 'Show', tarea: 'Tarea', hito: 'Hito' };
     return '<select ' + attrs + ' class="tipo tipo-' + (t === 'banda' ? mode : t) + '">' + C.TIPOS.map(x => '<option value="' + x + '"' + (x === t ? ' selected' : '') + '>' + lbl[x] + '</option>').join('') + '</select>';
+  }
+
+  /** «1 entrada movida» / «3 entradas movidas». */
+  function nEnt(n, adj) { return n + (n === 1 ? ' entrada ' + adj : ' entradas ' + adj + 's'); }
+  function keptTxt(n) { return n === 1 ? '1 en rojo no se mueve' : n + ' en rojo no se mueven'; }
+  // ── Regiduría en vivo: horas reales, Empezar / Terminar (opcionales) ──
+  let MARGINS = [];
+  function realChip(b) {
+    if (!b || (b.ri === null && b.rf === null)) return '';
+    const d = b.delta, sign = d > 0 ? '+' + d : d < 0 ? '−' + (-d) : '±0';
+    const cls = d > 0 ? 'late' : d < 0 ? 'early' : '';
+    return '<span class="realc ' + cls + '" title="Hora real registrada (Deshacer para quitarla)">real ' + C.fmtHM(b.ri !== null ? b.ri : b.si) + (b.rf !== null ? '–' + C.fmtHM(b.rf) : '') + ' · ' + sign + '</span>';
+  }
+  function liveBtns(b, band) {
+    if (!b || !band) return '';
+    if (b.ri === null) return '<button class="delbtn livebtn" data-act="start" title="Empezar ahora: registra la hora real de inicio (opcional; sin pulsar, se da por en hora)"><svg class="ic"><use href="#i-play"/></svg></button>';
+    if (b.rf === null) return '<button class="delbtn livebtn on" data-act="stop" title="Terminar ahora: registra la hora real de fin"><svg class="ic"><use href="#i-stop"/></svg></button>';
+    return '';
+  }
+  function marginChip(m) {
+    if (m.level === 'ok') return '<span class="mchip ok" title="Margen hasta el hito con el retraso actual (' + esc(m.band.name) + ' acaba ' + C.fmtHM(m.projEnd) + ')">Margen ' + m.margin + ' min</span>';
+    if (m.level === 'tight') return '<span class="mchip tight" title="' + esc(m.band.name) + ' acaba ' + C.fmtHM(m.projEnd) + '"><svg class="ic"><use href="#i-alert"/></svg>Margen ' + m.margin + ' min</span>';
+    return '<span class="mchip over" title="' + esc(m.band.name) + ' acaba ' + C.fmtHM(m.projEnd) + '"><svg class="ic"><use href="#i-alert"/></svg>Rebasado +' + (-m.margin) + ' min</span>';
+  }
+
+  /** Registra la hora real y, si desborda el colchón, empuja SOLO el desborde en lo autorizado (Retrasos ▾) de su zona. */
+  function registerReal(tr, which) {
+    const id = tr.dataset.id, mode = tr.dataset.mode || 'show', key = tr.dataset.key;
+    const now = Math.floor(C.nowAbs());
+    const r = C.setReal(FEST, id, mode, which, now);
+    if (!r.ok) { toast(r.error, true); return; }
+    let st = r.state;
+    const blocks = C.buildBlocks(st, { mode: 'all', day: 'all' });
+    const b = blocks.find(x => x.key === key);
+    const name = b ? b.name : '';
+    let msg = name + (which === 'i' ? ': empieza ' : ': termina ') + C.fmtHM(now);
+    const dz = b ? C.driftByZone(st, blocks, now).find(z => z.zoneId === (b.stageId || '')) : null;
+    if (dz && dz.block.key === key) {
+      const d = dz.delta;
+      if (d > 0 && dz.status === 'absorb') msg += ' · desfase +' + d + ' min, se absorbe en el cambio';
+      else if (d < 0) msg += ' · adelanto ' + (-d) + ' min';
+      else if (d === 0) msg += ' · en hora';
+      else if (dz.status === 'overflow') {
+        {
+          const sh = C.shiftEntries(st, { minutes: dz.overflow, zone: b.stageId || 'all', cats: catsFn(), fromAbs: Math.max(now, b.psi + 1), day: b.jornada });
+          if (sh.moved.length) { st = sh.state; msg += ' · desborde +' + dz.overflow + ' min: ' + nEnt(sh.moved.length, 'movida') + (sh.kept.length ? ' (' + keptTxt(sh.kept.length) + ')' : ''); }
+          else msg += ' · desborde +' + dz.overflow + ' min (nada que mover en ' + (b.stage || 'su zona') + ': bloqueado o en rojo)';
+          if (sh.clashes.length) setTimeout(() => toast('Choque con entrada en rojo: ' + sh.clashes.map(c => c.name + ' / ' + c.with).join(', '), true), 2800);
+        }
+      }
+    }
+    commitFestival(st, msg);
+  }
+
+  /** Barra de estado: desfase por zona (ámbar absorbiendo · rojo desborde · verde adelanto). */
+  function renderDrift(nowInt) {
+    MARGINS = C.hitoMargins(FEST, C.buildBlocks(FEST, { mode: 'all', day: 'all' }), nowInt);
+    const zones = C.driftByZone(FEST, ALL_MODE.length ? C.buildBlocks(FEST, { mode: 'all', day: 'all' }) : [], nowInt);
+    const html = zones.map(z => {
+      const nm = esc(z.zone || 'Sin zona');
+      if (z.status === 'overflow') return '<span class="dchip over"><svg class="ic"><use href="#i-alert"/></svg>' + nm + ' · Buffer agotado (+' + z.overflow + ' min de desborde)</span>';
+      if (z.status === 'absorb') return '<span class="dchip absorb"><svg class="ic"><use href="#i-clock"/></svg>' + nm + ' · Desfase: +' + z.delta + ' min (absorbiéndose en cambio)</span>';
+      if (z.status === 'early') return '<span class="dchip early"><svg class="ic"><use href="#i-clock"/></svg>' + nm + ' · Desfase: −' + (-z.delta) + ' min</span>';
+      return '<span class="dchip ok">' + nm + ' · En hora</span>';
+    }).join('');
+    const tight = MARGINS.filter(m => m.level !== 'ok').map(m => '<span class="dchip ' + (m.level === 'over' ? 'over' : 'absorb') + '"><svg class="ic"><use href="#i-alert"/></svg>' +
+      esc(m.hito.name) + ' ' + C.fmtHM(m.hito.psi) + ' · ' + (m.level === 'over' ? 'rebasado +' + (-m.margin) + ' min' : 'margen ' + m.margin + ' min') + '</span>').join('');
+    const h = html + tight;
+    if ($('drift').innerHTML !== h) $('drift').innerHTML = h;
+  }
+
+  /** LED DELAY: rojo si la entrada está fija o si su categoría está bloqueada en Retrasos. */
+  function ledCell(a, b, band, mode) {
+    const kind = b ? b.kind : (band ? mode : C.tipoOf(a));
+    const catBlocked = isBlocked(kind, a.escenarioId || '');
+    const fija = C.isFija(a), libre = C.isLibre(a);
+    const red = fija || (!libre && catBlocked);
+    const own = fija || libre;                         // decidido en esta entrada (por encima de su categoría)
+    const title = (red ? 'Rojo: no se mueve con los retrasos' : 'Verde: se mueve con los retrasos') +
+      (own ? ' (puesto en esta entrada)' : catBlocked ? ' (' + CAT_TXT[kind].toLowerCase() + ' bloqueados en Retrasos para esta zona)' : '') +
+      '. Clic: pasar a ' + (red ? 'verde' : 'rojo');
+    return '<td class="dl"><button class="led' + (red ? ' red' : '') + (own ? ' own' : '') + '" data-act="fija" data-red="' + (red ? '1' : '') + '" data-cat="' + (catBlocked ? '1' : '') + '" title="' + title + '" aria-label="Delay"></button></td>';
   }
 
   // Fila editable de una entrada (con o sin horario en la vista actual). b = su bloque (o null).
@@ -193,30 +294,32 @@
     const fecha = v('fecha');
     const real = (jor && fecha && fecha !== jor) ? '<span class="real" title="Empieza antes de la hora de corte: cuenta como la jornada anterior">fecha real ' + esc(fmtDay(fecha)) + '</span>' : '';
     let gap = '<span class="dash"' + (band ? '' : ' title="Las tareas y los hitos no tienen changeover ni solapes"') + '>—</span>';
+    if (b && tipo === 'hito') { const hm = (MARGINS || []).find(x => x.hito.key === b.key); if (hm) gap = marginChip(hm); }
     if (b && band) {
       const co = C.changeoverBefore(ALL_MODE, ALL_MODE.find(x => x.key === b.key) || b);
-      if (!co) gap = '<span class="dash" title="Primera actuación de su escenario">—</span>';
+      if (!co) gap = '<span class="dash" title="Primera actuación de su zona">—</span>';
       else if (co.mins < 0) gap = '<span class="gapbtn ovl" title="Empieza antes de que acabe ' + esc(co.prev.name) + '">Solapa ' + (-co.mins) + ' min</span>';
       else gap = b.standby
         ? '<button class="gapbtn sb" data-act="standby" data-on="0" title="Marcado como STANDBY. Pulsa para volver a CHANGEOVER"><svg class="ic"><use href="#i-pause"/></svg>Standby · ' + co.mins + ' min</button>'
-        : '<button class="gapbtn" data-act="standby" data-on="1" title="CHANGEOVER. Pulsa para marcarlo como STANDBY (escenario cerrado o descanso)"><svg class="ic"><use href="#i-swap"/></svg>Cambio · ' + co.mins + ' min</button>';
+        : '<button class="gapbtn" data-act="standby" data-on="1" title="CHANGEOVER. Pulsa para marcarlo como STANDBY (zona cerrada o descanso)"><svg class="ic"><use href="#i-swap"/></svg>Cambio · ' + co.mins + ' min</button>';
     }
     const off = '<span class="dash" title="' + (tipo === 'hito' ? 'Un hito es un momento: no tiene fin ni CALL' : 'Las tareas no tienen CALL') + '">—</span>';
     const cls = [isNew ? 'nueva' : '', 'k-' + (band ? mode : tipo)].filter(Boolean).join(' ');
     return '<tr data-id="' + esc(a.id) + '" data-mode="' + mode + '"' + (b ? ' data-key="' + esc(b.key) + '"' : '') + ' class="' + cls + '">' +
+      ledCell(a, b, band, mode) +
       td('tipo', 'tp', tipoSelect(a, mode, 'data-k="tipo" data-orig="' + tipo + '"')) +
-      td('escenario', 'stage', '<select data-k="escenario" data-orig="' + esc(a.escenarioId || '') + '" style="--sc:' + scol + '">' + stageOptions(a.escenarioId || '', !esc0 || !band, band ? '' : '— ninguno —') + '</select>') +
+      td('escenario', 'stage', '<input type="text" list="zones-dl" data-k="zona" value="' + esc(esc0 ? esc0.nombre : '') + '" data-orig="' + esc(esc0 ? esc0.nombre : '') + '" placeholder="' + (band ? '— zona —' : '— ninguna —') + '" style="--sc:' + scol + '" title="Elige una zona o escribe una nueva para crearla" autocomplete="off" spellcheck="false">') +
       '<td class="name' + (isMod('nombre') || isMod('color') ? ' mod' : '') + '"><div class="nm">' +
         '<input type="color" data-k="color" value="' + col + '" data-orig="' + col + '" title="Color de la banda">' +
         '<input type="text" data-k="nombre" value="' + esc(a.nombre || '') + '" data-orig="' + esc(a.nombre || '') + '" autocomplete="off" spellcheck="false">' +
         (isNew ? '<span class="tag" title="Creada desde la última importación/exportación">NUEVA</span>' : '') + '</div></td>' +
       td('fecha', 'f', jornadaSelect(jor, 'data-k="jornada" data-orig="' + esc(jor) + '"') + real) +
-      td('inicio', 't', inp('inicio')) +
+      td('inicio', 't', inp('inicio') + realChip(b)) +
       td('fin', 't', tipo === 'hito' ? off : inp('fin', '—')) +
       td('call', 't', band ? inp('call', '—') : off) +
       td('notas', 'n', inp('notas')) +
       td('standby', 'gap', gap) +
-      '<td><div class="rowbtns"><button class="delbtn dupbtn" data-act="dup" title="Duplicar en otra jornada"><svg class="ic"><use href="#i-copy"/></svg></button>' +
+      '<td><div class="rowbtns">' + liveBtns(b, band) + '<button class="delbtn dupbtn" data-act="dup" title="Duplicar en otra jornada"><svg class="ic"><use href="#i-copy"/></svg></button>' +
         '<button class="delbtn" data-act="del" title="Borrar ' + TIPO_TXT[tipo] + '"><svg class="ic"><use href="#i-trash"/></svg></button></div></td>' +
       '</tr>';
   }
@@ -229,6 +332,7 @@
     const mode = CONFIG.mode;
     const mods = ORIG ? { show: C.modifiedFields(ORIG, FEST, 'show'), sc: C.modifiedFields(ORIG, FEST, 'sc') } : {};
     const nuevas = new Set((ORIG ? C.newArtistIds(ORIG, FEST) : []).map(String));
+    zonesDatalist();
     $('list-title').textContent = viewOf().title + (CONFIG.day === 'all' ? ' · todas las jornadas' : ' · ' + fmtDay(CONFIG.day));
     // Ancho del selector de escenario según el nombre más largo (que «Escenario Alhambra» se lea entero)
     const longest = Math.max(8, ...(FEST.escenarios || []).map(e => String(e.nombre || '').length));
@@ -237,21 +341,20 @@
       const a = FEST.artists.find(x => String(x.id) === String(b.id));
       return a ? rowHtml(a, b, mods, nuevas.has(String(a.id))) : '';
     });
-    $('tbody').innerHTML = rows.join('') || '<tr><td colspan="10" class="hint" style="padding:16px">' +
+    $('tbody').innerHTML = rows.join('') || '<tr><td colspan="11" class="hint" style="padding:16px">' +
       (FEST.artists.length ? 'No hay ' + viewOf().what + ' en esta jornada. Añádelos abajo.' : 'Todavía no hay nada. Añade la primera entrada en la fila de abajo.') + '</td></tr>';
     // Las vistas son FILTROS PUROS: Shows = solo shows, Soundchecks = solo soundchecks.
     // Solo en Jornada completa se listan las entradas sin ningún horario (si no, no se verían en ninguna parte).
     const sin = mode === 'all' ? FEST.artists.filter(a => !C.entersMode(a, 'all')) : [];
     $('tbody-sin').innerHTML = sin.length
-      ? '<tr class="sec"><td colspan="10">Sin horario (' + sin.length + ') · elige jornada y escribe el inicio</td></tr>' + sin.map(a => rowHtml(a, null, mods, nuevas.has(String(a.id)))).join('')
+      ? '<tr class="sec"><td colspan="11">Sin horario (' + sin.length + ') · elige jornada y escribe el inicio</td></tr>' + sin.map(a => rowHtml(a, null, mods, nuevas.has(String(a.id)))).join('')
       : '';
     markRows(Math.floor(C.nowAbs()));
   }
 
   // Fila de alta: mantiene escenario y jornada elegidos; no propone horas.
   function renderAddRow() {
-    const sEsc = $('add-escenario'), prevEsc = sEsc.value;
-    sEsc.innerHTML = stageOptions(prevEsc && C.getEscenario(FEST, prevEsc) ? prevEsc : '', true);
+    zonesDatalist();
     const sJor = $('add-jornada'), prevJor = sJor.value;
     const want = prevJor || (CONFIG.day !== 'all' ? CONFIG.day : '');
     sJor.outerHTML = jornadaSelect(jornadaOptions().indexOf(want) >= 0 ? want : '', 'id="add-jornada" data-f="jornada"');
@@ -298,7 +401,10 @@
   function addBand() {
     document.querySelectorAll('#addrow .bad').forEach(x => x.classList.remove('bad'));
     const v = addValues();
-    const r = C.addArtist(FEST, v.modo, v);
+    const z = resolveZone(FEST, $('add-escenario').value);
+    if (!z.ok) { $('add-err').textContent = z.error; $('add-escenario').classList.add('bad'); return; }
+    v.escenarioId = z.id;
+    const r = C.addArtist(z.state, v.modo, v);
     if (!r.ok) {
       $('add-err').textContent = r.error;
       const f = r.field && document.querySelector('#addrow [data-f="' + r.field + '"]');
@@ -322,7 +428,10 @@
     if (e.key === 'Enter' && e.target.matches('input')) { e.preventDefault(); addBand(); }
   });
   $('addrow').addEventListener('input', e => { $('add-err').textContent = ''; e.target.classList.remove('bad'); updateAddHint(); });
-  $('addrow').addEventListener('change', e => { e.target.classList.remove('bad'); if (e.target.id === 'add-tipo') syncAddTipo(); else updateAddHint(); });
+  $('addrow').addEventListener('change', e => {
+    e.target.classList.remove('bad');
+    if (e.target.id === 'add-tipo') syncAddTipo(); else updateAddHint();
+  });
   $('btn-add').addEventListener('click', addBand);
 
   // Filas que suenan / siguientes / pasadas (solo clases: no rehace las casillas)
@@ -389,11 +498,12 @@
     $('clock').textContent = pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds());
     const on = !!(liveWin && !liveWin.closed);
     $('live-state').className = 'state ' + (on ? 'on' : 'off');
-    $('live-state').textContent = on ? 'Live abierta' : 'Live cerrada';
-    $('btn-live').lastChild.textContent = on ? 'Traer Pantalla Live' : 'Abrir Pantalla Live';
+    $('live-state').title = on ? 'Pantalla Live abierta' : 'Pantalla Live cerrada';
+    $('btn-live').title = on ? 'Traer la Pantalla Live al frente' : 'Abrir la Pantalla Live (ventana para el monitor de escenario)';
     if (!FEST) return;
     const nowMins = C.nowAbs(d), nowInt = Math.floor(nowMins);
     renderLive(nowMins, nowInt);
+    renderDrift(nowInt);
     markRows(nowInt);
     renderDaybar(nowInt);
   }
@@ -404,6 +514,18 @@
     const tr = el.closest('tr'); if (!tr || !document.body.contains(el)) return;
     const id = tr.dataset.id, k = el.dataset.k, rmode = tr.dataset.mode || 'show';
     if (!k || el.value === el.dataset.orig) { el.classList.remove('bad'); return; }
+    if (k === 'zona') {
+      const z = resolveZone(FEST, el.value);
+      if (!z.ok) { el.classList.add('bad'); toast(z.error, true); return; }
+      const rz = C.editArtist(z.state, id, rmode, 'escenario', z.id);
+      if (!rz.ok) { el.classList.add('bad'); toast(rz.error, true); return; }
+      el.dataset.orig = el.value;
+      if (document.activeElement && document.activeElement.closest && document.activeElement.closest('#tbody, #tbody-sin')) document.activeElement.blur();
+      const nm = (rz.state.artists.find(a => String(a.id) === String(id)) || {}).nombre || '';
+      commitFestival(rz.state, nm + ': zona → ' + (z.id ? (z.created ? z.name + ' (zona nueva creada)' : C.getEscenario(rz.state, z.id).nombre) : 'sin zona'));
+      if (then) { const t = document.querySelector('tr[data-id="' + CSS.escape(then.id) + '"] [data-k="' + then.k + '"]'); if (t) t.focus(); }
+      return;
+    }
     const r = C.editArtist(FEST, id, rmode, k, el.value);
     if (!r.ok && k === 'tipo') el.value = el.dataset.orig;
     if (!r.ok) { el.classList.add('bad'); el.title = r.error; toast(r.error, true); return; }
@@ -414,7 +536,7 @@
     if (document.activeElement && document.activeElement.closest && document.activeElement.closest('#tbody, #tbody-sin')) document.activeElement.blur();
     let shown = r.value || '—';
     if (k === 'jornada') shown = fmtDay(r.value);
-    else if (k === 'escenario') { const e = C.getEscenario(r.state, r.value); shown = e ? e.nombre : 'sin escenario'; }
+    else if (k === 'escenario') { const e = C.getEscenario(r.state, r.value); shown = e ? e.nombre : 'sin zona'; }
     else if (k === 'tipo') shown = TIPO_TXT[r.value] + (CONFIG.mode !== 'all' && r.value !== 'banda' ? ' (se ve en Jornada completa)' : '');
     commitFestival(r.state, name + ': ' + KEY_LABEL[k] + ' → ' + shown);
     const row = document.querySelector('#tbody tr[data-id="' + CSS.escape(String(id)) + '"], #tbody-sin tr[data-id="' + CSS.escape(String(id)) + '"]');
@@ -445,8 +567,23 @@
       if (el.matches('input[type=text]')) applyEdit(el, focusTarget(e.relatedTarget));
       setTimeout(() => { if (pendingRender && !(document.activeElement && document.activeElement.closest && document.activeElement.closest('#tbody, #tbody-sin'))) renderTable(); }, 0);
     });
-    tb.addEventListener('change', e => { if (e.target.matches('select, input[type=color]')) applyEdit(e.target); });
+    tb.addEventListener('change', e => {
+      const el = e.target;
+      if (el.matches('select, input[type=color]')) applyEdit(el);
+    });
     tb.addEventListener('click', e => {
+      const lv = e.target.closest('[data-act="start"], [data-act="stop"]');
+      if (lv) { registerReal(lv.closest('tr'), lv.dataset.act === 'start' ? 'i' : 'f'); return; }
+      const led = e.target.closest('[data-act="fija"]');
+      if (led) {
+        // Clic = el contrario de lo que se ve. Si coincide con lo que dice su categoría, la entrada vuelve a seguir a la categoría.
+        const tr = led.closest('tr'), wantRed = !led.dataset.red, catRed = !!led.dataset.cat;
+        const flag = wantRed === catRed ? null : (wantRed ? 'lock' : 'free');
+        const r = C.setDelayFlag(FEST, tr.dataset.id, flag);
+        const nm = (FEST.artists.find(x => String(x.id) === String(tr.dataset.id)) || {}).nombre || '';
+        if (r.ok && r.changed) commitFestival(r.state, nm + ': DELAY ' + (wantRed ? 'rojo (no se mueve con los retrasos)' : 'verde (se mueve con los retrasos)') + (flag ? '' : ' · como su categoría'));
+        return;
+      }
       const sb = e.target.closest('[data-act="standby"]');
       if (sb) {
         const tr = sb.closest('tr'), id = tr.dataset.id, on = sb.dataset.on === '1';
@@ -532,10 +669,12 @@
       '<div class="note">Lo que empieza antes de esta hora cuenta como la jornada anterior (un DJ a las 02:00 del sábado es del viernes).</div>' +
       '<label for="f-call">Aviso CALL</label><div><input id="f-call" type="number" min="1" max="180" value="' + esc(ev.callMins || C.DEFAULT_CALL_MINS) + '" style="width:90px"> min antes del inicio</div>' +
       '<div class="note">Se usa cuando una banda no tiene hora de CALL escrita.</div>' +
+      '<label for="f-comin">Changeover mínimo</label><div><input id="f-comin" type="number" min="0" max="180" value="' + esc(ev.coMin == null ? C.DEFAULT_CO_MIN : ev.coMin) + '" style="width:90px"> min</div>' +
+      '<div class="note">Lo mínimo para cambiar de banda. Con retraso, lo que sobra del cambio por encima de este mínimo es el colchón. Se puede personalizar por zona.</div>' +
       '<div id="f-err" class="err" style="grid-column:1/-1;margin:0"></div></div>';
   }
   function readFestForm() {
-    return { nombre: $('f-nombre').value, fechaInicio: $('f-ini').value, fechaFin: $('f-fin').value || $('f-ini').value, dayCutoff: $('f-cut').value, callMins: $('f-call').value };
+    return { nombre: $('f-nombre').value, fechaInicio: $('f-ini').value, fechaFin: $('f-fin').value || $('f-ini').value, dayCutoff: $('f-cut').value, callMins: $('f-call').value, coMin: $('f-comin').value };
   }
 
   function askNew() {
@@ -548,7 +687,7 @@
     acts.push({ label: 'Crear evento', kind: 'primary', run: () => {
       const r = C.newFestival(readFestForm());
       if (!r.ok) { $('f-err').textContent = r.error; return false; }
-      loadNew(r.state, 'Evento creado: ' + r.state.event.nombre + '. Ahora crea los escenarios.');
+      loadNew(r.state, 'Evento creado: ' + r.state.event.nombre + '. Ahora crea las zonas.');
       setTimeout(() => openConfig('stages'), 50);
     } });
     modal('Nuevo evento', html, acts);
@@ -606,18 +745,20 @@
   // ── Escenarios (dentro de Configuración) ─────────────────────────────
   function stagesHtml() {
     const st = FEST.escenarios || [];
-    return (st.length ? '' : '<p class="hint" style="margin-bottom:6px">Todavía no hay escenarios.</p>') +
+    return (st.length ? '' : '<p class="hint" style="margin-bottom:6px">Todavía no hay zonas.</p>') +
       st.map((e, i) => {
         const n = C.stageUse(FEST, e.id);
         return '<div class="stg" data-id="' + esc(e.id) + '">' +
-          '<input type="color" data-s="color" value="' + hex6(e.color, '#888888') + '" title="Color del escenario">' +
+          '<input type="color" data-s="color" value="' + hex6(e.color, '#888888') + '" title="Color de la zona">' +
           '<input type="text" data-s="nombre" value="' + esc(e.nombre) + '" data-orig="' + esc(e.nombre) + '" autocomplete="off">' +
-          '<span class="use">' + n + (n === 1 ? ' banda' : ' bandas') + '</span>' +
-          '<button class="iconsq" data-s="up" title="Subir"' + (i === 0 ? ' disabled' : '') + '>↑</button>' +
-          '<button class="iconsq" data-s="down" title="Bajar"' + (i === st.length - 1 ? ' disabled' : '') + '>↓</button>' +
-          '<button class="delbtn" data-s="del" title="' + (n ? 'Tiene bandas: muévelas o bórralas antes' : 'Borrar escenario') + '"' + (n ? ' disabled' : '') + '><svg class="ic"><use href="#i-trash"/></svg></button></div>';
+
+          '<button class="iconsq" data-s="up" title="Subir"' + (i === 0 ? ' disabled' : '') + '><svg class="ic"><use href="#i-up"/></svg></button>' +
+          '<button class="iconsq" data-s="down" title="Bajar"' + (i === st.length - 1 ? ' disabled' : '') + '><svg class="ic"><use href="#i-down"/></svg></button>' +
+          '<button class="delbtn" data-s="del" title="' + (n ? 'Tiene bandas: muévelas o bórralas antes' : 'Borrar zona') + '"' + (n ? ' disabled' : '') + '><svg class="ic"><use href="#i-trash"/></svg></button>' +
+          '<div class="stg-meta"><span class="use">' + n + (n === 1 ? ' entrada' : ' entradas') + '</span>' +
+          '<label class="comin" title="Changeover mínimo de esta zona (vacío = el del evento)">Changeover mínimo <input type="number" min="0" max="180" data-s="comin" value="' + (Number.isFinite(e.coMin) ? e.coMin : '') + '" placeholder="' + C.coMinFor({ event: FEST.event, escenarios: [] }, '') + '" data-orig="' + (Number.isFinite(e.coMin) ? e.coMin : '') + '"> min</label></div></div>';
       }).join('') +
-      '<div class="stg" style="border:0;margin-top:8px"><input id="s-new" type="text" placeholder="Nuevo escenario (p. ej. Principal)" autocomplete="off"><button id="s-add" class="btn primary"><svg class="ic"><use href="#i-plus"/></svg>Añadir</button></div>' +
+      '<div class="stg" style="border:0;margin-top:8px"><input id="s-new" type="text" placeholder="Nueva zona (p. ej. Principal, Carpa, Catering)" autocomplete="off"><button id="s-add" class="btn primary"><svg class="ic"><use href="#i-plus"/></svg>Añadir</button></div>' +
       '<div id="s-err" class="err" style="margin:6px 0 0"></div>' +
       '<p class="hint" style="margin-top:8px">El orden es el de la Pantalla Live. Los cambios se aplican al momento y se pueden deshacer.</p>';
   }
@@ -632,20 +773,24 @@
 
   function bindStages() {
     const body = $('cfg-stages');
-    const add = () => stageCommit(C.addStage(FEST, $('s-new').value), 'Escenario añadido', true);
+    const add = () => stageCommit(C.addStage(FEST, $('s-new').value), 'Zona añadida', true);
     $('s-add').addEventListener('click', add);
     $('s-new').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); add(); } });
     $('s-new').addEventListener('input', () => { $('s-err').textContent = ''; });
     body.querySelectorAll('.stg[data-id]').forEach(row => {
       const id = row.dataset.id;
-      row.querySelector('[data-s="color"]').addEventListener('change', e => stageCommit(C.updateStage(FEST, id, { color: e.target.value }), 'Color del escenario cambiado'));
+      row.querySelector('[data-s="color"]').addEventListener('change', e => stageCommit(C.updateStage(FEST, id, { color: e.target.value }), 'Color de la zona cambiado'));
       const nm = row.querySelector('[data-s="nombre"]');
-      const saveName = () => { if (nm.value !== nm.dataset.orig) stageCommit(C.updateStage(FEST, id, { nombre: nm.value }), 'Escenario renombrado'); };
+      const saveName = () => { if (nm.value !== nm.dataset.orig) stageCommit(C.updateStage(FEST, id, { nombre: nm.value }), 'Zona renombrada'); };
       nm.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); saveName(); } else if (e.key === 'Escape') { nm.value = nm.dataset.orig; } });
       nm.addEventListener('change', saveName);
+      const cm = row.querySelector('[data-s="comin"]');
+      const saveCm = () => { if (cm.value !== cm.dataset.orig) stageCommit(C.updateStage(FEST, id, { coMin: cm.value }), 'Changeover mínimo de la zona: ' + (cm.value === '' ? 'el del evento' : cm.value + ' min')); };
+      cm.addEventListener('change', saveCm);
+      cm.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); saveCm(); } });
       row.querySelector('[data-s="up"]').addEventListener('click', () => stageCommit(C.moveStage(FEST, id, -1), 'Orden cambiado'));
       row.querySelector('[data-s="down"]').addEventListener('click', () => stageCommit(C.moveStage(FEST, id, 1), 'Orden cambiado'));
-      row.querySelector('[data-s="del"]').addEventListener('click', () => stageCommit(C.removeStage(FEST, id), 'Escenario borrado'));
+      row.querySelector('[data-s="del"]').addEventListener('click', () => stageCommit(C.removeStage(FEST, id), 'Zona borrada'));
     });
   }
 
@@ -672,13 +817,151 @@
   $('btn-open').addEventListener('click', () => { closeConfig(); $('file').click(); });
 
   // ── Herramientas ─────────────────────────────────────────────────────
-  document.querySelectorAll('.tools .seg button[data-mode]').forEach(b => b.addEventListener('click', () => {
-    CONFIG = Dt.setConfig({ mode: b.dataset.mode }); compute(); renderAll();
+  document.querySelectorAll('#m-view [data-mode]').forEach(b => b.addEventListener('click', () => {
+    CONFIG = Dt.setConfig({ mode: b.dataset.mode }); compute(); renderAll(); closeMenus();
   }));
   $('days').addEventListener('click', e => {
     const b = e.target.closest('button[data-day]'); if (!b) return;
-    CONFIG = Dt.setConfig({ day: b.dataset.day }); compute(); renderAll();
+    CONFIG = Dt.setConfig({ day: b.dataset.day }); compute(); renderAll(); closeMenus();
   });
+
+  // ── Menús de la barra (cristal): hover o clic; se cierran al salir el cursor o con Esc ──
+  const MENUS = Array.from(document.querySelectorAll('.menus .menu'));
+  function setMenu(m, on) { m.classList.toggle('open', on); m.querySelector('.mbtn').setAttribute('aria-expanded', String(on)); }
+  function closeMenus(except) { MENUS.forEach(m => { if (m !== except) setMenu(m, false); }); }
+  MENUS.forEach(m => {
+    let tOpen = 0, tClose = 0;
+    m.addEventListener('pointerenter', e => { if (e.pointerType !== 'mouse') return; clearTimeout(tClose); tOpen = setTimeout(() => { closeMenus(m); setMenu(m, true); }, 120); });
+    m.addEventListener('pointerleave', e => { if (e.pointerType !== 'mouse') return; clearTimeout(tOpen); tClose = setTimeout(() => setMenu(m, false), 350); });
+    m.querySelector('.mbtn').addEventListener('click', () => { clearTimeout(tOpen); const on = !m.classList.contains('open'); closeMenus(m); setMenu(m, on); });
+    // Las acciones cierran el menú (los toggles de Retrasos no: se marcan varios seguidos)
+    m.querySelectorAll('.mitem').forEach(it => it.addEventListener('click', () => setMenu(m, false)));
+  });
+  document.addEventListener('pointerdown', e => { if (!e.target.closest('.menus')) closeMenus(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenus(); });
+
+  // ── Retrasos: categorías BLOQUEADAS («Bloquear retraso»). De entrada todo se mueve; lo marcado no. ──
+  const CATS = ['show', 'sc', 'tarea', 'hito'];
+  const CAT_TXT = { show: 'Shows', sc: 'Soundchecks', tarea: 'Tareas', hito: 'Hitos' };
+  const EMPTY_BLOCK = () => ({ show: false, sc: false, tarea: false, hito: false });
+  /** Bloqueos de un ámbito: 'all' (todas las zonas), un id de zona o '' (sin zona). */
+  function blockOf(scope) { return Object.assign(EMPTY_BLOCK(), ((CONFIG.delayBlock || {})[scope]) || {}); }
+  /** ¿Está bloqueada esta categoría en esta zona? (bloqueo global o de la zona) */
+  function isBlocked(kind, zoneId) { return !!(blockOf('all')[kind] || blockOf(zoneId || '')[kind]); }
+  /** Para el motor: ¿se mueve este bloque por su categoría y su zona? (el LED individual va por encima) */
+  function catsFn() { return b => !isBlocked(b.kind, b.stageId || ''); }
+  function curScope() {
+    const zs = (FEST && FEST.escenarios) || [];
+    return CONFIG.delayZone && (CONFIG.delayZone === 'all' || CONFIG.delayZone === '' || zs.some(z => z.id === CONFIG.delayZone)) ? CONFIG.delayZone : 'all';
+  }
+  function renderDelayCats() {
+    const zv = curScope(), g = blockOf('all'), own = blockOf(zv);
+    const eff = k => !!(g[k] || own[k]);
+    const all = CATS.every(eff);
+    document.querySelectorAll('#delay-cats [data-cat]').forEach(b => {
+      const k = b.dataset.cat, on = k === 'all' ? all : eff(k);
+      const inh = zv !== 'all' && k !== 'all' && g[k];     // bloqueado para todas las zonas (no se quita desde una zona)
+      b.classList.toggle('on', on); b.classList.toggle('inh', !!inh); b.setAttribute('aria-pressed', String(on));
+      b.title = inh ? 'Bloqueado para todas las zonas: quítalo con «Todas las zonas»' : '';
+    });
+    const any = Object.keys(CONFIG.delayBlock || {}).some(sc => CATS.some(k => (CONFIG.delayBlock[sc] || {})[k]));
+    $('delay-on').hidden = !any;
+    const zs = (FEST && FEST.escenarios) || [];
+    const hasNoZone = !!(FEST && FEST.artists.some(a => !a.escenarioId));
+    const mark = sc => CATS.some(k => blockOf(sc)[k]) ? ' ·  bloqueos' : '';
+    const zh = '<option value="all">Todas las zonas (global)' + mark('all') + '</option>' + zs.map(z => '<option value="' + esc(z.id) + '">' + esc(z.nombre) + mark(z.id) + '</option>').join('') +
+      (hasNoZone ? '<option value="">Sin zona' + mark('') + '</option>' : '');
+    if ($('delay-zone').innerHTML !== zh) $('delay-zone').innerHTML = zh;
+    $('delay-zone').value = zv;
+    $('m-delay').querySelector('.mbtn').title = any ? 'Hay categorías bloqueadas para los retrasos' : 'Todo se mueve con los retrasos (nada bloqueado)';
+  }
+  $('delay-cats').addEventListener('click', e => {
+    const b = e.target.closest('[data-cat]'); if (!b) return;
+    const zv = curScope(), g = blockOf('all'), c = blockOf(zv);
+    if (b.classList.contains('inh')) { toast('Bloqueado para todas las zonas: quítalo eligiendo «Todas las zonas»', true); return; }
+    if (b.dataset.cat === 'all') { const v = !CATS.every(k => c[k] || (zv !== 'all' && g[k])); CATS.forEach(k => { if (!(zv !== 'all' && g[k])) c[k] = v; }); }
+    else c[b.dataset.cat] = !c[b.dataset.cat];
+    const blk = Object.assign({}, CONFIG.delayBlock || {}); blk[zv] = c;
+    CONFIG = Dt.setConfig({ delayBlock: blk });
+    renderDelayCats();
+    renderTable();                         // los LED de la tabla reflejan el bloqueo
+  });
+  $('btn-delay').addEventListener('click', openDelayWindow);
+  $('delay-zone').addEventListener('change', e => { CONFIG = Dt.setConfig({ delayZone: e.target.value }); renderDelayCats(); });
+
+  // ── Ventana de retraso (nivel 2): minutos, ámbito, categorías y vista previa antes de aplicar ──
+  function openDelayWindow() {
+    if (!FEST) { toast('Primero crea o abre un evento', true); return; }
+    closeMenus(); closeConfig();
+    const zones = FEST.escenarios || [];
+    const hasNoZone = FEST.artists.some(a => !a.escenarioId);
+    const ZK = zones.map(z => z.id).concat(hasNoZone ? [''] : []);
+    const z0 = CONFIG.delayZone && CONFIG.delayZone !== 'all' && zones.some(z => z.id === CONFIG.delayZone) ? [CONFIG.delayZone] : ZK.slice();
+    // Jornada: la que se está viendo; si no, la de ahora si le queda algo; si no, la primera con algo pendiente
+    const nowI = Math.floor(C.nowAbs());
+    const pend = d => C.buildBlocks(FEST, { mode: 'all', day: d }).some(b => b.psi !== null && b.psi >= nowI);
+    const jors = jornadaOptions();
+    const jNow = C.jornadaOfAbs(FEST, nowI);
+    const j0 = CONFIG.day !== 'all' ? CONFIG.day : pend(jNow) ? jNow : (jors.find(pend) || jNow);
+    const W = { mins: 5, zones: z0, block: EMPTY_BLOCK(), day: j0, from: j0 === jNow ? C.fmtHM(nowI) : '' };
+    const html = '<div class="dw">' +
+      '<div class="dw-row"><span class="dw-l">Minutos</span><div class="dw-mins">' + [5, 10, 15].map(m => '<button class="dtb" data-m="' + m + '">+' + m + '</button>').join('') +
+        '<label class="dw-n">+ <input id="dw-n" type="number" min="1" max="600" value="5"> min</label></div></div>' +
+      '<div class="dw-row"><span class="dw-l">Zonas</span><div class="dtog" id="dw-zones"><button data-z="*">Todas</button>' + zones.map(z => '<button data-z="' + esc(z.id) + '">' + esc(z.nombre) + '</button>').join('') + (hasNoZone ? '<button data-z="">Sin zona</button>' : '') + '</div></div>' +
+      '<div class="dw-row"><span class="dw-l">Jornada</span>' + jornadaSelect(W.day, 'id="dw-day"') + '<span class="dw-l" style="width:auto;margin-left:8px">desde</span><input id="dw-from" type="text" value="' + W.from + '" placeholder="inicio" style="width:80px"><span class="hint">vacío = toda la jornada · solo lo que aún no ha empezado</span></div>' +
+      '<div class="dw-row"><span class="dw-l">Bloquear</span><span class="hint dw-hint">además de lo que ya está en rojo</span></div><div class="dw-row"><span class="dw-l"></span><div class="dtog block" id="dw-cats">' + ['all', 'show', 'sc', 'tarea', 'hito'].map(k => '<button data-cat="' + k + '">' + ({ all: 'Todos', show: 'Shows', sc: 'Soundchecks', tarea: 'Tareas', hito: 'Hitos' })[k] + '</button>').join('') + '</div></div>' +
+      '<div id="dw-prev" class="dw-prev"></div></div>';
+    modal('Aplicar retraso en cascada', html, [{ label: 'Cancelar' }, { label: 'Aplicar retraso en cascada', kind: 'primary', run: () => {
+      const r = dwCompute(W);
+      if (!r || !r.moved.length) { toast('No hay nada que mover con esa selección', true); return false; }
+      const zl = W.zones.length === ZK.length ? 'todas las zonas' : W.zones.map(z => z ? (C.getEscenario(FEST, z) || {}).nombre : 'sin zona').join(', ');
+      commitFestival(r.state, 'Retraso +' + W.mins + ' min (' + zl + '): ' + nEnt(r.moved.length, 'movida') + (r.kept.length ? ' · ' + keptTxt(r.kept.length) : ''));
+    } }], { wide: true });
+    const box = $('modal-body');
+    const paint = () => {
+      box.querySelectorAll('.dtb').forEach(b => b.classList.toggle('on', +b.dataset.m === W.mins));
+      const all = CATS.every(k => W.block[k]);
+      box.querySelectorAll('#dw-cats [data-cat]').forEach(b => b.classList.toggle('on', b.dataset.cat === 'all' ? all : !!W.block[b.dataset.cat]));
+      box.querySelectorAll('#dw-zones [data-z]').forEach(b => b.classList.toggle('on', b.dataset.z === '*' ? W.zones.length === ZK.length : W.zones.indexOf(b.dataset.z) >= 0));
+      const r = dwCompute(W);
+      const prev = box.querySelector('#dw-prev');
+      if (!r) { prev.innerHTML = '<p class="err">Elige la jornada y una hora «desde» válida (HH:MM) o déjala vacía.</p>'; $('modal-actions').querySelector('.primary').disabled = true; return; }
+      const rows = r.moved.map(m => '<tr><td>' + esc(m.name) + '</td><td class="dim">' + esc(m.stage || '—') + '</td><td class="dim">' + ({ show: 'Show', sc: 'Soundcheck', tarea: 'Tarea', hito: 'Hito' })[m.kind] + '</td><td class="t">' + C.fmtHM(m.from) + '</td><td class="t to">' + C.fmtHM(m.to) + '</td></tr>').join('') +
+        r.kept.map(k => '<tr class="kept"><td><span class="led red sm"></span>' + esc(k.name) + '</td><td class="dim">' + esc(k.stage || '—') + '</td><td class="dim">' + ({ show: 'Show', sc: 'Soundcheck', tarea: 'Tarea', hito: 'Hito' })[k.kind] + '</td><td class="t">' + C.fmtHM(k.at) + '</td><td class="t">no se mueve</td></tr>').join('');
+      prev.innerHTML = (r.clashes.length ? '<div class="errbox"><svg class="ic"><use href="#i-alert"/></svg>' + r.clashes.map(c => esc(c.name) + ' choca con «' + esc(c.with) + '» (' + C.fmtHM(c.at) + ', DELAY rojo)').join('<br>') + '</div>' : '') +
+        (rows ? '<table class="dw-t"><thead><tr><th>Entrada</th><th>Zona</th><th>Tipo</th><th>Antes</th><th>Después</th></tr></thead><tbody>' + rows + '</tbody></table>'
+              : '<p class="hint">' + (!W.zones.length ? 'Marca qué zonas se retrasan.' : CATS.every(k => W.block[k]) ? 'Todas las categorías están bloqueadas.' : 'No hay entradas pendientes con esa selección.') + '</p>');
+      $('modal-actions').querySelector('.primary').disabled = !r.moved.length;
+      $('modal-actions').querySelector('.primary').textContent = r.moved.length ? 'Aplicar retraso en cascada (' + r.moved.length + ')' : 'Aplicar retraso en cascada';
+    };
+    box.querySelectorAll('.dtb').forEach(b => b.addEventListener('click', () => { W.mins = +b.dataset.m; $('dw-n').value = W.mins; paint(); }));
+    $('dw-n').addEventListener('input', e => { const v = Math.round(+e.target.value); if (v >= 1 && v <= 600) { W.mins = v; paint(); } });
+    $('dw-zones').addEventListener('click', e => {
+      const b = e.target.closest('[data-z]'); if (!b) return;
+      const z = b.dataset.z;
+      if (z === '*') W.zones = W.zones.length === ZK.length ? [] : ZK.slice();
+      else W.zones = W.zones.indexOf(z) >= 0 ? W.zones.filter(x => x !== z) : W.zones.concat([z]);
+      paint();
+    });
+    $('dw-from').addEventListener('change', e => { W.from = e.target.value; paint(); });
+    $('dw-day').addEventListener('change', e => { W.day = e.target.value; paint(); });
+    $('dw-cats').addEventListener('click', e => {
+      const b = e.target.closest('[data-cat]'); if (!b) return;
+      if (b.dataset.cat === 'all') { const v = !CATS.every(k => W.block[k]); CATS.forEach(k => { W.block[k] = v; }); } else W.block[b.dataset.cat] = !W.block[b.dataset.cat];
+      paint();
+    });
+    paint();
+  }
+  /** Calcula el retraso de la ventana (sin aplicarlo). «Desde» se toma en la jornada actual. */
+  function dwCompute(W) {
+    if (C.dayIndex(W.day) === null) return null;
+    const hm = C.normHM(W.from); if (hm === null) return null;
+    const jor = W.day;
+    const from = hm ? C.toAbs(C.fechaFor(FEST, jor, hm), hm) : C.toAbs(jor, C.fmtHM(C.cutoffMins(FEST)));   // vacío: desde el inicio de la jornada
+    // Bloqueos: los del menú Retrasos (por zona) + los que se marquen aquí solo para este retraso
+    const cats = b => !W.block[b.kind] && !isBlocked(b.kind, b.stageId || '');
+    return C.shiftEntries(FEST, { minutes: W.mins, zone: W.zones, cats: cats, fromAbs: from, day: jor });
+  }
   $('btn-undo').addEventListener('click', undo);
   $('btn-new2').addEventListener('click', askNew);
 
@@ -717,7 +1000,7 @@
     const nT = s.artists.filter(a => C.tipoOf(a) === 'tarea').length, nH = s.artists.filter(a => C.tipoOf(a) === 'hito').length;
     let html = '<p>Archivo: <b>' + esc(fname) + '</b></p><ul>' +
       '<li>Evento: <b>' + esc(ev.nombre || 'sin nombre') + '</b></li>' +
-      '<li>' + (s.artists.length - nT - nH) + ' bandas · ' + (nT ? nT + ' tareas · ' : '') + (nH ? nH + ' hitos · ' : '') + s.escenarios.length + ' escenarios</li>' +
+      '<li>' + (s.artists.length - nT - nH) + ' bandas · ' + (nT ? nT + ' tareas · ' : '') + (nH ? nH + ' hitos · ' : '') + s.escenarios.length + ' zonas</li>' +
       '<li>Shows: ' + (dShow.length ? dShow.map(fmtDay).map(esc).join(', ') : 'ninguno') + '</li>' +
       '<li>Soundchecks: ' + (dSc.length ? dSc.map(fmtDay).map(esc).join(', ') : 'ninguno') + '</li>' +
       '<li>Hora de corte: ' + esc(ev.dayCutoff || C.DEFAULT_CUTOFF) + ' · aviso CALL: ' + esc(ev.callMins || C.DEFAULT_CALL_MINS) + ' min</li></ul>';
@@ -834,7 +1117,7 @@
     const jor = jornadaOptions();
     $('imp-jor').innerHTML = '<option value="">— ninguna —</option>' + jor.map(d => '<option value="' + d + '">' + esc(fmtDay(d)) + '</option>').join('');
     $('imp-jor').value = IMP.defJor;
-    $('imp-esc').innerHTML = '<option value="">— ninguno —</option>' + (FEST.escenarios || []).map(e => '<option value="' + esc(e.id) + '">' + esc(e.nombre) + '</option>').join('');
+    $('imp-esc').innerHTML = '<option value="">— ninguna —</option>' + (FEST.escenarios || []).map(e => '<option value="' + esc(e.id) + '">' + esc(e.nombre) + '</option>').join('');
     $('imp-esc').value = IMP.defEsc;
     $('imp-head-l').hidden = rd.kind !== 'tabla';
     $('imp-head').checked = !!rd.hasHeader;
@@ -856,17 +1139,18 @@
     // Escenarios nuevos y jornadas fuera del evento
     let nh = '';
     if (pv.newStages.length) {
-      nh += '<span><b>' + pv.newStages.length + (pv.newStages.length === 1 ? ' escenario nuevo' : ' escenarios nuevos') + ':</b></span>' +
+      nh += '<span><b>' + pv.newStages.length + (pv.newStages.length === 1 ? ' zona nueva' : ' zonas nuevas') + ':</b></span>' +
         pv.newStages.map(s => { const k = I.norm(s); return '<label><input type="checkbox" data-newstage="' + esc(k) + '"' + (IMP.create[k] === false ? '' : ' checked') + '> crear «' + esc(s) + '»</label>'; }).join('');
     }
     if (pv.outside.length) nh += '<label><input type="checkbox" id="imp-extend"' + (IMP.extend ? ' checked' : '') + '> <b>Ampliar el evento</b> a ' + pv.outside.map(fmtDay).map(esc).join(', ') + '</label>';
     $('imp-new').innerHTML = nh;
     // Vista previa
-    const head = '<thead><tr><th></th><th>Estado</th><th>Tipo</th><th>Escenario</th><th>Nombre</th><th>Jornada</th><th>Inicio</th><th>Fin</th><th>CALL</th><th>Notas</th><th>Avisos</th></tr></thead>';
+    const head = '<thead><tr><th></th><th>Estado</th><th>Tipo</th><th>Zona</th><th>Nombre</th><th>Jornada</th><th>Inicio</th><th>Fin</th><th>CALL</th><th>Notas</th><th>Avisos</th></tr></thead>';
     if (!pv.rows.length) {
       $('imp-prev').innerHTML = head + '<tbody><tr><td colspan="11" class="vacio">' + (rd.kind === 'vacio' ? 'Pega un horario arriba o elige un archivo .csv / .tsv.' : 'No se ha encontrado ninguna fila con hora.') + '</td></tr></tbody>';
     } else {
-      const st = { ok: '● OK', warn: '● Revisar', err: '● Error' };
+      const dot = '<svg class="ic dot"><use href="#i-dot"/></svg>';
+      const st = { ok: dot + 'OK', warn: dot + 'Revisar', err: dot + 'Error' };
       const inp = (r, k, v, cls) => '<td class="' + (cls || '') + '"><input type="text" data-row="' + r.idx + '" data-k="' + k + '" value="' + esc(v || '') + '" spellcheck="false" autocomplete="off"></td>';
       $('imp-prev').innerHTML = head + '<tbody>' + pv.rows.map(r =>
         '<tr class="st-' + r.status + (r.include ? '' : ' off') + '" title="' + esc(r.raw || '') + '">' +
@@ -901,7 +1185,7 @@
     const hidden = CONFIG.mode !== 'all' && Array.from(used).some(t => t !== CONFIG.mode);
     closeImport();
     let msg = 'Importado: ' + r.added + (r.added === 1 ? ' entrada nueva' : ' entradas nuevas');
-    if (r.stagesCreated) msg += ', ' + r.stagesCreated + ' escenario' + (r.stagesCreated === 1 ? '' : 's') + ' nuevo' + (r.stagesCreated === 1 ? '' : 's');
+    if (r.stagesCreated) msg += ', ' + r.stagesCreated + (r.stagesCreated === 1 ? ' zona nueva' : ' zonas nuevas');
     if (hidden) msg += ' · todo junto en Jornada completa';
     commitFestival(r.state, msg);
     if (r.errors.length) modal('Algunas filas no entraron', '<ul>' + r.errors.map(e => '<li>' + esc(e) + '</li>').join('') + '</ul>', [{ label: 'Entendido', kind: 'primary' }]);

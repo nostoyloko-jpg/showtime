@@ -554,6 +554,113 @@
     deq(C.stripLabels([null], 0), ['']);
   });
 
+  test('DELAY (LED): rojo = fija; verde por defecto; cuenta como cambio', () => {
+    ok(!C.isFija(DIA.artists[0]));
+    const r = C.setFija(DIA, 1, true); ok(r.ok && r.changed); ok(C.isFija(r.state.artists[0]));
+    eq(C.setFija(r.state, 1, true).changed, false);
+    eq(C.setFija(r.state, 1, false).state.artists[0].showtimeFija, undefined);
+    eq(C.diffSummary(DIA, r.state).fields, 1);
+  });
+  test('changeover mínimo: del evento (15 por defecto) o de la zona', () => {
+    const s0 = C.newFestival({ nombre: 'X', fechaInicio: '2026-07-10' }).state;
+    eq(s0.event.coMin, 15); eq(C.coMinFor(s0, ''), 15);
+    const s1 = C.updateEvent(s0, { coMin: 20 }).state; eq(C.coMinFor(s1, ''), 20);
+    ok(!C.updateEvent(s0, { coMin: 500 }).ok);
+    const s2 = C.addStage(s1, 'Carpa').state; const id = s2.escenarios[0].id;
+    eq(C.coMinFor(s2, id), 20, 'sin valor propio: el del evento');
+    const s3 = C.updateStage(s2, id, { coMin: '10' }).state; eq(C.coMinFor(s3, id), 10);
+    eq(C.coMinFor(C.updateStage(s3, id, { coMin: '' }).state, id), 20, 'vacío vuelve al del evento');
+    ok(!C.updateStage(s3, id, { coMin: 'abc' }).ok);
+    eq(C.coMinFor(FEST, 'esc1'), 15, 'evento antiguo sin coMin');
+  });
+
+  // ── Regiduría en vivo (2c-B) ─────────────────────────────────────────
+  function vivo() {
+    let s = C.newFestival({ nombre: 'Vivo', fechaInicio: '2026-07-10', coMin: 15 }).state;
+    s = C.addStage(s, 'Principal').state; s = C.addStage(s, 'Carpa').state;
+    const P = s.escenarios[0].id, K = s.escenarios[1].id;
+    const add = d => { const r = C.addArtist(s, d.modo || 'show', Object.assign({ jornada: '2026-07-10' }, d)); if (!r.ok) throw new Error(r.error); s = r.state; return r.id; };
+    const ids = {
+      A: add({ nombre: 'A', escenarioId: P, inicio: '20:00', fin: '21:00' }),
+      B: add({ nombre: 'B', escenarioId: P, inicio: '21:30', fin: '22:30' }),
+      T: add({ tipo: 'tarea', nombre: 'Cambio luces', escenarioId: P, inicio: '22:35', fin: '22:50' }),
+      C: add({ nombre: 'C', escenarioId: P, inicio: '23:00', fin: '00:00' }),
+      D: add({ nombre: 'D', escenarioId: P, inicio: '00:10', fin: '00:20' }),
+      H: add({ tipo: 'hito', nombre: 'Curfew', inicio: '00:30' }),
+      X: add({ nombre: 'X', escenarioId: K, inicio: '22:00', fin: '23:00' })
+    };
+    return { s, P, K, ids };
+  }
+  const V = vivo();
+  const blocksOf = st => C.buildBlocks(st, { mode: 'all', day: '2026-07-10' });
+
+  test('vivo: sin registrar nada, todo en hora (pasivo)', () => {
+    deq(C.driftByZone(V.s, blocksOf(V.s), at(D10, '20:30')), []);
+    const a = blocksOf(V.s).find(b => b.name === 'A'); eq(a.si, a.psi); eq(a.delta, null);
+  });
+  test('vivo: Empezar tarde dentro del colchón → se absorbe (Δ ≤ A)', () => {
+    const st = C.setReal(V.s, V.ids.A, 'show', 'i', at(D10, '20:08')).state;
+    const b = blocksOf(st).find(x => x.name === 'A');
+    eq(b.si, at(D10, '20:08')); eq(b.sf, at(D10, '21:08'), 'el fin previsto se desplaza'); eq(b.delta, 8);
+    const d = C.driftByZone(st, blocksOf(st), at(D10, '20:10'))[0];
+    eq(d.status, 'absorb'); eq(d.A, 15); eq(d.overflow, 0); eq(d.next.name, 'B');
+  });
+  test('vivo: más tarde que el colchón → desborde Δ−A; adelanto → early', () => {
+    const st = C.setReal(V.s, V.ids.A, 'show', 'i', at(D10, '20:20')).state;
+    const d = C.driftByZone(st, blocksOf(st), at(D10, '20:21'))[0];
+    eq(d.status, 'overflow'); eq(d.overflow, 5);
+    const e = C.setReal(V.s, V.ids.A, 'show', 'i', at(D10, '19:55')).state;
+    eq(C.driftByZone(e, blocksOf(e), at(D10, '20:00'))[0].status, 'early');
+  });
+  test('vivo: cascada del desborde solo en lo autorizado, su zona y sin las rojas (que no hacen de tope)', () => {
+    let st = C.setReal(V.s, V.ids.A, 'show', 'i', at(D10, '20:20')).state;
+    st = C.setFija(st, V.ids.C, true).state;
+    const r = C.shiftEntries(st, { minutes: 5, zone: V.P, cats: { show: true }, fromAbs: at(D10, '20:21'), afterAbs: at(D10, '20:00') });
+    deq(r.moved.map(m => m.name), ['B', 'D'], 'B y D se mueven; C (rojo) no; la tarea no (no autorizada); X es de otra zona');
+    deq(r.kept.map(k => k.name), ['Cambio luces', 'C'], 'no se mueven: la tarea (categoría no autorizada) y C (rojo)');
+    const after = blocksOf(r.state);
+    eq(C.fmtHM(after.find(b => b.name === 'B').psi), '21:35'); eq(C.fmtHM(after.find(b => b.name === 'D').psi), '00:15');
+    eq(C.fmtHM(after.find(b => b.name === 'C').psi), '23:00'); eq(C.fmtHM(after.find(b => b.name === 'X').psi), '22:00');
+    eq(after.find(b => b.name === 'D').jornada, '2026-07-10', 'cruzar medianoche no cambia la jornada');
+    eq(C.driftByZone(r.state, after, at(D10, '20:21'))[0].status, 'absorb', 'tras empujar el desborde, el cambio vuelve a absorber');
+  });
+  test('vivo: retraso global incluye tareas e hitos sin zona si se autorizan; avisa de choques con rojas', () => {
+    let st = C.setFija(V.s, V.ids.C, true).state;
+    const r = C.shiftEntries(st, { minutes: 40, zone: 'all', cats: { show: true, tarea: true, hito: true }, fromAbs: at(D10, '21:00') });
+    ok(r.moved.some(m => m.name === 'Curfew') && r.moved.some(m => m.name === 'Cambio luces') && r.moved.some(m => m.name === 'X'));
+    ok(r.clashes.some(c => c.name === 'B' && c.with === 'C'), 'B (22:10–23:10) pisa a C, que está en rojo');
+    eq(C.shiftEntries(V.s, { minutes: 10, zone: 'all', cats: {}, fromAbs: at(D10, '21:00') }).moved.length, 0, 'sin categorías no se mueve nada');
+  });
+  test('vivo: retraso multizona (lista de zonas; \'\' = sin zona)', () => {
+    const r = C.shiftEntries(V.s, { minutes: 10, zone: [V.K, ''], cats: { show: true, hito: true }, fromAbs: at(D10, '21:00') });
+    deq(r.moved.map(m => m.name).sort(), ['Curfew', 'X'], 'Carpa y lo sin zona; Principal no se toca');
+    eq(C.shiftEntries(V.s, { minutes: 10, zone: [], cats: { show: true }, fromAbs: at(D10, '21:00') }).moved.length, 0, 'ninguna zona = nada');
+  });
+  test('vivo: LED por entrada por encima de su categoría (verde forzado / rojo)', () => {
+    let st = C.setDelayFlag(V.s, V.ids.T, 'free').state;       // la tarea se mueve aunque las tareas estén bloqueadas
+    st = C.setDelayFlag(st, V.ids.B, 'lock').state;              // B no se mueve aunque los shows se muevan
+    const r = C.shiftEntries(st, { minutes: 5, zone: V.P, cats: { show: true }, fromAbs: at(D10, '21:00') });
+    deq(r.moved.map(m => m.name), ['Cambio luces', 'C', 'D']); deq(r.kept.map(k => k.name), ['B']);
+    eq(C.setDelayFlag(st, V.ids.T, null).state.artists.find(a => a.id === V.ids.T).showtimeLibre, undefined, 'null: vuelve a seguir a su categoría');
+    eq(C.fieldValue(st.artists.find(a => a.id === V.ids.T), 'show', 'fija'), 'libre');
+  });
+  test('vivo: no se mueve lo que ya ha empezado (tiene hora real)', () => {
+    const st = C.setReal(V.s, V.ids.B, 'show', 'i', at(D10, '21:31')).state;
+    eq(C.shiftEntries(st, { minutes: 5, zone: 'all', cats: { show: true }, fromAbs: at(D10, '21:00') }).moved.some(m => m.name === 'B'), false);
+  });
+  test('vivo: márgenes de hitos con el retraso arrastrado (ámbar < 15, rojo rebasado)', () => {
+    let m = C.hitoMargins(V.s, blocksOf(V.s), at(D10, '20:00'));
+    eq(m.length, 1); eq(m[0].band.name, 'D'); eq(m[0].margin, 10); eq(m[0].level, 'tight');
+    let st = C.setReal(V.s, V.ids.B, 'show', 'f', at(D10, '23:10')).state;   // B acaba 40 min tarde
+    m = C.hitoMargins(st, blocksOf(st), at(D10, '23:10'));
+    ok(m[0].margin < 0, 'C empuja a D más allá del curfew'); eq(m[0].level, 'over');
+  });
+  test('vivo: setReal borra con null; un hito no tiene hora real', () => {
+    const st = C.setReal(V.s, V.ids.A, 'show', 'i', at(D10, '20:05')).state;
+    eq(C.setReal(st, V.ids.A, 'show', 'i', null).state.artists[0].showtimeReal, undefined);
+    ok(!C.setReal(V.s, V.ids.H, 'show', 'i', at(D10, '20:05')).ok);
+  });
+
   // ── Ejecutar ──────────────────────────────────────────────────────────
   let pass = 0; const fails = [];
   tests.forEach(([name, fn]) => {
