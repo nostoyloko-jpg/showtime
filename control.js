@@ -504,6 +504,7 @@
     const nowMins = C.nowAbs(d), nowInt = Math.floor(nowMins);
     renderLive(nowMins, nowInt);
     renderDrift(nowInt);
+    renderFlash();
     markRows(nowInt);
     renderDaybar(nowInt);
   }
@@ -732,6 +733,14 @@
     }
     $('cfg-style-panel').value = panelStyle();
     $('cfg-style-live').value = CONFIG.style;
+    fillMsgCfg();
+  }
+  function fillMsgCfg() {
+    $('cfg-msg-bg').value = CONFIG.msgBg;
+    $('cfg-msg-fg').value = CONFIG.msgFg;
+    $('cfg-msg-secs').value = String(CONFIG.msgSecs);
+    const pv = $('cfg-msg-prev');
+    pv.style.setProperty('--mbg', CONFIG.msgBg); pv.style.setProperty('--mfg', CONFIG.msgFg);
   }
 
   function saveFest() {
@@ -811,6 +820,14 @@
     toast('Estilo de la Pantalla Live: ' + e.target.selectedOptions[0].textContent);
   });
   applyPanelStyle(panelStyle());
+  // Mensajes: colores y duración (se aplican al siguiente mensaje que se envíe)
+  $('cfg-msg-bg').addEventListener('input', e => { CONFIG = Dt.setConfig({ msgBg: e.target.value }); fillMsgCfg(); });
+  $('cfg-msg-fg').addEventListener('input', e => { CONFIG = Dt.setConfig({ msgFg: e.target.value }); fillMsgCfg(); });
+  $('cfg-msg-secs').addEventListener('change', e => {
+    CONFIG = Dt.setConfig({ msgSecs: Number(e.target.value) }); fillMsgCfg();
+    toast('Duración de los mensajes: ' + e.target.selectedOptions[0].textContent);
+  });
+  $('cfg-msg-reset').addEventListener('click', () => { CONFIG = Dt.setConfig({ msgBg: '#000000', msgFg: '#ffb347' }); fillMsgCfg(); toast('Colores de los mensajes por defecto'); });
 
   // Archivo (barra superior)
   $('btn-new').addEventListener('click', () => { closeConfig(); askNew(); });
@@ -1260,9 +1277,51 @@
   });
 
 
+  // ── Mensajes flash a la Pantalla Live (2c-C) ──────────────────────────
+  function sendFlash(text) {
+    const t = String(text || '').replace(/\s+/g, ' ').trim();
+    if (!t) return;
+    Dt.setFlash(t);
+    closeMenus();
+    $('msg-text').value = '';
+    renderFlash();
+    toast('Mensaje en la Pantalla Live: «' + t + '»' + (liveWin && !liveWin.closed ? '' : ' (la Live está cerrada en este Panel)'));
+  }
+  function flashLeftTxt(f) {
+    const l = Dt.flashLeft(f);
+    return l === null ? 'hasta retirarlo' : Math.ceil(l / 1000) + ' s';
+  }
+  function renderFlash() {
+    const f = Dt.getFlash ? Dt.getFlash() : null;
+    $('msg-on').hidden = !f;
+    const cur = $('msg-cur');
+    cur.hidden = !f;
+    if (f) cur.innerHTML = '<span>En pantalla: <b>' + esc(f.text) + '</b> · ' + flashLeftTxt(f) + '</span><button class="btn" id="msg-off" type="button">Retirar</button>';
+    const chip = $('drift').querySelector('.dchip.msg');
+    if (chip) chip.remove();
+    if (f) $('drift').insertAdjacentHTML('afterbegin', '<span class="dchip msg"><svg class="ic"><use href="#i-msg"/></svg>Live: «' + esc(f.text) + '»<button class="chipx" data-act="msg-off" title="Retirar el mensaje">Retirar</button></span>');
+    // Columna izquierda (lo que hay en la Live): tarjeta del mensaje con su aspecto real y el botón para quitarlo
+    const card = $('card-msg');
+    card.hidden = !f;
+    if (!f) { card.dataset.id = ''; return; }
+    if (card.dataset.id !== f.id) {
+      card.dataset.id = f.id;
+      const bg = f.bg || '#000000', fg = f.fg || '#ffb347';
+      $('v-msg').innerHTML = '<div class="msg-live" style="--mbg:' + bg + ';--mfg:' + fg + '">' + esc(f.text.toUpperCase()) + '</div>'
+        + '<div class="msg-foot"><span class="msg-left"></span><button class="btn" data-act="msg-off" type="button"><svg class="ic"><use href="#i-x"/></svg>Retirar</button></div>';
+    }
+    $('v-msg').querySelector('.msg-left').textContent = Dt.flashLeft(f) === null ? 'Hasta retirarlo' : 'Se cierra en ' + flashLeftTxt(f);
+  }
+  document.querySelectorAll('#m-msg .msgp').forEach(b => b.addEventListener('click', () => sendFlash(b.dataset.msg)));
+  $('msg-form').addEventListener('submit', e => { e.preventDefault(); sendFlash($('msg-text').value); });
+  document.addEventListener('click', e => {
+    if (e.target.closest('#msg-off, [data-act="msg-off"]')) { Dt.setFlash(null); renderFlash(); toast('Mensaje retirado de la Pantalla Live'); }
+  });
+
   // ── Sincronización con la Pantalla Live ──────────────────────────────
   Dt.onChange(type => {
     if (type === 'callDone') { tick(); return; }
+    if (type === 'flash') { renderFlash(); return; }
     loadState(); renderAll();
   });
 

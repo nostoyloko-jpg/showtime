@@ -678,7 +678,34 @@
   requestWake();
 
   // Cambios desde el Panel de Control (o desde otra Live)
-  Dt.onChange(() => { load(); tick(); });
+  Dt.onChange(type => { if (type === 'flash') { renderFlash(); return; } load(); tick(); });
+
+  // ── Mensaje flash (2c-C) ─────────────────────────────────────────────
+  let flashId = '';
+  function renderFlash() {
+    const f = Dt.getFlash ? Dt.getFlash() : null;
+    const el = $('flash');
+    if (!f) { if (!el.hidden) { el.hidden = true; flashId = ''; } return; }
+    if (f.id !== flashId) {
+      flashId = f.id;
+      $('flash-txt').textContent = f.text.toUpperCase();
+      const box = el.querySelector('.fl-box');
+      if (f.bg) box.style.setProperty('--mbg', f.bg); else box.style.removeProperty('--mbg');
+      if (f.fg) box.style.setProperty('--mfg', f.fg); else box.style.removeProperty('--mfg');
+      el.querySelector('.fl-bar').hidden = Dt.flashLeft(f) === null;   // «hasta retirarlo»: sin cuenta atrás
+      el.hidden = false;
+      // tamaño: lo más grande posible sin salirse
+      const t = $('flash-txt'); let fs = 22;
+      t.style.fontSize = fs + 'vh';
+      while (fs > 5 && (t.scrollWidth > t.clientWidth + 2 || t.scrollHeight > window.innerHeight * 0.62)) { fs -= 1; t.style.fontSize = fs + 'vh'; }
+      el.classList.remove('blink'); void el.offsetWidth; el.classList.add('blink');
+    }
+    const left = Dt.flashLeft(f), ms = Dt.flashMs(f);
+    if (left !== null) $('flash-prog').style.width = (left / ms * 100) + '%';
+  }
+  $('flash-x').addEventListener('click', () => { if (Dt.setFlash) Dt.setFlash(null); renderFlash(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('flash').hidden && Dt.setFlash) { Dt.setFlash(null); renderFlash(); } });
+  setInterval(renderFlash, 250);
   window.ShowtimeLive = { applyStyle: v => { applyStyle(v); tick(); }, reload: () => { load(); tick(); } };
 
   // ── Arranque ─────────────────────────────────────────────────────────

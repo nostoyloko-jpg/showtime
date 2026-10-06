@@ -219,3 +219,16 @@ body[data-lv="escenario"] .txtbtn{color:#fff}
 .dz.absorb{color:var(--call)}
 .dz.over{color:#ff3b30}
 .dz.early{color:#10b981}
+/* ── Mensaje flash (2c-C) ─────────────────────────────────────────── */
+#flash{position:fixed;inset:0;z-index:500;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.72)}
+#flash[hidden]{display:none}
+.fl-box{--mbg:#000;--mfg:var(--call);width:94vw;padding:4vh 3vw;border-radius:18px;background:var(--mbg);border:6px solid var(--mfg);text-align:center;box-shadow:0 0 60px color-mix(in srgb,var(--mfg) 35%,transparent)}
+.fl-bar[hidden]{display:none}
+#flash-txt{color:var(--mfg);font-weight:900;line-height:1.02;letter-spacing:.02em;overflow-wrap:break-word;width:100%}
+.fl-bar{height:8px;margin-top:3vh;border-radius:4px;background:rgba(128,128,128,.35);overflow:hidden}
+#flash-prog{height:100%;background:#fff;transition:width .25s linear}
+#flash.blink .fl-box{animation:flblink 1s steps(1,end) infinite}
+@keyframes flblink{0%{background:var(--mbg)}50%{background:var(--mfg)}100%{background:var(--mbg)}}
+#flash.blink .fl-box #flash-txt{animation:fltxt 1s steps(1,end) infinite}
+@keyframes fltxt{0%{color:var(--mfg)}50%{color:var(--mbg)}100%{color:var(--mfg)}}
+#flash-x{position:fixed;top:16px;right:16px;width:48px;height:48px}

@@ -412,7 +412,8 @@ body[data-ps="escenario"] .mpanel{box-shadow:none}
 #btn-live .state{margin-left:2px;gap:0}
 #btn-live .state::before{width:8px;height:8px;background:rgba(255,255,255,.45)}
 #btn-live .state.on::before{background:#10b981;box-shadow:0 0 6px #10b981}
-@media (max-width:1180px){ .mbtn .mlbl{display:none} #btn-cfg{font-size:0;gap:0;padding:0 9px} #btn-cfg .ic{font-size:14px} }
+@media (max-width:1380px){ .mbtn .mlbl{display:none} #btn-cfg{font-size:0;gap:0;padding:0 9px} #btn-cfg .ic{font-size:14px} }
+@media (max-width:1180px){ #btn-undo span{display:none} .menus{margin-left:0} }
 .rowbtns .delbtn{width:28px}
 @media (max-width:1600px){
   td.n input{min-width:64px}
@@ -447,3 +448,27 @@ td.stage input[type=text]{width:var(--escw,140px);min-width:120px;max-width:260p
 .mpanel,.modal-box,.cfg,.toast{box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 16px 48px rgba(0,0,0,.5),0 2px 8px rgba(0,0,0,.35)}
 .modal{background:rgba(0,0,0,.18)}
 body[data-ps="escenario"]{--glass-bg:#000;--glass-line:rgba(255,214,0,.55);--glass-blur:none}
+/* ── 2c-C · Mensajes flash ───────────────────────────────────────── */
+.msg-presets{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:0 4px}
+.msgp{justify-content:center;height:40px;border:1px solid var(--line2)!important;font-weight:900!important;letter-spacing:.06em}
+.msg-form{display:flex;gap:6px;padding:10px 4px 0}
+.msg-form input{flex:1;height:36px}
+.msg-cur{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:10px 4px 0;padding:8px 10px;border-radius:8px;background:rgba(255,197,51,.1);border:1px solid rgba(255,197,51,.4);font-size:13px}
+.msg-cur[hidden]{display:none}
+.mdot.msg{background:var(--call);box-shadow:0 0 6px var(--call);animation:blinkdot 1s steps(2) infinite}
+@keyframes blinkdot{50%{opacity:.25}}
+.dchip.msg{color:var(--call);border-color:rgba(255,197,51,.55);background:rgba(255,197,51,.1)}
+.chipx{margin-left:6px;height:20px;padding:0 8px;border-radius:999px;border:1px solid currentColor;background:transparent;color:inherit;font:inherit;font-size:11px;font-weight:800;cursor:pointer}
+
+/* ── Mensajes: configuración y tarjeta en la columna izquierda ───────── */
+.form input.swatch{width:64px;height:32px;padding:2px;border-radius:6px;border:1px solid var(--line2);background:var(--field);cursor:pointer}
+.msg-prev{grid-column:1/-1;display:flex;align-items:center;justify-content:center;height:54px;border-radius:8px;border:3px solid var(--mfg,#ffb347);
+  font-weight:900;font-size:22px;letter-spacing:.04em;animation:msgblink 1s steps(1,end) infinite}
+@keyframes msgblink{0%{background:var(--mbg,#000);color:var(--mfg,#ffb347)}50%{background:var(--mfg,#ffb347);color:var(--mbg,#000)}100%{background:var(--mbg,#000);color:var(--mfg,#ffb347)}}
+.card.msgcard{border-color:rgba(255,197,51,.55)}
+.card h3.h-msg{color:var(--call)}
+.card[hidden]{display:none}
+.msg-live{padding:10px 12px;border-radius:8px;border:3px solid var(--mfg);font-weight:900;font-size:20px;line-height:1.1;text-align:center;overflow-wrap:break-word;
+  animation:msgblink 1s steps(1,end) infinite}
+.msg-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px;font-size:13px;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){.msg-prev,.msg-live{animation:none;background:var(--mbg);color:var(--mfg)}}

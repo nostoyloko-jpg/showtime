@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Showtime · Panel de Control</title>
-<link rel="stylesheet" href="control.css?v=20261009">
+<link rel="stylesheet" href="control.css?v=20261012">
 </head>
 <body>
 
@@ -30,6 +30,7 @@
   <symbol id="i-alert" viewBox="0 0 20 20"><path d="M10 3.5l7 12.5H3z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M10 8.5v3.5M10 14.2v.1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
   <symbol id="i-chev" viewBox="0 0 20 20"><path d="M6 8l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-clock" viewBox="0 0 20 20"><circle cx="10" cy="10" r="6.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10 6.5V10l2.5 1.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+  <symbol id="i-msg" viewBox="0 0 20 20"><path d="M4 5.5h12a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H9l-3.5 3v-3H4a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
   <symbol id="i-sun" viewBox="0 0 20 20"><circle cx="10" cy="10" r="3.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M10 2.5v2M10 15.5v2M2.5 10h2M15.5 10h2M4.7 4.7l1.4 1.4M13.9 13.9l1.4 1.4M4.7 15.3l1.4-1.4M13.9 6.1l1.4-1.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
 </svg>
 
@@ -73,6 +74,22 @@
         <button id="btn-delay" class="mitem"><svg class="ic"><use href="#i-plus"/></svg>Retraso manual (zonas, minutos y vista previa)…</button>
       </div>
     </div>
+    <div class="menu" id="m-msg">
+      <button class="mbtn" aria-haspopup="true" aria-expanded="false"><svg class="ic"><use href="#i-msg"/></svg>Mensajes<span id="msg-on" class="mdot msg" hidden></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
+      <div class="mpanel wide" role="menu">
+        <div class="mhead">Mensaje a la Pantalla Live</div>
+        <div class="msg-presets">
+          <button class="mitem msgp" data-msg="5 MINUTOS">5 MINUTOS</button>
+          <button class="mitem msgp" data-msg="ÚLTIMO TEMA">ÚLTIMO TEMA</button>
+        </div>
+        <form id="msg-form" class="msg-form" autocomplete="off">
+          <input id="msg-text" type="text" maxlength="140" placeholder="Escribe un aviso…" spellcheck="false">
+          <button class="btn primary" type="submit">Enviar</button>
+        </form>
+        <div id="msg-cur" class="msg-cur" hidden></div>
+        <p class="mnote">Sale en grande y parpadeando en la Pantalla Live. Se cierra solo a los 20 s, con el botón de cerrar de la Live o con «Retirar».</p>
+      </div>
+    </div>
   </nav>
   <div class="grow"></div>
   <button id="btn-undo" class="btn"><svg class="ic"><use href="#i-undo"/></svg><span>Deshacer</span></button>
@@ -93,6 +110,7 @@
 
 <main id="main">
   <aside class="live">
+    <div class="card msgcard" id="card-msg" hidden><h3 class="h-msg">Mensaje en Live</h3><div id="v-msg"></div></div>
     <div class="card"><h3 class="h-now">En escena</h3><div id="v-now"></div></div>
     <div class="card"><h3>Siguiente</h3><div id="v-next"></div></div>
     <div class="card" id="card-call"><h3 class="h-call">CALL</h3><div id="v-call"></div></div>
@@ -160,6 +178,16 @@
       <div class="note">Van por separado: el portátil y el monitor de escenario suelen tener luz distinta.</div>
     </div>
   </section>
+  <section class="cfg-s" id="cfg-s-msg">
+    <h3>Mensajes</h3>
+    <div class="form">
+      <label for="cfg-msg-bg">Fondo</label><input id="cfg-msg-bg" type="color" class="swatch">
+      <label for="cfg-msg-fg">Letra</label><input id="cfg-msg-fg" type="color" class="swatch">
+      <label for="cfg-msg-secs">Duración</label><select id="cfg-msg-secs"><option value="10">10 s</option><option value="20">20 s</option><option value="30">30 s</option><option value="60">60 s</option><option value="0">Hasta retirarlo</option></select>
+      <div id="cfg-msg-prev" class="msg-prev"><span>5 MINUTOS</span></div>
+      <div class="note"><button id="cfg-msg-reset" class="btn" type="button">Colores por defecto</button> Cada mensaje sale con los colores y la duración que haya al enviarlo.</div>
+    </div>
+  </section>
 </aside>
 
 <div id="drop" class="drop" hidden><div>Suelta aquí el archivo (.json del evento, o .csv / .tsv con un horario)</div></div>
@@ -202,9 +230,9 @@
 <datalist id="zones-dl"></datalist>
 <div id="toast" class="toast" hidden></div>
 
-<script src="core.js?v=20261009"></script>
-<script src="datos.js?v=20261009"></script>
-<script src="importar.js?v=20261009"></script>
-<script src="control.js?v=20261009"></script>
+<script src="core.js?v=20261012"></script>
+<script src="datos.js?v=20261012"></script>
+<script src="importar.js?v=20261012"></script>
+<script src="control.js?v=20261012"></script>
 </body>
 </html>

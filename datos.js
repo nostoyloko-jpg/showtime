@@ -16,10 +16,12 @@
     festival: 'showtime.festival',     // proyecto Stage Master importado (con ajustes)
     config:   'showtime.config',       // { mode: show|sc|all, day, style, callMins }
     callDone: 'showtime.callDone',     // [callKey, ...] avisos marcados con OK
-    original: 'showtime.original'      // copia del festival tal como se importó (para marcar cambios)
+    original: 'showtime.original',     // copia del festival tal como se importó (para marcar cambios)
+    flash:    'showtime.flash'         // mensaje flash activo en la Pantalla Live: { id, text, at (ms) } o null
   };
   const STYLES = ['clasico', 'escenario', 'neutro', 'raycast'];
-  const DEFAULT_CONFIG = { mode: 'show', day: 'all', style: 'clasico', callMins: null };
+  const DEFAULT_CONFIG = { mode: 'show', day: 'all', style: 'clasico', callMins: null, msgBg: '#000000', msgFg: '#ffb347', msgSecs: 20 };
+  const MSG_SECS = [10, 20, 30, 60, 0];   // 0 = hasta retirarlo
 
   function read(key, fallback) {
     try { const v = localStorage.getItem(key); return v === null ? fallback : JSON.parse(v); }
@@ -48,6 +50,10 @@
     Object.keys(db).forEach(k => { o.delayBlock[k] = cb(db[k]); });
     if (!o.delayBlock.all) o.delayBlock.all = cb({});
     delete o.delayCats;
+    const hex = v => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v);
+    if (!hex(o.msgBg)) o.msgBg = DEFAULT_CONFIG.msgBg;
+    if (!hex(o.msgFg)) o.msgFg = DEFAULT_CONFIG.msgFg;
+    o.msgSecs = MSG_SECS.indexOf(Number(o.msgSecs)) >= 0 ? Number(o.msgSecs) : DEFAULT_CONFIG.msgSecs;
     o.delayZone = typeof o.delayZone === 'string' ? o.delayZone : 'all';   // zona que se está editando en el menú Retrasos
     return o;
   }
@@ -58,6 +64,13 @@
   function getOriginal() { return read(K.original, null); }
   function setOriginal(f) { write(K.original, f); }
   function getCallDone() { const a = read(K.callDone, []); return Array.isArray(a) ? a : []; }
+  const FLASH_MS = 20000;   // duración por defecto (mensajes antiguos sin duración propia)
+  /** Duración de un mensaje en ms (0 = hasta retirarlo). */
+  function flashMs(f) { return f && Number.isFinite(f.ms) ? f.ms : FLASH_MS; }
+  /** Milisegundos que le quedan (null si no se cierra solo). */
+  function flashLeft(f) { const ms = flashMs(f); return ms ? Math.max(0, ms - (Date.now() - f.at)) : null; }
+  /** Mensaje flash vigente (o null si no hay o ya caducó). */
+  function getFlash() { const f = read(K.flash, null); return f && f.text && (flashMs(f) === 0 || Date.now() - f.at < flashMs(f)) ? f : null; }
 
   /** Minutos de aviso efectivos: los de la configuración o, si no hay, los del festival. */
   function callMinsOf(festival, config) {
@@ -81,7 +94,7 @@
   const listeners = [], peerListeners = [];
 
   function addPeer(win) { if (win) peers.add(win); }
-  function snapshot() { return { app: APP, type: 'snapshot', festival: getFestival(), config: getConfig(), callDone: getCallDone() }; }
+  function snapshot() { return { app: APP, type: 'snapshot', festival: getFestival(), config: getConfig(), callDone: getCallDone(), flash: getFlash() }; }
 
   function send(msg) {
     const m = Object.assign({ app: APP }, msg);
@@ -100,11 +113,13 @@
     if (m.type === 'festival') write(K.festival, m.festival);
     else if (m.type === 'config') write(K.config, normConfig(m.config));
     else if (m.type === 'callDone') write(K.callDone, m.callDone || []);
-    else if (m.type === 'hello') { send({ type: 'snapshot', festival: getFestival(), config: getConfig(), callDone: getCallDone() }); return; }
+    else if (m.type === 'flash') write(K.flash, m.flash || null);
+    else if (m.type === 'hello') { send({ type: 'snapshot', festival: getFestival(), config: getConfig(), callDone: getCallDone(), flash: getFlash() }); return; }
     else if (m.type === 'snapshot') {
       if (m.festival) write(K.festival, m.festival);
       if (m.config) write(K.config, normConfig(m.config));
       if (m.callDone) write(K.callDone, m.callDone);
+      if (m.flash !== undefined) write(K.flash, m.flash);
     } else return;
     listeners.forEach(fn => { try { fn(m.type); } catch (e) { console.error(e); } });
   }
@@ -126,7 +141,7 @@
     receive(m);
   });
   root.addEventListener('storage', e => {
-    const type = e.key === K.festival ? 'festival' : e.key === K.config ? 'config' : e.key === K.callDone ? 'callDone' : null;
+    const type = e.key === K.festival ? 'festival' : e.key === K.config ? 'config' : e.key === K.callDone ? 'callDone' : e.key === K.flash ? 'flash' : null;
     if (type) listeners.forEach(fn => { try { fn(type); } catch (err) { console.error(err); } });
   });
 
@@ -146,12 +161,20 @@
     if (list.indexOf(key) < 0) list.push(key);
     write(K.callDone, list); send({ type: 'callDone', callDone: list }); return list;
   }
+  /** Mensaje flash a la Pantalla Live (texto) o retirarlo (null). Lo ven todas las ventanas abiertas. */
+  function setFlash(text) {
+    const c = getConfig();   // colores y duración: los de este momento; si luego se cambian, este mensaje no cambia
+    const f = text ? { id: Date.now().toString(36), text: String(text).slice(0, 140), at: Date.now(), ms: c.msgSecs * 1000, bg: c.msgBg, fg: c.msgFg } : null;
+    write(K.flash, f); send({ type: 'flash', flash: f });
+    listeners.forEach(fn => { try { fn('flash'); } catch (e) { console.error(e); } });
+    return f;
+  }
   /** Pide los datos a las otras ventanas (útil al abrir la Live con doble clic en Firefox). */
   function hello() { send({ type: 'hello' }); }
 
   root.ShowtimeDatos = {
     KEYS: K, STYLES, normStyle, normConfig,
-    getFestival, getConfig, getCallDone, callMinsOf, getOriginal, setOriginal,
+    getFestival, getConfig, getCallDone, getFlash, setFlash, FLASH_MS, MSG_SECS, flashMs, flashLeft, callMinsOf, getOriginal, setOriginal,
     setFestival, setConfig, markCallDone, pruneCallDone,
     onChange, onPeer, addPeer, send, hello, ping
   };

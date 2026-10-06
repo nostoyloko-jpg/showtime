@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Showtime · Pantalla Live</title>
-<link rel="stylesheet" href="live.css?v=20261009">
+<link rel="stylesheet" href="live.css?v=20261012">
 </head>
 <body>
 
@@ -53,6 +53,9 @@
 <div id="hsplit" title="Arrastra para ver más artistas"></div>
 <div id="bot"></div>
 
+<!-- Mensaje flash (2c-C): enorme, parpadea; se cierra solo (duración en Configuración → Mensajes) o con el botón -->
+<div id="flash" role="alert" hidden><div class="fl-box"><div id="flash-txt"></div><div class="fl-bar"><div id="flash-prog"></div></div></div><button id="flash-x" class="iconbtn" title="Cerrar mensaje"><svg class="ic"><use href="#i-x"/></svg></button></div>
+
 <!-- Controles plegados: un icono; al dejar el cursor encima (o al tocarlo) se despliegan -->
 <div id="zoomctl" class="dock">
   <div id="dockbody">
@@ -72,8 +75,8 @@
   <button id="dockbtn" class="iconbtn" title="Controles (zoom, volver a ahora, pantalla completa)" aria-expanded="false"><svg class="ic"><use href="#i-sliders"/></svg></button>
 </div>
 
-<script src="core.js?v=20261009"></script>
-<script src="datos.js?v=20261009"></script>
-<script src="live.js?v=20261009"></script>
+<script src="core.js?v=20261012"></script>
+<script src="datos.js?v=20261012"></script>
+<script src="live.js?v=20261012"></script>
 </body>
 </html>
