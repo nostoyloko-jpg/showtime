@@ -2,9 +2,12 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Showtime · Pantalla Live</title>
-<link rel="stylesheet" href="live.css?v=20261019">
+<link rel="stylesheet" href="live.css?v=20261020">
 </head>
 <body>
 
@@ -65,6 +68,7 @@
 
 <!-- Confidence: monitor de escenario de UNA zona (cuenta atrás gigante con semáforo) -->
 <div id="conf" class="conf"></div>
+<button id="cf-full" class="iconbtn cf-full" title="Pantalla completa (F)" aria-label="Pantalla completa"><svg class="ic"><use href="#i-full"/></svg></button>
 
 <!-- Mensaje flash (2c-C): enorme, parpadea; se cierra solo (duración en Configuración → Mensajes) o con el botón -->
 <div id="flash" role="alert" hidden><div class="fl-box"><div id="flash-txt"></div><div class="fl-bar"><div id="flash-prog"></div></div></div><button id="flash-x" class="iconbtn" title="Cerrar mensaje"><svg class="ic"><use href="#i-x"/></svg></button></div>
@@ -88,10 +92,10 @@
   <button id="dockbtn" class="iconbtn" title="Controles (zoom, volver a ahora, pantalla completa)" aria-expanded="false"><svg class="ic"><use href="#i-sliders"/></svg></button>
 </div>
 
-<script src="core.js?v=20261019"></script>
-<script src="datos.js?v=20261019"></script>
-<script src="emision.js?v=20261019"></script>
-<script src="vistas.js?v=20261019"></script>
-<script src="live.js?v=20261019"></script>
+<script src="core.js?v=20261020"></script>
+<script src="datos.js?v=20261020"></script>
+<script src="emision.js?v=20261020"></script>
+<script src="vistas.js?v=20261020"></script>
+<script src="live.js?v=20261020"></script>
 </body>
 </html>

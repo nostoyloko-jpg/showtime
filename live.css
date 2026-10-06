@@ -14,7 +14,7 @@
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
 body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
-  overflow:hidden;height:100vh;display:flex;flex-direction:column;user-select:none;-webkit-user-select:none}
+  overflow:hidden;height:100vh;height:100dvh;display:flex;flex-direction:column;user-select:none;-webkit-user-select:none}
 .ic{width:18px;height:18px;display:block}
 .num,#clk,.tmeta,.trem,.atime,#zlbl,#offlbl{font-variant-numeric:tabular-nums;font-feature-settings:var(--num)}
 
@@ -250,7 +250,7 @@ body.ro .vsplit,body.ro #hsplit{pointer-events:none}
 
 /* ── Móvil en vertical: todo en una columna con scroll ─────────────── */
 @media (max-width:700px) and (orientation:portrait){
-  body{height:auto;min-height:100vh;overflow:auto;user-select:auto}
+  body{height:auto;min-height:100vh;min-height:100dvh;overflow:auto;user-select:auto}
   body{--info-w:36vw}
   .rx{left:50%;transform:translateX(-50%);top:10px}
   #top{flex:0 0 auto!important;flex-direction:column;gap:10px;padding:46px 12px 12px;min-height:0;overflow:visible}
@@ -333,3 +333,11 @@ body.bs-nocards.bs-nolines .ticker{flex:1 1 auto;height:auto;font-size:clamp(28p
 .tip{position:fixed;left:50%;bottom:7vh;transform:translateX(-50%);z-index:300;max-width:90vw;padding:14px 22px;border-radius:12px;background:rgba(10,12,16,.94);border:1px solid rgba(255,255,255,.22);font-size:18px;color:#fff;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,.5)}
 .tip kbd{display:inline-block;min-width:1.6em;padding:1px 7px;margin:0 2px;border-radius:5px;border:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.1);font:inherit;font-weight:800}
 body.ro[data-vista="confidence"] .conf{padding-top:max(4vh,52px)}
+
+/* Confidence en el navegador del móvil: alto VISIBLE (sin la barra del navegador), para que no se corte abajo, y botón de pantalla completa */
+body[data-vista="confidence"]{height:100vh!important;height:100dvh!important;min-height:0!important;overflow:hidden!important}
+body[data-vista="confidence"] .conf{padding-bottom:max(4vh,calc(env(safe-area-inset-bottom,0px) + 14px))}
+.cf-full{display:none!important;position:fixed;right:14px;bottom:14px;z-index:220;opacity:.55}
+.cf-full:hover{opacity:1}
+body[data-vista="confidence"] .cf-full{display:flex!important}
+@media (max-aspect-ratio:1/1){ .cf-top{white-space:normal;font-size:min(7vw,5vh);line-height:1.15} .cf-foot{white-space:normal;font-size:min(5.5vw,4.5vh)} }

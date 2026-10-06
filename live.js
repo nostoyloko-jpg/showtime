@@ -665,10 +665,18 @@
   // Pantalla completa (botón o tecla F)
   function toggleFull() {
     const d = document;
-    if (!d.fullscreenElement) { const el = d.documentElement; (el.requestFullscreen || el.webkitRequestFullscreen || function () {}).call(el); }
+    if (!(d.fullscreenElement || d.webkitFullscreenElement)) { const el = d.documentElement; (el.requestFullscreen || el.webkitRequestFullscreen || function () {}).call(el); }
     else (d.exitFullscreen || d.webkitExitFullscreen || function () {}).call(d);
   }
   $('fullbtn').addEventListener('click', toggleFull);
+  // Confidence: botón propio de pantalla completa (allí no está el dock). Si el navegador no puede (iPhone), no se enseña.
+  (function () {
+    const b = $('cf-full'), d = document;
+    if (!(d.fullscreenEnabled || d.webkitFullscreenEnabled)) { b.remove(); return; }
+    b.addEventListener('click', toggleFull);
+    const upd = () => b.querySelector('use').setAttribute('href', (d.fullscreenElement || d.webkitFullscreenElement) ? '#i-unfull' : '#i-full');
+    d.addEventListener('fullscreenchange', upd); d.addEventListener('webkitfullscreenchange', upd);
+  })();
   document.addEventListener('keydown', e => { if ((e.key === 'f' || e.key === 'F') && !e.metaKey && !e.ctrlKey) toggleFull(); });
   document.addEventListener('fullscreenchange', () => {
     $('fullbtn').querySelector('use').setAttribute('href', document.fullscreenElement ? '#i-unfull' : '#i-full');
