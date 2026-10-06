@@ -23,12 +23,23 @@
   const DEFAULT_CONFIG = { mode: 'show', day: 'all', style: 'clasico', callMins: null, msgBg: '#000000', msgFg: '#ffb347', msgSecs: 20 };
   const MSG_SECS = [10, 20, 30, 60, 0];   // 0 = hasta retirarlo
 
+  // Modo Staff (2d-A): la Live abierta desde el QR («live.html#sala=…») es SOLO LECTURA. Sus datos llegan por la
+  // emisión y viven en memoria: no se mezclan con lo que este navegador tenga guardado ni se pueden cambiar.
+  const READONLY = !!(root.location && /^#?(.*&)?sala=/.test(root.location.hash || ''));
+  const mem = READONLY ? new Map() : null;
+  const writeHooks = [];
+
   function read(key, fallback) {
+    if (mem) { const v = mem.get(key); return v === undefined || v === null ? fallback : JSON.parse(v); }
     try { const v = localStorage.getItem(key); return v === null ? fallback : JSON.parse(v); }
     catch (e) { return fallback; }
   }
   function write(key, value) {
-    try { localStorage.setItem(key, JSON.stringify(value)); return true; } catch (e) { return false; }
+    if (mem) { mem.set(key, JSON.stringify(value)); return true; }
+    let okw = true;
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { okw = false; }
+    writeHooks.forEach(fn => { try { fn(key); } catch (e) { console.error(e); } });   // p. ej. la emisión a los móviles
+    return okw;
   }
 
   function normStyle(v) {
@@ -89,7 +100,7 @@
 
   // ── Sincronización ───────────────────────────────────────────────────
   let bc = null;
-  try { bc = new BroadcastChannel(APP); } catch (e) { bc = null; }
+  if (!READONLY) { try { bc = new BroadcastChannel(APP); } catch (e) { bc = null; } }
   const peers = new Set();               // ventanas abiertas por esta (p. ej. la Live) o que nos han escrito
   const listeners = [], peerListeners = [];
 
@@ -97,6 +108,7 @@
   function snapshot() { return { app: APP, type: 'snapshot', festival: getFestival(), config: getConfig(), callDone: getCallDone(), flash: getFlash() }; }
 
   function send(msg) {
+    if (READONLY) return;
     const m = Object.assign({ app: APP }, msg);
     if (bc) { try { bc.postMessage(m); } catch (e) {} }
     const targets = Array.from(peers);
@@ -127,7 +139,7 @@
   if (bc) bc.onmessage = e => receive(e.data);
   // Mensaje directo de otra ventana: si no la conocíamos (p. ej. el Panel se recargó y perdió la Live),
   // se apunta como compañera y se le manda el estado completo. Así los cambios vuelven a llegarle al momento.
-  root.addEventListener('message', e => {
+  if (!READONLY) root.addEventListener('message', e => {
     const m = e.data;
     if (!m || m.app !== APP) return;
     const src = e.source;
@@ -140,29 +152,42 @@
     if (m.type === 'hello' && src && src !== root) { try { src.postMessage(snapshot(), '*'); } catch (err) {} return; }
     receive(m);
   });
-  root.addEventListener('storage', e => {
+  if (!READONLY) root.addEventListener('storage', e => {
     const type = e.key === K.festival ? 'festival' : e.key === K.config ? 'config' : e.key === K.callDone ? 'callDone' : e.key === K.flash ? 'flash' : null;
     if (type) listeners.forEach(fn => { try { fn(type); } catch (err) { console.error(err); } });
   });
 
   function onChange(fn) { listeners.push(fn); }
+  /** Avisa de cada escritura en este navegador (cambios propios o recibidos de otra ventana). */
+  function onWrite(fn) { writeHooks.push(fn); }
+  /** Estado completo para la emisión. */
+  function getSnapshot() { return { festival: getFestival(), config: getConfig(), callDone: getCallDone(), flash: read(K.flash, null) }; }
+  /** Modo Staff: aplica el estado recibido por la emisión y avisa a la Live. */
+  function loadSnapshot(s) {
+    if (!READONLY || !s) return;
+    write(K.festival, s.festival || null); write(K.config, normConfig(s.config)); write(K.callDone, Array.isArray(s.callDone) ? s.callDone : []); write(K.flash, s.flash || null);
+    listeners.forEach(fn => { try { fn('snapshot'); } catch (e) { console.error(e); } });
+  }
   function onPeer(fn) { peerListeners.push(fn); }
   /** La Live se presenta cada pocos segundos a la ventana que la abrió (barato; solo cuenta la primera vez). */
-  function ping() { if (root.opener && !root.opener.closed) { try { root.opener.postMessage({ app: APP, type: 'ping' }, '*'); } catch (e) {} } }
+  function ping() { if (READONLY) return; if (root.opener && !root.opener.closed) { try { root.opener.postMessage({ app: APP, type: 'ping' }, '*'); } catch (e) {} } }
 
   // ── Cambios que se propagan ──────────────────────────────────────────
-  function setFestival(f) { write(K.festival, f); send({ type: 'festival', festival: f }); }
+  function setFestival(f) { if (READONLY) return; write(K.festival, f); send({ type: 'festival', festival: f }); }
   function setConfig(patch) {
+    if (READONLY) return getConfig();
     const c = normConfig(Object.assign(getConfig(), patch || {}));
     write(K.config, c); send({ type: 'config', config: c }); return c;
   }
   function markCallDone(key, nowAbs) {
+    if (READONLY) return getCallDone();
     const list = pruneCallDone(getCallDone(), nowAbs || 0);
     if (list.indexOf(key) < 0) list.push(key);
     write(K.callDone, list); send({ type: 'callDone', callDone: list }); return list;
   }
   /** Mensaje flash a la Pantalla Live (texto) o retirarlo (null). Lo ven todas las ventanas abiertas. */
   function setFlash(text) {
+    if (READONLY) return getFlash();
     const c = getConfig();   // colores y duración: los de este momento; si luego se cambian, este mensaje no cambia
     const f = text ? { id: Date.now().toString(36), text: String(text).slice(0, 140), at: Date.now(), ms: c.msgSecs * 1000, bg: c.msgBg, fg: c.msgFg } : null;
     write(K.flash, f); send({ type: 'flash', flash: f });
@@ -176,6 +201,7 @@
     KEYS: K, STYLES, normStyle, normConfig,
     getFestival, getConfig, getCallDone, getFlash, setFlash, FLASH_MS, MSG_SECS, flashMs, flashLeft, callMinsOf, getOriginal, setOriginal,
     setFestival, setConfig, markCallDone, pruneCallDone,
-    onChange, onPeer, addPeer, send, hello, ping
+    onChange, onPeer, addPeer, send, hello, ping,
+    READONLY, onWrite, getSnapshot, loadSnapshot
   };
 })(window);

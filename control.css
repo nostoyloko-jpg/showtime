@@ -412,7 +412,8 @@ body[data-ps="escenario"] .mpanel{box-shadow:none}
 #btn-live .state{margin-left:2px;gap:0}
 #btn-live .state::before{width:8px;height:8px;background:rgba(255,255,255,.45)}
 #btn-live .state.on::before{background:#10b981;box-shadow:0 0 6px #10b981}
-@media (max-width:1380px){ .mbtn .mlbl{display:none} #btn-cfg{font-size:0;gap:0;padding:0 9px} #btn-cfg .ic{font-size:14px} }
+@media (max-width:1600px){ .mbtn .mlbl{display:none} #btn-cfg{font-size:0;gap:0;padding:0 9px} #btn-cfg .ic{font-size:14px} }
+@media (max-width:1380px){ .mbtn .mtxt{display:none} }
 @media (max-width:1180px){ #btn-undo span{display:none} .menus{margin-left:0} }
 .rowbtns .delbtn{width:28px}
 @media (max-width:1600px){
@@ -472,3 +473,43 @@ body[data-ps="escenario"]{--glass-bg:#000;--glass-line:rgba(255,214,0,.55);--gla
   animation:msgblink 1s steps(1,end) infinite}
 .msg-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px;font-size:13px;color:var(--muted)}
 @media (prefers-reduced-motion:reduce){.msg-prev,.msg-live{animation:none;background:var(--mbg);color:var(--mfg)}}
+
+/* ── Emisión (2d-A): menú con pestañas, QR y estado ─────────────────── */
+.mpanel.cast{width:440px;padding:8px}
+.menu#m-cast .mpanel{left:auto;right:0}
+.ctabs{display:flex;gap:4px;padding:2px;margin-bottom:8px;border-radius:8px;background:rgba(255,255,255,.04)}
+.ctab{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:7px;height:32px;border:0;border-radius:6px;background:transparent;color:var(--muted);font:inherit;font-weight:700;font-size:12.5px;cursor:pointer}
+.ctab:hover{color:var(--text)}
+.ctab.on{background:rgba(255,255,255,.09);color:var(--text)}
+.cpane[hidden]{display:none}
+.cintro{font-size:13px;line-height:1.45;color:var(--text);padding:4px 8px 10px;white-space:normal}
+.cbtns{display:flex;gap:8px;padding:0 8px 4px;flex-wrap:wrap}
+.cgrid{display:flex;gap:12px;padding:4px 6px 4px}
+.cqr{flex:0 0 212px;width:212px;height:212px;border-radius:8px;overflow:hidden;background:#fff}
+.cqr svg,#qr-big-svg svg{display:block;width:100%;height:100%}
+.cside{flex:1;display:flex;flex-direction:column;gap:7px;min-width:0}
+.cside .btn{justify-content:flex-start}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--muted)}
+.btn.ghost:hover{color:var(--text)}
+.cstate{display:flex;align-items:center;gap:8px;font-size:13px;white-space:normal;line-height:1.25}
+.cdot{flex:0 0 auto;width:9px;height:9px;border-radius:50%;background:#10b981;box-shadow:0 0 7px #10b981}
+.cdot.warn{background:#ffb347;box-shadow:0 0 7px #ffb347;animation:cpulse 1.2s ease-in-out infinite}
+@keyframes cpulse{50%{opacity:.35}}
+.cview{font-size:12px;color:var(--muted)}
+.clinks{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:2px}
+.clink{display:inline-flex;align-items:center;gap:5px;height:20px;padding:0 7px;border-radius:10px;border:1px solid var(--glass-line);font-size:11px;font-weight:700;color:var(--dim)}
+.clink::before{content:'';width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.3)}
+.clink.on{color:var(--text)}
+.clink.on::before{background:#10b981;box-shadow:0 0 5px #10b981}
+.csoon{display:flex;flex-direction:column;align-items:center;gap:6px;padding:22px 18px;text-align:center;color:var(--muted);white-space:normal;font-size:13px;line-height:1.45}
+.csoon .ic{width:28px;height:28px;opacity:.6}
+.csoon b{color:var(--text);font-size:14px}
+#m-cast .mdot.warn{background:#ffb347;box-shadow:0 0 6px #ffb347}
+/* QR en grande */
+.qr-big{position:fixed;inset:0;z-index:300;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.qr-big[hidden]{display:none}
+.qr-big-box{display:flex;flex-direction:column;align-items:center;gap:12px;padding:22px 26px;border-radius:14px;background:var(--glass-bg);-webkit-backdrop-filter:var(--glass-blur);backdrop-filter:var(--glass-blur);border:1px solid var(--glass-line)}
+#qr-big-svg{width:min(70vh,80vw);height:min(70vh,80vw);border-radius:10px;overflow:hidden;background:#fff}
+.qr-big-t{font-size:15px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
+.qr-big-st{display:flex;flex-direction:column;align-items:center;gap:4px}
+body[data-ps="escenario"] .qr-big-box{background:#000;border-color:rgba(255,214,0,.45)}

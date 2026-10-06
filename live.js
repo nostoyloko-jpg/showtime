@@ -65,7 +65,7 @@
 
     $('evn-name').textContent = NOFEST ? 'SIN EVENTO' : (DEMO ? 'DEMO · ' : '') + ((FEST.event && FEST.event.nombre) || '');
     $('evn-mode').textContent = vt[0] + ' · ';
-    const msg = NOFEST ? 'SIN EVENTO CARGADO · ábrelo en el Panel de Control'
+    const msg = NOFEST ? (Dt.READONLY ? 'ESPERANDO LOS DATOS DE LA SALA…' : 'SIN EVENTO CARGADO · ábrelo en el Panel de Control')
       : DAY_MISSING ? 'EL ' + fmtDay(DAY_MISSING) + ' NO TIENE ' + vt[1] + ' · elige otro día'
       : '';
     $('banner').textContent = msg;
@@ -160,6 +160,8 @@
     const compact = H < 72;
     // Rejilla cada 5 min, etiquetas cada 10 (en compacto, solo las medias y las horas)
     const startM = Math.ceil(leftMins / 5) * 5;
+    // Etiquetas solo si caben (pantallas estrechas, p. ej. el móvil): cada 10, cada 30 o cada hora
+    const lstep = Math.max(compact ? 30 : 10, pxM * 10 >= 46 ? 10 : pxM * 30 >= 46 ? 30 : 60);
     for (let mi = startM; mi <= leftMins + VISIBLE + 5; mi += 5) {
       const x = xOf(mi);
       if (x < -2 || x > W + 2) continue;
@@ -167,7 +169,7 @@
       ctx.strokeStyle = i60 ? 'rgba(255,255,255,.35)' : i30 ? 'rgba(255,255,255,.18)' : i15 ? 'rgba(255,255,255,.08)' : 'rgba(255,255,255,.03)';
       ctx.lineWidth = i60 ? 2 : i30 ? 1.2 : 0.8;
       ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
-      if (compact ? i30 : i10) {
+      if (mi % lstep === 0) {
         ctx.fillStyle = i60 ? '#fff' : i30 ? 'rgba(255,255,255,.75)' : 'rgba(255,255,255,.45)';
         ctx.font = (compact ? (i60 ? 'bold 11px ' : '10px ') : i60 ? 'bold 16px ' : i30 ? 'bold 13px ' : '11px ') + FONT;
         ctx.fillText(C.fmtHM(mi), x + 4, compact ? 10 : i60 ? 22 : i30 ? 18 : 14);
@@ -548,7 +550,7 @@
   // OK de CALL: se guarda (no vuelve al recargar) y se avisa a las demás ventanas.
   document.addEventListener('click', e => {
     const btn = e.target.closest && e.target.closest('.callok');
-    if (!btn || !btn.dataset.ck) return;
+    if (!btn || !btn.dataset.ck || Dt.READONLY) return;
     CALL_DONE = new Set(Dt.markCallDone(btn.dataset.ck, Math.floor(C.nowAbs())));
     tick();
   });
@@ -703,10 +705,34 @@
     const left = Dt.flashLeft(f), ms = Dt.flashMs(f);
     if (left !== null) $('flash-prog').style.width = (left / ms * 100) + '%';
   }
-  $('flash-x').addEventListener('click', () => { if (Dt.setFlash) Dt.setFlash(null); renderFlash(); });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('flash').hidden && Dt.setFlash) { Dt.setFlash(null); renderFlash(); } });
+  $('flash-x').addEventListener('click', () => { if (Dt.READONLY) return; if (Dt.setFlash) Dt.setFlash(null); renderFlash(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !Dt.READONLY && !$('flash').hidden && Dt.setFlash) { Dt.setFlash(null); renderFlash(); } });
   setInterval(renderFlash, 250);
   window.ShowtimeLive = { applyStyle: v => { applyStyle(v); tick(); }, reload: () => { load(); tick(); } };
+
+  // ── Modo Staff (2d-A): Pantalla Live de solo lectura abierta desde el QR ──
+  // Los datos llegan cifrados por la emisión del Mac; aquí no se puede cambiar nada (sin OK de CALL ni cerrar mensajes).
+  function startStaff() {
+    document.body.classList.add('ro');
+    const Em = window.ShowtimeEmision, params = Em && Em.parseHash(location.hash), rx = $('rx');
+    rx.hidden = false;
+    const ago = s => s < 60 ? s + ' s' : s < 3600 ? Math.floor(s / 60) + ' min' : Math.floor(s / 3600) + ' h';
+    function render(st) {
+      const s = st ? st.state : 'bad';
+      rx.className = 'rx ' + s;
+      const t = st && st.lastMsg ? Math.round((Date.now() - st.lastMsg) / 1000) : 0;
+      const nLinks = st ? st.links.filter(l => l.state === 'on').length : 0;
+      $('rx-t').textContent = s === 'live' ? 'EN DIRECTO'
+        : s === 'connecting' ? (nLinks ? 'ESPERANDO A LA SALA…' : 'CONECTANDO…')
+        : s === 'stale' ? 'SIN CONEXIÓN CON LA SALA · último dato hace ' + ago(t)
+        : s === 'end' ? 'EMISIÓN DETENIDA EN EL PANEL'
+        : 'ENLACE NO VÁLIDO · vuelve a escanear el QR';
+      rx.title = st ? st.links.map(l => l.name + ': ' + (l.state === 'on' ? 'conectado' : 'sin conexión')).join(' · ') : '';
+    }
+    if (!params || !(window.crypto && crypto.subtle) || !('WebSocket' in window)) { render(null); return; }
+    const R = new Em.Receptor({ params, onSnapshot: snap => Dt.loadSnapshot(snap), onStatus: render });
+    R.start().catch(e => { console.error(e); render(null); });
+  }
 
   // ── Arranque ─────────────────────────────────────────────────────────
   load();
@@ -715,6 +741,7 @@
   tick();
   setInterval(tick, 1000);
   window.addEventListener('resize', () => requestAnimationFrame(tick));
+  if (Dt.READONLY) startStaff();
   if (window.opener || !Dt.getFestival()) Dt.hello();   // pide los datos al Panel que la abrió (o a uno abierto)
   // Si el Panel se recarga, pierde la referencia a esta ventana: el «ping» hace que la recupere y le reenvíe todo.
   if (window.opener && Dt.ping) setInterval(Dt.ping, 2000);

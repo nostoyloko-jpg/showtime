@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Showtime · Pantalla Live</title>
-<link rel="stylesheet" href="live.css?v=20261012">
+<link rel="stylesheet" href="live.css?v=20261013">
 </head>
 <body>
 
@@ -24,6 +24,9 @@
 </svg>
 
 <div id="banner" role="status" hidden></div>
+
+<!-- Modo Staff (QR, solo lectura): estado de la conexión con la sala -->
+<div id="rx" class="rx" role="status" hidden><span class="rx-dot"></span><span id="rx-t"></span></div>
 
 <button id="close" class="iconbtn" title="Cerrar la Pantalla Live" hidden><svg class="ic"><use href="#i-x"/></svg></button>
 
@@ -75,8 +78,9 @@
   <button id="dockbtn" class="iconbtn" title="Controles (zoom, volver a ahora, pantalla completa)" aria-expanded="false"><svg class="ic"><use href="#i-sliders"/></svg></button>
 </div>
 
-<script src="core.js?v=20261012"></script>
-<script src="datos.js?v=20261012"></script>
-<script src="live.js?v=20261012"></script>
+<script src="core.js?v=20261013"></script>
+<script src="datos.js?v=20261013"></script>
+<script src="emision.js?v=20261013"></script>
+<script src="live.js?v=20261013"></script>
 </body>
 </html>

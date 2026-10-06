@@ -1318,6 +1318,109 @@
     if (e.target.closest('#msg-off, [data-act="msg-off"]')) { Dt.setFlash(null); renderFlash(); toast('Mensaje retirado de la Pantalla Live'); }
   });
 
+  // ── Emisión a los móviles del equipo (2d-A) ───────────────────────────
+  // El Mac publica el estado cifrado y firmado en dos repetidores públicos; los móviles lo leen con el QR de Staff.
+  const Em = window.ShowtimeEmision, QR = window.ShowtimeQR;
+  const EM_KEY = 'showtime.emision';          // { room, on } — la sala y sus claves solo viven en este navegador
+  let EM = null, EMST = null, emRoom = null;
+  function emLoad() { try { const v = JSON.parse(localStorage.getItem(EM_KEY) || 'null'); return v && Em && Em.validRoom(v.room) ? v : null; } catch (e) { return null; } }
+  function emSave(on) { try { localStorage.setItem(EM_KEY, JSON.stringify({ room: emRoom, on: !!on })); } catch (e) {} }
+  function emCan() { return !!(Em && QR && window.crypto && crypto.subtle && 'WebSocket' in window); }
+  async function emStart(resumed) {
+    if (!emCan()) { toast('Este navegador no permite la emisión cifrada', true); return; }
+    if (EM) return;
+    try {
+      if (!emRoom) { const saved = emLoad(); emRoom = saved ? saved.room : await Em.newRoom(); }
+      EM = new Em.Emisor({ room: emRoom, getSnapshot: Dt.getSnapshot, onStatus: st => { EMST = st; renderCast(); } });
+      await EM.start(); emSave(true); renderCast();
+      toast(resumed ? 'Emisión reanudada (estaba activa antes de recargar el Panel)' : 'Emitiendo: escanea el QR de Staff con el móvil');
+    } catch (e) { console.error(e); EM = null; renderCast(); toast('No se pudo empezar la emisión: ' + (e && e.message || e), true); }
+  }
+  async function emStop(quiet) {
+    if (!EM) return;
+    const e = EM; EM = null; EMST = null; emSave(false); renderCast();
+    await e.stop();
+    if (!quiet) toast('Emisión parada: los móviles muestran «Emisión detenida»');
+  }
+  function emRegen() {
+    modal('Regenerar claves', '<p>Se crea una sala nueva con claves nuevas. <b>Los QR anteriores dejan de funcionar</b>: el equipo tendrá que escanear el nuevo.</p>', [
+      { label: 'Cancelar' },
+      { label: 'Regenerar', kind: 'primary', run: () => { (async () => {
+        const was = !!EM; await emStop(true);
+        emRoom = await Em.newRoom(); emSave(false);
+        if (was) await emStart(); else renderCast();
+        toast('Claves nuevas: los QR anteriores ya no sirven');
+      })(); } }
+    ]);
+  }
+  function emLinksOn() { return EMST ? EMST.links.filter(l => l.state === 'on').length : 0; }
+  function emStateHtml() {
+    const n = emLinksOn(), tot = EMST ? EMST.links.length : 2, v = EMST ? EMST.viewers : 0;
+    const cls = n ? 'ok' : 'warn';
+    const txt = n === 0 ? 'Conectando con los repetidores…' : n < tot ? 'En directo (' + n + ' de ' + tot + ' repetidores)' : 'En directo';
+    const links = (EMST ? EMST.links : Em.BROKERS.map(b => ({ name: b.name, state: 'connecting' })))
+      .map(l => '<span class="clink ' + (l.state === 'on' ? 'on' : '') + '" title="' + esc(l.state === 'on' ? 'Conectado' : l.err ? 'Sin conexión: ' + l.err : 'Conectando…') + '">' + esc(l.name) + '</span>').join('');
+    return '<div class="cstate"><span class="cdot ' + cls + '"></span><b>' + txt + '</b></div>'
+      + '<div class="cview">' + (v === 1 ? '1 móvil conectado' : v + ' móviles conectados') + '</div><div class="clinks">' + links + '</div>';
+  }
+  function renderCast() {
+    if (!$('cast-staff')) return;
+    const on = !!EM;
+    $('cast-on').hidden = !on;
+    $('cast-on').classList.toggle('warn', on && !emLinksOn());
+    const box = $('cast-staff');
+    if (!emCan()) { box.innerHTML = '<p class="cintro">Este navegador no permite la emisión cifrada.</p>'; return; }
+    if (!on) {
+      box.dataset.url = '';
+      box.innerHTML = '<p class="cintro">Emite el horario en directo a los móviles del equipo (técnicos, producción, managers…). Lo ven <b>solo en lectura</b>: nadie puede cambiar nada desde el móvil.</p>'
+        + '<div class="cbtns"><button class="btn primary" type="button" data-act="cast-start"><svg class="ic"><use href="#i-cast"/></svg>Empezar a emitir</button>'
+        + (emRoom ? '<button class="btn" type="button" data-act="cast-regen">Regenerar claves…</button>' : '') + '</div>'
+        + '<p class="mnote">Necesita internet en el Mac y en los móviles (4G o Wi-Fi con salida). Todo va cifrado: los repetidores públicos solo ven datos ilegibles y no guardan nada.</p>';
+      $('qr-big').hidden = true;
+      return;
+    }
+    const url = Em.staffUrl(emRoom);
+    if (box.dataset.url !== url) {
+      box.dataset.url = url;
+      box.innerHTML = '<div class="cgrid"><div class="cqr" title="QR de Staff">' + QR.svg(url, { ecl: 'M', margin: 3 }) + '</div>'
+        + '<div class="cside"><div id="cast-st"></div>'
+        + '<button class="btn" type="button" data-act="cast-big"><svg class="ic"><use href="#i-expand"/></svg>Ampliar</button>'
+        + '<button class="btn" type="button" data-act="cast-copy"><svg class="ic"><use href="#i-copy"/></svg>Copiar enlace</button>'
+        + '<button class="btn" type="button" data-act="cast-stop">Parar emisión</button>'
+        + '<button class="btn ghost" type="button" data-act="cast-regen">Regenerar claves…</button></div></div>'
+        + '<p class="mnote">Abre la Pantalla Live en el móvil, en solo lectura. Si el Mac se duerme o se cierra el Panel, la emisión se corta y los móviles lo avisan.</p>';
+      $('qr-big-svg').innerHTML = QR.svg(url, { ecl: 'M', margin: 4 });
+    }
+    $('cast-st').innerHTML = emStateHtml();
+    $('qr-big-st').innerHTML = emStateHtml();
+  }
+  async function emCopy() {
+    const url = Em.staffUrl(emRoom);
+    try { await navigator.clipboard.writeText(url); toast('Enlace de Staff copiado'); }
+    catch (e) { modal('Enlace de Staff', '<input type="text" readonly value="' + esc(url) + '" style="width:100%" onfocus="this.select()">', [{ label: 'Cerrar', kind: 'primary' }]); }
+  }
+  document.addEventListener('click', e => {
+    const t = e.target.closest('[data-act^="cast-"], .ctab, #qr-big-x');
+    if (!t) { if (e.target.id === 'qr-big') $('qr-big').hidden = true; return; }
+    if (t.classList.contains('ctab')) {
+      document.querySelectorAll('#m-cast .ctab').forEach(b => { const on = b === t; b.classList.toggle('on', on); b.setAttribute('aria-selected', String(on)); });
+      $('cast-staff').hidden = t.dataset.tab !== 'staff'; $('cast-remote').hidden = t.dataset.tab !== 'remote';
+      return;
+    }
+    if (t.id === 'qr-big-x') { $('qr-big').hidden = true; return; }
+    const a = t.dataset.act;
+    if (a === 'cast-start') emStart();
+    else if (a === 'cast-stop') emStop();
+    else if (a === 'cast-regen') { closeMenus(); emRegen(); }
+    else if (a === 'cast-copy') emCopy();
+    else if (a === 'cast-big') { closeMenus(); $('qr-big').hidden = false; }
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') $('qr-big').hidden = true; });
+  // Cada cambio guardado (en este Panel o llegado de la Live, p. ej. un OK de CALL) sale hacia los móviles
+  const EM_KEYS = [Dt.KEYS.festival, Dt.KEYS.config, Dt.KEYS.callDone, Dt.KEYS.flash];
+  Dt.onWrite(k => { if (EM && EM_KEYS.indexOf(k) >= 0) EM.push(); });
+  (function () { const saved = emLoad(); if (saved) emRoom = saved.room; renderCast(); if (saved && saved.on) emStart(true); })();
+
   // ── Sincronización con la Pantalla Live ──────────────────────────────
   Dt.onChange(type => {
     if (type === 'callDone') { tick(); return; }

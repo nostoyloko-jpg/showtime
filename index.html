@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Showtime · Panel de Control</title>
-<link rel="stylesheet" href="control.css?v=20261012">
+<link rel="stylesheet" href="control.css?v=20261013">
 </head>
 <body>
 
@@ -30,6 +30,11 @@
   <symbol id="i-alert" viewBox="0 0 20 20"><path d="M10 3.5l7 12.5H3z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M10 8.5v3.5M10 14.2v.1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
   <symbol id="i-chev" viewBox="0 0 20 20"><path d="M6 8l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-clock" viewBox="0 0 20 20"><circle cx="10" cy="10" r="6.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10 6.5V10l2.5 1.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+  <symbol id="i-cast" viewBox="0 0 20 20"><circle cx="10" cy="11" r="1.6" fill="currentColor"/><path d="M6.8 14.2a4.5 4.5 0 0 1 0-6.4M13.2 7.8a4.5 4.5 0 0 1 0 6.4M4.3 16.7a8 8 0 0 1 0-11.4M15.7 5.3a8 8 0 0 1 0 11.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 20 20"><rect x="6" y="2.5" width="8" height="15" rx="1.8" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M9 15h2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+  <symbol id="i-remote" viewBox="0 0 20 20"><rect x="5.5" y="2.5" width="9" height="15" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="7" r="1.8" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 11.5h4M8 14h4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 20 20"><rect x="7" y="7" width="9.5" height="9.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M13 4.5V4a1 1 0 0 0-1-1H4.5a1 1 0 0 0-1 1v7.5a1 1 0 0 0 1 1H5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+  <symbol id="i-expand" viewBox="0 0 20 20"><path d="M11.5 3.5h5v5M8.5 16.5h-5v-5M16.5 3.5l-5.5 5.5M3.5 16.5L9 11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-msg" viewBox="0 0 20 20"><path d="M4 5.5h12a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H9l-3.5 3v-3H4a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
   <symbol id="i-sun" viewBox="0 0 20 20"><circle cx="10" cy="10" r="3.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M10 2.5v2M10 15.5v2M2.5 10h2M15.5 10h2M4.7 4.7l1.4 1.4M13.9 13.9l1.4 1.4M4.7 15.3l1.4-1.4M13.9 6.1l1.4-1.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
 </svg>
@@ -62,7 +67,7 @@
       <div class="mpanel" role="menu"><nav id="days" class="days" aria-label="Jornadas"></nav></div>
     </div>
     <div class="menu" id="m-delay">
-      <button class="mbtn" aria-haspopup="true" aria-expanded="false"><svg class="ic"><use href="#i-clock"/></svg>Retrasos<span id="delay-on" class="mdot" hidden></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
+      <button class="mbtn" aria-haspopup="true" aria-expanded="false" title="Retrasos"><svg class="ic"><use href="#i-clock"/></svg><span class="mtxt">Retrasos</span><span id="delay-on" class="mdot" hidden></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
       <div class="mpanel wide" role="menu">
         <div class="mhead">Bloquear retraso</div>
         <div class="mzone top"><span>Zona</span><select id="delay-zone"></select></div>
@@ -75,7 +80,7 @@
       </div>
     </div>
     <div class="menu" id="m-msg">
-      <button class="mbtn" aria-haspopup="true" aria-expanded="false"><svg class="ic"><use href="#i-msg"/></svg>Mensajes<span id="msg-on" class="mdot msg" hidden></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
+      <button class="mbtn" aria-haspopup="true" aria-expanded="false" title="Mensajes"><svg class="ic"><use href="#i-msg"/></svg><span class="mtxt">Mensajes</span><span id="msg-on" class="mdot msg" hidden></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
       <div class="mpanel wide" role="menu">
         <div class="mhead">Mensaje a la Pantalla Live</div>
         <div class="msg-presets">
@@ -87,7 +92,20 @@
           <button class="btn primary" type="submit">Enviar</button>
         </form>
         <div id="msg-cur" class="msg-cur" hidden></div>
-        <p class="mnote">Sale en grande y parpadeando en la Pantalla Live. Se cierra solo a los 20 s, con el botón de cerrar de la Live o con «Retirar».</p>
+        <p class="mnote">Sale en grande y parpadeando en la Pantalla Live. Se cierra solo (duración en Configuración › Mensajes), con el botón de cerrar de la Live o con «Retirar».</p>
+      </div>
+    </div>
+    <div class="menu" id="m-cast">
+      <button class="mbtn" aria-haspopup="true" aria-expanded="false" title="Emisión a móviles"><svg class="ic"><use href="#i-cast"/></svg><span class="mtxt">Emisión</span><span id="cast-on" class="mdot" hidden></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
+      <div class="mpanel cast" role="menu">
+        <div class="ctabs" role="tablist">
+          <button class="ctab on" data-tab="staff" role="tab" aria-selected="true"><svg class="ic"><use href="#i-phone"/></svg>Staff · solo lectura</button>
+          <button class="ctab" data-tab="remote" role="tab" aria-selected="false"><svg class="ic"><use href="#i-remote"/></svg>Regidor · mando</button>
+        </div>
+        <div class="cpane" id="cast-staff"></div>
+        <div class="cpane" id="cast-remote" hidden>
+          <div class="csoon"><svg class="ic"><use href="#i-remote"/></svg><b>Mando del regidor</b><span>Llega en la Entrega 2d-B: ▶ / ■, En hora, retrasos con resumen y Confirmar, mensajes y CALL desde el móvil, protegido con su propia clave.</span></div>
+        </div>
       </div>
     </div>
   </nav>
@@ -190,6 +208,9 @@
   </section>
 </aside>
 
+<!-- QR en grande (Emisión): se queda abierto hasta cerrarlo, para escanearlo con calma -->
+<div id="qr-big" class="qr-big" hidden><div class="qr-big-box"><div id="qr-big-svg"></div><div class="qr-big-t">Staff · solo lectura</div><div id="qr-big-st" class="qr-big-st"></div><button id="qr-big-x" class="btn">Cerrar</button></div></div>
+
 <div id="drop" class="drop" hidden><div>Suelta aquí el archivo (.json del evento, o .csv / .tsv con un horario)</div></div>
 
 <div id="modal" class="modal" hidden>
@@ -230,9 +251,11 @@
 <datalist id="zones-dl"></datalist>
 <div id="toast" class="toast" hidden></div>
 
-<script src="core.js?v=20261012"></script>
-<script src="datos.js?v=20261012"></script>
-<script src="importar.js?v=20261012"></script>
-<script src="control.js?v=20261012"></script>
+<script src="core.js?v=20261013"></script>
+<script src="datos.js?v=20261013"></script>
+<script src="importar.js?v=20261013"></script>
+<script src="qr.js?v=20261013"></script>
+<script src="emision.js?v=20261013"></script>
+<script src="control.js?v=20261013"></script>
 </body>
 </html>
