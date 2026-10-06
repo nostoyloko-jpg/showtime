@@ -15,7 +15,12 @@
   let BLOCKS = [], ALL_MODE = [], DAY_MISSING = '';
   const UNDO = [];                 // festivales anteriores (JSON), para «Deshacer»
   const UNDO_MAX = 30;
-  let liveWin = null;
+  const LIVES = new Map();            // ventanas Live abiertas desde aquí: nombre → ventana (una por vista; Confidence, una por zona)
+  const Vs = window.ShowtimeVistas;
+  let MSG_TO = null;                  // destino de los mensajes flash: null = todas las pantallas; si no, lista de vistas
+  let MSG_ZONES = null;               // zonas de las pantallas Confidence que lo reciben: null = todas
+  function zoneLabel(id) { const z = FEST && C.getEscenario(FEST, id); return z ? z.nombre : 'Sin zona'; }
+  function liveOpen(name) { const w = name ? LIVES.get(name) : null; if (name) return !!(w && !w.closed); return Array.from(LIVES.values()).some(x => x && !x.closed); }
   let pendingRender = false;       // si llegan datos mientras se edita una casilla, se pinta al salir
   const KEY_LABEL = { nombre: 'nombre', escenario: 'zona', color: 'color', tipo: 'tipo', jornada: 'jornada', fecha: 'fecha', inicio: 'inicio', fin: 'fin', call: 'CALL', notas: 'notas' };
   const TIPO_TXT = { banda: 'banda', tarea: 'tarea', hito: 'hito' };
@@ -121,6 +126,8 @@
 
   // ── Pintado ──────────────────────────────────────────────────────────
   function renderAll() {
+    renderLiveMenu();
+    if ($('msg-zl')) renderMsgZones();
     const has = !!FEST;
     $('main').hidden = !has;
     $('empty').hidden = has;
@@ -474,10 +481,13 @@
   function tick() {
     const d = new Date();
     $('clock').textContent = pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds());
-    const on = !!(liveWin && !liveWin.closed);
-    $('live-state').className = 'state ' + (on ? 'on' : 'off');
-    $('live-state').title = on ? 'Pantalla Live abierta' : 'Pantalla Live cerrada';
-    $('btn-live').title = on ? 'Traer la Pantalla Live al frente' : 'Abrir la Pantalla Live (ventana para el monitor de escenario)';
+    const nOpen = Array.from(LIVES.values()).filter(x => x && !x.closed).length;
+    $('live-state').className = 'state ' + (nOpen ? 'on' : 'off');
+    $('live-state').title = nOpen ? (nOpen === 1 ? '1 Pantalla Live abierta' : nOpen + ' Pantallas Live abiertas') : 'Ninguna Pantalla Live abierta';
+    $('btn-live').title = 'Pantallas Live: Manager, Confidence (por zona) y Backstage';
+    document.querySelectorAll('#m-live [data-on]').forEach(el => el.classList.toggle('on', liveOpen(el.dataset.on)));
+    document.querySelectorAll('#m-live [data-close]').forEach(el => { el.hidden = !liveOpen(el.dataset.close); });
+    if ($('lv-closeall')) $('lv-closeall').hidden = nOpen < 2;
     if (!FEST) return;
     const nowMins = C.nowAbs(d), nowInt = Math.floor(nowMins);
     renderLive(nowMins, nowInt);
@@ -712,7 +722,27 @@
     $('cfg-style-panel').value = panelStyle();
     $('cfg-style-live').value = CONFIG.style;
     fillMsgCfg();
+    fillScreensCfg();
   }
+  // Pantallas Live y vistas (2e-A)
+  function fillScreensCfg() {
+    const sc = CONFIG.screens || Vs.normScreens();
+    document.querySelectorAll('#cfg-s-screens [data-sc]').forEach(el => {
+      const [g, k] = el.dataset.sc.split('.');
+      const v = k === 'all' ? (sc.ticker.delays && sc.ticker.hitos && sc.ticker.meteo) : sc[g][k];
+      if (el.type === 'checkbox') el.checked = !!v; else if (document.activeElement !== el) el.value = v;
+    });
+    const pv = $('sc-tprev'); pv.style.background = sc.ticker.bg; pv.style.color = sc.ticker.fg; pv.className = 'tkprev ' + sc.ticker.mode;
+  }
+  function saveScreens(el) {
+    const sc = JSON.parse(JSON.stringify(CONFIG.screens || Vs.normScreens()));
+    const [g, k] = el.dataset.sc.split('.');
+    const v = el.type === 'checkbox' ? el.checked : el.type === 'number' ? Number(el.value) : el.value;
+    if (k === 'all') { sc.ticker.delays = sc.ticker.hitos = sc.ticker.meteo = v; } else sc[g][k] = v;
+    if (g === 'back' && !sc.back.cards && !sc.back.lines && !sc.back.ticker) { el.checked = true; toast('Backstage necesita al menos un bloque', true); return; }
+    CONFIG = Dt.setConfig({ screens: sc }); fillScreensCfg();
+  }
+  document.querySelectorAll('#cfg-s-screens [data-sc]').forEach(el => el.addEventListener(el.type === 'color' ? 'input' : 'change', () => saveScreens(el)));
   function fillMsgCfg() {
     $('cfg-msg-bg').value = CONFIG.msgBg;
     $('cfg-msg-fg').value = CONFIG.msgFg;
@@ -791,7 +821,7 @@
   $('cfg-style-panel').addEventListener('change', e => {
     try { localStorage.setItem(PS_KEY, JSON.stringify(e.target.value)); } catch (err) {}
     applyPanelStyle(e.target.value);
-    toast('Estilo del panel: ' + e.target.selectedOptions[0].textContent);
+    toast('Estilo del Dashboard: ' + e.target.selectedOptions[0].textContent);
   });
   $('cfg-style-live').addEventListener('change', e => {
     CONFIG = Dt.setConfig({ style: e.target.value });
@@ -821,7 +851,7 @@
   });
 
   // ── Menús de la barra (cristal): hover o clic; se cierran al salir el cursor o con Esc ──
-  const MENUS = Array.from(document.querySelectorAll('.menus .menu'));
+  const MENUS = Array.from(document.querySelectorAll('.menus .menu, #m-live'));
   function setMenu(m, on) { m.classList.toggle('open', on); m.querySelector('.mbtn').setAttribute('aria-expanded', String(on)); }
   function closeMenus(except) { MENUS.forEach(m => { if (m !== except) setMenu(m, false); }); }
   MENUS.forEach(m => {
@@ -832,7 +862,7 @@
     // Las acciones cierran el menú (los toggles de Retrasos no: se marcan varios seguidos)
     m.querySelectorAll('.mitem').forEach(it => it.addEventListener('click', () => setMenu(m, false)));
   });
-  document.addEventListener('pointerdown', e => { if (!e.target.closest('.menus')) closeMenus(); });
+  document.addEventListener('pointerdown', e => { if (!e.target.closest('.menus, #m-live')) closeMenus(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenus(); });
 
   // ── Retrasos: categorías BLOQUEADAS («Bloquear retraso»). De entrada todo se mueve; lo marcado no. ──
@@ -960,20 +990,65 @@
   $('btn-undo').addEventListener('click', undo);
   $('btn-new2').addEventListener('click', askNew);
 
-  // ── Pantalla Live (ventana emergente) ────────────────────────────────
-  function openLive() {
-    if (liveWin && !liveWin.closed) { try { liveWin.focus(); } catch (e) {} return; }
-    liveWin = window.open('live.html', 'showtime-live', 'popup=yes,width=1280,height=720');
-    if (!liveWin) {
-      modal('Ventana emergente bloqueada', '<p>El navegador no ha dejado abrir la Pantalla Live. Permite las ventanas emergentes para Showtime (icono en la barra de direcciones) y vuelve a pulsar el botón.</p>', [{ label: 'Entendido', kind: 'primary' }]);
-      return;
-    }
-    Dt.addPeer(liveWin);
-    tick();
+  // ── Pantallas Live (ventanas): Manager · Confidence por zona · Backstage (2e-A) ──
+  function liveName(vista, zona) { return 'showtime-live-' + vista + (vista === 'confidence' ? '-' + (zona || 'sinzona') : ''); }
+  /** Zonas para Confidence: las del evento y «Sin zona» si hay bandas sin zona. */
+  function renderLiveMenu() {
+    const box = $('lv-zones'); if (!box) return;
+    if (!FEST) { box.innerHTML = '<p class="mnote">Sin evento cargado.</p>'; return; }
+    const zs = (FEST.escenarios || []).map(z => ({ id: z.id, name: z.nombre, color: z.color }));
+    if (C.buildBlocks(FEST, { mode: 'all', day: 'all' }).some(b => C.isBand(b) && !b.stageId)) zs.push({ id: '', name: 'Sin zona', color: '#888' });
+    const h = zs.map(z => '<button class="mitem lvz" data-vista="confidence" data-zona="' + esc(z.id) + '"><i style="background:' + esc(safeColor(z.color, '#888')) + '"></i>' + esc(z.name) +
+      '<span class="lvon" data-on="' + esc(liveName('confidence', z.id)) + '"></span>' +
+      '<span class="lvx" role="button" data-close="' + esc(liveName('confidence', z.id)) + '" title="Cerrar esta ventana Live" hidden><svg class="ic"><use href="#i-x"/></svg></span></button>').join('');
+    if (box.dataset.h !== h) { box.innerHTML = h; box.dataset.h = h; }
   }
-  $('btn-live').addEventListener('click', openLive);
-  // La Live que se abrió antes de recargar el Panel se vuelve a presentar sola: se recupera para el estado y la sincronización.
-  if (Dt.onPeer) Dt.onPeer(w => { if (!liveWin || liveWin.closed) { liveWin = w; tick(); } });
+  /** Abre (o trae al frente) una Pantalla Live. Con un segundo monitor (Chrome/Edge/Brave), se abre en él. */
+  async function openLive(vista, zona) {
+    const v = Vs.normVista(vista), name = liveName(v, zona);
+    const w0 = LIVES.get(name);
+    if (w0 && !w0.closed) { try { w0.focus(); } catch (e) {} return; }
+    let url = Vs.liveUrl('', v, v === 'confidence' ? (zona || '') : null), feats = 'popup=yes,width=1280,height=720', target = null;
+    if ('getScreenDetails' in window) {
+      try { const sd = await window.getScreenDetails(); target = Vs.pickScreen(sd.screens, sd.currentScreen); } catch (e) { target = null; }
+      if (target) { feats = 'popup=yes,left=' + target.availLeft + ',top=' + target.availTop + ',width=' + target.availWidth + ',height=' + target.availHeight; url += '&aviso=f'; }
+    } else url += '&aviso=arrastra';
+    const label = Vs.VISTA_TXT[v] + (v === 'confidence' ? ' · ' + ((C.getEscenario(FEST, zona) || {}).nombre || 'Sin zona') : '');
+    const done = w => {
+      LIVES.set(name, w); Dt.addPeer(w); tick();
+      toast(target ? 'Live ' + label + ' abierta en el monitor ' + (target.label || 'externo') + ' · pulsa F en ella para pantalla completa'
+        : 'Live ' + label + ' abierta' + (url.indexOf('aviso=arrastra') > 0 ? ': arrástrala al monitor y pulsa F (este navegador no puede llevarla solo)' : ''));
+    };
+    const w = window.open(url, name, feats);
+    if (w) { done(w); return; }
+    // El permiso de pantallas pudo gastar el «clic»: un segundo clic la abre
+    modal('Abrir la Pantalla Live', '<p>' + (target ? 'Listo para abrirla en el monitor <b>' + esc(target.label || 'externo') + '</b>.' : 'El navegador ha frenado la ventana.') + ' Pulsa «Abrir». Si no sale, permite las ventanas emergentes para Showtime (icono en la barra de direcciones).</p>', [
+      { label: 'Cancelar' },
+      { label: 'Abrir', kind: 'primary', run: () => { const w2 = window.open(url, name, feats); if (w2) done(w2); else toast('Ventana emergente bloqueada', true); } }
+    ]);
+  }
+  /** Cierra una ventana Live (o todas) desde aquí, esté en el monitor que esté. */
+  function closeLive(name) {
+    const names = name ? [name] : Array.from(LIVES.keys());
+    names.forEach(n => {
+      const w = LIVES.get(n);
+      try { if (w && !w.closed) w.postMessage({ app: 'showtime', type: 'closeLive' }, '*'); } catch (e) {}
+      try { if (w && !w.closed) w.close(); } catch (e) {}
+      LIVES.delete(n);
+    });
+    tick();
+    toast(name ? 'Pantalla Live cerrada' : 'Pantallas Live cerradas');
+  }
+  document.addEventListener('click', e => {
+    const x = e.target.closest('#m-live [data-close]');
+    if (x) { e.preventDefault(); e.stopPropagation(); closeLive(x.dataset.close); return; }
+    if (e.target.closest('#lv-closeall')) { closeLive(null); return; }
+    const it = e.target.closest('#m-live [data-vista]'); if (!it) return;
+    openLive(it.dataset.vista, it.dataset.zona);
+  }, true);
+  // Las Live que se abrieron antes de recargar el Dashboard se vuelven a presentar solas: se recuperan para el estado y la sincronización.
+  let peerN = 0;
+  if (Dt.onPeer) Dt.onPeer((w, m) => { let n = m && typeof m.name === 'string' ? m.name : ''; if (!n) { try { n = w.name; } catch (e) {} } LIVES.set(n || 'peer-' + (++peerN), w); tick(); });
 
   // ── Abrir / Exportar ─────────────────────────────────────────────────
   function readFile(file) {
@@ -1043,7 +1118,7 @@
   $('file').addEventListener('change', e => { readFile(e.target.files[0]); e.target.value = ''; });
   $('btn-export').addEventListener('click', exportJSON);
   function askDemo() {
-    modal('Evento de demostración', '<p>Carga un evento de ejemplo con horarios alrededor de la hora actual, para probar el Panel y la Pantalla Live.</p>',
+    modal('Evento de demostración', '<p>Carga un evento de ejemplo con horarios alrededor de la hora actual, para probar el Dashboard y la Pantalla Live.</p>',
       [{ label: 'Cancelar' }, { label: 'Cargar demo', kind: 'primary', run: () => loadNew(C.demoFestival(Math.floor(C.nowAbs())), 'Demo cargada') }]);
   }
   $('btn-demo').addEventListener('click', askDemo);
@@ -1259,11 +1334,11 @@
   function sendFlash(text) {
     const t = String(text || '').replace(/\s+/g, ' ').trim();
     if (!t) return;
-    Dt.setFlash(t);
+    Dt.setFlash(t, MSG_TO, MSG_ZONES);
     closeMenus();
     $('msg-text').value = '';
     renderFlash();
-    toast('Mensaje en la Pantalla Live: «' + t + '»' + (liveWin && !liveWin.closed ? '' : ' (la Live está cerrada en este Panel)'));
+    toast('Mensaje → ' + Vs.targetsTxt(MSG_TO, MSG_ZONES, zoneLabel) + ': «' + t + '»' + (liveOpen() ? '' : ' (no hay ninguna Live abierta en este Dashboard)'));
   }
   function flashLeftTxt(f) {
     const l = Dt.flashLeft(f);
@@ -1277,7 +1352,7 @@
     if (f) cur.innerHTML = '<span>En pantalla: <b>' + esc(f.text) + '</b> · ' + flashLeftTxt(f) + '</span><button class="btn" id="msg-off" type="button">Retirar</button>';
     const chip = $('drift').querySelector('.dchip.msg');
     if (chip) chip.remove();
-    if (f) $('drift').insertAdjacentHTML('afterbegin', '<span class="dchip msg"><svg class="ic"><use href="#i-msg"/></svg>Live: «' + esc(f.text) + '»<button class="chipx" data-act="msg-off" title="Retirar el mensaje">Retirar</button></span>');
+    if (f) $('drift').insertAdjacentHTML('afterbegin', '<span class="dchip msg"><svg class="ic"><use href="#i-msg"/></svg>' + (f.to || f.zones ? esc(Vs.targetsTxt(f.to, f.zones, zoneLabel)) : 'Live') + ': «' + esc(f.text) + '»<button class="chipx" data-act="msg-off" title="Retirar el mensaje">Retirar</button></span>');
     // Columna izquierda (lo que hay en la Live): tarjeta del mensaje con su aspecto real y el botón para quitarlo
     const card = $('card-msg');
     card.hidden = !f;
@@ -1286,11 +1361,41 @@
       card.dataset.id = f.id;
       const bg = f.bg || '#000000', fg = f.fg || '#ffb347';
       $('v-msg').innerHTML = '<div class="msg-live" style="--mbg:' + bg + ';--mfg:' + fg + '">' + esc(f.text.toUpperCase()) + '</div>'
+        + '<div class="msg-to">→ ' + esc(Vs.targetsTxt(f.to, f.zones, zoneLabel)) + '</div>'
         + '<div class="msg-foot"><span class="msg-left"></span><button class="btn" data-act="msg-off" type="button"><svg class="ic"><use href="#i-x"/></svg>Retirar</button></div>';
     }
     $('v-msg').querySelector('.msg-left').textContent = Dt.flashLeft(f) === null ? 'Hasta retirarlo' : 'Se cierra en ' + flashLeftTxt(f);
   }
   document.querySelectorAll('#m-msg .msgp').forEach(b => b.addEventListener('click', () => sendFlash(b.dataset.msg)));
+  // Destino del mensaje: Todas · Confidence · Backstage · Manager (varios a la vez)
+  function renderMsgTo() {
+    document.querySelectorAll('#msg-to [data-to]').forEach(b => b.classList.toggle('on', b.dataset.to === 'all' ? !MSG_TO : !!(MSG_TO && MSG_TO.indexOf(b.dataset.to) >= 0)));
+    renderMsgZones();
+  }
+  /** Zonas de Confidence que reciben el mensaje (solo si el mensaje va a Confidence y hay más de una zona). */
+  function renderMsgZones() {
+    const box = $('msg-zones'); if (!box) return;
+    const zs = castZones(), show = (!MSG_TO || MSG_TO.indexOf('confidence') >= 0) && zs.length > 1;
+    box.hidden = !show;
+    if (MSG_ZONES) MSG_ZONES = Vs.normZones(MSG_ZONES.filter(id => zs.some(z => z.id === id)));
+    const h = '<button data-z="*" class="' + (!MSG_ZONES ? 'on' : '') + '">Todas las zonas</button>' + zs.map(z => '<button data-z="' + esc(z.id) + '" class="' + (MSG_ZONES && MSG_ZONES.indexOf(z.id) >= 0 ? 'on' : '') + '">' + esc(z.name) + '</button>').join('');
+    if ($('msg-zl').innerHTML !== h) $('msg-zl').innerHTML = h;
+  }
+  $('msg-zl').addEventListener('click', e => {
+    const b = e.target.closest('[data-z]'); if (!b) return;
+    const z = b.dataset.z;
+    if (z === '*') MSG_ZONES = null;
+    else { const cur = MSG_ZONES ? MSG_ZONES.slice() : []; const i = cur.indexOf(z); if (i >= 0) cur.splice(i, 1); else cur.push(z); MSG_ZONES = cur.length === castZones().length ? null : Vs.normZones(cur); }
+    renderMsgZones();
+  });
+  $('msg-to').addEventListener('click', e => {
+    const b = e.target.closest('[data-to]'); if (!b) return;
+    const t = b.dataset.to;
+    if (t === 'all') MSG_TO = null;
+    else { const cur = MSG_TO ? MSG_TO.slice() : []; const i = cur.indexOf(t); if (i >= 0) cur.splice(i, 1); else cur.push(t); MSG_TO = Vs.normTargets(cur); }
+    renderMsgTo();
+  });
+  renderMsgTo();
   $('msg-form').addEventListener('submit', e => { e.preventDefault(); sendFlash($('msg-text').value); });
   document.addEventListener('click', e => {
     if (e.target.closest('#msg-off, [data-act="msg-off"]')) { Dt.setFlash(null); renderFlash(); toast('Mensaje retirado de la Pantalla Live'); }
@@ -1319,7 +1424,7 @@
       if (!emRoom) { const saved = emLoad(); emRoom = saved ? saved.room : await Em.newRoom(); }
       EM = new Em.Emisor({ room: emRoom, getSnapshot: Dt.getSnapshot, onCommand: emCommand, onStatus: st => { EMST = st; renderCast(); } });
       await EM.start(); emSave(true); renderCast();
-      toast(resumed ? 'Emisión reanudada (estaba activa antes de recargar el Panel)' : 'Emitiendo: escanea el QR con el móvil');
+      toast(resumed ? 'Emisión reanudada (estaba activa antes de recargar el Dashboard)' : 'Emitiendo: escanea el QR con el móvil');
     } catch (e) { console.error(e); EM = null; renderCast(); toast('No se pudo empezar la emisión: ' + (e && e.message || e), true); }
   }
   async function emStop(quiet) {
@@ -1355,7 +1460,7 @@
     const bad = M.checkCmd(cmd);
     if (bad) return { ok: false, msg: bad };
     const a = cmd.args || {};
-    if (!FEST && ['flash', 'flashOff'].indexOf(cmd.op) < 0) return { ok: false, msg: 'No hay evento abierto en el Panel' };
+    if (!FEST && ['flash', 'flashOff'].indexOf(cmd.op) < 0) return { ok: false, msg: 'No hay evento abierto en el Dashboard' };
     const at = Math.abs(Date.now() - cmd.t) < 120000 ? cmd.t : Date.now();     // la hora en que se pulsó en el móvil
     const abs = Math.floor(C.nowAbs(new Date(at)));
     const from = 'Desde el móvil · ';
@@ -1384,8 +1489,9 @@
     }
     if (cmd.op === 'flash') {
       const t = String(a.text).replace(/\s+/g, ' ').trim();
-      Dt.setFlash(t); renderFlash(); toast(from + 'Mensaje: «' + t + '»');
-      return { ok: true, msg: 'Mensaje en pantalla: «' + t + '»' };
+      const to = Vs.normTargets(a.to), zs = Vs.normZones(a.zones);
+      Dt.setFlash(t, to, zs); renderFlash(); toast(from + 'Mensaje → ' + Vs.targetsTxt(to, zs, zoneLabel) + ': «' + t + '»');
+      return { ok: true, msg: 'Mensaje → ' + Vs.targetsTxt(to, zs, zoneLabel) + ': «' + t + '»' };
     }
     if (cmd.op === 'flashOff') {
       Dt.setFlash(null); renderFlash(); toast(from + 'Mensaje retirado');
@@ -1409,7 +1515,25 @@
     const who = kind === 'remote' ? (r ? '<b class="cok">Mando conectado</b>' : 'Sin mando conectado') : (v === 1 ? '1 móvil conectado' : v + ' móviles conectados');
     return '<div class="cstate"><span class="cdot ' + cls + '"></span><b>' + txt + '</b></div><div class="cview">' + who + '</div><div class="clinks">' + links + '</div>';
   }
-  function emUrl(kind) { return kind === 'remote' ? Em.remoteUrl(emRoom) : Em.staffUrl(emRoom); }
+  // QR de Staff por pantalla (2e-A): Manager · Confidence (con zona) · Backstage
+  let CAST_VISTA = 'manager', CAST_ZONA = null;
+  function castZones() {
+    if (!FEST) return [];
+    const zs = (FEST.escenarios || []).map(z => ({ id: z.id, name: z.nombre }));
+    if (C.buildBlocks(FEST, { mode: 'all', day: 'all' }).some(b => C.isBand(b) && !b.stageId)) zs.push({ id: '', name: 'Sin zona' });
+    return zs;
+  }
+  function emUrl(kind) {
+    if (kind === 'remote') return Em.remoteUrl(emRoom);
+    if (CAST_VISTA === 'confidence') { const zs = castZones(); if (!zs.some(z => z.id === CAST_ZONA)) CAST_ZONA = zs.length ? zs[0].id : ''; }
+    return Em.staffUrl(emRoom, undefined, { vista: CAST_VISTA, zona: CAST_ZONA });
+  }
+  function castPickHtml() {
+    const zs = castZones();
+    return '<div class="cpick"><div class="cseg">' + Vs.VISTAS.map(v => '<button type="button" data-cv="' + v + '" class="' + (CAST_VISTA === v ? 'on' : '') + '">' + Vs.VISTA_TXT[v] + '</button>').join('') + '</div>'
+      + (CAST_VISTA === 'confidence' ? '<select class="czone" data-cz="1">' + zs.map(z => '<option value="' + esc(z.id) + '"' + (z.id === CAST_ZONA ? ' selected' : '') + '>' + esc(z.name) + '</option>').join('') + '</select>' : '')
+      + '<span class="csub">' + esc(Vs.VISTA_SUB[CAST_VISTA]) + '</span></div>';
+  }
   function paneHtml(kind) {
     const url = emUrl(kind);
     const side = kind === 'remote'
@@ -1422,8 +1546,8 @@
         + '<button class="btn ghost" type="button" data-act="cast-regen">Regenerar claves…</button>';
     const note = kind === 'remote'
       ? '<p class="cwarn"><svg class="ic"><use href="#i-alert"/></svg><span><b>Privado.</b> Quien tenga este QR puede mandar al Mac (▶ / ■, En hora, retrasos, mensajes, CALL). No lo compartas; si se escapa, «Nueva clave del mando».</span></p>'
-      : '<p class="mnote">Abre la Pantalla Live en el móvil, en solo lectura. Si el Mac se duerme o se cierra el Panel, la emisión se corta y los móviles lo avisan.</p>';
-    return '<div class="cgrid"><div class="cqr" title="QR ' + (kind === 'remote' ? 'del regidor' : 'de Staff') + '">' + QR.svg(url, { ecl: 'M', margin: 3 }) + '</div>'
+      : '<p class="mnote">Abre la Pantalla Live en el móvil, en solo lectura. Si el Mac se duerme o se cierra el Dashboard, la emisión se corta y los móviles lo avisan.</p>';
+    return (kind === 'staff' ? castPickHtml() : '') + '<div class="cgrid"><div class="cqr" title="QR ' + (kind === 'remote' ? 'del regidor' : 'de Staff · ' + Vs.VISTA_TXT[CAST_VISTA]) + '">' + QR.svg(url, { ecl: 'M', margin: 3 }) + '</div>'
       + '<div class="cside"><div class="cst" data-k="' + kind + '"></div>' + side + '</div></div>' + note;
   }
   function renderCast() {
@@ -1452,7 +1576,7 @@
     else {
       const url = emUrl(bigTab);
       if ($('qr-big-svg').dataset.url !== url) { $('qr-big-svg').dataset.url = url; $('qr-big-svg').innerHTML = QR.svg(url, { ecl: 'M', margin: 4 }); }
-      $('qr-big-t').textContent = bigTab === 'remote' ? 'Regidor · mando (privado)' : 'Staff · solo lectura';
+      $('qr-big-t').textContent = bigTab === 'remote' ? 'Regidor · mando (privado)' : 'Staff · ' + Vs.VISTA_TXT[CAST_VISTA] + (CAST_VISTA === 'confidence' ? ' · ' + ((castZones().find(z => z.id === CAST_ZONA) || {}).name || '') : '') + ' · solo lectura';
       $('qr-big').classList.toggle('remote', bigTab === 'remote');
       $('qr-big-st').innerHTML = emStateHtml(bigTab);
     }
@@ -1484,6 +1608,8 @@
     else if (a === 'cast-big') { closeMenus(); bigTab = t.dataset.k || 'staff'; renderCast(); $('qr-big').hidden = false; }
   });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') $('qr-big').hidden = true; });
+  document.addEventListener('click', e => { const b = e.target.closest('#cast-staff [data-cv]'); if (!b) return; CAST_VISTA = b.dataset.cv; renderCast(); });
+  document.addEventListener('change', e => { if (e.target.matches('#cast-staff [data-cz]')) { CAST_ZONA = e.target.value; renderCast(); } });
   // Cada cambio guardado (en este Panel o llegado de la Live, p. ej. un OK de CALL) sale hacia los móviles
   const EM_KEYS = [Dt.KEYS.festival, Dt.KEYS.config, Dt.KEYS.callDone, Dt.KEYS.flash];
   Dt.onWrite(k => { if (EM && EM_KEYS.indexOf(k) >= 0) EM.push(); });

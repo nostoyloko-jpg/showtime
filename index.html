@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Showtime · Panel de Control</title>
-<link rel="stylesheet" href="control.css?v=20261016">
+<title>Showtime · Dashboard</title>
+<link rel="stylesheet" href="control.css?v=20261019">
 </head>
 <body>
 
@@ -83,7 +83,9 @@
     <div class="menu" id="m-msg">
       <button class="mbtn" aria-haspopup="true" aria-expanded="false" title="Mensajes"><svg class="ic"><use href="#i-msg"/></svg><span class="mtxt">Mensajes</span><span id="msg-on" class="mdot msg" hidden></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
       <div class="mpanel wide" role="menu">
-        <div class="mhead">Mensaje a la Pantalla Live</div>
+        <div class="mhead">Mensaje a las pantallas Live</div>
+        <div class="dtog msgto" id="msg-to" title="A qué pantallas va el mensaje"><button data-to="all">Todas</button><button data-to="confidence">Confidence</button><button data-to="backstage">Backstage</button><button data-to="manager">Manager</button></div>
+        <div class="msgzones" id="msg-zones" hidden><span class="mzl">Confidence en</span><div class="dtog" id="msg-zl"></div></div>
         <div class="msg-presets">
           <button class="mitem msgp" data-msg="5 MINUTOS">5 MINUTOS</button>
           <button class="mitem msgp" data-msg="ÚLTIMO TEMA">ÚLTIMO TEMA</button>
@@ -110,7 +112,21 @@
   </nav>
   <div class="grow"></div>
   <button id="btn-undo" class="btn"><svg class="ic"><use href="#i-undo"/></svg><span>Deshacer</span></button>
-  <button id="btn-live" class="btn primary"><svg class="ic"><use href="#i-screen"/></svg>Pantalla Live<span id="live-state" class="state off" title="Pantalla Live cerrada"></span></button>
+  <div class="menu" id="m-live">
+    <button id="btn-live" class="mbtn btn primary mlive" aria-haspopup="true" aria-expanded="false"><svg class="ic"><use href="#i-screen"/></svg>Live<span id="live-state" class="state off" title="Ninguna Pantalla Live abierta"></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
+    <div class="mpanel wide lvpanel" role="menu">
+      <div class="mhead">Abrir una Pantalla Live</div>
+      <button class="mitem lv" data-vista="manager"><svg class="ic"><use href="#i-screen"/></svg><span class="lvt"><b>Manager</b><small>Cronograma completo · FOH y regiduría</small></span><span class="lvon" data-on="showtime-live-manager"></span><span class="lvx" role="button" data-close="showtime-live-manager" title="Cerrar esta ventana Live" hidden><svg class="ic"><use href="#i-x"/></svg></span></button>
+      <div class="lvgroup">
+        <div class="mitem lvh"><svg class="ic"><use href="#i-clock"/></svg><span class="lvt"><b>Confidence</b><small>Monitor de escenario de una zona · elige cuál</small></span></div>
+        <div id="lv-zones" class="lvzones"></div>
+      </div>
+      <button class="mitem lv" data-vista="backstage"><svg class="ic"><use href="#i-msg"/></svg><span class="lvt"><b>Backstage</b><small>Camerinos y catering · tarjetas, 2 líneas y cinta de avisos</small></span><span class="lvon" data-on="showtime-live-backstage"></span><span class="lvx" role="button" data-close="showtime-live-backstage" title="Cerrar esta ventana Live" hidden><svg class="ic"><use href="#i-x"/></svg></span></button>
+      <button class="mitem lvcloseall" id="lv-closeall" hidden><svg class="ic"><use href="#i-x"/></svg><span class="lvt"><b>Cerrar todas las Live</b><small>También las que no estén en este escritorio</small></span></button>
+      <div class="msep"></div>
+      <p class="mnote" id="lv-note">Con un segundo monitor conectado, la ventana se abre en él (Chrome, Edge o Brave). En la ventana: <b>F</b> pantalla completa · <b>V</b> cambia de vista.</p>
+    </div>
+  </div>
   <span class="sep"></span>
   <button id="btn-cfg" class="btn" aria-controls="cfg" aria-expanded="false"><svg class="ic"><use href="#i-gear"/></svg>Configuración</button>
 </header>
@@ -190,9 +206,39 @@
   <section class="cfg-s" id="cfg-s-styles">
     <h3>Estilos</h3>
     <div class="form">
-      <label for="cfg-style-panel">Este panel</label><select id="cfg-style-panel"><option value="clasico">Clásico</option><option value="escenario">Escenario (alto contraste)</option><option value="neutro">Neutro</option><option value="raycast">Raycast</option></select>
+      <label for="cfg-style-panel">Este Dashboard</label><select id="cfg-style-panel"><option value="clasico">Clásico</option><option value="escenario">Escenario (alto contraste)</option><option value="neutro">Neutro</option><option value="raycast">Raycast</option></select>
       <label for="cfg-style-live">Pantalla Live</label><select id="cfg-style-live"><option value="clasico">Clásico</option><option value="escenario">Escenario (alto contraste)</option><option value="neutro">Neutro</option><option value="raycast">Raycast</option></select>
       <div class="note">Van por separado: el portátil y el monitor de escenario suelen tener luz distinta.</div>
+    </div>
+  </section>
+  <section class="cfg-s" id="cfg-s-screens">
+    <h3>Pantallas Live y vistas</h3>
+    <div class="form scr">
+      <div class="fsub">Confidence · show</div>
+      <label for="sc-sw">Ámbar a falta de</label><span class="nrow"><input id="sc-sw" type="number" min="0" max="180" data-sc="conf.showWarn"> min</span>
+      <label for="sc-sd">Rojo a falta de</label><span class="nrow"><input id="sc-sd" type="number" min="0" max="180" data-sc="conf.showDanger"> min</span>
+      <span></span><label class="chk"><input id="sc-blink" type="checkbox" data-sc="conf.blink"> Parpadear en sobretiempo</label>
+      <div class="fsub">Confidence · changeover</div>
+      <label for="sc-cw">Ámbar a falta de</label><span class="nrow"><input id="sc-cw" type="number" min="0" max="180" data-sc="conf.coWarn"> min</span>
+      <label for="sc-cd">Rojo a falta de</label><span class="nrow"><input id="sc-cd" type="number" min="0" max="180" data-sc="conf.coDanger"> min</span>
+      <div class="fsub">Backstage · bloques visibles</div>
+      <span></span><div class="chks">
+        <label class="chk"><input type="checkbox" data-sc="back.cards"> Tarjetas (En escena, Siguiente, CALL)</label>
+        <label class="chk"><input type="checkbox" data-sc="back.lines"> Líneas de cronograma (actual y siguiente)</label>
+        <label class="chk"><input type="checkbox" data-sc="back.ticker"> Cinta de avisos</label>
+      </div>
+      <div class="fsub">Cinta de avisos</div>
+      <label>Mostrar</label><div class="chks row">
+        <label class="chk"><input type="checkbox" data-sc="ticker.all"> Todos</label>
+        <label class="chk"><input type="checkbox" data-sc="ticker.delays"> Retrasos</label>
+        <label class="chk"><input type="checkbox" data-sc="ticker.hitos"> Hitos</label>
+        <label class="chk"><input type="checkbox" data-sc="ticker.meteo"> El tiempo</label>
+      </div>
+      <label for="sc-tmode">Modo</label><select id="sc-tmode" data-sc="ticker.mode"><option value="crawl">Deslizante (crawler)</option><option value="static">Estática</option></select>
+      <label for="sc-tbg">Fondo</label><input id="sc-tbg" type="color" class="swatch" data-sc="ticker.bg">
+      <label for="sc-tfg">Texto</label><input id="sc-tfg" type="color" class="swatch" data-sc="ticker.fg">
+      <div id="sc-tprev" class="tkprev crawl"><div class="tkp-track"><span class="tkp-run"><span>PRINCIPAL · RETRASO +10 MIN</span><i></i><span>CURFEW 01:30</span><i></i></span><span class="tkp-run" aria-hidden="true"><span>PRINCIPAL · RETRASO +10 MIN</span><i></i><span>CURFEW 01:30</span><i></i></span></div></div>
+      <div class="note">Se aplican al momento en todas las Pantallas Live abiertas y en los móviles de Staff.</div>
     </div>
   </section>
   <section class="cfg-s" id="cfg-s-msg">
@@ -250,12 +296,13 @@
 <datalist id="zones-dl"></datalist>
 <div id="toast" class="toast" hidden></div>
 
-<script src="core.js?v=20261016"></script>
-<script src="datos.js?v=20261016"></script>
-<script src="importar.js?v=20261016"></script>
-<script src="qr.js?v=20261016"></script>
-<script src="emision.js?v=20261016"></script>
-<script src="mando.js?v=20261016"></script>
-<script src="control.js?v=20261016"></script>
+<script src="core.js?v=20261019"></script>
+<script src="datos.js?v=20261019"></script>
+<script src="importar.js?v=20261019"></script>
+<script src="qr.js?v=20261019"></script>
+<script src="emision.js?v=20261019"></script>
+<script src="mando.js?v=20261019"></script>
+<script src="vistas.js?v=20261019"></script>
+<script src="control.js?v=20261019"></script>
 </body>
 </html>

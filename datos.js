@@ -65,6 +65,8 @@
     if (!hex(o.msgBg)) o.msgBg = DEFAULT_CONFIG.msgBg;
     if (!hex(o.msgFg)) o.msgFg = DEFAULT_CONFIG.msgFg;
     o.msgSecs = MSG_SECS.indexOf(Number(o.msgSecs)) >= 0 ? Number(o.msgSecs) : DEFAULT_CONFIG.msgSecs;
+    // Pantallas Live y vistas (2e-A): umbrales de Confidence, bloques de Backstage y cinta de avisos
+    if (root.ShowtimeVistas) o.screens = root.ShowtimeVistas.normScreens(o.screens);
     o.delayZone = typeof o.delayZone === 'string' ? o.delayZone : 'all';   // zona que se está editando en el menú Retrasos
     return o;
   }
@@ -145,7 +147,7 @@
     const src = e.source;
     if (src && src !== root && src !== root.opener && !peers.has(src)) {
       peers.add(src);
-      peerListeners.forEach(fn => { try { fn(src); } catch (err) { console.error(err); } });
+      peerListeners.forEach(fn => { try { fn(src, m); } catch (err) { console.error(err); } });
       if (m.type === 'ping' || m.type === 'hello') { try { src.postMessage(snapshot(), '*'); } catch (err) {} }
     }
     if (m.type === 'ping') return;
@@ -170,7 +172,7 @@
   }
   function onPeer(fn) { peerListeners.push(fn); }
   /** La Live se presenta cada pocos segundos a la ventana que la abrió (barato; solo cuenta la primera vez). */
-  function ping() { if (READONLY) return; if (root.opener && !root.opener.closed) { try { root.opener.postMessage({ app: APP, type: 'ping' }, '*'); } catch (e) {} } }
+  function ping() { if (READONLY) return; if (root.opener && !root.opener.closed) { try { root.opener.postMessage({ app: APP, type: 'ping', name: String(root.name || '').slice(0, 80) }, '*'); } catch (e) {} } }
 
   // ── Cambios que se propagan ──────────────────────────────────────────
   function setFestival(f) { if (READONLY) return; write(K.festival, f); send({ type: 'festival', festival: f }); }
@@ -185,11 +187,13 @@
     if (list.indexOf(key) < 0) list.push(key);
     write(K.callDone, list); send({ type: 'callDone', callDone: list }); return list;
   }
-  /** Mensaje flash a la Pantalla Live (texto) o retirarlo (null). Lo ven todas las ventanas abiertas. */
-  function setFlash(text) {
+  /** Mensaje flash a la Pantalla Live (texto) o retirarlo (null). `to`: vistas de destino (null = todas). */
+  function setFlash(text, to, zones) {
     if (READONLY) return getFlash();
     const c = getConfig();   // colores y duración: los de este momento; si luego se cambian, este mensaje no cambia
-    const f = text ? { id: Date.now().toString(36), text: String(text).slice(0, 140), at: Date.now(), ms: c.msgSecs * 1000, bg: c.msgBg, fg: c.msgFg } : null;
+    const Vv = root.ShowtimeVistas, tg = Vv ? Vv.normTargets(to) : null;
+    const zs = Vv && (!tg || tg.indexOf('confidence') >= 0) ? Vv.normZones(zones) : null;   // zonas: solo cuentan para Confidence
+    const f = text ? { id: Date.now().toString(36), text: String(text).slice(0, 140), at: Date.now(), ms: c.msgSecs * 1000, bg: c.msgBg, fg: c.msgFg, to: tg, zones: zs } : null;
     write(K.flash, f); send({ type: 'flash', flash: f });
     listeners.forEach(fn => { try { fn('flash'); } catch (e) { console.error(e); } });
     return f;

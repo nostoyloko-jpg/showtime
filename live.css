@@ -273,3 +273,63 @@ body.ro .vsplit,body.ro #hsplit{pointer-events:none}
   #top{padding:8px 1.5vw;--top-h:46vh}
   .tpanel{padding:6px 10px}
 }
+
+/* ── Vistas (2e-A): Manager (la de siempre) · Confidence · Backstage ── */
+.conf,.ticker{display:none}
+
+/* Confidence: monitor de escenario de una zona */
+body[data-vista="confidence"] #top,body[data-vista="confidence"] #hsplit,body[data-vista="confidence"] #bot,body[data-vista="confidence"] #zoomctl{display:none!important}
+body[data-vista="confidence"] .conf{display:flex}
+.conf{flex:1 1 auto;flex-direction:column;justify-content:space-between;gap:2vh;padding:4vh 3vw 4vh;background:#000;min-height:0;--cf:#10b981}
+.cf-top{font-size:min(5.6vw,7vh);font-weight:900;letter-spacing:.05em;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cf-dig{flex:1 1 auto;display:flex;align-items:center;justify-content:center;min-height:0;--n:5}
+.cf-dig span{font-size:min(calc(100vw / var(--n) * 1.6),60vh);font-weight:900;line-height:.9;letter-spacing:-.03em;font-variant-numeric:tabular-nums;font-feature-settings:'tnum' 1;color:#fff}
+.cf-bar{flex:0 0 auto;height:3.4vh;min-height:14px;border-radius:99px;background:rgba(255,255,255,.12);overflow:hidden}
+#cf-fill{height:100%;width:100%;border-radius:99px;background:var(--cf);transition:width .25s linear,background .3s}
+.cf-foot{font-size:min(4.6vw,6vh);font-weight:800;text-align:center;color:rgba(255,255,255,.75);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.cf-foot b{color:#fff}
+.cf-sep{margin:0 .6em;opacity:.45}
+.conf.lv-warn{--cf:#ffb347}
+.conf.lv-danger,.conf.lv-over{--cf:#ff3b30}
+.conf.lv-warn .cf-dig span{color:#ffb347}
+.conf.lv-danger .cf-dig span,.conf.lv-over .cf-dig span{color:#ff3b30}
+.conf.blink{animation:cfbg 1s steps(1,end) infinite}
+.conf.blink .cf-dig span{animation:cfdig 1s steps(1,end) infinite}
+@keyframes cfbg{50%{background:#5a0000}}
+@keyframes cfdig{50%{color:#fff}}
+.conf.nobar .cf-bar{visibility:hidden}
+.conf.end .cf-dig span{color:rgba(255,255,255,.85)}
+.conf.pick{justify-content:center;align-items:center;gap:5vh}
+.cf-msg{font-size:min(3.6vw,5vh);font-weight:900;letter-spacing:.12em;color:rgba(255,255,255,.75);text-align:center}
+.cf-zones{display:flex;flex-wrap:wrap;gap:2vh 2vw;justify-content:center;max-width:90vw}
+.cf-zone{font:inherit;font-size:min(3.4vw,4.6vh);font-weight:900;letter-spacing:.06em;padding:2.2vh 4vw;border-radius:2vh;border:2px solid rgba(255,255,255,.3);background:rgba(255,255,255,.06);color:#fff;cursor:pointer}
+.cf-zone:hover{border-color:#fff}
+@media (prefers-reduced-motion:reduce){.conf.blink,.conf.blink .cf-dig span{animation:none}}
+
+/* Backstage: tarjetas · 2 líneas de cronograma · cinta de avisos (los bloques que se quitan dejan sitio a los demás) */
+body[data-vista="backstage"] .ticker{display:flex}
+body.bs-noticker .ticker{display:none!important}
+body.bs-nocards #top,body.bs-nocards #hsplit{display:none!important}
+body.bs-nolines #bot,body.bs-nolines #hsplit{display:none!important}
+body.bs-nolines #top{flex:1 1 auto!important}
+body[data-vista="backstage"] #bot{overflow:hidden}
+.calldone{flex:0 0 auto;display:inline-flex;align-items:center;gap:.4em;padding:6px 12px;border-radius:7px;background:rgba(16,185,129,.16);color:#34d399;font-weight:900;letter-spacing:.06em;font-size:min(4.5cqw,2vh)}
+.calldone .ic{width:1.1em;height:1.1em}
+.ticker{flex:0 0 auto;height:clamp(48px,9vh,120px);align-items:center;overflow:hidden;background:var(--tbg,#000);color:var(--tfg,#ffb347);
+  border-top:2px solid color-mix(in srgb,var(--tfg,#ffb347) 45%,transparent);font-weight:900;letter-spacing:.05em;font-size:clamp(20px,4.4vh,56px);white-space:nowrap}
+body.bs-nocards.bs-nolines .ticker{flex:1 1 auto;height:auto;font-size:clamp(28px,9vh,150px)}
+.tk-track{display:flex;width:max-content;animation:tkrun 30s linear infinite;will-change:transform}
+.tk-run{display:flex;align-items:center;flex:0 0 auto;padding-left:2vw}
+@keyframes tkrun{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.tk-it{display:inline-flex;align-items:center;gap:.45em}
+.tk-it .ic{width:.95em;height:.95em}
+.tk-it.over{color:#ff6b61}
+.tk-it.ok{opacity:.85}
+.tk-sep{display:inline-block;width:.42em;height:.42em;border-radius:50%;background:currentColor;opacity:.35;margin:0 1.3em;flex:0 0 auto}
+.tk-static{width:100%;display:flex;flex-wrap:wrap;justify-content:center;align-items:center;row-gap:.15em;padding:0 2vw;white-space:normal;font-size:.82em}
+/* La cinta deslizante se mueve aunque el sistema pida «reducir movimiento»: es una elección explícita en Configuración */
+
+/* Aviso al abrir desde el Dashboard */
+.tip{position:fixed;left:50%;bottom:7vh;transform:translateX(-50%);z-index:300;max-width:90vw;padding:14px 22px;border-radius:12px;background:rgba(10,12,16,.94);border:1px solid rgba(255,255,255,.22);font-size:18px;color:#fff;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+.tip kbd{display:inline-block;min-width:1.6em;padding:1px 7px;margin:0 2px;border-radius:5px;border:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.1);font:inherit;font-weight:800}
+body.ro[data-vista="confidence"] .conf{padding-top:max(4vh,52px)}

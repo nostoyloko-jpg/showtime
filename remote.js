@@ -17,12 +17,14 @@
   let ZONE = (() => { try { return JSON.parse(localStorage.getItem(ZKEY)); } catch (e) { return null; } })();
   let SEL = null;           // banda elegida a mano (clave); null = la que se propone
   let R = null, SHEET = null;
+  let MSG_TO = null;        // destino de los mensajes: null = todas; si no, lista de vistas
+  let MSG_ZONES = null;     // zonas de las pantallas Confidence que lo reciben: null = todas
 
   // ── Enlace ───────────────────────────────────────────────────────────
   const params = Em && Em.parseHash(location.hash);
   if (!params || !params.c || !(window.crypto && crypto.subtle) || !('WebSocket' in window)) {
     $('bad').hidden = false; $('app').hidden = true; document.querySelector('.actbar').hidden = true;
-    if (params && !params.c) $('bad-t').textContent = 'Este es el QR de Staff (solo lectura). Para mandar, escanea el QR del regidor (Panel › Emisión › Regidor · mando).';
+    if (params && !params.c) $('bad-t').textContent = 'Este es el QR de Staff (solo lectura). Para mandar, escanea el QR del regidor (Dashboard › Emisión › Regidor · mando).';
     return;
   }
 
@@ -60,7 +62,7 @@
     const n = now(), d = new Date();
     $('clk').textContent = pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds());
     renderRx();
-    if (!FEST) { $('evn').textContent = ST && ST.state === 'end' ? 'La emisión está parada en el Panel' : 'Esperando los datos del Mac…'; setActs(null); return; }
+    if (!FEST) { $('evn').textContent = ST && ST.state === 'end' ? 'La emisión está parada en el Dashboard' : 'Esperando los datos del Mac…'; setActs(null); return; }
     const jor = C.jornadaOfAbs(FEST, Math.floor(n));
     $('evn').textContent = ((FEST.event && FEST.event.nombre) || 'Evento') + ' · ' + fmtDay(jor);
 
@@ -106,11 +108,12 @@
 
     // Mensaje en pantalla
     const f = Dt.getFlash();
-    const fh = f ? '<div class="fl-t"><span>EN PANTALLA</span><b>' + esc(f.text) + '</b><em>' + (Dt.flashLeft(f) === null ? 'hasta retirarlo' : 'se cierra en ' + Math.ceil(Dt.flashLeft(f) / 1000) + ' s') + '</em></div><button class="tbtn danger" id="flash-off"' + (live() && !BUSY ? '' : ' disabled') + '><svg class="ic"><use href="#i-x"/></svg>Retirar</button>' : '';
+    const fh = f ? '<div class="fl-t"><span>EN PANTALLA' + (f.to && f.to.length ? ' · ' + esc(f.to.map(v => v.charAt(0).toUpperCase() + v.slice(1)).join(' · ')).toUpperCase() : '') + '</span><b>' + esc(f.text) + '</b><em>' + (Dt.flashLeft(f) === null ? 'hasta retirarlo' : 'se cierra en ' + Math.ceil(Dt.flashLeft(f) / 1000) + ' s') + '</em></div><button class="tbtn danger" id="flash-off"' + (live() && !BUSY ? '' : ' disabled') + '><svg class="ic"><use href="#i-x"/></svg>Retirar</button>' : '';
     if ($('flash-cur').dataset.h !== fh) { $('flash-cur').innerHTML = fh; $('flash-cur').dataset.h = fh; }
     $('flash-cur').hidden = !f;
 
     setActs(b);
+    renderMsgZones();
     document.querySelectorAll('.tbtn[data-delay], .msgp, #msg-form .send').forEach(x => { x.disabled = !live() || BUSY; });
     if (SHEET && SHEET.refresh) SHEET.refresh();
   }
@@ -163,7 +166,30 @@
     const z = e.target.closest('.zchip'); if (z) { ZONE = z.dataset.z; SEL = null; try { localStorage.setItem(ZKEY, JSON.stringify(ZONE)); } catch (er) {} render(); return; }
     if (e.target.closest('#b-auto')) { SEL = null; render(); return; }
     const dl = e.target.closest('[data-delay]'); if (dl && !dl.disabled) { openDelay(dl.dataset.delay === 'n' ? null : +dl.dataset.delay); return; }
-    const mp = e.target.closest('.msgp'); if (mp && !mp.disabled) send('flash', { text: mp.dataset.msg });
+    const mp = e.target.closest('.msgp'); if (mp && !mp.disabled) send('flash', { text: mp.dataset.msg, to: MSG_TO, zones: MSG_ZONES });
+  });
+  $('msg-to').addEventListener('click', e => {
+    const b = e.target.closest('[data-to]'); if (!b) return;
+    const t = b.dataset.to, V3 = ['manager', 'confidence', 'backstage'];
+    if (t === 'all') MSG_TO = null;
+    else { const cur = (MSG_TO || []).slice(); const i = cur.indexOf(t); if (i >= 0) cur.splice(i, 1); else cur.push(t); MSG_TO = cur.length && cur.length < 3 ? V3.filter(v => cur.indexOf(v) >= 0) : null; }
+    document.querySelectorAll('#msg-to [data-to]').forEach(x => x.classList.toggle('on', x.dataset.to === 'all' ? !MSG_TO : !!(MSG_TO && MSG_TO.indexOf(x.dataset.to) >= 0)));
+    renderMsgZones();
+  });
+  /** Zonas de Confidence que reciben el mensaje (si va a Confidence y hay más de una zona). */
+  function renderMsgZones() {
+    const zs = zones(), box = $('msg-zones');
+    box.hidden = !((!MSG_TO || MSG_TO.indexOf('confidence') >= 0) && zs.length > 1);
+    if (MSG_ZONES) { MSG_ZONES = MSG_ZONES.filter(id => zs.some(z => z.id === id)); if (!MSG_ZONES.length) MSG_ZONES = null; }
+    const h = '<button data-z="*" class="' + (!MSG_ZONES ? 'on' : '') + '">Todas</button>' + zs.map(z => '<button data-z="' + esc(z.id) + '" class="' + (MSG_ZONES && MSG_ZONES.indexOf(z.id) >= 0 ? 'on' : '') + '" style="--zc:' + esc(z.color || '#888') + '">' + esc(z.name) + '</button>').join('');
+    if ($('msg-zl').dataset.h !== h) { $('msg-zl').innerHTML = h; $('msg-zl').dataset.h = h; }
+  }
+  $('msg-zl').addEventListener('click', e => {
+    const b = e.target.closest('[data-z]'); if (!b) return;
+    const z = b.dataset.z;
+    if (z === '*') MSG_ZONES = null;
+    else { const cur = (MSG_ZONES || []).slice(); const i = cur.indexOf(z); if (i >= 0) cur.splice(i, 1); else cur.push(z); MSG_ZONES = cur.length && cur.length < zones().length ? cur : null; }
+    renderMsgZones();
   });
   $('prev').addEventListener('click', () => { const c = current(), i = c.list.indexOf(c.band); if (i > 0) { SEL = c.list[i - 1].key; render(); } });
   $('next').addEventListener('click', () => { const c = current(), i = c.list.indexOf(c.band); if (i >= 0 && i < c.list.length - 1) { SEL = c.list[i + 1].key; render(); } });
@@ -171,7 +197,7 @@
     e.preventDefault();
     const t = $('msg-text').value.replace(/\s+/g, ' ').trim();
     if (!t) return;
-    const r = await send('flash', { text: t });
+    const r = await send('flash', { text: t, to: MSG_TO, zones: MSG_ZONES });
     if (r && r.ok) { $('msg-text').value = ''; $('msg-text').blur(); }
   });
 
@@ -212,7 +238,7 @@
         const p = plan();
         const head = (W.custom ? '<label class="nrow">+ <input id="d-n" type="number" inputmode="numeric" min="1" max="600" value="' + W.mins + '"> min</label>' : '<div class="dbig">+' + W.mins + ' min</div>')
           + '<div class="seg"><button data-sc="z" class="' + (W.all ? '' : 'on') + '">Solo ' + esc(zoneName(zid)) + '</button><button data-sc="all" class="' + (W.all ? 'on' : '') + '">Todas las zonas</button></div>'
-          + '<p class="dfrom">Lo que empiece desde las ' + C.fmtHM(W.from) + ' · respeta los DELAY en rojo y los bloqueos del Panel</p>';
+          + '<p class="dfrom">Lo que empiece desde las ' + C.fmtHM(W.from) + ' · respeta los DELAY en rojo y los bloqueos del Dashboard</p>';
         if (!p.ok) return head + '<p class="err">' + esc(p.error) + '</p>';
         const sum = '<div class="dsum"><b>mueve ' + p.moved.length + '</b> · ' + p.kept.length + (p.kept.length === 1 ? ' fija' : ' fijas') + (p.clashes.length ? ' · <span class="bad">' + p.clashes.length + (p.clashes.length === 1 ? ' choque' : ' choques') + '</span>' : '') + '</div>';
         const rows = p.moved.map(m => '<li><span>' + esc(m.name) + '</span><em>' + C.fmtHM(m.from) + ' → <b>' + C.fmtHM(m.to) + '</b></em></li>').join('')

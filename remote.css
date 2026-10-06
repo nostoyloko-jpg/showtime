@@ -71,7 +71,7 @@ main{padding:12px 12px 0;display:flex;flex-direction:column;gap:12px}
 .bempty{padding:16px 4px;color:var(--muted);font-weight:700}
 .drift{margin-top:10px}
 .dchip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:9px;font-size:15px;font-weight:800}
-.dchip.ok{background:rgba(255,255,255,.07);color:var(--muted)}
+.dchip.ok{background:rgba(16,185,129,.16);color:#5eead4}
 .dchip .ic{width:16px;height:16px}
 .dchip.ok .ic{color:var(--green)}
 .dchip.acc{background:rgba(255,179,71,.16);color:var(--amber)}
@@ -143,3 +143,16 @@ body.busy .act:not(:disabled),body.busy .tbtn{opacity:.5}
 
 @media (min-width:700px){ main,.rh{max-width:640px;margin:0 auto} .actbar{max-width:640px;margin:0 auto} }
 @media (prefers-reduced-motion:reduce){ .call,.rx-dot{animation:none!important} }
+
+/* Destino de los mensajes (2e-A) */
+.seg4{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px}
+.seg4 button{height:42px;border-radius:10px;border:1px solid var(--line);background:transparent;font-weight:800;font-size:13px;color:var(--muted);padding:0 4px}
+.seg4 button.on{background:#fff;color:#000;border-color:#fff}
+
+.mzones{display:flex;flex-direction:column;gap:6px;margin:-2px 0 10px}
+.mzones>span{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);font-weight:800}
+.zrow{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+.zrow::-webkit-scrollbar{display:none}
+.zrow button{flex:0 0 auto;height:38px;padding:0 12px;border-radius:19px;border:1px solid var(--line);background:transparent;font-weight:800;font-size:13px;color:var(--muted);display:inline-flex;align-items:center;gap:6px}
+.zrow button[data-z]:not([data-z="*"])::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--zc,#888)}
+.zrow button.on{background:#fff;color:#000;border-color:#fff}

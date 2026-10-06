@@ -89,10 +89,14 @@
     const room = await E.newRoom();
     ok(E.validRoom(room)); eq(room.sala.length, 16);
     const url = E.staffUrl(room, E.PUBLIC_BASE);
-    ok(url.indexOf('https://nostoyloko-jpg.github.io/showtime/live.html#sala=') === 0, url);
+    ok(url.indexOf('https://nostoyloko-jpg.github.io/showtime/live.html?b=' + E.BUILD + '#sala=') === 0, 'con la versión para saltarse la caché: ' + url);
+    const cu = E.staffUrl(room, E.PUBLIC_BASE, { vista: 'confidence', zona: 'esc1' });
+    ok(cu.indexOf('live.html?vista=confidence&zona=esc1&b=' + E.BUILD + '#sala=' + room.sala) > 0, 'QR de Confidence con su zona: ' + cu);
+    ok(E.staffUrl(room, E.PUBLIC_BASE, { vista: 'backstage' }).indexOf('live.html?vista=backstage&b=') > 0);
+    ok(Q.encode(cu, { ecl: 'M' }).version <= 10, 'QR de Confidence versión ' + Q.encode(cu, { ecl: 'M' }).version);
     const p = E.parseHash(url.slice(url.indexOf('#')));
     eq(p.sala, room.sala); eq(p.k, room.k); eq(p.p, room.p);
-    ok(Q.encode(url, { ecl: 'M' }).version <= 8, 'QR versión ' + Q.encode(url, { ecl: 'M' }).version);
+    ok(Q.encode(url, { ecl: 'M' }).version <= 9, 'QR versión ' + Q.encode(url, { ecl: 'M' }).version);
     ok(url.indexOf(room.pub) < 0 && JSON.stringify(room.sk).length > 0 && url.indexOf(room.sk.d) < 0, 'la clave privada no va en el enlace');
   });
 

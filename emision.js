@@ -30,6 +30,9 @@
     { id: 'hivemq', name: 'HiveMQ', url: 'wss://broker.hivemq.com:8884/mqtt' }
   ];
   const PUBLIC_BASE = 'https://nostoyloko-jpg.github.io/showtime/';
+  // Versión publicada: va en los enlaces de los QR para que el móvil no abra una copia vieja guardada en su caché
+  // (súbela junto con los ?v= de index.html / live.html / remote.html).
+  const BUILD = '20261019';
   const CHUNK = 24000;           // bytes por trozo (los repetidores públicos limitan el tamaño de mensaje)
   const BEAT_MS = 10000;         // latido del Mac
   const PRESENCE_MS = 30000;     // presencia de cada móvil
@@ -232,9 +235,14 @@
     if (l && /^https?:$/.test(l.protocol) && !/^(localhost|127\.|\[::1\])/.test(l.hostname)) return l.origin + l.pathname.replace(/[^/]*$/, '');
     return PUBLIC_BASE;
   }
-  function staffUrl(room, base) { return (base || publicBase()) + 'live.html#sala=' + room.sala + '&k=' + room.k + '&p=' + room.p; }
+  /** opts (2e-A): { vista: 'manager'|'confidence'|'backstage', zona } → QR de Staff de esa pantalla (Manager = la de siempre). */
+  function staffUrl(room, base, opts) {
+    const o = opts || {}, v = o.vista === 'confidence' || o.vista === 'backstage' ? o.vista : null;
+    const q = '?' + (v ? 'vista=' + v + (v === 'confidence' && o.zona !== null && o.zona !== undefined ? '&zona=' + encodeURIComponent(o.zona) : '') + '&' : '') + 'b=' + BUILD;
+    return (base || publicBase()) + 'live.html' + q + '#sala=' + room.sala + '&k=' + room.k + '&p=' + room.p;
+  }
   /** QR PRIVADO del regidor: lo mismo que el de Staff + la clave del mando. */
-  function remoteUrl(room, base) { return (base || publicBase()) + 'remote.html#sala=' + room.sala + '&k=' + room.k + '&p=' + room.p + '&c=' + room.c; }
+  function remoteUrl(room, base) { return (base || publicBase()) + 'remote.html?b=' + BUILD + '#sala=' + room.sala + '&k=' + room.k + '&p=' + room.p + '&c=' + room.c; }
   /** Lee «#sala=…&k=…&p=…». null si falta algo o no tiene el formato esperado. */
   function parseHash(hash) {
     const h = String(hash || '').replace(/^#/, ''), o = {};
@@ -363,8 +371,8 @@
     if (g === 'old') res = { ok: false, msg: 'Orden caducada (revisa la hora del móvil)' };
     else {
       if (cmd.from) this.remotes.set(String(cmd.from).slice(0, 32), Date.now());
-      try { res = this.o.onCommand ? await this.o.onCommand(cmd) : { ok: false, msg: 'El Panel no acepta órdenes' }; }
-      catch (e) { res = { ok: false, msg: 'Error en el Panel: ' + (e && e.message || e) }; }
+      try { res = this.o.onCommand ? await this.o.onCommand(cmd) : { ok: false, msg: 'El Dashboard no acepta órdenes' }; }
+      catch (e) { res = { ok: false, msg: 'Error en el Dashboard: ' + (e && e.message || e) }; }
     }
     await this.reply(cmd.id, res || { ok: false, msg: 'Sin respuesta' });
     this.status();
@@ -448,14 +456,14 @@
     const live = this.links.filter(l => l.publish(topic(this.V.sala, 'c'), f)).length;
     if (!live) return { ok: false, msg: 'Sin conexión: la orden no ha salido' };
     return new Promise(resolve => {
-      const timer = setTimeout(() => { this.pending.delete(cmd.id); resolve({ ok: false, msg: 'El Mac no responde (¿Panel cerrado, sin internet o QR del mando renovado?)', timeout: true }); }, this.o.cmdTimeout || CMD_TIMEOUT);
+      const timer = setTimeout(() => { this.pending.delete(cmd.id); resolve({ ok: false, msg: 'El Mac no responde (¿Dashboard cerrado, sin internet o QR del mando renovado?)', timeout: true }); }, this.o.cmdTimeout || CMD_TIMEOUT);
       this.pending.set(cmd.id, { resolve, timer });
     });
   };
   Receptor.prototype.stop = function () { this.timers.forEach(t => clearInterval(t)); this.links.forEach(l => l.stop()); };
 
   const API = {
-    BROKERS, PUBLIC_BASE, PROTO, STALE_MS, VIEWER_TTL, CMD_WINDOW, K_STATE, K_BEAT, K_END, K_ACK, K_HELLO, K_CMD,
+    BROKERS, PUBLIC_BASE, BUILD, PROTO, STALE_MS, VIEWER_TTL, CMD_WINDOW, K_STATE, K_BEAT, K_END, K_ACK, K_HELLO, K_CMD,
     newRoom, validRoom, withCmdKey, newCmdKey, staffUrl, remoteUrl, parseHash, publicBase, Emisor, Receptor, CmdGuard,
     // internos (para los tests)
     _: { b64u, unb64u, concat, MQ, varLen, pack, unpack, splitChunks, Assembler, macKeys, viewerKeys, seal, openFrame, sealHello, openHello, sealCmd, openCmd, fingerprint, topic, Link }

@@ -215,6 +215,10 @@
     ok(M.checkCmd({ op: 'delay', args: { minutes: 5, zones: [], from: 1, stamp: '' } }));
     ok(M.checkCmd({ op: 'delay', args: { minutes: 5, zones: 'all', from: 1 } }), 'sin resumen confirmado no vale');
     ok(M.checkCmd({ op: 'flash', args: { text: 'x'.repeat(141) } }));
+    eq(M.checkCmd({ op: 'flash', args: { text: 'ÚLTIMO TEMA', to: ['confidence'] } }), null, 'mensaje solo a Confidence');
+    eq(M.checkCmd({ op: 'flash', args: { text: 'ÚLTIMO TEMA', to: ['confidence'], zones: ['esc1'] } }), null, 'a la Confidence de una zona');
+    ok(M.checkCmd({ op: 'flash', args: { text: 'x', zones: 'esc1' } }), 'zonas mal formadas');
+    ok(M.checkCmd({ op: 'flash', args: { text: 'x', to: ['camerino'] } }), 'destino desconocido');
     ok(M.checkCmd(null));
   });
 
@@ -222,11 +226,11 @@
   test('enlace del regidor: lleva la clave del mando; el de Staff no', async () => {
     const room = await E.newRoom();
     const st = E.staffUrl(room, E.PUBLIC_BASE), rm = E.remoteUrl(room, E.PUBLIC_BASE);
-    ok(rm.indexOf(E.PUBLIC_BASE + 'remote.html#') === 0, rm);
+    ok(rm.indexOf(E.PUBLIC_BASE + 'remote.html?b=' + E.BUILD + '#') === 0, rm);
     eq(E.parseHash(rm.slice(rm.indexOf('#'))).c, room.c); eq(E.parseHash(st.slice(st.indexOf('#'))).c, undefined);
     ok(st.indexOf(room.c) < 0, 'la clave del mando no va en el QR de Staff');
     eq(E.parseHash('#sala=AAAAAAAAAAAAAAAA&k=' + _.b64u(new Uint8Array(16)) + '&p=' + _.b64u(new Uint8Array(16)) + '&c=abc'), null, 'clave de mando mal formada');
-    ok(Q.encode(rm, { ecl: 'M' }).version <= 9, 'QR del regidor versión ' + Q.encode(rm, { ecl: 'M' }).version);
+    ok(Q.encode(rm, { ecl: 'M' }).version <= 10, 'QR del regidor versión ' + Q.encode(rm, { ecl: 'M' }).version);
     const old = Object.assign({}, room); delete old.c;
     ok(E.withCmdKey(old).c && E.withCmdKey(old).sala === room.sala, 'sala de la 2d-A: se le añade la clave sin cambiar la sala');
     ok(E.newCmdKey(room).c !== room.c && E.newCmdKey(room).k === room.k, 'nueva clave de mando: Staff sigue igual');

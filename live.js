@@ -8,6 +8,10 @@
   const Dt = window.ShowtimeDatos;
   const $ = id => document.getElementById(id);
   const URLP = new URLSearchParams(location.search);
+  // ── Vista de esta ventana (2e-A): manager · confidence · backstage (?vista=…; tecla V para rotar) ──
+  const Vs = window.ShowtimeVistas;
+  let VISTA = Vs.normVista(URLP.get('vista'));
+  let ZONA = URLP.has('zona') ? URLP.get('zona') : null;   // zona de Confidence (null = sin elegir)
 
   // ── Preferencias de ESTA pantalla (otra luz, otro monitor: van aparte del Panel) ──
   const P = {
@@ -65,7 +69,7 @@
 
     $('evn-name').textContent = NOFEST ? 'SIN EVENTO' : (DEMO ? 'DEMO · ' : '') + ((FEST.event && FEST.event.nombre) || '');
     $('evn-mode').textContent = vt[0] + ' · ';
-    const msg = NOFEST ? (Dt.READONLY ? 'ESPERANDO LOS DATOS DE LA SALA…' : 'SIN EVENTO CARGADO · ábrelo en el Panel de Control')
+    const msg = NOFEST ? (Dt.READONLY ? 'ESPERANDO LOS DATOS DE LA SALA…' : 'SIN EVENTO CARGADO · ábrelo en el Dashboard')
       : DAY_MISSING ? 'EL ' + fmtDay(DAY_MISSING) + ' NO TIENE ' + vt[1] + ' · elige otro día'
       : '';
     $('banner').textContent = msg;
@@ -273,9 +277,9 @@
 
   // ── Barras dinámicas ─────────────────────────────────────────────────
   /** Filas que llenan la pantalla (para no dejar huecos): según el alto elegido o el automático. */
-  function autoCount() { const h = $('bot').clientHeight; return Math.max(1, Math.floor(h / (ROW_H || STRIP_MIN_H))); }
+  function autoCount() { if (VISTA === 'backstage') return 2; const h = $('bot').clientHeight; return Math.max(1, Math.floor(h / (ROW_H || STRIP_MIN_H))); }
   /** Alto actual de una fila (el elegido o el automático). */
-  function curRowH() { const h = $('bot').clientHeight; return ROW_H || Math.max(STRIP_MIN_H, Math.floor(h / autoCount())); }
+  function curRowH() { const h = $('bot').clientHeight; if (VISTA === 'backstage') return Math.max(60, Math.floor(h / 2)); return ROW_H || Math.max(STRIP_MIN_H, Math.floor(h / autoCount())); }
   /** − / +: un paso más bajo o más alto para todas las filas por igual. */
   function stepRowH(dir) {
     const cur = curRowH();
@@ -294,6 +298,7 @@
   /** Una barra por cada entrada que queda (todo el horario, como siempre), al menos las que llenan el alto.
    *  Las que ya terminaron salen y las demás suben solas. Si no caben, la lista hace scroll. */
   function visibleCount() {
+    if (VISTA === 'backstage') return 2;                  // Backstage: banda actual y siguiente
     const at = Math.floor(C.nowAbs()) + Math.round(TIME_OFFSET);
     const left = C.pickBlocks(BLOCKS, at, 500).list.filter(Boolean).length;
     return Math.max(autoCount(), left);
@@ -443,20 +448,23 @@
     const tasks = (C.tasksNow ? C.tasksNow(BLOCKS, nowInt) : []).map(b => ({ o: 1000, h: taskHtml(b, nowInt) }));
     const scene = playing.concat(changing).concat(tasks).sort((a, b) => a.o - b.o);   // sort estable: misma posición, primero el que suena
     const next = C.nextPerStage(BLOCKS, nowInt);
-    const calls = C.callList(BLOCKS, nowInt, CALL_MINS, CALL_DONE);
+    // Backstage: el CALL sigue a la vista hasta que arranca el show (con OK sale como «avisado»)
+    const calls = VISTA === 'backstage' ? Vs.backstageCalls(BLOCKS, nowInt, CALL_MINS, CALL_DONE) : C.callList(BLOCKS, nowInt, CALL_MINS, CALL_DONE).map(b => ({ block: b, done: false }));
     const fin = '<div class="tempty fin">FIN DE JORNADA</div>', none = '<div class="tempty">—</div>';
     const empty = NOFEST ? '<div class="tempty fin">SIN EVENTO CARGADO</div>' : DAY_MISSING ? '<div class="tempty fin">DÍA SIN DATOS</div>' : (ended ? fin : none);
     const idle = (NOFEST || DAY_MISSING || ended) ? empty : '<div class="tempty idle">— SIN ACTIVIDAD —</div>';
     $('now-list').innerHTML = scene.length ? scene.map(x => x.h).join('') : idle;
     $('next-list').innerHTML = next.length ? next.map(nextHtml).join('') : none;
-    $('call-list').innerHTML = calls.map(b => {
+    $('call-list').innerHTML = calls.map(cb => {
+      const b = cb.block;
       const col = safeColor(b.stageColor || b.color, CALLC);
       const falta = Math.max(1, Math.round(b.si - nowInt));
       return '<div class="trow callrow" style="--c:' + col + '"><div class="callmain">' +
         '<div class="tname fit" style="color:' + col + '">' + esc(b.name.toUpperCase()) + '</div>' +
         (b.stage ? '<div class="tmeta"><span class="tstage" style="color:' + col + '">' + esc(b.stage.toUpperCase()) + '</span></div>' : '') +
         '<div class="trem" style="color:' + col + '">en ' + falta + ' min &middot; ' + C.fmtHM(b.si) + '</div>' +
-        '</div><button class="callok" data-ck="' + esc(C.callKey(b)) + '" title="Marcar como avisado">OK</button></div>';
+        '</div>' + (VISTA === 'backstage' ? (cb.done ? '<span class="calldone"><svg class="ic"><use href="#i-check"/></svg>AVISADO</span>' : '')
+          : '<button class="callok" data-ck="' + esc(C.callKey(b)) + '" title="Marcar como avisado">OK</button>') + '</div>';
     }).join('');
     $('panel-call').classList.toggle('hot', calls.length > 0);
     fitNames();
@@ -525,6 +533,8 @@
     const d = new Date();
     const nowMins = C.nowAbs(d), nowInt = Math.floor(nowMins);
     $('clk').textContent = pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+    if (VISTA === 'confidence') { renderConf(); return; }
+    if (VISTA === 'backstage') renderTicker(nowMins);
     $('dat').textContent = d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }).toUpperCase();
 
     renderDrift(nowInt);
@@ -680,12 +690,13 @@
   requestWake();
 
   // Cambios desde el Panel de Control (o desde otra Live)
-  Dt.onChange(type => { if (type === 'flash') { renderFlash(); return; } load(); tick(); });
+  Dt.onChange(type => { if (type === 'flash') { renderFlash(); return; } load(); if (type === 'config' || type === 'snapshot') applyVista(); else tick(); });
 
   // ── Mensaje flash (2c-C) ─────────────────────────────────────────────
   let flashId = '';
   function renderFlash() {
-    const f = Dt.getFlash ? Dt.getFlash() : null;
+    const f0 = Dt.getFlash ? Dt.getFlash() : null;
+    const f = f0 && Vs.flashFor(f0, VISTA, ZONA) ? f0 : null;           // mensajes por destino (2e-A)
     const el = $('flash');
     if (!f) { if (!el.hidden) { el.hidden = true; flashId = ''; } return; }
     if (f.id !== flashId) {
@@ -707,7 +718,7 @@
   }
   $('flash-x').addEventListener('click', () => { if (Dt.READONLY) return; if (Dt.setFlash) Dt.setFlash(null); renderFlash(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && !Dt.READONLY && !$('flash').hidden && Dt.setFlash) { Dt.setFlash(null); renderFlash(); } });
-  setInterval(renderFlash, 250);
+  setInterval(() => { renderFlash(); if (VISTA === 'confidence') renderConf(); }, 250);
   window.ShowtimeLive = { applyStyle: v => { applyStyle(v); tick(); }, reload: () => { load(); tick(); } };
 
   // ── Modo Staff (2d-A): Pantalla Live de solo lectura abierta desde el QR ──
@@ -725,7 +736,7 @@
       $('rx-t').textContent = s === 'live' ? 'EN DIRECTO'
         : s === 'connecting' ? (nLinks ? 'ESPERANDO A LA SALA…' : 'CONECTANDO…')
         : s === 'stale' ? 'SIN CONEXIÓN CON LA SALA · último dato hace ' + ago(t)
-        : s === 'end' ? 'EMISIÓN DETENIDA EN EL PANEL'
+        : s === 'end' ? 'EMISIÓN DETENIDA EN EL DASHBOARD'
         : 'ENLACE NO VÁLIDO · vuelve a escanear el QR';
       rx.title = st ? st.links.map(l => l.name + ': ' + (l.state === 'on' ? 'conectado' : 'sin conexión')).join(' · ') : '';
     }
@@ -734,8 +745,131 @@
     R.start().catch(e => { console.error(e); render(null); });
   }
 
+  // ── Vistas (2e-A) ───────────────────────────────────────────────────
+  const LIVE_ZONE = 'showtime.live.zona';
+  function screensCfg() { return (CONFIG && CONFIG.screens) || Vs.normScreens(); }
+  /** Aplica la vista: qué bloques se ven y cómo. Solo maquetación; no toca datos. */
+  function applyVista() {
+    document.body.dataset.vista = VISTA;
+    const b = screensCfg().back;
+    document.body.classList.toggle('bs-nocards', VISTA === 'backstage' && !b.cards);
+    document.body.classList.toggle('bs-nolines', VISTA === 'backstage' && !b.lines);
+    document.body.classList.toggle('bs-noticker', VISTA !== 'backstage' || !b.ticker);
+    document.title = 'Showtime · ' + Vs.VISTA_TXT[VISTA];
+    tickerKey = '';
+    if (VISTA !== 'confidence') { buildStrips(visibleCount()); }
+    requestAnimationFrame(tick);
+  }
+  /** Cambia de vista sin recargar (tecla V): la URL se actualiza (el «#…» de la emisión se conserva). */
+  function setVista(v) {
+    VISTA = Vs.normVista(v);
+    const q = new URLSearchParams(location.search);
+    q.set('vista', VISTA);
+    if (VISTA === 'confidence' && ZONA !== null) q.set('zona', ZONA); else q.delete('zona');
+    try { history.replaceState(null, '', location.pathname + '?' + q.toString() + location.hash); } catch (e) {}
+    applyVista();
+  }
+  document.addEventListener('keydown', e => {
+    if ((e.key === 'v' || e.key === 'V') && !e.metaKey && !e.ctrlKey && !e.altKey && !(e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName))) {
+      if (VISTA === 'manager' && ZONA === null) { const z = pget(LIVE_ZONE, null); if (z !== null) ZONA = z; }   // última zona elegida en esta pantalla
+      setVista(Vs.nextVista(VISTA));
+    }
+  });
+
+  // Confidence: cuenta atrás gigante de UNA zona (la que lleva la URL o la que se elige aquí)
+  let confKey = '';
+  function renderConf() {
+    if (VISTA !== 'confidence') return;
+    const r = Vs.confidence(FEST, ZONA, C.nowAbs(), screensCfg());
+    const d = new Date(), hhmm = pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+    const box = $('conf');
+    if (r.mode === 'pickzone' || r.mode === 'nofest') {
+      const k = r.mode + JSON.stringify(r.zones || []);
+      if (confKey !== k) {
+        confKey = k;
+        box.className = 'conf pick';
+        box.innerHTML = r.mode === 'nofest' ? '<div class="cf-msg">' + (Dt.READONLY ? 'ESPERANDO LOS DATOS DE LA SALA…' : 'SIN EVENTO CARGADO') + '</div>'
+          : '<div class="cf-msg">CONFIDENCE · ELIGE LA ZONA DE ESTA PANTALLA</div><div class="cf-zones">' +
+            r.zones.map(z => '<button class="cf-zone" data-z="' + esc(z.id) + '">' + esc(z.name.toUpperCase()) + '</button>').join('') + '</div>';
+      }
+      return;
+    }
+    let top = '', digits = '', foot = '', cls = 'conf ' + r.mode, frac = r.frac;
+    const zn = esc((r.zone || '').toUpperCase());
+    if (r.mode === 'show') {
+      top = zn + ' · ' + esc(r.band.name.toUpperCase());
+      digits = Vs.fmtClock(r.remSec); foot = hhmm;
+      cls += ' lv-' + r.level + (r.blink ? ' blink' : '');
+    } else if (r.mode === 'changeover') {
+      top = zn + ' · ' + (r.standby ? 'STANDBY' : 'CHANGEOVER');
+      digits = Vs.fmtClock(r.remSec);
+      foot = hhmm + '<span class="cf-sep">·</span>PRÓXIMO SHOW: <b>' + esc(r.next.name.toUpperCase()) + '</b> · ' + C.fmtHM(r.next.si);
+      cls += ' lv-' + r.level;
+    } else if (r.mode === 'wait') {
+      top = zn + ' · EN ESPERA';
+      digits = Vs.fmtClock(r.remSec);
+      foot = hhmm + '<span class="cf-sep">·</span>PRÓXIMO SHOW: <b>' + esc(r.next.name.toUpperCase()) + '</b> · ' + C.fmtHM(r.next.si);
+      cls += ' lv-ok nobar';
+    } else {
+      top = zn; digits = hhmm; foot = 'FIN DE JORNADA'; cls += ' nobar';
+    }
+    const k = cls + '|' + top + '|' + foot;
+    if (confKey !== k) {
+      confKey = k;
+      box.className = cls;
+      box.innerHTML = '<div class="cf-top">' + top + '</div><div class="cf-dig"><span id="cf-d"></span></div>' +
+        '<div class="cf-bar"><div id="cf-fill"></div></div><div class="cf-foot">' + foot + '</div>';
+    }
+    const dEl = $('cf-d');
+    if (dEl.textContent !== digits) { dEl.textContent = digits; dEl.parentNode.style.setProperty('--n', Math.max(5, digits.length)); }
+    if (frac !== null && frac !== undefined) $('cf-fill').style.width = (frac * 100).toFixed(2) + '%';
+  }
+  $('conf').addEventListener('click', e => {
+    const b = e.target.closest('.cf-zone'); if (!b) return;
+    ZONA = b.dataset.z; pset(LIVE_ZONE, ZONA); confKey = ''; setVista('confidence');
+  });
+
+  // Cinta de avisos (Backstage): retrasos, hitos y (en la 2e-B) el tiempo
+  let tickerKey = '';
+  function renderTicker(nowMins) {
+    const t = screensCfg().ticker;
+    if (!screensCfg().back.ticker) return;
+    const items = Vs.tickerItems(FEST, screensCfg(), nowMins, null);
+    const k = t.mode + t.bg + t.fg + JSON.stringify(items);
+    if (k === tickerKey) return;
+    tickerKey = k;
+    const tk = $('ticker');
+    tk.style.setProperty('--tbg', t.bg); tk.style.setProperty('--tfg', t.fg);
+    tk.className = 'ticker ' + t.mode;
+    const ic = { delay: '#i-clock', hito: '#i-flag', meteo: '#i-sun' };
+    const html = items.length ? items.map(x => '<span class="tk-it ' + x.kind + ' ' + x.level + '"><svg class="ic"><use href="' + ic[x.kind] + '"/></svg>' + esc(x.text) + '</span>').join('<span class="tk-sep"></span>')
+      : '<span class="tk-it">SIN AVISOS</span>';
+    if (t.mode === 'crawl') {
+      tk.innerHTML = '<div class="tk-track"><div class="tk-run">' + html + '<span class="tk-sep"></span></div><div class="tk-run" aria-hidden="true">' + html + '<span class="tk-sep"></span></div></div>';
+      const run = tk.querySelector('.tk-run');
+      const secs = Math.max(12, run.scrollWidth / 90);           // ~90 px/s, siempre a la misma velocidad de lectura
+      tk.querySelector('.tk-track').style.animationDuration = secs + 's';
+    } else tk.innerHTML = '<div class="tk-static">' + html + '</div>';
+  }
+
+  // Aviso al abrir desde el Dashboard (monitor externo o arrastrar)
+  (function () {
+    const a = URLP.get('aviso'); if (!a) return;
+    const tip = document.createElement('div');
+    tip.className = 'tip';
+    tip.innerHTML = a === 'arrastra' ? '<b>Arrastra esta ventana al monitor de escenario</b> y pulsa <kbd>F</kbd> para pantalla completa'
+      : 'Pulsa <kbd>F</kbd> (o haz clic y pulsa F) para pantalla completa';
+    document.body.appendChild(tip);
+    const off = () => { tip.remove(); document.removeEventListener('fullscreenchange', off); };
+    setTimeout(off, 12000); document.addEventListener('fullscreenchange', off);
+  })();
+
+  // El Dashboard puede cerrar esta ventana desde «Live ▾» (aunque esté en otro monitor)
+  window.addEventListener('message', e => { const m = e.data; if (m && m.app === 'showtime' && m.type === 'closeLive' && !Dt.READONLY) { try { window.close(); } catch (er) {} } });
+
   // ── Arranque ─────────────────────────────────────────────────────────
   load();
+  applyVista();
   setZoom(0);
   setRowH(ROW_H);
   tick();

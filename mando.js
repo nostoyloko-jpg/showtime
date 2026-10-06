@@ -133,7 +133,11 @@
         if (!Number.isFinite(a.from)) return 'Falta desde cuándo';
         if (typeof a.stamp !== 'string' || a.stamp.length > 20000) return 'Falta el resumen confirmado';
         return null;
-      case 'flash': return typeof a.text === 'string' && a.text.trim().length > 0 && a.text.length <= 140 ? null : 'Mensaje vacío o de más de 140 caracteres';
+      case 'flash':
+        if (!(typeof a.text === 'string' && a.text.trim().length > 0 && a.text.length <= 140)) return 'Mensaje vacío o de más de 140 caracteres';
+        if (a.to !== undefined && a.to !== null && !(Array.isArray(a.to) && a.to.length <= 3 && a.to.every(v => ['manager', 'confidence', 'backstage'].indexOf(v) >= 0))) return 'Destino del mensaje no válido';
+        if (a.zones !== undefined && a.zones !== null && !(Array.isArray(a.zones) && a.zones.length <= 50 && a.zones.every(z => typeof z === 'string' && z.length <= 80))) return 'Zonas del mensaje no válidas';
+        return null;
       case 'flashOff': return null;
       case 'callOk': return str(a.key, 200) ? null : 'Falta el CALL';
     }
