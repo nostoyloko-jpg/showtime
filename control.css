@@ -513,3 +513,11 @@ body[data-ps="escenario"]{--glass-bg:#000;--glass-line:rgba(255,214,0,.55);--gla
 .qr-big-t{font-size:15px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
 .qr-big-st{display:flex;flex-direction:column;align-items:center;gap:4px}
 body[data-ps="escenario"] .qr-big-box{background:#000;border-color:rgba(255,214,0,.45)}
+/* Mando del regidor (2d-B) */
+.cwarn{display:flex;gap:8px;align-items:flex-start;margin:8px 6px 2px;padding:8px 10px;border-radius:8px;font-size:12px;line-height:1.4;white-space:normal;
+  color:#ffd6d3;background:rgba(255,59,48,.10);border:1px solid rgba(255,59,48,.45)}
+.cwarn .ic{flex:0 0 auto;width:16px;height:16px;color:#ff6b61;margin-top:1px}
+.cok{color:#10b981}
+.ctab.rlive::after{content:'';width:6px;height:6px;border-radius:50%;background:#10b981;box-shadow:0 0 5px #10b981}
+.qr-big.remote .qr-big-box{border-color:rgba(255,59,48,.6)}
+.qr-big.remote .qr-big-t{color:#ff6b61}

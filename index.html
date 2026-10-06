@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Showtime · Panel de Control</title>
-<link rel="stylesheet" href="control.css?v=20261013">
+<link rel="stylesheet" href="control.css?v=20261014">
 </head>
 <body>
 
@@ -103,9 +103,7 @@
           <button class="ctab" data-tab="remote" role="tab" aria-selected="false"><svg class="ic"><use href="#i-remote"/></svg>Regidor · mando</button>
         </div>
         <div class="cpane" id="cast-staff"></div>
-        <div class="cpane" id="cast-remote" hidden>
-          <div class="csoon"><svg class="ic"><use href="#i-remote"/></svg><b>Mando del regidor</b><span>Llega en la Entrega 2d-B: ▶ / ■, En hora, retrasos con resumen y Confirmar, mensajes y CALL desde el móvil, protegido con su propia clave.</span></div>
-        </div>
+        <div class="cpane" id="cast-remote" hidden></div>
       </div>
     </div>
   </nav>
@@ -209,7 +207,7 @@
 </aside>
 
 <!-- QR en grande (Emisión): se queda abierto hasta cerrarlo, para escanearlo con calma -->
-<div id="qr-big" class="qr-big" hidden><div class="qr-big-box"><div id="qr-big-svg"></div><div class="qr-big-t">Staff · solo lectura</div><div id="qr-big-st" class="qr-big-st"></div><button id="qr-big-x" class="btn">Cerrar</button></div></div>
+<div id="qr-big" class="qr-big" hidden><div class="qr-big-box"><div id="qr-big-svg"></div><div id="qr-big-t" class="qr-big-t">Staff · solo lectura</div><div id="qr-big-st" class="qr-big-st"></div><button id="qr-big-x" class="btn">Cerrar</button></div></div>
 
 <div id="drop" class="drop" hidden><div>Suelta aquí el archivo (.json del evento, o .csv / .tsv con un horario)</div></div>
 
@@ -251,11 +249,12 @@
 <datalist id="zones-dl"></datalist>
 <div id="toast" class="toast" hidden></div>
 
-<script src="core.js?v=20261013"></script>
-<script src="datos.js?v=20261013"></script>
-<script src="importar.js?v=20261013"></script>
-<script src="qr.js?v=20261013"></script>
-<script src="emision.js?v=20261013"></script>
-<script src="control.js?v=20261013"></script>
+<script src="core.js?v=20261014"></script>
+<script src="datos.js?v=20261014"></script>
+<script src="importar.js?v=20261014"></script>
+<script src="qr.js?v=20261014"></script>
+<script src="emision.js?v=20261014"></script>
+<script src="mando.js?v=20261014"></script>
+<script src="control.js?v=20261014"></script>
 </body>
 </html>

@@ -7,6 +7,7 @@
   'use strict';
   const C = window.ShowtimeCore;
   const Dt = window.ShowtimeDatos;
+  const M = window.ShowtimeMando;
   const $ = id => document.getElementById(id);
 
   // ── Estado (declarado antes de usarse) ───────────────────────────────
@@ -219,33 +220,13 @@
     return '<span class="mchip over" title="' + esc(m.band.name) + ' acaba ' + C.fmtHM(m.projEnd) + '"><svg class="ic"><use href="#i-alert"/></svg>Rebasado +' + (-m.margin) + ' min</span>';
   }
 
-  /** Registra la hora real y, si desborda el colchón, empuja SOLO el desborde en lo autorizado (Retrasos ▾) de su zona. */
+  /** Registra la hora real y, si desborda el colchón, empuja SOLO el desborde en lo autorizado (Retrasos ▾) de su zona.
+   *  La regla está en mando.js (la misma para la tabla y para el mando del móvil). */
   function registerReal(tr, which) {
-    const id = tr.dataset.id, mode = tr.dataset.mode || 'show', key = tr.dataset.key;
-    const now = Math.floor(C.nowAbs());
-    const r = C.setReal(FEST, id, mode, which, now);
+    const r = M.realPlan(FEST, CONFIG, tr.dataset.key, which, Math.floor(C.nowAbs()));
     if (!r.ok) { toast(r.error, true); return; }
-    let st = r.state;
-    const blocks = C.buildBlocks(st, { mode: 'all', day: 'all' });
-    const b = blocks.find(x => x.key === key);
-    const name = b ? b.name : '';
-    let msg = name + (which === 'i' ? ': empieza ' : ': termina ') + C.fmtHM(now);
-    const dz = b ? C.driftByZone(st, blocks, now).find(z => z.zoneId === (b.stageId || '')) : null;
-    if (dz && dz.block.key === key) {
-      const d = dz.delta;
-      if (d > 0 && dz.status === 'absorb') msg += ' · desfase +' + d + ' min, se absorbe en el cambio';
-      else if (d < 0) msg += ' · adelanto ' + (-d) + ' min';
-      else if (d === 0) msg += ' · en hora';
-      else if (dz.status === 'overflow') {
-        {
-          const sh = C.shiftEntries(st, { minutes: dz.overflow, zone: b.stageId || 'all', cats: catsFn(), fromAbs: Math.max(now, b.psi + 1), day: b.jornada });
-          if (sh.moved.length) { st = sh.state; msg += ' · desborde +' + dz.overflow + ' min: ' + nEnt(sh.moved.length, 'movida') + (sh.kept.length ? ' (' + keptTxt(sh.kept.length) + ')' : ''); }
-          else msg += ' · desborde +' + dz.overflow + ' min (nada que mover en ' + (b.stage || 'su zona') + ': bloqueado o en rojo)';
-          if (sh.clashes.length) setTimeout(() => toast('Choque con entrada en rojo: ' + sh.clashes.map(c => c.name + ' / ' + c.with).join(', '), true), 2800);
-        }
-      }
-    }
-    commitFestival(st, msg);
+    if (r.clashes.length) setTimeout(() => toast('Choque con entrada en rojo: ' + r.clashes.map(c => c.name + ' / ' + c.with).join(', '), true), 2800);
+    commitFestival(r.state, r.msg);
   }
 
   /** Barra de estado: desfase por zona (ámbar absorbiendo · rojo desborde · verde adelanto). */
@@ -1318,22 +1299,30 @@
     if (e.target.closest('#msg-off, [data-act="msg-off"]')) { Dt.setFlash(null); renderFlash(); toast('Mensaje retirado de la Pantalla Live'); }
   });
 
-  // ── Emisión a los móviles del equipo (2d-A) ───────────────────────────
+  // ── Emisión a los móviles (2d-A) y mando del regidor (2d-B) ──────────
   // El Mac publica el estado cifrado y firmado en dos repetidores públicos; los móviles lo leen con el QR de Staff.
+  // El QR PRIVADO del regidor añade la clave del mando: solo esas órdenes se obedecen (y entran en el Deshacer).
   const Em = window.ShowtimeEmision, QR = window.ShowtimeQR;
   const EM_KEY = 'showtime.emision';          // { room, on } — la sala y sus claves solo viven en este navegador
-  let EM = null, EMST = null, emRoom = null;
-  function emLoad() { try { const v = JSON.parse(localStorage.getItem(EM_KEY) || 'null'); return v && Em && Em.validRoom(v.room) ? v : null; } catch (e) { return null; } }
+  let EM = null, EMST = null, emRoom = null, emTab = 'staff', bigTab = 'staff';
+  function emLoad() {
+    try {
+      const v = JSON.parse(localStorage.getItem(EM_KEY) || 'null');
+      if (!v || !Em || !Em.validRoom(v.room)) return null;
+      if (!v.room.c) { v.room = Em.withCmdKey(v.room); localStorage.setItem(EM_KEY, JSON.stringify(v)); }   // sala de la 2d-A: se le añade la clave del mando
+      return v;
+    } catch (e) { return null; }
+  }
   function emSave(on) { try { localStorage.setItem(EM_KEY, JSON.stringify({ room: emRoom, on: !!on })); } catch (e) {} }
-  function emCan() { return !!(Em && QR && window.crypto && crypto.subtle && 'WebSocket' in window); }
+  function emCan() { return !!(Em && QR && M && window.crypto && crypto.subtle && 'WebSocket' in window); }
   async function emStart(resumed) {
     if (!emCan()) { toast('Este navegador no permite la emisión cifrada', true); return; }
     if (EM) return;
     try {
       if (!emRoom) { const saved = emLoad(); emRoom = saved ? saved.room : await Em.newRoom(); }
-      EM = new Em.Emisor({ room: emRoom, getSnapshot: Dt.getSnapshot, onStatus: st => { EMST = st; renderCast(); } });
+      EM = new Em.Emisor({ room: emRoom, getSnapshot: Dt.getSnapshot, onCommand: emCommand, onStatus: st => { EMST = st; renderCast(); } });
       await EM.start(); emSave(true); renderCast();
-      toast(resumed ? 'Emisión reanudada (estaba activa antes de recargar el Panel)' : 'Emitiendo: escanea el QR de Staff con el móvil');
+      toast(resumed ? 'Emisión reanudada (estaba activa antes de recargar el Panel)' : 'Emitiendo: escanea el QR con el móvil');
     } catch (e) { console.error(e); EM = null; renderCast(); toast('No se pudo empezar la emisión: ' + (e && e.message || e), true); }
   }
   async function emStop(quiet) {
@@ -1343,7 +1332,7 @@
     if (!quiet) toast('Emisión parada: los móviles muestran «Emisión detenida»');
   }
   function emRegen() {
-    modal('Regenerar claves', '<p>Se crea una sala nueva con claves nuevas. <b>Los QR anteriores dejan de funcionar</b>: el equipo tendrá que escanear el nuevo.</p>', [
+    modal('Regenerar claves', '<p>Se crea una sala nueva con claves nuevas. <b>Los dos QR anteriores (Staff y Regidor) dejan de funcionar</b>: habrá que escanear los nuevos.</p>', [
       { label: 'Cancelar' },
       { label: 'Regenerar', kind: 'primary', run: () => { (async () => {
         const was = !!EM; await emStop(true);
@@ -1353,67 +1342,149 @@
       })(); } }
     ]);
   }
+  function emRegenCmd() {
+    modal('Nueva clave del mando', '<p>El QR del regidor anterior <b>deja de poder mandar</b> al Mac. El QR de Staff sigue valiendo y la emisión no se corta.</p>', [
+      { label: 'Cancelar' },
+      { label: 'Nueva clave', kind: 'primary', run: () => { (async () => {
+        emRoom = Em.newCmdKey(emRoom); emSave(!!EM);
+        if (EM) await EM.setCmdKey(emRoom.c);
+        renderCast(); toast('Clave del mando nueva: escanea el QR del regidor otra vez');
+      })(); } }
+    ]);
+  }
+
+  // Órdenes del mando: las mismas reglas que los botones del Panel (mando.js); todo entra en el Deshacer.
+  async function emCommand(cmd) {
+    const bad = M.checkCmd(cmd);
+    if (bad) return { ok: false, msg: bad };
+    const a = cmd.args || {};
+    if (!FEST && ['flash', 'flashOff'].indexOf(cmd.op) < 0) return { ok: false, msg: 'No hay evento abierto en el Panel' };
+    const at = Math.abs(Date.now() - cmd.t) < 120000 ? cmd.t : Date.now();     // la hora en que se pulsó en el móvil
+    const abs = Math.floor(C.nowAbs(new Date(at)));
+    const from = 'Desde el móvil · ';
+    if (cmd.op === 'start' || cmd.op === 'stop') {
+      const r = M.realPlan(FEST, CONFIG, a.key, cmd.op === 'start' ? 'i' : 'f', abs);
+      if (!r.ok) return { ok: false, msg: r.error };
+      commitFestival(r.state, from + r.msg);
+      if (r.clashes.length) setTimeout(() => toast('Choque con entrada en rojo: ' + r.clashes.map(c => c.name + ' / ' + c.with).join(', '), true), 2800);
+      return { ok: true, msg: r.msg + (r.clashes.length ? ' · ¡choque con entrada en rojo!' : '') };
+    }
+    if (cmd.op === 'onTime') {
+      const r = M.onTimePlan(FEST, a.key);
+      if (!r.ok) return { ok: false, msg: r.error };
+      commitFestival(r.state, from + r.msg);
+      return { ok: true, msg: r.msg };
+    }
+    if (cmd.op === 'delay') {
+      const r = M.delayPlan(FEST, CONFIG, { minutes: a.minutes, zones: a.zones, from: a.from });
+      if (!r.ok) return { ok: false, msg: r.error };
+      if (M.delayStamp(r) !== a.stamp) return { ok: false, msg: 'El horario ha cambiado desde el resumen: revísalo y confirma otra vez', data: { stale: true } };
+      if (!r.moved.length) return { ok: false, msg: 'No hay nada que mover con esa selección' };
+      const zl = a.zones === 'all' ? 'todas las zonas' : a.zones.map(z => z ? ((C.getEscenario(FEST, z) || {}).nombre || z) : 'sin zona').join(', ');
+      const msg = 'Retraso +' + r.minutes + ' min (' + zl + '): ' + nEnt(r.moved.length, 'movida') + (r.kept.length ? ' · ' + keptTxt(r.kept.length) : '');
+      commitFestival(r.state, from + msg);
+      return { ok: true, msg };
+    }
+    if (cmd.op === 'flash') {
+      const t = String(a.text).replace(/\s+/g, ' ').trim();
+      Dt.setFlash(t); renderFlash(); toast(from + 'Mensaje: «' + t + '»');
+      return { ok: true, msg: 'Mensaje en pantalla: «' + t + '»' };
+    }
+    if (cmd.op === 'flashOff') {
+      Dt.setFlash(null); renderFlash(); toast(from + 'Mensaje retirado');
+      return { ok: true, msg: 'Mensaje retirado' };
+    }
+    if (cmd.op === 'callOk') {
+      Dt.markCallDone(a.key, Math.floor(C.nowAbs())); tick(); toast(from + 'CALL confirmado');
+      return { ok: true, msg: 'CALL confirmado' };
+    }
+    return { ok: false, msg: 'Orden desconocida' };
+  }
+
   function emLinksOn() { return EMST ? EMST.links.filter(l => l.state === 'on').length : 0; }
-  function emStateHtml() {
-    const n = emLinksOn(), tot = EMST ? EMST.links.length : 2, v = EMST ? EMST.viewers : 0;
+  function emStateHtml(kind) {
+    const n = emLinksOn(), tot = EMST ? EMST.links.length : 2;
     const cls = n ? 'ok' : 'warn';
     const txt = n === 0 ? 'Conectando con los repetidores…' : n < tot ? 'En directo (' + n + ' de ' + tot + ' repetidores)' : 'En directo';
     const links = (EMST ? EMST.links : Em.BROKERS.map(b => ({ name: b.name, state: 'connecting' })))
       .map(l => '<span class="clink ' + (l.state === 'on' ? 'on' : '') + '" title="' + esc(l.state === 'on' ? 'Conectado' : l.err ? 'Sin conexión: ' + l.err : 'Conectando…') + '">' + esc(l.name) + '</span>').join('');
-    return '<div class="cstate"><span class="cdot ' + cls + '"></span><b>' + txt + '</b></div>'
-      + '<div class="cview">' + (v === 1 ? '1 móvil conectado' : v + ' móviles conectados') + '</div><div class="clinks">' + links + '</div>';
+    const v = EMST ? EMST.viewers : 0, r = EMST ? EMST.remotes : 0;
+    const who = kind === 'remote' ? (r ? '<b class="cok">Mando conectado</b>' : 'Sin mando conectado') : (v === 1 ? '1 móvil conectado' : v + ' móviles conectados');
+    return '<div class="cstate"><span class="cdot ' + cls + '"></span><b>' + txt + '</b></div><div class="cview">' + who + '</div><div class="clinks">' + links + '</div>';
+  }
+  function emUrl(kind) { return kind === 'remote' ? Em.remoteUrl(emRoom) : Em.staffUrl(emRoom); }
+  function paneHtml(kind) {
+    const url = emUrl(kind);
+    const side = kind === 'remote'
+      ? '<button class="btn" type="button" data-act="cast-big" data-k="remote"><svg class="ic"><use href="#i-expand"/></svg>Ampliar</button>'
+        + '<button class="btn" type="button" data-act="cast-copy" data-k="remote"><svg class="ic"><use href="#i-copy"/></svg>Copiar enlace</button>'
+        + '<button class="btn ghost" type="button" data-act="cast-regencmd">Nueva clave del mando…</button>'
+      : '<button class="btn" type="button" data-act="cast-big" data-k="staff"><svg class="ic"><use href="#i-expand"/></svg>Ampliar</button>'
+        + '<button class="btn" type="button" data-act="cast-copy" data-k="staff"><svg class="ic"><use href="#i-copy"/></svg>Copiar enlace</button>'
+        + '<button class="btn" type="button" data-act="cast-stop">Parar emisión</button>'
+        + '<button class="btn ghost" type="button" data-act="cast-regen">Regenerar claves…</button>';
+    const note = kind === 'remote'
+      ? '<p class="cwarn"><svg class="ic"><use href="#i-alert"/></svg><span><b>Privado.</b> Quien tenga este QR puede mandar al Mac (▶ / ■, En hora, retrasos, mensajes, CALL). No lo compartas; si se escapa, «Nueva clave del mando».</span></p>'
+      : '<p class="mnote">Abre la Pantalla Live en el móvil, en solo lectura. Si el Mac se duerme o se cierra el Panel, la emisión se corta y los móviles lo avisan.</p>';
+    return '<div class="cgrid"><div class="cqr" title="QR ' + (kind === 'remote' ? 'del regidor' : 'de Staff') + '">' + QR.svg(url, { ecl: 'M', margin: 3 }) + '</div>'
+      + '<div class="cside"><div class="cst" data-k="' + kind + '"></div>' + side + '</div></div>' + note;
   }
   function renderCast() {
     if (!$('cast-staff')) return;
     const on = !!EM;
     $('cast-on').hidden = !on;
     $('cast-on').classList.toggle('warn', on && !emLinksOn());
-    const box = $('cast-staff');
-    if (!emCan()) { box.innerHTML = '<p class="cintro">Este navegador no permite la emisión cifrada.</p>'; return; }
-    if (!on) {
-      box.dataset.url = '';
-      box.innerHTML = '<p class="cintro">Emite el horario en directo a los móviles del equipo (técnicos, producción, managers…). Lo ven <b>solo en lectura</b>: nadie puede cambiar nada desde el móvil.</p>'
-        + '<div class="cbtns"><button class="btn primary" type="button" data-act="cast-start"><svg class="ic"><use href="#i-cast"/></svg>Empezar a emitir</button>'
-        + (emRoom ? '<button class="btn" type="button" data-act="cast-regen">Regenerar claves…</button>' : '') + '</div>'
-        + '<p class="mnote">Necesita internet en el Mac y en los móviles (4G o Wi-Fi con salida). Todo va cifrado: los repetidores públicos solo ven datos ilegibles y no guardan nada.</p>';
-      $('qr-big').hidden = true;
-      return;
+    ['staff', 'remote'].forEach(kind => {
+      const box = $('cast-' + kind);
+      if (!emCan()) { box.innerHTML = '<p class="cintro">Este navegador no permite la emisión cifrada.</p>'; return; }
+      if (!on) {
+        box.dataset.url = '';
+        box.innerHTML = (kind === 'remote'
+          ? '<p class="cintro">Con el <b>mando del regidor</b> manejas el Mac desde tu móvil: ▶ / ■, En hora, retrasos con resumen y Confirmar, mensajes y CALL. Necesita que la emisión esté activa.</p>'
+          : '<p class="cintro">Emite el horario en directo a los móviles del equipo (técnicos, producción, managers…). Lo ven <b>solo en lectura</b>: nadie puede cambiar nada desde el móvil.</p>')
+          + '<div class="cbtns"><button class="btn primary" type="button" data-act="cast-start"><svg class="ic"><use href="#i-cast"/></svg>Empezar a emitir</button>'
+          + (emRoom && kind === 'staff' ? '<button class="btn" type="button" data-act="cast-regen">Regenerar claves…</button>' : '') + '</div>'
+          + '<p class="mnote">Necesita internet en el Mac y en los móviles (4G o Wi-Fi con salida). Todo va cifrado: los repetidores públicos solo ven datos ilegibles y no guardan nada.</p>';
+        return;
+      }
+      const url = emUrl(kind);
+      if (box.dataset.url !== url) { box.dataset.url = url; box.innerHTML = paneHtml(kind); }
+      box.querySelector('.cst').innerHTML = emStateHtml(kind);
+    });
+    if (!on) $('qr-big').hidden = true;
+    else {
+      const url = emUrl(bigTab);
+      if ($('qr-big-svg').dataset.url !== url) { $('qr-big-svg').dataset.url = url; $('qr-big-svg').innerHTML = QR.svg(url, { ecl: 'M', margin: 4 }); }
+      $('qr-big-t').textContent = bigTab === 'remote' ? 'Regidor · mando (privado)' : 'Staff · solo lectura';
+      $('qr-big').classList.toggle('remote', bigTab === 'remote');
+      $('qr-big-st').innerHTML = emStateHtml(bigTab);
     }
-    const url = Em.staffUrl(emRoom);
-    if (box.dataset.url !== url) {
-      box.dataset.url = url;
-      box.innerHTML = '<div class="cgrid"><div class="cqr" title="QR de Staff">' + QR.svg(url, { ecl: 'M', margin: 3 }) + '</div>'
-        + '<div class="cside"><div id="cast-st"></div>'
-        + '<button class="btn" type="button" data-act="cast-big"><svg class="ic"><use href="#i-expand"/></svg>Ampliar</button>'
-        + '<button class="btn" type="button" data-act="cast-copy"><svg class="ic"><use href="#i-copy"/></svg>Copiar enlace</button>'
-        + '<button class="btn" type="button" data-act="cast-stop">Parar emisión</button>'
-        + '<button class="btn ghost" type="button" data-act="cast-regen">Regenerar claves…</button></div></div>'
-        + '<p class="mnote">Abre la Pantalla Live en el móvil, en solo lectura. Si el Mac se duerme o se cierra el Panel, la emisión se corta y los móviles lo avisan.</p>';
-      $('qr-big-svg').innerHTML = QR.svg(url, { ecl: 'M', margin: 4 });
-    }
-    $('cast-st').innerHTML = emStateHtml();
-    $('qr-big-st').innerHTML = emStateHtml();
+    // Pestaña del mando: punto si hay un mando conectado
+    const rt = document.querySelector('#m-cast .ctab[data-tab="remote"]');
+    if (rt) rt.classList.toggle('rlive', on && !!(EMST && EMST.remotes));
   }
-  async function emCopy() {
-    const url = Em.staffUrl(emRoom);
-    try { await navigator.clipboard.writeText(url); toast('Enlace de Staff copiado'); }
-    catch (e) { modal('Enlace de Staff', '<input type="text" readonly value="' + esc(url) + '" style="width:100%" onfocus="this.select()">', [{ label: 'Cerrar', kind: 'primary' }]); }
+  async function emCopy(kind) {
+    const url = emUrl(kind);
+    try { await navigator.clipboard.writeText(url); toast(kind === 'remote' ? 'Enlace del mando copiado (es privado)' : 'Enlace de Staff copiado'); }
+    catch (e) { modal(kind === 'remote' ? 'Enlace del mando (privado)' : 'Enlace de Staff', '<input type="text" readonly value="' + esc(url) + '" style="width:100%" onfocus="this.select()">', [{ label: 'Cerrar', kind: 'primary' }]); }
+  }
+  function setCastTab(tab) {
+    emTab = tab;
+    document.querySelectorAll('#m-cast .ctab').forEach(b => { const on = b.dataset.tab === tab; b.classList.toggle('on', on); b.setAttribute('aria-selected', String(on)); });
+    $('cast-staff').hidden = tab !== 'staff'; $('cast-remote').hidden = tab !== 'remote';
   }
   document.addEventListener('click', e => {
-    const t = e.target.closest('[data-act^="cast-"], .ctab, #qr-big-x');
+    const t = e.target.closest('[data-act^="cast-"], #m-cast .ctab, #qr-big-x');
     if (!t) { if (e.target.id === 'qr-big') $('qr-big').hidden = true; return; }
-    if (t.classList.contains('ctab')) {
-      document.querySelectorAll('#m-cast .ctab').forEach(b => { const on = b === t; b.classList.toggle('on', on); b.setAttribute('aria-selected', String(on)); });
-      $('cast-staff').hidden = t.dataset.tab !== 'staff'; $('cast-remote').hidden = t.dataset.tab !== 'remote';
-      return;
-    }
+    if (t.classList.contains('ctab')) { setCastTab(t.dataset.tab); return; }
     if (t.id === 'qr-big-x') { $('qr-big').hidden = true; return; }
     const a = t.dataset.act;
     if (a === 'cast-start') emStart();
     else if (a === 'cast-stop') emStop();
     else if (a === 'cast-regen') { closeMenus(); emRegen(); }
-    else if (a === 'cast-copy') emCopy();
-    else if (a === 'cast-big') { closeMenus(); $('qr-big').hidden = false; }
+    else if (a === 'cast-regencmd') { closeMenus(); emRegenCmd(); }
+    else if (a === 'cast-copy') emCopy(t.dataset.k || 'staff');
+    else if (a === 'cast-big') { closeMenus(); bigTab = t.dataset.k || 'staff'; renderCast(); $('qr-big').hidden = false; }
   });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') $('qr-big').hidden = true; });
   // Cada cambio guardado (en este Panel o llegado de la Live, p. ej. un OK de CALL) sale hacia los móviles

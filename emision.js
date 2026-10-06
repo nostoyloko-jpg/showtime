@@ -9,8 +9,13 @@
  *  - Nada queda guardado fuera: los repetidores solo reenvían (sin mensajes retenidos). Quien entra pide el estado
  *    y el Mac se lo vuelve a mandar.
  *
- *  Temas:  showtime/v1/<sala>/s  (Mac → móviles: estado, latido, fin)
+ *  Mando del regidor (2d-B): las órdenes del móvil del regidor van cifradas y FIRMADAS con una clave propia del mando
+ *    (HMAC-SHA256, solo en su QR privado). El Mac solo obedece órdenes con esa firma, recientes y no repetidas,
+ *    y contesta a cada una (hecho / motivo del rechazo).
+ *
+ *  Temas:  showtime/v1/<sala>/s  (Mac → móviles: estado, latido, fin, respuestas a órdenes)
  *          showtime/v1/<sala>/h  (móviles → Mac: «hola», presencia)
+ *          showtime/v1/<sala>/c  (mando → Mac: órdenes)
  */
 (function (root) {
   'use strict';
@@ -31,7 +36,9 @@
   const VIEWER_TTL = 75000;      // un móvil cuenta como conectado si se ha presentado en este tiempo
   const STALE_MS = 25000;        // sin noticias del Mac en este tiempo → «sin conexión con la sala»
   const RETRY = [1000, 2000, 5000, 10000, 15000];
-  const K_STATE = 1, K_BEAT = 2, K_END = 3, K_HELLO = 16;
+  const K_STATE = 1, K_BEAT = 2, K_END = 3, K_ACK = 4, K_HELLO = 16, K_CMD = 32;
+  const CMD_WINDOW = 120000;     // una orden con más de 2 min de diferencia con el reloj del Mac se rechaza
+  const CMD_TIMEOUT = 8000;      // el mando espera la respuesta del Mac este tiempo
   const VER = 1;
 
   // ── Utilidades ───────────────────────────────────────────────────────
@@ -136,12 +143,18 @@
   async function newRoom() {
     const kp = await subtle.generateKey(ECDSA, true, ['sign', 'verify']);
     const pub = new Uint8Array(await subtle.exportKey('raw', kp.publicKey));
-    return { v: 1, sala: b64u(rand(12)), k: b64u(rand(16)), pub: b64u(pub), p: b64u(await fingerprint(pub)), sk: await subtle.exportKey('jwk', kp.privateKey), at: Date.now() };
+    return { v: 1, sala: b64u(rand(12)), k: b64u(rand(16)), c: b64u(rand(16)), pub: b64u(pub), p: b64u(await fingerprint(pub)), sk: await subtle.exportKey('jwk', kp.privateKey), at: Date.now() };
   }
+  /** Salas de la 2d-A (sin clave de mando): se les añade una; el QR de Staff no cambia. */
+  function withCmdKey(room) { return room && !room.c ? Object.assign({}, room, { c: b64u(rand(16)) }) : room; }
+  /** Clave de mando nueva (el QR del regidor anterior deja de valer; el de Staff sigue). */
+  function newCmdKey(room) { return Object.assign({}, room, { c: b64u(rand(16)) }); }
   function validRoom(r) { return !!(r && typeof r.sala === 'string' && r.sala.length === 16 && unb64u(r.k) && unb64u(r.k).length === 16 && unb64u(r.pub) && r.sk && r.p); }
   async function aesKey(k) { return subtle.importKey('raw', unb64u(k), 'AES-GCM', false, ['encrypt', 'decrypt']); }
+  async function hmacKey(c) { return subtle.importKey('raw', unb64u(c), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']); }
   async function macKeys(room) {
-    return { sala: room.sala, aes: await aesKey(room.k), pub: unb64u(room.pub), sk: await subtle.importKey('jwk', room.sk, ECDSA, false, ['sign']) };
+    return { sala: room.sala, aes: await aesKey(room.k), pub: unb64u(room.pub), sk: await subtle.importKey('jwk', room.sk, ECDSA, false, ['sign']),
+      cmd: room.c && unb64u(room.c) && unb64u(room.c).length === 16 ? await hmacKey(room.c) : null };
   }
   function aad(sala, kind) { return enc.encode(sala + '|' + kind); }
 
@@ -153,7 +166,7 @@
     return concat([VER, kind], K.pub, sig, iv, ct);
   }
   /** Móvil: claves de la sala a partir de lo que trae el QR. */
-  async function viewerKeys(params) { return { sala: params.sala, aes: await aesKey(params.k), p: unb64u(params.p), verify: null, pubRaw: null }; }
+  async function viewerKeys(params) { return { sala: params.sala, aes: await aesKey(params.k), p: unb64u(params.p), verify: null, pubRaw: null, cmd: params.c ? await hmacKey(params.c) : null }; }
   /** Móvil: abre un mensaje del Mac. null si no es de esta sala, está alterado o no lo firma el Mac del QR. */
   async function openFrame(V, f) {
     try {
@@ -183,6 +196,35 @@
     } catch (e) { return null; }
   }
 
+  /** Mando → Mac: orden cifrada (clave de lectura) y firmada con la clave del mando. Marco: ver · tipo · iv (12) · firma (32) · cifrado. */
+  async function sealCmd(V, cmd) {
+    const iv = rand(12);
+    const ct = new Uint8Array(await subtle.encrypt({ name: 'AES-GCM', iv, additionalData: aad(V.sala, K_CMD) }, V.aes, enc.encode(JSON.stringify(cmd))));
+    const mac = new Uint8Array(await subtle.sign('HMAC', V.cmd, concat([VER, K_CMD], iv, ct, enc.encode(V.sala))));
+    return concat([VER, K_CMD], iv, mac, ct);
+  }
+  /** Mac: abre una orden. null si no la firma el mando de esta sala o está alterada. */
+  async function openCmd(K, f) {
+    try {
+      if (!K.cmd || !f || f.length < 2 + 12 + 32 + 16 || f[0] !== VER || f[1] !== K_CMD) return null;
+      const iv = f.subarray(2, 14), mac = f.subarray(14, 46), ct = f.subarray(46);
+      if (!await subtle.verify('HMAC', K.cmd, mac, concat([VER, K_CMD], iv, ct, enc.encode(K.sala)))) return null;
+      const o = JSON.parse(dec.decode(await subtle.decrypt({ name: 'AES-GCM', iv, additionalData: aad(K.sala, K_CMD) }, K.aes, ct)));
+      return o && typeof o === 'object' ? o : null;
+    } catch (e) { return null; }
+  }
+  /** Contra repeticiones: cada orden lleva id y hora; se rechaza si es vieja (o del futuro) y se ignora si ya llegó (por el otro repetidor). */
+  function CmdGuard() { this.seen = new Map(); }
+  CmdGuard.prototype.check = function (cmd, now) {
+    const t = now === undefined ? Date.now() : now;
+    this.seen.forEach((at, id) => { if (t - at > 10 * 60000) this.seen.delete(id); });
+    if (!cmd || typeof cmd.id !== 'string' || cmd.id.length < 6 || cmd.id.length > 40 || !Number.isFinite(cmd.t)) return 'bad';
+    if (this.seen.has(cmd.id)) return 'dup';
+    this.seen.set(cmd.id, t);
+    if (Math.abs(t - cmd.t) > CMD_WINDOW) return 'old';
+    return 'ok';
+  };
+
   // ── Enlaces del QR ───────────────────────────────────────────────────
   /** Base pública de la app: la carpeta de esta página si se sirve por http(s); si se abrió con doble clic, GitHub Pages. */
   function publicBase(loc) {
@@ -191,6 +233,8 @@
     return PUBLIC_BASE;
   }
   function staffUrl(room, base) { return (base || publicBase()) + 'live.html#sala=' + room.sala + '&k=' + room.k + '&p=' + room.p; }
+  /** QR PRIVADO del regidor: lo mismo que el de Staff + la clave del mando. */
+  function remoteUrl(room, base) { return (base || publicBase()) + 'remote.html#sala=' + room.sala + '&k=' + room.k + '&p=' + room.p + '&c=' + room.c; }
   /** Lee «#sala=…&k=…&p=…». null si falta algo o no tiene el formato esperado. */
   function parseHash(hash) {
     const h = String(hash || '').replace(/^#/, ''), o = {};
@@ -198,7 +242,9 @@
     if (!o.sala || !/^[A-Za-z0-9_-]{16}$/.test(o.sala)) return null;
     const k = unb64u(o.k), p = unb64u(o.p);
     if (!k || k.length !== 16 || !p || p.length !== 16) return null;
-    return { sala: o.sala, k: o.k, p: o.p };
+    const r = { sala: o.sala, k: o.k, p: o.p };
+    if (o.c !== undefined) { const c = unb64u(o.c); if (!c || c.length !== 16) return null; r.c = o.c; }
+    return r;
   }
 
   // ── Conexión con un repetidor ────────────────────────────────────────
@@ -251,7 +297,7 @@
    * st: { on, links:[{id,name,state}], viewers, lastTs }
    */
   function Emisor(opts) {
-    this.o = opts; this.K = null; this.links = []; this.viewers = new Map(); this.on = false;
+    this.o = opts; this.K = null; this.links = []; this.viewers = new Map(); this.remotes = new Map(); this.on = false; this.guard = new CmdGuard();
     this.lastTs = 0; this.pushT = null; this.lastPush = 0; this.beatT = null; this.busy = Promise.resolve();
   }
   Emisor.prototype.start = async function () {
@@ -259,8 +305,8 @@
     this.on = true;
     const brokers = this.o.brokers || BROKERS;
     this.links = brokers.map(b => new Link(b, {
-      WebSocket: this.o.WebSocket, topics: [topic(this.K.sala, 'h')],
-      onMessage: (t, payload) => this.onHello(payload),
+      WebSocket: this.o.WebSocket, topics: [topic(this.K.sala, 'h'), topic(this.K.sala, 'c')],
+      onMessage: (t, payload) => { if (t === topic(this.K.sala, 'c')) this.onCmd(payload); else this.onHello(payload); },
       onState: l => { if (l.state === 'on') this.push(0); this.status(); }
     }));
     this.links.forEach(l => l.start());
@@ -270,7 +316,8 @@
   Emisor.prototype.status = function () {
     const now = Date.now();
     this.viewers.forEach((t, id) => { if (now - t > VIEWER_TTL) this.viewers.delete(id); });
-    if (this.o.onStatus) this.o.onStatus({ on: this.on, links: linkStatus(this.links), viewers: this.viewers.size, lastTs: this.lastTs });
+    this.remotes.forEach((t, id) => { if (now - t > VIEWER_TTL) this.remotes.delete(id); });
+    if (this.o.onStatus) this.o.onStatus({ on: this.on, links: linkStatus(this.links), viewers: this.viewers.size, remotes: this.remotes.size, lastTs: this.lastTs });
   };
   /** Programa el envío del estado (agrupa cambios seguidos). */
   Emisor.prototype.push = function (delay) {
@@ -298,10 +345,33 @@
   Emisor.prototype.onHello = async function (payload) {
     const h = await openHello(this.K, payload);
     if (!h) return;
-    const isNew = !this.viewers.has(h.id);
-    this.viewers.set(h.id, Date.now());
+    const map = h.r ? this.remotes : this.viewers;
+    const isNew = !map.has(h.id);
+    map.set(h.id, Date.now());
     if (h.want) this.push(Math.max(0, 1500 - (Date.now() - this.lastPush)));   // como mucho un reenvío cada 1,5 s
     if (isNew || h.want) this.status();
+  };
+  /** Clave de mando nueva sin cortar la emisión (el QR de Staff sigue valiendo). */
+  Emisor.prototype.setCmdKey = async function (c) { this.o.room = Object.assign({}, this.o.room, { c }); if (this.K) this.K.cmd = await hmacKey(c); this.remotes.clear(); this.status(); };
+  /** Orden del mando: se comprueba (firma, hora, repetida), se ejecuta en el Mac (opts.onCommand) y se contesta. */
+  Emisor.prototype.onCmd = async function (payload) {
+    const cmd = await openCmd(this.K, payload);
+    if (!cmd) return;                                         // sin la firma del mando: ni se contesta
+    const g = this.guard.check(cmd);
+    if (g === 'dup' || g === 'bad') return;
+    let res;
+    if (g === 'old') res = { ok: false, msg: 'Orden caducada (revisa la hora del móvil)' };
+    else {
+      if (cmd.from) this.remotes.set(String(cmd.from).slice(0, 32), Date.now());
+      try { res = this.o.onCommand ? await this.o.onCommand(cmd) : { ok: false, msg: 'El Panel no acepta órdenes' }; }
+      catch (e) { res = { ok: false, msg: 'Error en el Panel: ' + (e && e.message || e) }; }
+    }
+    await this.reply(cmd.id, res || { ok: false, msg: 'Sin respuesta' });
+    this.status();
+  };
+  Emisor.prototype.reply = async function (id, res) {
+    const f = await seal(this.K, K_ACK, enc.encode(JSON.stringify({ id, ok: !!res.ok, msg: String(res.msg || '').slice(0, 300), data: res.data || null })));
+    this.links.forEach(l => l.publish(topic(this.K.sala, 's'), f));
   };
   /** Para la emisión: avisa a los móviles («emisión detenida») y cierra. */
   Emisor.prototype.stop = async function () {
@@ -322,7 +392,7 @@
    */
   function Receptor(opts) {
     this.o = opts; this.V = null; this.links = []; this.asm = new Assembler(); this.seen = [];
-    this.id = b64u(rand(9)); this.applied = 0; this.lastMsg = 0; this.ended = false; this.lastAsk = 0; this.timers = [];
+    this.id = b64u(rand(9)); this.applied = 0; this.lastMsg = 0; this.ended = false; this.lastAsk = 0; this.timers = []; this.pending = new Map();
   }
   Receptor.prototype.start = async function () {
     this.V = await viewerKeys(this.o.params);
@@ -339,7 +409,7 @@
   };
   Receptor.prototype.hello = async function (want, only) {
     if (want) this.lastAsk = Date.now();
-    const f = await sealHello(this.V, { id: this.id, want: !!want });
+    const f = await sealHello(this.V, { id: this.id, want: !!want, r: this.V.cmd ? 1 : 0 });
     (only ? [only] : this.links).forEach(l => l.publish(topic(this.V.sala, 'h'), f));
   };
   Receptor.prototype.onFrame = async function (payload) {
@@ -356,6 +426,10 @@
       this.ended = false;
       if (b.ts > this.applied && Date.now() - this.lastAsk > 3000) this.hello(true);   // se perdió algo: pedirlo otra vez
     } else if (m.kind === K_END) this.ended = true;
+    else if (m.kind === K_ACK) {
+      const a = JSON.parse(dec.decode(m.plain)), p = this.pending.get(a.id);
+      if (p) { this.pending.delete(a.id); clearTimeout(p.timer); p.resolve(a); }
+    }
     this.status();
   };
   Receptor.prototype.state = function () {
@@ -366,13 +440,25 @@
   Receptor.prototype.status = function () {
     if (this.o.onStatus) this.o.onStatus({ state: this.state(), links: linkStatus(this.links), lastMsg: this.lastMsg, applied: this.applied });
   };
+  /** Mando: envía una orden al Mac y espera su respuesta ({ ok, msg }). Sin respuesta en 8 s → { ok:false }. */
+  Receptor.prototype.command = async function (op, args) {
+    if (!this.V || !this.V.cmd) return { ok: false, msg: 'Este enlace no es de mando' };
+    const cmd = { id: b64u(rand(12)), t: Date.now(), from: this.id, op, args: args || {} };
+    const f = await sealCmd(this.V, cmd);
+    const live = this.links.filter(l => l.publish(topic(this.V.sala, 'c'), f)).length;
+    if (!live) return { ok: false, msg: 'Sin conexión: la orden no ha salido' };
+    return new Promise(resolve => {
+      const timer = setTimeout(() => { this.pending.delete(cmd.id); resolve({ ok: false, msg: 'El Mac no responde (¿Panel cerrado, sin internet o QR del mando renovado?)', timeout: true }); }, this.o.cmdTimeout || CMD_TIMEOUT);
+      this.pending.set(cmd.id, { resolve, timer });
+    });
+  };
   Receptor.prototype.stop = function () { this.timers.forEach(t => clearInterval(t)); this.links.forEach(l => l.stop()); };
 
   const API = {
-    BROKERS, PUBLIC_BASE, PROTO, STALE_MS, VIEWER_TTL, K_STATE, K_BEAT, K_END, K_HELLO,
-    newRoom, validRoom, staffUrl, parseHash, publicBase, Emisor, Receptor,
+    BROKERS, PUBLIC_BASE, PROTO, STALE_MS, VIEWER_TTL, CMD_WINDOW, K_STATE, K_BEAT, K_END, K_ACK, K_HELLO, K_CMD,
+    newRoom, validRoom, withCmdKey, newCmdKey, staffUrl, remoteUrl, parseHash, publicBase, Emisor, Receptor, CmdGuard,
     // internos (para los tests)
-    _: { b64u, unb64u, concat, MQ, varLen, pack, unpack, splitChunks, Assembler, macKeys, viewerKeys, seal, openFrame, sealHello, openHello, fingerprint, topic, Link }
+    _: { b64u, unb64u, concat, MQ, varLen, pack, unpack, splitChunks, Assembler, macKeys, viewerKeys, seal, openFrame, sealHello, openHello, sealCmd, openCmd, fingerprint, topic, Link }
   };
   if (isNode) module.exports = API;
   else root.ShowtimeEmision = API;
