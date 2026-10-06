@@ -175,8 +175,8 @@
   // ── Campos del proyecto por modo ──────────────────────────────────────
   // Los de Stage Master y, con prefijo «showtime», los que añade Showtime (Stage Master los ignora).
   const FIELDS = {
-    show: { fecha: 'fecha', inicio: 'inicio', fin: 'fin', call: 'showtimeCall', notas: 'notas', standby: 'showtimeStandby', real: 'showtimeReal' },
-    sc:   { fecha: 'soundcheckFecha', inicio: 'soundcheckInicio', fin: 'soundcheckFin', call: 'soundcheckCall', notas: 'soundcheckNotas', standby: 'showtimeStandbySC', real: 'showtimeRealSC' }
+    show: { fecha: 'fecha', inicio: 'inicio', fin: 'fin', call: 'showtimeCall', notas: 'notas', standby: 'showtimeStandby', real: 'showtimeReal', base: 'showtimeBase' },
+    sc:   { fecha: 'soundcheckFecha', inicio: 'soundcheckInicio', fin: 'soundcheckFin', call: 'soundcheckCall', notas: 'soundcheckNotas', standby: 'showtimeStandbySC', real: 'showtimeRealSC', base: 'showtimeBaseSC' }
   };
 
   // ── De proyecto Stage Master a bloques ────────────────────────────────
@@ -204,11 +204,13 @@
       const si = ri !== null ? ri : psi;                                   // inicio efectivo
       const sf = kind === 'hito' ? null : rf !== null ? rf : (ri !== null && dur !== null ? ri + dur : psf);   // fin efectivo (previsto)
       const delta = rf !== null && psf !== null ? rf - psf : ri !== null && psi !== null ? ri - psi : null;
+      // Inicio ORIGINAL antes de los retrasos (se apunta la primera vez que un retraso la mueve; editar a mano lo borra)
+      const bs = a[FIELDS[sc ? 'sc' : 'show'].base], base = Number.isFinite(bs) ? bs : null;
       const call = band ? ((sc ? a.soundcheckCall : a[FIELDS.show.call]) || '') : '';
       const esc = getEscenario(state, a.escenarioId);
       return {
         id: a.id, kind: kind, key: a.id + ':' + kind,
-        si: si, sf: sf, psi: psi, psf: psf, ri: ri, rf: rf, delta: delta,
+        si: si, sf: sf, psi: psi, psf: psf, ri: ri, rf: rf, delta: delta, base: base,
         fija: isFija(a), libre: isLibre(a),
         name: a.nombre || '',
         color: artistColor(state, a),
@@ -518,6 +520,8 @@
       }
       a[F[key]] = value;
     } else return { ok: false, error: 'Campo no editable.' };
+    // Un cambio de hora a mano es el nuevo horario de referencia: deja de contar como retraso acumulado
+    if ((key === 'inicio' || key === 'fecha' || key === 'jornada') && a[F.base] !== undefined) delete a[F.base];
 
     return { ok: true, state: next, changed: JSON.stringify(state.artists[i]) !== JSON.stringify(a), value: value, before: before };
   }
@@ -796,6 +800,31 @@
     return out;
   }
 
+  /** Retraso por zona en la jornada de `now` (radiografía del directo):
+   *  acc  = retraso ACUMULADO de lo que viene: el mayor corrimiento de las bandas aún sin empezar respecto a su hora
+   *         original (cascadas y desbordes aplicados; no cuentan los cambios hechos a mano);
+   *  live = desfase EN VIVO (> 0) de la última banda con hora real (lo que aún se está absorbiendo o desborda);
+   *  early = adelanto en vivo; status/overflow como driftByZone. Zonas en el orden de la Live; «sin zona» al final. */
+  function delayByZone(state, now) {
+    if (!state) return [];
+    const n = Math.floor(now), jor = jornadaOfAbs(state, n);
+    const blocks = buildBlocks(state, { mode: 'all', day: jor });
+    const drift = driftByZone(state, blocks, n);
+    const groups = {};
+    blocks.filter(b => isBand(b) && b.psi !== null).forEach(b => { const k = b.stageId || ''; (groups[k] = groups[k] || []).push(b); });
+    const order = (state.escenarios || []).map(e => e.id).concat(['']);
+    return order.filter(k => groups[k]).map(k => {
+      // Lo que viene: bandas sin empezar que aún no han pasado. El acumulado es el mayor corrimiento entre ellas.
+      const pend = groups[k].filter(b => b.ri === null && b.rf === null && blockEnd(b) > n);
+      const acc = pend.reduce((m, b) => Math.max(m, b.base !== null ? b.psi - b.base : 0), 0);
+      const dz = drift.find(z => z.zoneId === k);
+      const esc = getEscenario(state, k);
+      return { zoneId: k, zone: esc ? esc.nombre : '', color: esc ? esc.color : '', acc: acc,
+        live: dz && dz.delta > 0 ? dz.delta : 0, early: dz && dz.delta < 0 ? -dz.delta : 0,
+        status: dz ? dz.status : 'ontime', overflow: dz ? dz.overflow : 0, liveBlock: dz ? dz.block : null };
+    });
+  }
+
   /** Mueve en cascada `minutes` las entradas que cumplan TODO esto:
    *  - de la jornada de `fromAbs`, con inicio programado >= fromAbs (y > afterAbs si se da), sin hora real de inicio;
    *  - de las zonas `zone` ('all' = todas; un id; o lista de ids, '' = sin zona);
@@ -821,6 +850,7 @@
       const i = findArtistIndex(next, b.id); if (i < 0) return;
       const a = next.artists[i], F = FIELDS[b.kind === 'sc' ? 'sc' : 'show'];
       const ns = b.psi + mins;
+      if (!Number.isFinite(a[F.base])) a[F.base] = b.psi;          // hora original, para el retraso acumulado
       a[F.fecha] = isoOfDay(Math.floor(ns / 1440));
       a[F.inicio] = fmtHM(ns);
       if (b.kind !== 'hito' && b.psf !== null) a[F.fin] = fmtHM(b.psf + mins);
@@ -999,7 +1029,7 @@
 
   const API = {
     DEFAULT_CUTOFF, DEFAULT_CALL_MINS, DEFAULT_DURATION, DEFAULT_CO_MIN, isFija, setFija, coMinFor,
-    MARGIN_WARN, isLibre, setDelayFlag, movesWithDelay, setReal, jornadaOfAbs, driftByZone, shiftEntries, hitoMargins, projectBands, MAX_NEXT, ARTIST_COLORS,
+    MARGIN_WARN, isLibre, setDelayFlag, movesWithDelay, setReal, jornadaOfAbs, driftByZone, delayByZone, shiftEntries, hitoMargins, projectBands, MAX_NEXT, ARTIST_COLORS,
     pad2, parseHM, fmtHM, dayIndex, isoOfDay, shiftDate, toAbs, adjustEnd, nowAbs,
     cutoffMins, festivalDateOf, entersMode, festivalDays, TIPOS, tipoOf, isBand, isAll, entriesOf, tasksNow, hitosOf,
     getEscenario, artistColor, callAbsFor, buildBlocks,

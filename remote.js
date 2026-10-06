@@ -97,15 +97,10 @@
     }
     if ($('band').dataset.h !== bh) { $('band').innerHTML = bh; $('band').dataset.h = bh; }
 
-    // Desfase de la zona
-    const dz = C.driftByZone(FEST, blocks, Math.floor(n)).find(z => z.zoneId === (cur.zid || ''));
+    // Retraso de la zona elegida: acumulado (+ desfase en vivo)
+    const dz = C.delayByZone(FEST, n).find(z => z.zoneId === (cur.zid || ''));
     let dh = '';
-    if (dz) {
-      if (dz.status === 'overflow') dh = '<span class="dchip over">Buffer agotado · desborde +' + dz.overflow + ' min</span>';
-      else if (dz.status === 'absorb') dh = '<span class="dchip absorb">Desfase +' + dz.delta + ' min · se absorbe en el cambio</span>';
-      else if (dz.status === 'early') dh = '<span class="dchip early">Adelanto ' + (-dz.delta) + ' min</span>';
-      else dh = '<span class="dchip ok">En hora</span>';
-    }
+    if (dz) { const p = M.delayPill(dz, zoneName(cur.zid)); dh = '<span class="dchip ' + p.cls + '">' + (p.cls === 'ok' || p.cls === 'early' ? '<svg class="ic"><use href="#i-check"/></svg>' : '') + esc(p.text) + '</span>'; }
     if ($('drift').dataset.h !== dh) { $('drift').innerHTML = dh; $('drift').dataset.h = dh; }
     $('delay-hint').textContent = 'Zona ' + zoneName(cur.zid) + ' (o todas, en el resumen) · lo que empiece desde las ' + C.fmtHM(Math.floor(n));
 

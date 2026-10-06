@@ -377,6 +377,8 @@ body[data-ps="escenario"] .mpanel{box-shadow:none}
 .dchip.over{color:#ff6b62;border-color:rgba(255,59,48,.6);background:rgba(255,59,48,.12)}
 .dchip.early{color:#34d399;border-color:rgba(16,185,129,.5);background:rgba(16,185,129,.1)}
 .dchip.ok{color:var(--muted)}
+.dchip.ok .ic{color:#10b981}
+.dchip.acc{color:var(--call);border-color:rgba(255,197,51,.5);background:rgba(255,197,51,.08)}
 .realc{display:block;font-size:11px;font-weight:700;color:var(--muted);margin-top:2px;white-space:nowrap}
 .realc.late{color:var(--call)}
 .realc.early{color:#34d399}

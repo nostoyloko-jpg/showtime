@@ -157,6 +157,52 @@
     ok(!M.delayPlan(F.s, CFG, { minutes: 5, zones: 'all' }).ok);
   });
 
+  // ── Retraso acumulado por zona (barra del Panel y mando) ───────────────
+  test('acumulado: se apunta la hora original al primer retraso y se suma con los siguientes', async () => {
+    const F = fest();
+    let s = M.delayPlan(F.s, CFG, { minutes: 10, zones: [F.P], from: at('20:00') }).state;
+    s = M.delayPlan(s, CFG, { minutes: 5, zones: [F.P], from: at('20:00') }).state;
+    const b = blk(s, 'Banda B'); eq(C.fmtHM(b.base), '22:00', 'hora original'); eq(C.fmtHM(b.psi), '22:15');
+    const z = C.delayByZone(s, at('20:00'));
+    eq(z.map(x => x.zone).join(), 'Principal,Carpa', 'zonas en orden');
+    eq(z[0].acc, 15); eq(z[1].acc, 0, 'la Carpa no se ha movido');
+    eq(blk(s, 'Cabeza').base, null, 'lo rojo no se mueve: sin hora original');
+  });
+
+  test('acumulado: cambiar la hora a mano es el nuevo horario de referencia', async () => {
+    const F = fest();
+    const s = M.delayPlan(F.s, CFG, { minutes: 10, zones: [F.P], from: at('20:00') }).state;
+    const e = C.editArtist(s, F.ids['Banda B'], 'show', 'inicio', '22:30');
+    eq(blk(e.state, 'Banda B').base, null);
+    eq(C.delayByZone(e.state, at('20:00'))[0].acc, 10, 'quedan las otras movidas (Banda A)');
+  });
+
+  test('acumulado + vivo: desbordes empujados y desfase de la banda en curso', async () => {
+    const F = fest();
+    const r = M.realPlan(F.s, CFG, key(F.s, 'Banda A'), 'i', at('21:00'));   // +30; desborde 15 empujado
+    const z = C.delayByZone(r.state, at('21:05')).find(x => x.zoneId === F.P);
+    eq(z.acc, 15, 'lo que viene va +15'); eq(z.live, 30, 'Banda A va +30'); eq(z.status, 'absorb', 'tras empujar el desborde, el resto cabe en el cambio');
+    const p = M.delayPill(z); eq(p.cls, 'absorb'); eq(p.text, 'Principal: +15 min (+30 vivo)');
+    // Desborde que no se pudo empujar (shows bloqueados en la zona): rojo
+    const rb = M.realPlan(F.s, { delayBlock: { all: {}, [F.P]: { show: true } } }, key(F.s, 'Banda A'), 'i', at('21:00'));
+    const pb = M.delayPill(C.delayByZone(rb.state, at('21:05')).find(x => x.zoneId === F.P));
+    eq(pb.cls, 'over'); eq(pb.text, 'Principal: +0 min (+30 vivo) · buffer agotado');
+    const r2 = M.realPlan(F.s, CFG, key(F.s, 'Banda A'), 'i', at('20:40'));
+    const z2 = C.delayByZone(r2.state, at('20:45')).find(x => x.zoneId === F.P);
+    const p2 = M.delayPill(z2); eq(p2.cls, 'absorb'); eq(p2.text, 'Principal: +0 min (+10 vivo)');
+  });
+
+  test('píldora: en hora, solo acumulado y adelanto', async () => {
+    const F = fest();
+    eq(M.delayPill(C.delayByZone(F.s, at('20:00'))[0]).text, 'Principal · En hora');
+    eq(M.delayPill(C.delayByZone(F.s, at('20:00'))[0]).cls, 'ok');
+    const s = M.delayPlan(F.s, CFG, { minutes: 10, zones: [F.P], from: at('20:00') }).state;
+    const p = M.delayPill(C.delayByZone(s, at('20:00'))[0]); eq(p.cls, 'acc'); eq(p.text, 'Principal: +10 min');
+    const e = M.realPlan(F.s, CFG, key(F.s, 'Banda A'), 'i', at('20:27')).state;
+    const pe = M.delayPill(C.delayByZone(e, at('20:30'))[0]); eq(pe.cls, 'early'); eq(pe.text, 'Principal · En hora (−3 vivo)');
+    eq(M.delayPill(C.delayByZone(F.s, at('20:00'))[1], 'Carpa grande').text, 'Carpa grande · En hora', 'nombre propio de la zona');
+  });
+
   // ── Forma de las órdenes ──────────────────────────────────────────────
   test('órdenes: válidas e inválidas', async () => {
     eq(M.checkCmd({ op: 'start', args: { key: '3:show' } }), null);

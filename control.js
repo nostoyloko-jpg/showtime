@@ -232,13 +232,10 @@
   /** Barra de estado: desfase por zona (ámbar absorbiendo · rojo desborde · verde adelanto). */
   function renderDrift(nowInt) {
     MARGINS = C.hitoMargins(FEST, C.buildBlocks(FEST, { mode: 'all', day: 'all' }), nowInt);
-    const zones = C.driftByZone(FEST, ALL_MODE.length ? C.buildBlocks(FEST, { mode: 'all', day: 'all' }) : [], nowInt);
-    const html = zones.map(z => {
-      const nm = esc(z.zone || 'Sin zona');
-      if (z.status === 'overflow') return '<span class="dchip over"><svg class="ic"><use href="#i-alert"/></svg>' + nm + ' · Buffer agotado (+' + z.overflow + ' min de desborde)</span>';
-      if (z.status === 'absorb') return '<span class="dchip absorb"><svg class="ic"><use href="#i-clock"/></svg>' + nm + ' · Desfase: +' + z.delta + ' min (absorbiéndose en cambio)</span>';
-      if (z.status === 'early') return '<span class="dchip early"><svg class="ic"><use href="#i-clock"/></svg>' + nm + ' · Desfase: −' + (-z.delta) + ' min</span>';
-      return '<span class="dchip ok">' + nm + ' · En hora</span>';
+    // Solo las zonas que van con retraso (acumulado o en vivo): si una zona no sale, va bien
+    const html = (FEST ? C.delayByZone(FEST, nowInt) : []).map(z => M.delayPill(z)).filter(p => p.cls !== 'ok' && p.cls !== 'early').map(p => {
+      const ic = p.cls === 'over' ? '#i-alert' : '#i-clock';
+      return '<span class="dchip ' + p.cls + '" title="' + esc(p.title) + '"><svg class="ic"><use href="' + ic + '"/></svg>' + esc(p.text) + '</span>';
     }).join('');
     const tight = MARGINS.filter(m => m.level !== 'ok').map(m => '<span class="dchip ' + (m.level === 'over' ? 'over' : 'absorb') + '"><svg class="ic"><use href="#i-alert"/></svg>' +
       esc(m.hito.name) + ' ' + C.fmtHM(m.hito.psi) + ' · ' + (m.level === 'over' ? 'rebasado +' + (-m.margin) + ' min' : 'margen ' + m.margin + ' min') + '</span>').join('');

@@ -70,8 +70,11 @@ main{padding:12px 12px 0;display:flex;flex-direction:column;gap:12px}
 .bst.done{color:var(--muted)}
 .bempty{padding:16px 4px;color:var(--muted);font-weight:700}
 .drift{margin-top:10px}
-.dchip{display:inline-block;padding:5px 10px;border-radius:8px;font-size:13px;font-weight:800}
+.dchip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:9px;font-size:15px;font-weight:800}
 .dchip.ok{background:rgba(255,255,255,.07);color:var(--muted)}
+.dchip .ic{width:16px;height:16px}
+.dchip.ok .ic{color:var(--green)}
+.dchip.acc{background:rgba(255,179,71,.16);color:var(--amber)}
 .dchip.absorb{background:rgba(255,179,71,.16);color:var(--amber)}
 .dchip.over{background:rgba(255,59,48,.18);color:#ff8a82}
 .dchip.early{background:rgba(16,185,129,.16);color:#5eead4}

@@ -140,7 +140,23 @@
     return 'Orden desconocida';
   }
 
-  const API = { OPS, OP_TXT, isBlocked, catsFor, targets, suggest, actionsFor, findBlock, realPlan, onTimePlan, delayPlan, delayStamp, checkCmd };
+  // ── Píldora de retraso por zona (Panel y mando) ─────────────────────
+  /** z = una fila de core.delayByZone → { cls: 'ok'|'early'|'acc'|'absorb'|'over', text, title } */
+  function delayPill(z, zoneLabel) {
+    const nm = zoneLabel || z.zone || 'Sin zona';
+    const who = z.liveBlock ? z.liveBlock.name : '';
+    const accT = 'Retraso acumulado: lo que viene va +' + z.acc + ' min respecto al horario original (retrasos y desbordes ya aplicados)';
+    if (z.live > 0) {
+      const over = z.status === 'overflow';
+      return { cls: over ? 'over' : 'absorb', text: nm + ': +' + z.acc + ' min (+' + z.live + ' vivo)' + (over ? ' · buffer agotado' : ''),
+        title: accT + '\nDesfase en vivo de ' + who + ': +' + z.live + ' min' + (over ? ' · desborda el cambio en +' + z.overflow + ' min' : ' · se absorbe en el cambio') };
+    }
+    if (z.acc > 0) return { cls: 'acc', text: nm + ': +' + z.acc + ' min', title: accT + (z.early ? '\nEn vivo: adelanto de ' + z.early + ' min' : '') };
+    if (z.early > 0) return { cls: 'early', text: nm + ' · En hora (−' + z.early + ' vivo)', title: who + ' va ' + z.early + ' min adelantada' };
+    return { cls: 'ok', text: nm + ' · En hora', title: 'Sin retraso acumulado ni desfase en vivo' };
+  }
+
+  const API = { OPS, delayPill, OP_TXT, isBlocked, catsFor, targets, suggest, actionsFor, findBlock, realPlan, onTimePlan, delayPlan, delayStamp, checkCmd };
   if (isNode) module.exports = API;
   else root.ShowtimeMando = API;
 })(typeof window !== 'undefined' ? window : globalThis);
