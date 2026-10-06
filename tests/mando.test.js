@@ -14,6 +14,7 @@
   const tests = [];
   function test(name, fn) { tests.push([name, fn]); }
   function eq(a, b, msg) { if (a !== b) throw new Error((msg ? msg + ': ' : '') + 'esperaba ' + JSON.stringify(b) + ', salió ' + JSON.stringify(a)); }
+  function deq(a, b, msg) { eq(JSON.stringify(a), JSON.stringify(b), msg); }
   function ok(v, msg) { if (!v) throw new Error(msg || 'esperaba verdadero'); }
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   async function until(fn, ms, what) { const t0 = Date.now(); while (!fn()) { if (Date.now() - t0 > (ms || 4000)) throw new Error('tiempo agotado: ' + (what || '')); await sleep(20); } }
@@ -56,79 +57,124 @@
     eq(M.suggest(list('03:00'), at('03:00')).name, 'Cabeza', 'todo pasado: la última');
   });
 
-  test('acciones posibles: ▶ sin inicio; ■ con inicio y sin fin; En hora con algún registro', async () => {
+  test('acciones posibles: ▶ sin inicio; ■ desde su hora hasta que acaba (o hasta ■ con Alargar); En hora si no va en hora; Alargar hasta ■', async () => {
     const F = fest(), k = key(F.s, 'Banda A');
-    let a = M.actionsFor(blk(F.s, 'Banda A')); ok(a.start && !a.stop && !a.onTime);
+    let a = M.actionsFor(blk(F.s, 'Banda A'), at('20:00')); ok(a.start && !a.stop && !a.onTime && a.stretch, 'va en hora: no hace falta En hora');
     const s1 = M.realPlan(F.s, CFG, k, 'i', at('20:35')).state;
-    a = M.actionsFor(blk(s1, 'Banda A')); ok(!a.start && a.stop && a.onTime);
-    const s2 = M.realPlan(s1, CFG, k, 'f', at('21:35')).state;
-    a = M.actionsFor(blk(s2, 'Banda A')); ok(!a.start && !a.stop && a.onTime);
-    a = M.actionsFor(null); ok(!a.start && !a.stop && !a.onTime);
+    a = M.actionsFor(blk(s1, 'Banda A'), at('20:40')); ok(!a.start && a.stop && a.onTime && a.stretch);
+    a = M.actionsFor(blk(F.s, 'Banda A'), at('21:31')); ok(!a.start && !a.stop && a.stretch, 'sin Alargar, pasada su hora ya acabó: sin ▶ ni ■');
+    a = M.actionsFor(blk(M.stretchPlan(F.s, k, true).state, 'Banda A'), at('21:31')); ok(a.stop, 'con Alargar, ■ hasta que acabe');
+    const s2 = M.realPlan(s1, CFG, k, 'f', at('21:20')).state;
+    a = M.actionsFor(blk(s2, 'Banda A'), at('21:40')); ok(!a.start && !a.stop && !a.onTime && !a.stretch, 'terminada: nada');
+    a = M.actionsFor(null); ok(!a.start && !a.stop && !a.onTime && !a.stretch);
+    a = M.actionsFor(blk(F.s, 'Banda A'), at('20:29')); ok(a.start && !a.stop, 'antes de su hora: solo ▶');
+    a = M.actionsFor(blk(F.s, 'Banda A'), at('20:30')); ok(a.start && a.stop, 'a su hora: ▶ y ■');
+  });
+
+  test('■ sin ▶ (pasivo): inicio = el estimado, fin = ahora; acabar antes no adelanta nada', async () => {
+    const F = fest(), k = key(F.s, 'Banda A');
+    const r = M.realPlan(F.s, CFG, k, 'f', at('21:10'));
+    ok(r.ok, r.error); ok(r.passive);
+    const b = blk(r.state, 'Banda A');
+    eq(C.fmtHM(b.ri), '20:30', 'inicio dado por en hora'); eq(C.fmtHM(b.rf), '21:10'); eq(b.delta, -20);
+    ok(/termina 21:10 \(inicio 20:30, a su hora\)/.test(r.msg) && /20 min antes/.test(r.msg), r.msg);
+    eq(C.fmtHM(blk(r.state, 'Banda B').si), '22:00', 'la siguiente NO se adelanta (regla de oro)');
+    eq(r.pushed, null);
+    ok(/aún no ha empezado \(empieza a las 20:30\)/.test(M.realPlan(F.s, CFG, k, 'f', at('20:10')).error), 'antes de su hora no');
+  });
+
+  test('■ tarde: sin Alargar no existe (acabó a su hora); con Alargar, lo que pasa del colchón va al estimado', async () => {
+    const F = fest(), k = key(F.s, 'Banda A');
+    ok(/ya acabó a su hora \(21:30\).*Tiempo extra/.test(M.realPlan(F.s, CFG, k, 'f', at('21:55')).error));
+    const r = M.realPlan(M.stretchPlan(F.s, k, true).state, CFG, k, 'f', at('21:55'));   // +25 al fin; colchón 15 → desborde 10
+    ok(r.ok, r.error); ok(/\+10 sobre lo previsto/.test(r.msg), r.msg);
+    eq(C.fmtHM(blk(r.state, 'Banda B').si), '22:10'); eq(C.fmtHM(blk(r.state, 'Banda B').psi), '22:00');
+    eq(r.pushed.minutes, 10); eq(r.pushed.who, 'Banda A');
   });
 
   // ── ▶ / ■ ─────────────────────────────────────────────────────────────
   test('▶ tarde dentro del colchón: se absorbe, no se mueve nada', async () => {
     const F = fest();
     const r = M.realPlan(F.s, CFG, key(F.s, 'Banda A'), 'i', at('20:40'));
-    ok(r.ok); ok(/empieza 20:40/.test(r.msg) && /se absorbe/.test(r.msg), r.msg);
-    eq(blk(r.state, 'Banda B').psi, at('22:00'));
+    ok(r.ok); ok(/empieza 20:40 · sale 10 min tarde · siguiente Banda B 22:00 \(en hora\)/.test(r.msg), r.msg);
+    eq(blk(r.state, 'Banda B').si, at('22:00')); eq(r.pushed, null);
   });
 
-  test('▶ más tarde que el colchón: empuja SOLO el desborde, en su zona, sin lo rojo', async () => {
-    const F = fest();
-    const r = M.realPlan(F.s, CFG, key(F.s, 'Banda A'), 'i', at('21:00'));   // +30; colchón 30 − 15 = 15 → desborde 15
-    ok(r.ok, r.error); ok(/desborde \+15/.test(r.msg), r.msg);
-    eq(C.fmtHM(blk(r.state, 'Banda B').psi), '22:15', 'Banda B +15');
-    eq(C.fmtHM(blk(r.state, 'Cabeza').psi), '23:30', 'Cabeza (DELAY rojo) no se mueve');
-    eq(C.fmtHM(blk(r.state, 'Acústico').psi), '21:00', 'la Carpa no se toca');
-    eq(C.fmtHM(blk(r.state, 'Curfew').psi), '01:30', 'el hito sin zona no se toca');
+  test('▶ tarde sin Alargar: se para a su hora, nadie se mueve; con Alargar, SOLO el desborde, en su zona, sin lo rojo', async () => {
+    const F = fest(), k = key(F.s, 'Banda A');
+    const r0 = M.realPlan(F.s, CFG, k, 'i', at('21:00'));
+    ok(r0.ok); eq(C.fmtHM(blk(r0.state, 'Banda A').sf), '21:30'); eq(C.fmtHM(blk(r0.state, 'Banda B').si), '22:00'); eq(r0.pushed, null);
+    const r = M.realPlan(M.realPlan(M.stretchPlan(F.s, k, true).state, CFG, k, 'i', at('21:00')).state, CFG, k, 'f', at('22:00'));   // +30 → desborde 15
+    ok(r.ok, r.error); ok(/\+15 sobre lo previsto/.test(r.msg), r.msg);
+    eq(C.fmtHM(blk(r.state, 'Banda B').si), '22:15', 'Banda B +15'); eq(C.fmtHM(blk(r.state, 'Banda B').psi), '22:00', 'previsto intacto');
+    eq(C.fmtHM(blk(r.state, 'Cabeza').si), '23:30', 'Cabeza (DELAY rojo) no se mueve');
+    eq(C.fmtHM(blk(r.state, 'Acústico').si), '21:00', 'la Carpa no se toca');
+    eq(C.fmtHM(blk(r.state, 'Curfew').si), '01:30', 'el hito sin zona no se toca');
   });
 
   test('▶ / ■ con bloqueo de Retrasos: lo bloqueado no se empuja', async () => {
     const F = fest();
     const cfg = { delayBlock: { all: {}, [F.P]: { show: true } } };
-    const r = M.realPlan(F.s, cfg, key(F.s, 'Banda A'), 'i', at('21:00'));
-    ok(r.ok); ok(/nada que mover/.test(r.msg), r.msg);
-    eq(C.fmtHM(blk(r.state, 'Banda B').psi), '22:00');
+    const kA = key(F.s, 'Banda A');
+    const r = M.realPlan(M.stretchPlan(F.s, kA, true).state, cfg, kA, 'f', at('22:00'));
+    ok(r.ok, r.error); eq(C.fmtHM(blk(r.state, 'Banda B').si), '22:00');
+    deq(r.state.showtimeBloqueos, cfg.delayBlock, 'los bloqueos viajan con el evento');
   });
 
-  test('▶ / ■ rechazos claros: dos veces, ■ sin ▶, hito, entrada borrada', async () => {
+  test('Alargar: activar/desactivar; con él, el directo gasta el colchón y luego suma al estimado hasta ■', async () => {
+    const F = fest(), k = key(F.s, 'Banda A');
+    const r = M.stretchPlan(F.s, k, true, at('21:20')); ok(r.ok, r.error); ok(/TIEMPO EXTRA/.test(r.msg));
+    ok(blk(r.state, 'Banda A').alargar);
+    ok(/ya tiene Tiempo extra/.test(M.stretchPlan(r.state, k, true).error));
+    const est = (st, n, t) => C.buildBlocks(st, { mode: 'all', day: 'all', now: at(t) }).find(b => b.name === n);
+    eq(C.fmtHM(est(r.state, 'Banda B', '21:40').si), '22:00', '+10: en el colchón');
+    eq(C.fmtHM(est(r.state, 'Banda B', '21:52').si), '22:07', '+22: desborda 7');
+    eq(C.delayByZone(r.state, at('21:52')).find(z => z.zoneId === F.P).status, 'overflow');
+    const off = M.stretchPlan(r.state, k, false); ok(off.ok); ok(!blk(off.state, 'Banda A').alargar);
+    ok(!M.stretchPlan(F.s, key(F.s, 'Curfew'), true).ok, 'un hito no');
+  });
+
+  test('▶ / ■ rechazos claros: dos veces, hito, entrada borrada', async () => {
     const F = fest(), k = key(F.s, 'Banda A');
     const s1 = M.realPlan(F.s, CFG, k, 'i', at('20:35')).state;
     ok(/ya tiene inicio real/.test(M.realPlan(s1, CFG, k, 'i', at('20:36')).error));
-    ok(/aún no ha empezado/.test(M.realPlan(F.s, CFG, k, 'f', at('21:30')).error));
     ok(/Solo los shows/.test(M.realPlan(F.s, CFG, key(F.s, 'Curfew'), 'i', at('01:30')).error));
     ok(/ya no está/.test(M.realPlan(F.s, CFG, '999:show', 'i', at('20:30')).error));
-    const s2 = M.realPlan(s1, CFG, k, 'f', at('21:30')).state;
-    ok(/ya tiene fin real/.test(M.realPlan(s2, CFG, k, 'f', at('21:31')).error));
+    const s2 = M.realPlan(s1, CFG, k, 'f', at('21:25')).state;
+    ok(/ya tiene fin real/.test(M.realPlan(s2, CFG, k, 'f', at('21:26')).error));
   });
 
   test('■ de un soundcheck: registra su fin (campos de soundcheck)', async () => {
     const F = fest(), k = key(F.s, 'Prueba A', 'sc');
     let r = M.realPlan(F.s, CFG, k, 'i', at('17:05')); ok(r.ok);
-    r = M.realPlan(r.state, CFG, k, 'f', at('17:50')); ok(r.ok);
+    r = M.realPlan(r.state, CFG, k, 'f', at('17:40')); ok(r.ok, r.error);
     const b = blk(r.state, 'Prueba A');
-    eq(C.fmtHM(b.ri), '17:05'); eq(C.fmtHM(b.rf), '17:50');
+    eq(C.fmtHM(b.ri), '17:05'); eq(C.fmtHM(b.rf), '17:40');
     eq(blk(r.state, 'Banda A').ri, null, 'el show de la misma entrada no se toca');
   });
 
   // ── En hora ───────────────────────────────────────────────────────────
-  test('En hora (a): borra ▶/■ de la banda (Δ = 0) y MANTIENE los retrasos ya aplicados', async () => {
-    const F = fest(), k = key(F.s, 'Banda A');
-    const s1 = M.realPlan(F.s, CFG, k, 'i', at('21:00')).state;          // empuja Banda B a 22:15
-    const r = M.onTimePlan(s1, k);
-    ok(r.ok); ok(/en hora/.test(r.msg));
-    const b = blk(r.state, 'Banda A'); eq(b.ri, null); eq(b.rf, null); ok(!b.delta, 'sin desfase');
-    eq(C.fmtHM(blk(r.state, 'Banda B').psi), '22:15', 'el retraso aplicado se queda');
-    ok(/ya está en hora/.test(M.onTimePlan(F.s, k).error), 'sin registros no hace nada');
+  test('En hora: inicio real = su hora prevista y el retraso que arrastraba se cancela', async () => {
+    const F = fest();
+    const kA = key(F.s, 'Banda A');
+    const s1 = M.realPlan(M.stretchPlan(F.s, kA, true).state, CFG, kA, 'f', at('22:00')).state;   // Banda B estimada 22:15
+    const kB = key(F.s, 'Banda B');
+    ok(/ya está en hora/.test(M.onTimePlan(F.s, kB, at('21:50')).error), 'sin retraso: nada que cancelar');
+    const r = M.onTimePlan(s1, kB, at('21:45'));   // se puede pulsar siempre (también antes de su hora)
+    ok(r.ok, r.error); ok(/en hora, empieza 22:00 \(estaba estimada a las 22:15\)/.test(r.msg), r.msg);
+    const b = blk(r.state, 'Banda B'); eq(C.fmtHM(b.ri), '22:00'); eq(b.si, b.psi);
+    ok(/ya está en hora/.test(M.onTimePlan(r.state, kB, at('22:01')).error));
+    const done = M.realPlan(r.state, CFG, kB, 'f', at('22:50')).state;
+    ok(/ya ha terminado/.test(M.onTimePlan(done, kB, at('23:01')).error));
   });
 
   // ── Retraso desde el móvil ────────────────────────────────────────────
-  test('retraso de una zona: mueve lo pendiente de esa zona y cuenta las fijas', async () => {
+  test('retraso de una zona: estimado de lo pendiente de esa zona, cuenta las fijas; el previsto no cambia', async () => {
     const F = fest();
     const p = M.delayPlan(F.s, CFG, { minutes: 10, zones: [F.P], from: at('21:00') });
     ok(p.ok); eq(p.moved.map(m => m.name).join(), 'Banda B'); eq(p.kept.length, 1); eq(p.summary, 'mueve 1 · 1 fija');
-    eq(C.fmtHM(blk(p.state, 'Banda B').psi), '22:10'); eq(C.fmtHM(blk(p.state, 'Acústico').psi), '21:00');
+    eq(C.fmtHM(blk(p.state, 'Banda B').si), '22:10'); eq(C.fmtHM(blk(p.state, 'Banda B').psi), '22:00');
+    eq(C.fmtHM(blk(p.state, 'Acústico').si), '21:00'); eq(p.state.showtimeRetrasos.length, 1);
   });
 
   test('retraso de todas las zonas: incluye la Carpa y el hito sin zona; choques con lo rojo', async () => {
@@ -157,39 +203,39 @@
     ok(!M.delayPlan(F.s, CFG, { minutes: 5, zones: 'all' }).ok);
   });
 
-  // ── Retraso acumulado por zona (barra del Panel y mando) ───────────────
-  test('acumulado: se apunta la hora original al primer retraso y se suma con los siguientes', async () => {
+  // ── Retraso por zona (barra del Panel y mando) ─────────────────────────
+  test('acumulado: los retrasos se suman en el estimado; lo rojo y las otras zonas no', async () => {
     const F = fest();
     let s = M.delayPlan(F.s, CFG, { minutes: 10, zones: [F.P], from: at('20:00') }).state;
     s = M.delayPlan(s, CFG, { minutes: 5, zones: [F.P], from: at('20:00') }).state;
-    const b = blk(s, 'Banda B'); eq(C.fmtHM(b.base), '22:00', 'hora original'); eq(C.fmtHM(b.psi), '22:15');
+    const b = blk(s, 'Banda B'); eq(C.fmtHM(b.psi), '22:00', 'previsto'); eq(C.fmtHM(b.si), '22:15', 'estimado');
     const z = C.delayByZone(s, at('20:00'));
     eq(z.map(x => x.zone).join(), 'Principal,Carpa', 'zonas en orden');
     eq(z[0].acc, 15); eq(z[1].acc, 0, 'la Carpa no se ha movido');
-    eq(blk(s, 'Cabeza').base, null, 'lo rojo no se mueve: sin hora original');
+    eq(blk(s, 'Cabeza').si, blk(s, 'Cabeza').psi, 'lo rojo no se mueve');
   });
 
-  test('acumulado: cambiar la hora a mano es el nuevo horario de referencia', async () => {
+  test('cambiar la hora prevista a mano: el retraso aplicado sigue sumándose encima', async () => {
     const F = fest();
     const s = M.delayPlan(F.s, CFG, { minutes: 10, zones: [F.P], from: at('20:00') }).state;
     const e = C.editArtist(s, F.ids['Banda B'], 'show', 'inicio', '22:30');
-    eq(blk(e.state, 'Banda B').base, null);
-    eq(C.delayByZone(e.state, at('20:00'))[0].acc, 10, 'quedan las otras movidas (Banda A)');
+    eq(C.fmtHM(blk(e.state, 'Banda B').si), '22:40');
+    eq(C.delayByZone(e.state, at('20:00'))[0].acc, 10);
   });
 
-  test('acumulado + vivo: desbordes empujados y desfase de la banda en curso', async () => {
+  test('acumulado + vivo: desborde y desfase de la banda en curso', async () => {
     const F = fest();
-    const r = M.realPlan(F.s, CFG, key(F.s, 'Banda A'), 'i', at('21:00'));   // +30; desborde 15 empujado
-    const z = C.delayByZone(r.state, at('21:05')).find(x => x.zoneId === F.P);
-    eq(z.acc, 15, 'lo que viene va +15'); eq(z.live, 30, 'Banda A va +30'); eq(z.status, 'absorb', 'tras empujar el desborde, el resto cabe en el cambio');
-    const p = M.delayPill(z); eq(p.cls, 'absorb'); eq(p.text, 'Principal: +15 min (+30 vivo)');
-    // Desborde que no se pudo empujar (shows bloqueados en la zona): rojo
-    const rb = M.realPlan(F.s, { delayBlock: { all: {}, [F.P]: { show: true } } }, key(F.s, 'Banda A'), 'i', at('21:00'));
-    const pb = M.delayPill(C.delayByZone(rb.state, at('21:05')).find(x => x.zoneId === F.P));
-    eq(pb.cls, 'over'); eq(pb.text, 'Principal: +0 min (+30 vivo) · buffer agotado');
-    const r2 = M.realPlan(F.s, CFG, key(F.s, 'Banda A'), 'i', at('20:40'));
-    const z2 = C.delayByZone(r2.state, at('20:45')).find(x => x.zoneId === F.P);
-    const p2 = M.delayPill(z2); eq(p2.cls, 'absorb'); eq(p2.text, 'Principal: +0 min (+10 vivo)');
+    const kA = key(F.s, 'Banda A'), alg = M.stretchPlan(F.s, kA, true).state;
+    const r = M.realPlan(alg, CFG, kA, 'f', at('22:00'));   // alarga +30; desborde 15
+    const z = C.delayByZone(r.state, at('22:05')).find(x => x.zoneId === F.P);
+    eq(z.acc, 15, 'lo que viene va +15'); eq(z.live, 30, 'Banda A va +30'); eq(z.status, 'overflow'); eq(z.overflow, 15);
+    const p = M.delayPill(z); eq(p.cls, 'over'); eq(p.text, 'Principal: +15 min (+30 vivo) · buffer agotado');
+    // Desborde que no se puede pasar (shows bloqueados en la zona): rojo, sin acumulado
+    const rb = M.realPlan(alg, { delayBlock: { all: {}, [F.P]: { show: true } } }, kA, 'f', at('22:00'));
+    eq(C.fmtHM(blk(rb.state, 'Banda B').si), '22:00', 'shows bloqueados en la zona: el desborde no los mueve');
+    eq(C.delayByZone(rb.state, at('22:05')).find(x => x.zoneId === F.P).acc, 0);
+    const r2 = M.realPlan(alg, CFG, kA, 'f', at('21:40'));
+    const p2 = M.delayPill(C.delayByZone(r2.state, at('21:45')).find(x => x.zoneId === F.P)); eq(p2.cls, 'absorb'); eq(p2.text, 'Principal: +0 min (+10 vivo)');
   });
 
   test('píldora: en hora, solo acumulado y adelanto', async () => {
@@ -206,6 +252,7 @@
   // ── Forma de las órdenes ──────────────────────────────────────────────
   test('órdenes: válidas e inválidas', async () => {
     eq(M.checkCmd({ op: 'start', args: { key: '3:show' } }), null);
+    eq(M.checkCmd({ op: 'stretch', args: { key: '3:show', on: true } }), null); ok(M.checkCmd({ op: 'stretch', args: { key: '3:show' } }));
     eq(M.checkCmd({ op: 'delay', args: { minutes: 5, zones: 'all', from: 100, stamp: 'x' } }), null);
     eq(M.checkCmd({ op: 'flash', args: { text: '5 MINUTOS' } }), null);
     eq(M.checkCmd({ op: 'flashOff' }), null);

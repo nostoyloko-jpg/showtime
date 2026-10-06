@@ -96,9 +96,25 @@
     eq(r.band.name, 'Acústico', 'la otra zona va aparte');
   });
 
-  test('Confidence: con ▶ y sin ■, sobretiempo en negativo y parpadeo', () => {
+  test('Confidence: con ALARGAR (sin ▶) sigue en el show pasada su hora y cuenta sobretiempo en rojo; sin Alargar pasa al cambio', () => {
+    const F = fest();
+    const st = C.setAlargar(F.s, F.ids['Banda A'], 'show', true).state;
+    let r = V.confidence(st, F.P, at('21:35'));
+    eq(r.mode, 'show'); eq(r.band.name, 'Banda A'); eq(r.level, 'over'); eq(V.fmtClock(r.remSec), '-05:00');
+    eq(V.confidence(F.s, F.P, at('21:35')).mode, 'changeover', 'sin Alargar: pasivo, acabó a su hora');
+    r = V.confidence(C.setReal(st, F.ids['Banda A'], 'show', 'f', at('21:40')).state, F.P, at('21:41'));
+    eq(r.mode, 'changeover'); eq(C.fmtHM(r.next.si), '22:00', '+10 cabe en el colchón');
+  });
+
+  test('Confidence: con ▶ y sin ■ pero sin Alargar, se para a su hora (pasa al cambio)', () => {
     const F = fest();
     const s = M.realPlan(F.s, {}, key(F.s, 'Banda A'), 'i', at('20:30')).state;
+    eq(V.confidence(s, F.P, atS('21:32', 15)).mode, 'changeover');
+  });
+
+  test('Confidence: con Alargar y sin ■, sobretiempo en negativo y parpadeo', () => {
+    const F = fest();
+    const s = M.realPlan(M.stretchPlan(F.s, key(F.s, 'Banda A'), true).state, {}, key(F.s, 'Banda A'), 'i', at('20:30')).state;
     const r = V.confidence(s, F.P, atS('21:32', 15));
     eq(r.mode, 'show'); eq(V.fmtClock(r.remSec), '-02:15'); eq(r.level, 'over'); eq(r.blink, true); eq(r.frac, 0);
     eq(V.confidence(s, F.P, atS('21:32', 15), { conf: { blink: false } }).blink, false, 'parpadeo apagado en Configuración');

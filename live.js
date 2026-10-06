@@ -265,6 +265,10 @@
       tm.appendChild(sp);
     }
     nt.textContent = block.notes || '';
+    if (block.alargar && block.rf === null) {
+      const xo = xtraOver(block, Math.floor(C.nowAbs()));
+      nt.textContent = (xo !== null ? 'TIEMPO EXTRA · +' + xo + ' MIN' : 'TIEMPO EXTRA') + (block.notes ? '  ·  ' + block.notes : '');
+    }
     if (block.kind === 'tarea' && C.isPlaying(block, Math.floor(C.nowAbs()))) {
       const p = C.progress(block, Math.floor(C.nowAbs()));
       nt.textContent = 'quedan ' + p.remaining + ' min' + (block.notes ? '  ·  ' + block.notes : '');
@@ -393,13 +397,19 @@
       (b.stage ? '<div class="tmeta"><span class="tstage" style="color:' + col + '">' + esc(b.stage.toUpperCase()) + '</span></div>' : '');
   }
 
+  /** Minutos de tiempo extra (activado y pasada su hora), o null. */
+  function xtraOver(b, now) { return b && b.alargar && b.rf === null && b.nf !== null && b.nf !== undefined && now >= b.nf ? Math.max(0, Math.floor(now - b.nf)) : null; }
   // EN ESCENA: banda que suena (con minutos restantes)
   function playingHtml(b, nowInt) {
     const col = safeColor(b.stageColor || b.color, '#888');
-    const p = C.progress(b, nowInt);
+    const p = C.progress(b, nowInt), xo = xtraOver(b, nowInt), xt = b.alargar && b.rf === null;
+    if (xo !== null) return '<div class="trow xtra" style="--c:' + col + '"><div class="tname fit">' + esc(b.name.toUpperCase()) + '</div>' +
+      metaHtml(b, col) +
+      '<div class="trem xtra">TIEMPO EXTRA · +' + xo + ' MIN</div>' +
+      '<div class="tbar"><div style="width:100%;background:#ffb347"></div></div></div>';
     return '<div class="trow" style="--c:' + col + '"><div class="tname fit">' + esc(b.name.toUpperCase()) + '</div>' +
       metaHtml(b, col) +
-      '<div class="trem" style="color:' + col + '">' + (p.remaining > 0 ? p.remaining + ' min restantes' : 'Finalizado') + '</div>' +
+      '<div class="trem" style="color:' + col + '">' + (p.remaining > 0 ? p.remaining + ' min restantes' : 'Finalizado') + (xt ? '<span class="xtag">TIEMPO EXTRA</span>' : '') + '</div>' +
       '<div class="tbar"><div style="width:' + p.pct + '%;background:' + col + '"></div></div></div>';
   }
 
@@ -539,9 +549,12 @@
   }
 
   // ── Bucle principal ──────────────────────────────────────────────────
+  let LAST_MIN = null;
   function tick() {
     const d = new Date();
     const nowMins = C.nowAbs(d), nowInt = Math.floor(nowMins);
+    if (LAST_MIN !== null && nowInt !== LAST_MIN && !NOFEST) load();   // cada minuto: el estimado (Alargar en directo) se recalcula
+    LAST_MIN = nowInt;
     $('clk').textContent = pad2(d.getHours()) + ':' + pad2(d.getMinutes());
     if (VISTA === 'confidence') { renderConf(); return; }   // Confidence: sin el tiempo (decisión 77)
     const mt = meteoNow();
@@ -580,7 +593,8 @@
     if (mt && VISTA === 'manager') {
       if (mt.sum) {
         cls += mt.sum.stale ? ' stale' : mt.list.length ? ' warn' : '';
-        h = '<div class="mt-l1"><svg class="ic"><use href="#i-' + (mt.sum.stale ? 'alert' : mt.sum.icon) + '"/></svg><span>' + esc(Wm.pillText(mt.sum)) + '</span></div>';
+        h = '<div class="mt-l1"><svg class="ic"><use href="#i-' + (mt.sum.stale ? 'alert' : mt.sum.icon) + '"/></svg>' +
+          Wm.pillText(mt.sum).split(' · ').map(x => '<span>' + esc(x) + '</span>').join('<i>·</i>') + '</div>';
         if (!mt.sum.stale && mt.list.length) h += '<div class="mt-l2">PREVISIÓN · ' + esc(mt.list[0].short) + (mt.list.length > 1 ? ' · +' + (mt.list.length - 1) : '') + '</div>';
       } else if (mt.m && mt.m.err) { cls += ' stale'; h = '<div class="mt-l1"><svg class="ic"><use href="#i-alert"/></svg><span>EL TIEMPO: SIN DATOS</span></div>'; }
     }
@@ -842,19 +856,21 @@
     }
     let top = '', digits = '', foot = '', cls = 'conf ' + r.mode, frac = r.frac;
     const zn = esc((r.zone || '').toUpperCase());
+    const kindTag = b => '<span class="cf-kind ' + (b.kind === 'sc' ? 'sc' : 'show') + '">' + (b.kind === 'sc' ? 'SOUNDCHECK' : 'SHOW') + '</span>';
+    const prox = b => 'PRÓXIMO ' + (b.kind === 'sc' ? 'SOUNDCHECK' : 'SHOW') + ': <b>' + esc(b.name.toUpperCase()) + '</b> · ' + C.fmtHM(b.si);
     if (r.mode === 'show') {
-      top = zn + ' · ' + esc(r.band.name.toUpperCase());
+      top = zn + ' · ' + kindTag(r.band) + ' · ' + esc(r.band.name.toUpperCase());
       digits = Vs.fmtClock(r.remSec); foot = hhmm;
       cls += ' lv-' + r.level + (r.blink ? ' blink' : '');
     } else if (r.mode === 'changeover') {
       top = zn + ' · ' + (r.standby ? 'STANDBY' : 'CHANGEOVER');
       digits = Vs.fmtClock(r.remSec);
-      foot = hhmm + '<span class="cf-sep">·</span>PRÓXIMO SHOW: <b>' + esc(r.next.name.toUpperCase()) + '</b> · ' + C.fmtHM(r.next.si);
+      foot = hhmm + '<span class="cf-sep">·</span>' + prox(r.next);
       cls += ' lv-' + r.level;
     } else if (r.mode === 'wait') {
       top = zn + ' · EN ESPERA';
       digits = Vs.fmtClock(r.remSec);
-      foot = hhmm + '<span class="cf-sep">·</span>PRÓXIMO SHOW: <b>' + esc(r.next.name.toUpperCase()) + '</b> · ' + C.fmtHM(r.next.si);
+      foot = hhmm + '<span class="cf-sep">·</span>' + prox(r.next);
       cls += ' lv-ok nobar';
     } else {
       top = zn; digits = hhmm; foot = 'FIN DE JORNADA'; cls += ' nobar';
@@ -865,11 +881,24 @@
       box.className = cls;
       box.innerHTML = '<div class="cf-top">' + top + '</div><div class="cf-dig"><span id="cf-d"></span></div>' +
         '<div class="cf-bar"><div id="cf-fill"></div></div><div class="cf-foot">' + foot + '</div>';
+      fitConf();
     }
     const dEl = $('cf-d');
     if (dEl.textContent !== digits) { dEl.textContent = digits; dEl.parentNode.style.setProperty('--n', Math.max(5, digits.length)); }
     if (frac !== null && frac !== undefined) $('cf-fill').style.width = (frac * 100).toFixed(2) + '%';
   }
+  /** Confidence: la línea de arriba y la de abajo se ajustan solas para caber enteras (sin «…»):
+   *  primero se reduce la letra (hasta el 60 %); si aun así no cabe, pasa a dos líneas. */
+  function fitConf() {
+    document.querySelectorAll('#conf .cf-top, #conf .cf-foot').forEach(el => {
+      el.style.fontSize = ''; el.style.whiteSpace = ''; el.style.lineHeight = '';
+      const base = parseFloat(getComputedStyle(el).fontSize);
+      let k = 1;
+      while (el.scrollWidth > el.clientWidth + 1 && k > 0.6) { k -= 0.05; el.style.fontSize = (base * k) + 'px'; }
+      if (el.scrollWidth > el.clientWidth + 1) { el.style.whiteSpace = 'normal'; el.style.lineHeight = '1.15'; el.style.fontSize = (base * 0.7) + 'px'; }
+    });
+  }
+  window.addEventListener('resize', () => { if (VISTA === 'confidence') fitConf(); });
   $('conf').addEventListener('click', e => {
     const b = e.target.closest('.cf-zone'); if (!b) return;
     ZONA = b.dataset.z; pset(LIVE_ZONE, ZONA); confKey = ''; setVista('confidence');

@@ -644,60 +644,97 @@
     deq(C.driftByZone(V.s, blocksOf(V.s), at(D10, '20:30')), []);
     const a = blocksOf(V.s).find(b => b.name === 'A'); eq(a.si, a.psi); eq(a.delta, null);
   });
-  test('vivo: Empezar tarde dentro del colchón → se absorbe (Δ ≤ A)', () => {
-    const st = C.setReal(V.s, V.ids.A, 'show', 'i', at(D10, '20:08')).state;
-    const b = blocksOf(st).find(x => x.name === 'A');
-    eq(b.si, at(D10, '20:08')); eq(b.sf, at(D10, '21:08'), 'el fin previsto se desplaza'); eq(b.delta, 8);
-    const d = C.driftByZone(st, blocksOf(st), at(D10, '20:10'))[0];
-    eq(d.status, 'absorb'); eq(d.A, 15); eq(d.overflow, 0); eq(d.next.name, 'B');
-  });
-  test('vivo: más tarde que el colchón → desborde Δ−A; adelanto → early', () => {
+  // Alargar y ■ a una hora: solo con Alargar una banda puede acabar después de su hora
+  const alargarHasta = (st, id, hm) => C.setReal(C.setAlargar(st, id, 'show', true).state, id, 'show', 'f', at(D10, hm)).state;
+  test('vivo: ▶ tarde SIN Alargar → se para a su hora (parada automática) y no retrasa nada', () => {
     const st = C.setReal(V.s, V.ids.A, 'show', 'i', at(D10, '20:20')).state;
-    const d = C.driftByZone(st, blocksOf(st), at(D10, '20:21'))[0];
+    const b = blocksOf(st).find(x => x.name === 'A');
+    eq(b.si, at(D10, '20:20')); eq(C.fmtHM(b.sf), '21:00', 'acaba a su hora'); eq(b.delta, 20);
+    eq(C.fmtHM(blocksOf(st).find(x => x.name === 'B').si), '21:30');
+    eq(C.driftByZone(st, blocksOf(st), at(D10, '20:30'))[0].status, 'ontime');
+    eq(C.fmtHM(blocksOf(C.setReal(V.s, V.ids.A, 'show', 'f', at(D10, '21:20')).state).find(x => x.name === 'A').sf), '21:00', 'un fin real tardío sin Alargar no cuenta');
+  });
+  test('vivo: con Alargar, dentro del colchón se absorbe; más allá, desborde Δ−A; adelanto → early', () => {
+    let st = alargarHasta(V.s, V.ids.A, '21:08');
+    let d = C.driftByZone(st, blocksOf(st), at(D10, '21:10'))[0];
+    eq(d.status, 'absorb'); eq(d.A, 15); eq(d.overflow, 0); eq(d.next.name, 'B');
+    st = alargarHasta(V.s, V.ids.A, '21:20');
+    d = C.driftByZone(st, blocksOf(st), at(D10, '21:21'))[0];
     eq(d.status, 'overflow'); eq(d.overflow, 5);
     const e = C.setReal(V.s, V.ids.A, 'show', 'i', at(D10, '19:55')).state;
     eq(C.driftByZone(e, blocksOf(e), at(D10, '20:00'))[0].status, 'early');
   });
-  test('vivo: cascada del desborde solo en lo autorizado, su zona y sin las rojas (que no hacen de tope)', () => {
-    let st = C.setReal(V.s, V.ids.A, 'show', 'i', at(D10, '20:20')).state;
+  const ONLY_SHOWS = { all: { sc: true, tarea: true, hito: true } };     // menú Retrasos: tareas, hitos y SC bloqueados
+  const est = (st, name, now) => C.buildBlocks(st, { mode: 'all', day: '2026-07-10', now: now }).find(b => b.name === name);
+  test('vivo: el desborde va al ESTIMADO, solo en su zona, sin lo bloqueado ni las rojas (que no hacen de tope); el previsto no se toca', () => {
+    let st = alargarHasta(V.s, V.ids.A, '21:20');   // +20; colchón 30 − 15 = 15 → desborde 5
     st = C.setFija(st, V.ids.C, true).state;
-    const r = C.shiftEntries(st, { minutes: 5, zone: V.P, cats: { show: true }, fromAbs: at(D10, '20:21'), afterAbs: at(D10, '20:00') });
-    deq(r.moved.map(m => m.name), ['B', 'D'], 'B y D se mueven; C (rojo) no; la tarea no (no autorizada); X es de otra zona');
-    deq(r.kept.map(k => k.name), ['Cambio luces', 'C'], 'no se mueven: la tarea (categoría no autorizada) y C (rojo)');
-    const after = blocksOf(r.state);
-    eq(C.fmtHM(after.find(b => b.name === 'B').psi), '21:35'); eq(C.fmtHM(after.find(b => b.name === 'D').psi), '00:15');
-    eq(C.fmtHM(after.find(b => b.name === 'C').psi), '23:00'); eq(C.fmtHM(after.find(b => b.name === 'X').psi), '22:00');
-    eq(after.find(b => b.name === 'D').jornada, '2026-07-10', 'cruzar medianoche no cambia la jornada');
-    eq(C.driftByZone(r.state, after, at(D10, '20:21'))[0].status, 'absorb', 'tras empujar el desborde, el cambio vuelve a absorber');
+    st = Object.assign({}, st, { showtimeBloqueos: ONLY_SHOWS });
+    const n = at(D10, '21:21');
+    eq(C.fmtHM(est(st, 'B', n).si), '21:35'); eq(C.fmtHM(est(st, 'B', n).psi), '21:30', 'previsto intacto');
+    eq(est(st, 'B', n).push, 5);
+    eq(C.fmtHM(est(st, 'Cambio luces', n).si), '22:35', 'tarea bloqueada: no se mueve');
+    eq(C.fmtHM(est(st, 'C', n).si), '23:00', 'C (rojo) no se mueve');
+    eq(C.fmtHM(est(st, 'D', n).si), '00:15', 'D sí: el rojo no es tope');
+    eq(C.fmtHM(est(st, 'X', n).si), '22:00', 'otra zona');
+    eq(est(st, 'D', n).jornada, '2026-07-10');
+    const z = C.delayByZone(st, n).find(x => x.zoneId === V.P);
+    eq(z.status, 'overflow'); eq(z.live, 20); eq(z.overflow, 5); eq(z.acc, 5);
   });
-  test('vivo: retraso global incluye tareas e hitos sin zona si se autorizan; avisa de choques con rojas', () => {
+  test('vivo: retraso MANUAL = orden guardada; estimado sí, previsto no; avisa de choques con rojas', () => {
     let st = C.setFija(V.s, V.ids.C, true).state;
-    const r = C.shiftEntries(st, { minutes: 40, zone: 'all', cats: { show: true, tarea: true, hito: true }, fromAbs: at(D10, '21:00') });
+    const r = C.addRetraso(st, { minutes: 40, zone: 'all', blocked: {}, fromAbs: at(D10, '21:00'), day: '2026-07-10', at: at(D10, '20:00') });
     ok(r.moved.some(m => m.name === 'Curfew') && r.moved.some(m => m.name === 'Cambio luces') && r.moved.some(m => m.name === 'X'));
+    eq(r.state.showtimeRetrasos.length, 1); eq(r.order.minutes, 40);
+    eq(C.fmtHM(est(r.state, 'B', at(D10, '20:00')).si), '22:10'); eq(C.fmtHM(est(r.state, 'B', at(D10, '20:00')).psi), '21:30');
     ok(r.clashes.some(c => c.name === 'B' && c.with === 'C'), 'B (22:10–23:10) pisa a C, que está en rojo');
-    eq(C.shiftEntries(V.s, { minutes: 10, zone: 'all', cats: {}, fromAbs: at(D10, '21:00') }).moved.length, 0, 'sin categorías no se mueve nada');
+    deq(r.kept.map(k => k.name), ['C']);
+    eq(C.addRetraso(V.s, { minutes: 10, zone: 'all', blocked: { all: { show: true, sc: true, tarea: true, hito: true } }, fromAbs: at(D10, '21:00'), day: '2026-07-10' }).moved.length, 0, 'todo bloqueado: nada');
+    eq(C.diffSummary(V.s, r.state).festival, 1, 'cuenta como cambio sin exportar');
   });
-  test('vivo: retraso multizona (lista de zonas; \'\' = sin zona)', () => {
-    const r = C.shiftEntries(V.s, { minutes: 10, zone: [V.K, ''], cats: { show: true, hito: true }, fromAbs: at(D10, '21:00') });
-    deq(r.moved.map(m => m.name).sort(), ['Curfew', 'X'], 'Carpa y lo sin zona; Principal no se toca');
-    eq(C.shiftEntries(V.s, { minutes: 10, zone: [], cats: { show: true }, fromAbs: at(D10, '21:00') }).moved.length, 0, 'ninguna zona = nada');
+  test('vivo: retraso multizona (lista de zonas; \'\' = sin zona) y bloqueos de la orden', () => {
+    const r = C.addRetraso(V.s, { minutes: 10, zone: [V.K, ''], blocked: ONLY_SHOWS, extra: { hito: false }, fromAbs: at(D10, '21:00'), day: '2026-07-10' });
+    deq(r.moved.map(m => m.name).sort(), ['X'], 'Carpa; el curfew (sin zona) es hito y está bloqueado');
+    const r2 = C.addRetraso(V.s, { minutes: 10, zone: [V.K, ''], blocked: {}, extra: { hito: true }, fromAbs: at(D10, '21:00'), day: '2026-07-10' });
+    deq(r2.moved.map(m => m.name).sort(), ['X'], 'bloqueo extra solo para esta orden');
+    eq(C.addRetraso(V.s, { minutes: 10, zone: [], blocked: {}, fromAbs: at(D10, '21:00'), day: '2026-07-10' }).moved.length, 0, 'ninguna zona = nada');
   });
   test('vivo: LED por entrada por encima de su categoría (verde forzado / rojo)', () => {
-    let st = C.setDelayFlag(V.s, V.ids.T, 'free').state;       // la tarea se mueve aunque las tareas estén bloqueadas
-    st = C.setDelayFlag(st, V.ids.B, 'lock').state;              // B no se mueve aunque los shows se muevan
-    const r = C.shiftEntries(st, { minutes: 5, zone: V.P, cats: { show: true }, fromAbs: at(D10, '21:00') });
+    let st = C.setDelayFlag(V.s, V.ids.T, 'free').state;
+    st = C.setDelayFlag(st, V.ids.B, 'lock').state;
+    const r = C.addRetraso(st, { minutes: 5, zone: V.P, blocked: ONLY_SHOWS, fromAbs: at(D10, '21:00'), day: '2026-07-10' });
     deq(r.moved.map(m => m.name), ['Cambio luces', 'C', 'D']); deq(r.kept.map(k => k.name), ['B']);
     eq(C.setDelayFlag(st, V.ids.T, null).state.artists.find(a => a.id === V.ids.T).showtimeLibre, undefined, 'null: vuelve a seguir a su categoría');
     eq(C.fieldValue(st.artists.find(a => a.id === V.ids.T), 'show', 'fija'), 'libre');
   });
-  test('vivo: no se mueve lo que ya ha empezado (tiene hora real)', () => {
+  test('vivo: un retraso manual no mueve lo que ya había empezado', () => {
     const st = C.setReal(V.s, V.ids.B, 'show', 'i', at(D10, '21:31')).state;
-    eq(C.shiftEntries(st, { minutes: 5, zone: 'all', cats: { show: true }, fromAbs: at(D10, '21:00') }).moved.some(m => m.name === 'B'), false);
+    eq(C.addRetraso(st, { minutes: 5, zone: 'all', blocked: {}, fromAbs: at(D10, '21:00'), day: '2026-07-10', at: at(D10, '21:40') }).moved.some(m => m.name === 'B'), false);
+  });
+  test('vivo: ALARGAR — en directo gasta el colchón y, pasado, cada minuto suma al estimado hasta ■', () => {
+    const st = C.setAlargar(V.s, V.ids.A, 'show', true).state;
+    eq(C.fmtHM(est(st, 'B', at(D10, '21:10')).si), '21:30', 'A +10: cabe en el colchón (15)');
+    eq(est(st, 'A', at(D10, '21:10')).live, true); eq(C.fmtHM(est(st, 'A', at(D10, '21:10')).sf), '21:10');
+    eq(C.fmtHM(est(st, 'B', at(D10, '21:22')).si), '21:37', 'A +22: desborda 7');
+    eq(C.fmtHM(est(st, 'C', at(D10, '21:22')).si), '23:07', 'y arrastra a lo que viene de la zona');
+    const fin = C.setReal(st, V.ids.A, 'show', 'f', at(D10, '21:22')).state;
+    eq(C.fmtHM(est(fin, 'B', at(D10, '23:59')).si), '21:37', 'tras ■ se queda fijo');
+    eq(C.fmtHM(est(V.s, 'B', at(D10, '21:22')).si), '21:30', 'sin Alargar no se suma nada en directo (sin ■ acaba a su hora)');
+  });
+  test('vivo: recuperación — si la siguiente arranca ANTES de lo estimado, el retraso baja (nunca por debajo de lo previsto); acabar antes no adelanta', () => {
+    let st = alargarHasta(V.s, V.ids.A, '21:30');     // +30 → desborde 15
+    eq(C.fmtHM(est(st, 'B', at(D10, '21:31')).si), '21:45'); eq(C.fmtHM(est(st, 'C', at(D10, '21:31')).si), '23:15');
+    st = C.setReal(st, V.ids.B, 'show', 'i', at(D10, '21:38')).state;           // B ▶ 7 min antes de lo estimado
+    eq(C.fmtHM(est(st, 'C', at(D10, '21:38')).si), '23:08', 'el retraso baja a +8');
+    const e = C.setReal(st, V.ids.B, 'show', 'f', at(D10, '22:00')).state;     // B acaba muy pronto
+    eq(C.fmtHM(est(e, 'C', at(D10, '22:00')).si), '23:08', 'acabar antes no adelanta a C');
+    const t = C.setReal(st, V.ids.B, 'show', 'i', null).state;
+    eq(C.fmtHM(est(C.setReal(t, V.ids.B, 'show', 'i', at(D10, '21:20')).state, 'C', at(D10, '21:20')).si), '23:00', 'nunca antes de lo previsto');
   });
   test('vivo: márgenes de hitos con el retraso arrastrado (ámbar < 15, rojo rebasado)', () => {
     let m = C.hitoMargins(V.s, blocksOf(V.s), at(D10, '20:00'));
     eq(m.length, 1); eq(m[0].band.name, 'D'); eq(m[0].margin, 10); eq(m[0].level, 'tight');
-    let st = C.setReal(V.s, V.ids.B, 'show', 'f', at(D10, '23:10')).state;   // B acaba 40 min tarde
+    let st = alargarHasta(V.s, V.ids.B, '23:10');   // B alarga 40 min
     m = C.hitoMargins(st, blocksOf(st), at(D10, '23:10'));
     ok(m[0].margin < 0, 'C empuja a D más allá del curfew'); eq(m[0].level, 'over');
   });

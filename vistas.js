@@ -111,11 +111,13 @@
     let z = zoneId;
     if (z === null || z === undefined) { if (zs.length === 1) z = zs[0]; else return { mode: 'pickzone', zones: zs.map(id => ({ id, name: zoneName(state, id) })) }; }
     const base = { zoneId: z, zone: zoneName(state, z) };
-    const dayB = C.buildBlocks(state, { mode: 'all', day: jor });
+    const dayB = C.buildBlocks(state, { mode: 'all', day: jor, now: n });
     const bands = dayB.filter(b => C.isBand(b) && b.psi !== null && (b.stageId || '') === z).sort((a, b) => a.si - b.si);
-    const cur = bands.find(b => b.ri !== null && b.rf === null) || bands.find(b => b.ri === null && b.rf === null && b.si <= n && n < C.blockEnd(b));
+        // Sin Alargar, se para a su hora (aunque tenga ▶). Con Alargar, sigue hasta ■ y pasada su hora cuenta en rojo.
+    const cur = bands.find(b => b.alargar && b.rf === null && b.si <= n && n >= (b.nf !== null && b.nf !== undefined ? b.nf : C.blockEnd(b))) || bands.find(b => b.rf === null && b.si <= n && n < (b.nf !== null && b.nf !== undefined ? b.nf : C.blockEnd(b)));
     if (cur) {
-      const total = Math.max(1, (C.blockEnd(cur) - cur.si) * 60), rem = (C.blockEnd(cur) - n) * 60;
+      const end = cur.nf !== null && cur.nf !== undefined ? cur.nf : C.blockEnd(cur);   // fin NOMINAL: pasado, cuenta en rojo
+      const total = Math.max(1, (end - cur.si) * 60), rem = (end - n) * 60;
       const lv = level(rem, S.conf.showWarn, S.conf.showDanger);
       return Object.assign(base, { mode: 'show', band: cur, remSec: rem, totalSec: total, frac: Math.max(0, Math.min(1, rem / total)), level: lv, blink: lv === 'over' && S.conf.blink });
     }
@@ -145,6 +147,9 @@
       late.forEach(z => out.push({ kind: 'delay', level: z.status === 'overflow' ? 'over' : 'warn',
         text: (z.zone || 'Sin zona').toUpperCase() + ' · RETRASO +' + z.acc + ' MIN' + (z.live > 0 ? ' (+' + z.live + ' EN VIVO)' : '') }));
       if (!late.length) out.push({ kind: 'delay', level: 'ok', text: 'HORARIO EN HORA' });
+      // Tiempo extra en curso (activado y pasada su hora)
+      C.buildBlocks(state, { mode: 'all', day: jor, now: n }).filter(b => C.isBand(b) && b.alargar && b.rf === null && b.nf !== null && n >= b.nf && b.si <= n).forEach(b =>
+        out.push({ kind: 'delay', level: 'warn', text: (b.stage || 'Sin zona').toUpperCase() + ' · ' + b.name.toUpperCase() + ' · TIEMPO EXTRA +' + Math.floor(n - b.nf) + ' MIN' }));
     }
     if (t.hitos) {
       const all = C.buildBlocks(state, { mode: 'all', day: jor });

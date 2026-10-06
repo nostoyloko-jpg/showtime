@@ -175,56 +175,61 @@
   // ── Campos del proyecto por modo ──────────────────────────────────────
   // Los de Stage Master y, con prefijo «showtime», los que añade Showtime (Stage Master los ignora).
   const FIELDS = {
-    show: { fecha: 'fecha', inicio: 'inicio', fin: 'fin', call: 'showtimeCall', notas: 'notas', standby: 'showtimeStandby', real: 'showtimeReal', base: 'showtimeBase' },
-    sc:   { fecha: 'soundcheckFecha', inicio: 'soundcheckInicio', fin: 'soundcheckFin', call: 'soundcheckCall', notas: 'soundcheckNotas', standby: 'showtimeStandbySC', real: 'showtimeRealSC', base: 'showtimeBaseSC' }
+    show: { fecha: 'fecha', inicio: 'inicio', fin: 'fin', call: 'showtimeCall', notas: 'notas', standby: 'showtimeStandby', real: 'showtimeReal', base: 'showtimeBase', alargar: 'showtimeAlargar' },
+    sc:   { fecha: 'soundcheckFecha', inicio: 'soundcheckInicio', fin: 'soundcheckFin', call: 'soundcheckCall', notas: 'soundcheckNotas', standby: 'showtimeStandbySC', real: 'showtimeRealSC', base: 'showtimeBaseSC', alargar: 'showtimeAlargarSC' }
   };
 
   // ── De proyecto Stage Master a bloques ────────────────────────────────
   /**
-   * opts: { mode: 'show' | 'sc' | 'all', day: 'all' | 'YYYY-MM-DD' }
-   * Devuelve los bloques ordenados por inicio absoluto (sin inicio, al final).
+   * opts: { mode: 'show' | 'sc' | 'all', day: 'all' | 'YYYY-MM-DD', now?: minutos absolutos (por defecto, ahora) }
+   * Devuelve los bloques ordenados por inicio ESTIMADO (sin inicio, al final).
    * Cada bloque lleva kind: 'show' | 'sc' | 'tarea' | 'hito' y key = id:kind (única en la vista).
+   *
+   * Dos horarios por bloque (decisión 82):
+   *   psi / psf  PREVISTO: lo escrito en la tabla (la escaleta). Los retrasos NO lo tocan.
+   *   si  / sf   ESTIMADO / REAL: lo calcula la app (retrasos manuales, desbordes, ▶/■, «Alargar»). Nunca se escribe solo.
+   * Más: pmi/pmf (previsto + retrasos manuales) · nf (fin nominal, sin el «sigue tocando») · live (alargando ahora)
+   *      · dev (minutos de más de esta banda) · push (lo que empuja a esta banda el desborde de la anterior) · A (colchón)
+   *      · clash (entrada fija pisada por la anterior) · alargar.
    */
-  function buildBlocks(state, opts) {
-    const o = opts || {};
-    const day = o.day || 'all';
-    let arr = entriesOf(state, isAll(o.mode) ? 'all' : isSC(o.mode) ? 'sc' : 'show');
-    if (day !== 'all') arr = arr.filter(e => festivalDateOf(state, e.a, e.sc) === day);
-
-    const blocks = arr.map(e => {
-      const a = e.a, sc = e.sc, kind = e.kind, band = kind === 'show' || kind === 'sc';
+  function rawBlocks(state) {
+    return entriesOf(state, 'all').map(e => {
+      const a = e.a, sc = e.sc, kind = e.kind, band = kind === 'show' || kind === 'sc', F = FIELDS[sc ? 'sc' : 'show'];
       const f = sc ? (a.soundcheckFecha || a.fecha) : a.fecha;
       const psi = toAbs(f, sc ? a.soundcheckInicio : a.inicio);
       const psf = kind === 'hito' ? null : adjustEnd(psi, toAbs(f, sc ? a.soundcheckFin : a.fin));
-      // Horas REALES (opcionales: «Empezar» / «Terminar»). Sin ellas, todo va en hora (real = teórica).
-      const real = kind !== 'hito' ? (a[FIELDS[sc ? 'sc' : 'show'].real] || null) : null;
+      // Horas REALES (opcionales: ▶ / ■). Sin ellas, todo va en hora.
+      const real = kind !== 'hito' ? (a[F.real] || null) : null;
       const ri = real && Number.isFinite(real.i) ? real.i : null;
       const rf = real && Number.isFinite(real.f) ? real.f : null;
-      const dur = (psi !== null && psf !== null) ? psf - psi : null;
-      const si = ri !== null ? ri : psi;                                   // inicio efectivo
-      const sf = kind === 'hito' ? null : rf !== null ? rf : (ri !== null && dur !== null ? ri + dur : psf);   // fin efectivo (previsto)
       const delta = rf !== null && psf !== null ? rf - psf : ri !== null && psi !== null ? ri - psi : null;
-      // Inicio ORIGINAL antes de los retrasos (se apunta la primera vez que un retraso la mueve; editar a mano lo borra)
-      const bs = a[FIELDS[sc ? 'sc' : 'show'].base], base = Number.isFinite(bs) ? bs : null;
+      const bs = a[F.base], base = Number.isFinite(bs) ? bs : null;
       const call = band ? ((sc ? a.soundcheckCall : a[FIELDS.show.call]) || '') : '';
       const esc = getEscenario(state, a.escenarioId);
       return {
         id: a.id, kind: kind, key: a.id + ':' + kind,
-        si: si, sf: sf, psi: psi, psf: psf, ri: ri, rf: rf, delta: delta, base: base,
-        fija: isFija(a), libre: isLibre(a),
+        si: psi, sf: psf, psi: psi, psf: psf, ri: ri, rf: rf, delta: delta, base: base,
+        fija: isFija(a), libre: isLibre(a), alargar: band && !!a[F.alargar],
         name: a.nombre || '',
         color: artistColor(state, a),
         notes: (sc ? a.soundcheckNotas : a.notas) || '',
         call: call,
-        callAbs: call ? callAbsFor(si, call, f) : null,
+        callAbs: call ? callAbsFor(psi, call, f) : null,
         stage: esc ? (esc.nombre || '') : '',
         stageId: esc ? esc.id : '',
         stageColor: esc ? (esc.color || '') : '',
-        standby: band && !!a[FIELDS[sc ? 'sc' : 'show'].standby],   // hueco ANTES de este bloque marcado a mano como STANDBY
+        standby: band && !!a[F.standby],   // hueco ANTES de este bloque marcado a mano como STANDBY
         jornada: festivalDateOf(state, a, sc)                 // día del festival (con la hora de corte)
       };
     });
+  }
 
+  function buildBlocks(state, opts) {
+    const o = opts || {};
+    const day = o.day || 'all';
+    const all = projectAll(state, rawBlocks(state), Number.isFinite(o.now) ? o.now : nowAbs());
+    let blocks = all.filter(b => isAll(o.mode) ? true : isSC(o.mode) ? b.kind === 'sc' : b.kind === 'show');
+    if (day !== 'all') blocks = blocks.filter(b => b.jornada === day);
     blocks.sort((a, b) => {
       const an = a.si === null, bn = b.si === null;
       if (an || bn) return an === bn ? 0 : (an ? 1 : -1);
@@ -242,7 +247,7 @@
   function hasStart(b) { return b && b.si !== null && b.si !== undefined; }
 
   function isPlaying(b, now) {
-    return hasStart(b) && now >= b.si && now < blockEnd(b);
+    return hasStart(b) && now >= b.si && (now < blockEnd(b) || (!!b.alargar && b.rf === null));   // con «Tiempo extra», sigue hasta ■ (aunque pase su hora)
   }
 
   /** En escena: todos los que suenan ahora (puede haber varios escenarios). */
@@ -362,7 +367,8 @@
     };
   }
 
-  function callKey(b) { return b.name + '@' + b.si; }
+  /** Clave del OK de CALL: con la hora PREVISTA (un retraso no lo borra; cambiar la hora en la tabla, sí). */
+  function callKey(b) { return b.name + '@' + (b.psi !== undefined && b.psi !== null ? b.psi : b.si); }
 
   /** Momento en que salta el aviso (cascada):
    *  1) hora de CALL escrita en el artista (callAbs), si es válida y anterior al inicio;
@@ -805,116 +811,177 @@
     return isoOfDay(t < cutoffMins(state) ? d - 1 : d);
   }
 
-  /** Desfase por zona. Para cada zona, la última banda con hora real registrada (en su jornada) da Δ.
-   *  A = changeover programado hasta la siguiente banda − changeover mínimo de la zona.
-   *  status: 'early' (Δ<0) · 'ontime' (Δ=0) · 'absorb' (0<Δ≤A) · 'overflow' (Δ>A; overflow = Δ−A).
-   *  Comportamiento pasivo: si la siguiente ya debería haber empezado y no se ha registrado, se da por en hora. */
-  function driftByZone(state, blocks, now) {
-    const bands = blocks.filter(b => isBand(b) && b.psi !== null);
-    const zones = {};
-    bands.forEach(b => { const k = b.stageId || ''; (zones[k] = zones[k] || []).push(b); });
-    const out = [];
-    Object.keys(zones).forEach(k => {
-      const list = zones[k].slice().sort((x, y) => x.psi - y.psi);
-      let last = null;
-      list.forEach(b => { if (b.delta !== null && (!last || b.psi > last.psi)) last = b; });
-      if (!last) return;
-      const next = list.find(b => b.psi > last.psi && b.jornada === last.jornada) || null;
-      // Pasivo: si la anterior acabó a tiempo para que la siguiente empiece en hora y ya es su hora, se da por en hora
-      if (next && next.ri === null && now !== undefined && now >= next.psi && last.rf !== null && last.rf <= next.psi) return;
-      const coMin = coMinFor(state, k);
-      const A = next ? Math.max(0, (next.psi - last.psf) - coMin) : Infinity;
-      const d = last.delta;
-      let status = d < 0 ? 'early' : d === 0 ? 'ontime' : d <= A ? 'absorb' : 'overflow';
-      const esc = getEscenario(state, k);
-      out.push({ zoneId: k, zone: esc ? esc.nombre : '', color: esc ? esc.color : '', block: last, next: next,
-        delta: d, A: A === Infinity ? null : A, coMin: coMin, status: status, overflow: status === 'overflow' ? d - A : 0 });
+  // ── Estimado / Real (decisión 82): retrasos manuales + desbordes, calculado en pantalla ──
+  /** Órdenes de retraso manual guardadas en el evento: [{ id, at, minutes, zones: 'all'|[ids], day, from, blocked, extra, src }]. */
+  function retrasosOf(state) {
+    const l = state && Array.isArray(state.showtimeRetrasos) ? state.showtimeRetrasos : [];
+    return l.filter(d => d && Number.isFinite(d.minutes) && d.minutes > 0 && Number.isFinite(d.from) && dayIndex(d.day) !== null && (d.zones === 'all' || Array.isArray(d.zones)));
+  }
+  /** Bloqueos de categorías ({ all: {show,sc,tarea,hito}, <zona>: {…} }): ¿está bloqueada esta categoría en esta zona? */
+  function blockedIn(map, kind, zoneId) { const g = (map && map.all) || {}, z = (map && map[zoneId || '']) || {}; return !!(g[kind] || z[kind]); }
+  /** ¿Se mueve con un retraso? LED rojo > LED verde > bloqueos extra de la orden > bloqueos del menú Retrasos. */
+  function movesBy(b, map, extra) { if (b.fija) return false; if (b.libre) return true; if (extra && extra[b.kind]) return false; return !blockedIn(map, b.kind, b.stageId); }
+
+  /** Minutos de retraso MANUAL de cada entrada (las órdenes, en el orden en que se dieron). */
+  function manualOffsets(state, raw) {
+    const M = new Map(); raw.forEach(b => M.set(b.key, 0));
+    retrasosOf(state).forEach(d => {
+      const zs = d.zones === 'all' ? null : d.zones;
+      raw.forEach(b => {
+        if (b.psi === null || b.jornada !== d.day) return;
+        if (zs && zs.indexOf(b.stageId || '') < 0) return;
+        if (b.psi + M.get(b.key) < d.from) return;                       // solo lo que empieza desde «desde»
+        if (b.ri !== null && Number.isFinite(d.at) && b.ri <= d.at) return;  // lo que ya había empezado no se mueve
+        if (!movesBy(b, d.blocked, d.extra)) return;
+        M.set(b.key, M.get(b.key) + Math.round(d.minutes));
+      });
     });
-    return out;
+    return M;
+  }
+
+  /**
+   * Proyección por zona y jornada (regla del colchón, decisión 48 + 82):
+   *  - una banda empieza a su hora prevista + retraso manual + el retraso que arrastra la zona (lo fijo/bloqueado no se mueve);
+   *  - ▶ manda (inicio real). Si empieza ANTES de lo estimado, el retraso de lo que viene baja (nunca por debajo de lo previsto);
+   *  - sin «Alargar», la banda se para A SU HORA (parada automática), aunque saliera tarde: no retrasa nada. ■ antes = fin anticipado;
+   *  - con «Alargar», lo que se pasa (en directo hasta ■) se absorbe primero en el colchón del cambio
+   *    (A = cambio previsto − changeover mínimo) y solo lo que sobra (el DESBORDE) pasa solo a todo lo que viene de su zona;
+   *    llevarlo a otras zonas lo decide el regidor en Retrasos (la ventana enseña los desbordes del día);
+   *  - acabar antes (■) no adelanta a nadie.
+   */
+  function projectAll(state, raw, now) {
+    const M = manualOffsets(state, raw);
+    const blk = (state && state.showtimeBloqueos) || {};
+    const n = Math.floor(now);
+    raw.forEach(b => {
+      const m = M.get(b.key) || 0;
+      b.man = m; b.pmi = b.psi === null ? null : b.psi + m; b.pmf = b.psf === null ? null : b.psf + m;
+      b.si = b.pmi; b.sf = b.pmf; b.nf = b.pmf; b.live = false; b.dev = 0; b.push = 0; b.pushFrom = ''; b.A = null; b.clash = false; b.clashWith = '';
+    });
+    const groups = {};
+    raw.filter(b => b.psi !== null).forEach(b => { const k = (b.stageId || '') + '|' + b.jornada; (groups[k] = groups[k] || []).push(b); });
+    const RANK = { show: 0, sc: 0, tarea: 1, hito: 2 };
+    Object.keys(groups).forEach(k => {
+      const list = groups[k].sort((x, y) => (x.pmi - y.pmi) || (RANK[x.kind] - RANK[y.kind]));
+      const coMin = coMinFor(state, k.split('|')[0]);
+      let prev = null;                                  // última banda: { pmf, lend, dev, cOut, si, name, alargar, key }
+      list.forEach(e => {
+        const mov = movesBy(e, blk, null);
+        if (isBand(e)) {
+          const dur = e.pmf !== null ? e.pmf - e.pmi : DEFAULT_DURATION;
+          const A = prev ? Math.max(0, (e.pmi - prev.pmf) - coMin) : null;
+          const push = prev ? Math.max(0, prev.dev - A) : 0;               // desborde: lo que la anterior se pasó por encima del colchón
+          if (push) e.pushFrom = prev.name;
+          const cin = prev ? prev.cOut + push : 0;
+          const est = mov ? e.pmi + cin : e.pmi;
+          if (!mov && prev && prev.lend > e.pmi) { e.clash = true; e.clashWith = prev.name; }
+          const S = e.ri !== null ? e.ri : est;
+          const cOut = S < est ? Math.max(0, S - e.pmi) : cin;   // empezar antes de lo estimado recupera retraso
+          const ref = (mov ? e.pmi + cOut : e.pmi) + dur;          // fin de referencia de esta banda
+          const hora = Math.max(S, est + dur);                     // su hora de acabar (parada automática sin Alargar)
+          const nf = e.alargar ? (e.rf !== null ? e.rf : S + dur) : (e.rf !== null ? Math.min(e.rf, hora) : hora);
+          const live = e.rf === null && e.alargar && n >= S && n >= S + dur;   // con Tiempo extra, pasada su hora: sigue hasta ■
+          const lend = live ? Math.max(nf, n) : nf;
+          e.si = S; e.nf = nf; e.sf = lend; e.live = live; e.A = A; e.push = push;   // push: lo que el desborde de la anterior pasa del colchón (aunque esta no se mueva)
+          e.dev = Math.max(0, lend - ref);
+          prev = { pmf: e.pmf !== null ? e.pmf : e.pmi + dur, lend, dev: e.dev, cOut, si: S, name: e.name, alargar: e.alargar, key: e.key };
+        } else {
+          // Tareas e hitos de la zona: les llega lo que sobra después de la banda anterior (sin changeover mínimo)
+          const cin = prev ? prev.cOut + Math.max(0, prev.dev - Math.max(0, e.pmi - prev.pmf)) : 0;
+          const est = mov ? e.pmi + cin : e.pmi;
+          if (e.kind === 'hito' && !mov && prev && prev.si < e.pmi && prev.lend > e.pmi) { e.clash = true; e.clashWith = prev.name; }
+          const S = e.kind !== 'hito' && e.ri !== null ? e.ri : est;
+          e.si = S;
+          if (e.kind === 'hito') { e.sf = null; e.nf = null; }
+          else { const dur = e.pmf !== null ? e.pmf - e.pmi : DEFAULT_DURATION; e.nf = e.rf !== null ? e.rf : S + dur; e.sf = e.nf; }
+        }
+        if (e.callAbs !== null && e.callAbs !== undefined) e.callAbs += e.si - e.psi;   // el CALL escrito va con su banda
+      });
+    });
+    return raw;
   }
 
   /** Retraso por zona en la jornada de `now` (radiografía del directo):
-   *  acc  = retraso ACUMULADO de lo que viene: el mayor corrimiento de las bandas aún sin empezar respecto a su hora
-   *         original (cascadas y desbordes aplicados; no cuentan los cambios hechos a mano);
-   *  live = desfase EN VIVO (> 0) de la última banda con hora real (lo que aún se está absorbiendo o desborda);
-   *  early = adelanto en vivo; status/overflow como driftByZone. Zonas en el orden de la Live; «sin zona» al final. */
+   *  acc  = retraso de lo que viene: el mayor «estimado − previsto» de las bandas que aún no han empezado;
+   *  live = minutos de más de la última banda con ▶/■ o alargando (lo que se absorbe en el cambio o desborda);
+   *  early = adelanto en vivo; status: 'ontime' · 'early' · 'absorb' (cabe en el colchón) · 'overflow' (empuja lo que viene).
+   *  Zonas en el orden de la Live; «sin zona» al final. */
   function delayByZone(state, now) {
     if (!state) return [];
     const n = Math.floor(now), jor = jornadaOfAbs(state, n);
-    const blocks = buildBlocks(state, { mode: 'all', day: jor });
-    const drift = driftByZone(state, blocks, n);
+    const blocks = buildBlocks(state, { mode: 'all', day: jor, now: n });
     const groups = {};
     blocks.filter(b => isBand(b) && b.psi !== null).forEach(b => { const k = b.stageId || ''; (groups[k] = groups[k] || []).push(b); });
     const order = (state.escenarios || []).map(e => e.id).concat(['']);
     return order.filter(k => groups[k]).map(k => {
-      // Lo que viene: bandas sin empezar que aún no han pasado. El acumulado es el mayor corrimiento entre ellas.
-      const pend = groups[k].filter(b => b.ri === null && b.rf === null && blockEnd(b) > n);
-      const acc = pend.reduce((m, b) => Math.max(m, b.base !== null ? b.psi - b.base : 0), 0);
-      const dz = drift.find(z => z.zoneId === k);
+      const list = groups[k].slice().sort((x, y) => x.pmi - y.pmi);
+      const pend = list.filter(b => b.ri === null && b.rf === null && !b.live && b.si > n);
+      const acc = pend.reduce((m, b) => Math.max(m, b.si - b.psi), 0);
+      let lb = null;
+      list.forEach(b => { if ((b.ri !== null || b.rf !== null || b.live) && b.si <= n) lb = b; });
+      let next = lb ? list[list.indexOf(lb) + 1] || null : null;
+      if (lb && next && next.si <= n) lb = null;        // la siguiente ya ha empezado: lo de la anterior ya no está «en vivo»
+      if (!lb) next = null;
+      const live = lb ? lb.dev : 0, overflow = next ? next.push : 0;
+      const early = lb && !live && lb.delta !== null && lb.delta < 0 ? -lb.delta : 0;
       const esc = getEscenario(state, k);
-      return { zoneId: k, zone: esc ? esc.nombre : '', color: esc ? esc.color : '', acc: acc,
-        live: dz && dz.delta > 0 ? dz.delta : 0, early: dz && dz.delta < 0 ? -dz.delta : 0,
-        status: dz ? dz.status : 'ontime', overflow: dz ? dz.overflow : 0, liveBlock: dz ? dz.block : null };
+      return { zoneId: k, zone: esc ? esc.nombre : '', color: esc ? esc.color : '', acc: acc, live: live, early: early,
+        status: live > 0 ? (overflow > 0 ? 'overflow' : 'absorb') : early ? 'early' : 'ontime', overflow: overflow,
+        liveBlock: lb, next: next, A: next ? next.A : null };
     });
   }
 
-  /** Mueve en cascada `minutes` las entradas que cumplan TODO esto:
-   *  - de la jornada de `fromAbs`, con inicio programado >= fromAbs (y > afterAbs si se da), sin hora real de inicio;
-   *  - de las zonas `zone` ('all' = todas; un id; o lista de ids, '' = sin zona);
-   *  - de una categoría autorizada en `cats` ({ show, sc, tarea, hito }, o función (bloque) → bool, p. ej. por zona);
-   *  - con DELAY en verde (las de LED rojo no se mueven; NO hacen de tope: lo verde de después sí se mueve).
-   *  Devuelve { state, moved:[...], kept:[...entradas rojas afectadas], clashes:[...] }. No toca el original. */
-  function shiftEntries(state, opts) {
+  /** Desfase en vivo por zona (para la Live): las zonas con algo «en vivo» (delta > 0 de más; < 0 adelanto). */
+  function driftByZone(state, blocks, now) {
+    return delayByZone(state, now).filter(z => z.liveBlock).map(z => ({ zoneId: z.zoneId, zone: z.zone, color: z.color, block: z.liveBlock, next: z.next,
+      delta: z.live > 0 ? z.live : -z.early, A: z.A, status: z.status, overflow: z.overflow }));
+  }
+
+  /**
+   * Retraso MANUAL (+5, +10…): se guarda como ORDEN en el evento; el previsto no se toca y el estimado se recalcula.
+   * opts: { minutes, zone: 'all' | id | [ids] ('' = sin zona), fromAbs, day, blocked (bloqueos del menú Retrasos), extra (solo esta vez), at, src, now }
+   * → { ok, state, moved:[{key,id,kind,name,stage,from,to}], kept:[…], clashes:[…], jornada, order }. No toca el original.
+   */
+  function addRetraso(state, opts) {
     const o = opts || {};
     const mins = Math.round(Number(o.minutes) || 0);
-    const cats = o.cats || {};
-    const jor = o.day || jornadaOfAbs(state, o.fromAbs);
-    const all = buildBlocks(state, { mode: 'all', day: jor });
-    // Zonas: 'all' (o vacío) = todas; un id; o una lista de ids ('' = entradas sin zona)
-    const zs = Array.isArray(o.zone) ? o.zone : (o.zone === 'all' || !o.zone ? null : [o.zone]);
-    const inScope = b => b.psi !== null && b.psi >= o.fromAbs && (o.afterAbs === undefined || b.psi > o.afterAbs) && b.ri === null &&
-      (!zs || zs.indexOf(b.stageId || '') >= 0);
-    const cand = all.filter(inScope);
-    const move = cand.filter(b => movesWithDelay(b, cats));
-    const kept = cand.filter(b => !movesWithDelay(b, cats));
-    let next = clone(state);
-    const moved = [];
-    move.forEach(b => {
-      const i = findArtistIndex(next, b.id); if (i < 0) return;
-      const a = next.artists[i], F = FIELDS[b.kind === 'sc' ? 'sc' : 'show'];
-      const ns = b.psi + mins;
-      if (!Number.isFinite(a[F.base])) a[F.base] = b.psi;          // hora original, para el retraso acumulado
-      a[F.fecha] = isoOfDay(Math.floor(ns / 1440));
-      a[F.inicio] = fmtHM(ns);
-      if (b.kind !== 'hito' && b.psf !== null) a[F.fin] = fmtHM(b.psf + mins);
-      moved.push({ id: b.id, key: b.key, kind: b.kind, name: b.name, stage: b.stage, from: b.psi, to: ns, fromEnd: b.psf, toEnd: b.psf !== null ? b.psf + mins : null });
+    const day = o.day || jornadaOfAbs(state, o.fromAbs);
+    const zones = Array.isArray(o.zone) ? o.zone.slice() : (o.zone === 'all' || !o.zone ? 'all' : [o.zone]);
+    const at = Number.isFinite(o.at) ? Math.floor(o.at) : Math.floor(nowAbs());
+    const now = Number.isFinite(o.now) ? o.now : at;
+    const extra = {}; ['show', 'sc', 'tarea', 'hito'].forEach(k => { extra[k] = !!(o.extra && o.extra[k]); });
+    const order = { id: 'r' + at.toString(36) + Math.random().toString(36).slice(2, 6), at: at, minutes: mins, zones: zones, day: day,
+      from: Math.floor(o.fromAbs), blocked: clone(o.blocked || {}), extra: extra, src: o.src === 'mando' ? 'mando' : 'panel' };
+    const next = clone(state);
+    next.showtimeRetrasos = retrasosOf(state).concat(mins > 0 ? [order] : []);
+    const before = new Map(); buildBlocks(state, { mode: 'all', day: day, now: now }).forEach(b => before.set(b.key, b));
+    const after = buildBlocks(next, { mode: 'all', day: day, now: now });
+    const moved = [], kept = [], clashes = [];
+    after.forEach(b => {
+      const a = before.get(b.key); if (!a || b.psi === null) return;
+      if (b.man > a.man) moved.push({ id: b.id, key: b.key, kind: b.kind, name: b.name, stage: b.stage, from: a.si, to: b.si });
+      else {
+        const inScope = (zones === 'all' || zones.indexOf(b.stageId || '') >= 0) && a.pmi >= order.from && !(a.ri !== null && a.ri <= at);
+        if (inScope && !movesBy(b, order.blocked, extra)) kept.push({ name: b.name, kind: b.kind, stage: b.stage, at: b.si });
+      }
+      if (b.clash && !a.clash && b.kind !== 'tarea') clashes.push({ name: b.clashWith, with: b.name, at: b.si });
     });
-    // Choques: lo movido invade una entrada en rojo (o un hito en rojo) de su zona que antes no invadía
-    const after = buildBlocks(next, { mode: 'all', day: jor });
-    const fixed = after.filter(b => b.psi !== null && !movesWithDelay(b, cats) && moved.every(m => m.key !== b.key));
-    const clashes = [];
-    moved.forEach(m => {
-      const mb = after.find(b => b.key === m.key); if (!mb) return;
-      fixed.forEach(f => {
-        if (f.key === m.key || f.kind === 'tarea' || mb.kind === 'tarea') return;   // las tareas conviven: no hay choque
-        if (f.stageId && mb.stageId && f.stageId !== mb.stageId) return;
-        if (f.stageId && !mb.stageId) return;
-        const ov = (s1, e1, s2, e2) => s1 < e2 && s2 < e1;
-        const fEnd = f.kind === 'hito' ? f.psi : blockEnd(f);
-        const mEnd = mb.kind === 'hito' ? mb.psi : blockEnd(mb);
-        const nowOv = f.kind === 'hito' ? (mb.psi < f.psi && mEnd > f.psi) : mb.kind === 'hito' ? (f.psi < mb.psi && fEnd > mb.psi) : ov(mb.psi, mEnd, f.psi, fEnd);
-        const was = f.kind === 'hito' ? (m.from < f.psi && (m.fromEnd !== null ? m.fromEnd : m.from) > f.psi) : mb.kind === 'hito' ? (f.psi < m.from && fEnd > m.from) : ov(m.from, m.fromEnd !== null ? m.fromEnd : m.from + DEFAULT_DURATION, f.psi, fEnd);
-        if (nowOv && !was) clashes.push({ name: m.name, with: f.name, at: f.psi });
-      });
-    });
-    return { ok: true, state: next, moved: moved, kept: kept.map(b => ({ name: b.name, kind: b.kind, stage: b.stage, at: b.psi })), clashes: clashes, jornada: jor };
+    return { ok: true, state: next, moved: moved, kept: kept, clashes: clashes, jornada: day, order: order };
+  }
+
+  /** «Alargar»: la banda puede gastar el colchón del cambio; hasta ■, cada minuto de más cuenta en el estimado. */
+  function setAlargar(state, id, mode, on) {
+    const i = findArtistIndex(state, id);
+    if (i < 0) return { ok: false, error: 'Entrada no encontrada.' };
+    if (tipoOf(state.artists[i]) !== 'banda') return { ok: false, error: 'Solo los shows y soundchecks tienen Tiempo extra.' };
+    const next = clone(state), k = FIELDS[modeKey(mode)].alargar;
+    if (on) next.artists[i][k] = true; else delete next.artists[i][k];
+    return { ok: true, state: next, changed: !!state.artists[i][k] !== !!on };
   }
 
   /** Márgenes de los hitos: para cada hito, la última banda que debía acabar antes de él (de su zona; sin zona, de cualquiera),
-   *  con su fin PROYECTADO (retraso acumulado incluido: lo que se ha registrado y el desborde que arrastra).
-   *  level: 'ok' · 'tight' (margen < 15) · 'over' (rebasado). Solo avisa. */
+   *  con su fin ESTIMADO. level: 'ok' · 'tight' (margen < 15) · 'over' (rebasado). Solo avisa. */
   function hitoMargins(state, blocks, now) {
-    const proj = projectBands(state, blocks, now);
     const out = [];
     blocks.filter(b => b.kind === 'hito' && b.psi !== null).forEach(h => {
       let best = null;
@@ -925,34 +992,17 @@
         if (!best || b.psf > best.psf) best = b;
       });
       if (!best) return;
-      const end = proj[best.key] ? proj[best.key].pe : blockEnd(best);
-      const margin = Math.round(h.psi - end);
+      const end = blockEnd(best);
+      const margin = Math.round(h.si - end);
       out.push({ hito: h, band: best, projEnd: end, margin: margin, level: margin < 0 ? 'over' : margin < MARGIN_WARN ? 'tight' : 'ok' });
     });
     return out;
   }
 
-  /** Proyección por zona: una banda futura no puede empezar antes de que acabe la anterior (con su retraso) + el changeover mínimo.
-   *  Solo se arrastra retraso real registrado; sin registros, todo coincide con el horario. */
-  function projectBands(state, blocks, now) {
-    const res = {}, zones = {};
-    blocks.filter(b => isBand(b) && b.psi !== null).forEach(b => { const k = (b.stageId || '') + '|' + b.jornada; (zones[k] = zones[k] || []).push(b); });
-    Object.keys(zones).forEach(k => {
-      const list = zones[k].sort((x, y) => x.psi - y.psi);
-      let prevEnd = null, prevLate = false;
-      const coMin = coMinFor(state, k.split('|')[0]);
-      list.forEach(b => {
-        const dur = b.psf !== null ? b.psf - b.psi : DEFAULT_DURATION;
-        let ps;
-        if (b.ri !== null) ps = b.ri;
-        else if (prevLate && prevEnd + coMin > b.psi) ps = prevEnd + coMin;   // no pudo empezar antes de que acabara la anterior
-        else ps = b.psi;
-        const pe = b.rf !== null ? b.rf : ps + dur;
-        res[b.key] = { ps: ps, pe: pe };
-        prevLate = pe > (b.psf !== null ? b.psf : b.psi + dur);
-        prevEnd = pe;
-      });
-    });
+  /** Compatibilidad: { key: { ps, pe } } con el estimado. */
+  function projectBands(state, blocks) {
+    const res = {};
+    blocks.filter(b => isBand(b) && b.psi !== null).forEach(b => { res[b.key] = { ps: b.si, pe: blockEnd(b) }; });
     return res;
   }
 
@@ -991,6 +1041,7 @@
     (original.artists || []).forEach(o => { if (findArtistIndex(current, o.id) < 0) r.removed++; });
     if (JSON.stringify(original.event || {}) !== JSON.stringify(current.event || {})) r.festival++;
     if (JSON.stringify(original.escenarios || []) !== JSON.stringify(current.escenarios || [])) r.festival++;
+    if (JSON.stringify(original.showtimeRetrasos || []) !== JSON.stringify(current.showtimeRetrasos || [])) r.festival++;
     r.total = r.fields + r.added + r.removed + r.festival;
     return r;
   }
@@ -1062,7 +1113,7 @@
 
   const API = {
     DEFAULT_CUTOFF, DEFAULT_CALL_MINS, DEFAULT_DURATION, DEFAULT_CO_MIN, isFija, setFija, coMinFor,
-    MARGIN_WARN, isLibre, setDelayFlag, movesWithDelay, setReal, jornadaOfAbs, driftByZone, delayByZone, shiftEntries, hitoMargins, projectBands, MAX_NEXT, ARTIST_COLORS,
+    MARGIN_WARN, isLibre, setDelayFlag, movesWithDelay, setReal, jornadaOfAbs, driftByZone, delayByZone, addRetraso, retrasosOf, blockedIn, movesBy, setAlargar, hitoMargins, projectBands, MAX_NEXT, ARTIST_COLORS,
     pad2, parseHM, fmtHM, dayIndex, isoOfDay, shiftDate, toAbs, adjustEnd, nowAbs,
     cutoffMins, festivalDateOf, entersMode, festivalDays, TIPOS, tipoOf, isBand, isAll, entriesOf, tasksNow, hitosOf,
     getEscenario, artistColor, callAbsFor, buildBlocks,

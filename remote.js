@@ -88,14 +88,19 @@
     else {
       let st = '';
       if (b.rf !== null) st = '<span class="bst done">Terminada ' + C.fmtHM(b.rf) + '</span>';
-      else if (b.ri !== null) st = '<span class="bst on">En curso · quedan ' + fmtMin(C.blockEnd(b) - n) + '</span>';
+      else if (b.live) st = '<span class="bst warn">Tiempo extra · +' + Math.round(b.sf - b.nf) + ' min · ■ cuando acabe</span>';
+      else if (b.ri !== null) st = '<span class="bst on">En curso · quedan ' + fmtMin(b.nf - n) + '</span>';
       else if (b.si > n) st = '<span class="bst">Empieza en ' + fmtMin(b.si - n) + '</span>';
-      else if (n < C.blockEnd(b)) st = '<span class="bst warn">Debería estar sonando · sin ▶</span>';
+      else if (n < C.blockEnd(b)) st = '<span class="bst on">Sonando según el horario · ■ cuando acabe</span>';
       else st = '<span class="bst">Pasada sin registros</span>';
-      const real = b.ri !== null ? '<div class="breal ' + (b.delta > 0 ? 'late' : b.delta < 0 ? 'early' : '') + '">Real ' + C.fmtHM(b.ri) + (b.rf !== null ? '–' + C.fmtHM(b.rf) : '') + ' · ' + deltaTxt(b.delta) + ' min</div>' : '';
+      const est = b.si !== b.psi || b.sf !== b.psf || b.ri !== null || b.rf !== null;
+      const real = est ? '<div class="breal ' + (b.clash ? 'clash' : 'late') + '">' + (b.ri !== null || b.rf !== null ? 'Real ' : 'Estimado ') + C.fmtHM(b.si) + (b.sf !== null ? '–' + C.fmtHM(b.sf) : '') +
+        (b.si !== b.psi ? ' · ' + deltaTxt(b.si - b.psi) + ' min' : '') + (b.clash ? ' · pisada por ' + esc(b.clashWith) : '') + '</div>' : '';
+      const alg = b.rf === null ? '<button class="tbtn stretch' + (b.alargar ? ' on' : '') + '" id="b-stretch" data-on="' + (b.alargar ? '0' : '1') + '"' + (live() && !BUSY ? '' : ' disabled') + '><svg class="ic"><use href="#i-stretch"/></svg>' +
+        (b.alargar ? 'TIEMPO EXTRA · ACTIVADO' : 'TIEMPO EXTRA') + '</button>' : '';
       bh = '<div class="bpos">' + (SEL ? 'ELEGIDA' : 'PROPUESTA') + ' · ' + (i + 1) + ' de ' + cur.list.length + (SEL ? ' · <button class="link" id="b-auto">volver a la propuesta</button>' : '') + '</div>'
         + '<div class="bkind">' + (KIND[b.kind] || '') + '</div><div class="bname" style="--bc:' + esc(b.color || '#888') + '">' + esc(b.name) + '</div>'
-        + '<div class="btime">Programado ' + C.fmtHM(b.psi) + (b.psf !== null ? '–' + C.fmtHM(b.psf) : '') + '</div>' + real + st;
+        + '<div class="btime">Previsto ' + C.fmtHM(b.psi) + (b.psf !== null ? '–' + C.fmtHM(b.psf) : '') + '</div>' + real + st + alg;
     }
     if ($('band').dataset.h !== bh) { $('band').innerHTML = bh; $('band').dataset.h = bh; }
 
@@ -112,13 +117,13 @@
     if ($('flash-cur').dataset.h !== fh) { $('flash-cur').innerHTML = fh; $('flash-cur').dataset.h = fh; }
     $('flash-cur').hidden = !f;
 
-    setActs(b);
+    setActs(b, n);
     renderMsgZones();
     document.querySelectorAll('.tbtn[data-delay], .msgp, #msg-form .send').forEach(x => { x.disabled = !live() || BUSY; });
     if (SHEET && SHEET.refresh) SHEET.refresh();
   }
-  function setActs(b) {
-    const a = M.actionsFor(b), ok = live() && !BUSY;
+  function setActs(b, n) {
+    const a = M.actionsFor(b, n), ok = live() && !BUSY;
     $('b-start').disabled = !(ok && a.start);
     $('b-stop').disabled = !(ok && a.stop);
     $('b-ontime').disabled = !(ok && a.onTime);
@@ -154,13 +159,14 @@
   $('b-ontime').addEventListener('click', () => {
     const b = selBand(); if (!b) return;
     openSheet({
-      title: 'Poner en hora · ' + b.name,
-      body: () => '<p class="big">Se borran sus registros: <b>▶ ' + (b.ri !== null ? C.fmtHM(b.ri) : '—') + '</b> · <b>■ ' + (b.rf !== null ? C.fmtHM(b.rf) : '—') + '</b>. Su desfase vuelve a 0.</p><p>Los retrasos que ya se aplicaron al resto del horario <b>se mantienen</b>.</p>',
+      title: 'En hora · ' + b.name,
+      body: () => '<p class="big">Empieza (o empezó) a su hora prevista: <b>' + C.fmtHM(b.pmi) + '</b>' + (b.si !== b.pmi ? ' (estaba estimada a las ' + C.fmtHM(b.si) + ')' : '') + '.</p><p>El retraso que arrastraba la zona <b>se cancela</b>. Los retrasos manuales (+5, +10…) se mantienen.</p>',
       yes: 'Sí, en hora',
       run: () => send('onTime', { key: b.key })
     });
   });
   document.addEventListener('click', e => {
+    const sg = e.target.closest('#b-stretch'); if (sg && !sg.disabled) { const b = selBand(); if (b) send('stretch', { key: b.key, on: sg.dataset.on === '1' }); return; }
     const ck = e.target.closest('.callok'); if (ck && !ck.disabled) { send('callOk', { key: ck.dataset.ck }); return; }
     if (e.target.closest('#flash-off')) { send('flashOff', {}); return; }
     const z = e.target.closest('.zchip'); if (z) { ZONE = z.dataset.z; SEL = null; try { localStorage.setItem(ZKEY, JSON.stringify(ZONE)); } catch (er) {} render(); return; }
@@ -263,7 +269,7 @@
   // ── Arranque ─────────────────────────────────────────────────────────
   load();
   Dt.onChange(() => { load(); render(); });
-  R = new Em.Receptor({ params, onSnapshot: s => Dt.loadSnapshot(s), onStatus: st => { ST = st; renderRx(); setActs(FEST ? current().band : null); } });
+  R = new Em.Receptor({ params, onSnapshot: s => Dt.loadSnapshot(s), onStatus: st => { ST = st; renderRx(); setActs(FEST ? current().band : null, now()); } });
   R.start().catch(e => { console.error(e); toast('No se pudo conectar: ' + (e && e.message || e), true); });
   render();
   setInterval(render, 1000);

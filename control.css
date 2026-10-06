@@ -94,7 +94,9 @@ td input{height:30px;border-radius:5px;border:1px solid transparent;background:t
 td input:hover{border-color:var(--line2)}
 td input:focus{outline:none;border-color:var(--accent);background:var(--field)}
 td.t input{width:68px;text-align:center;font-weight:700}
-td.n input{min-width:110px}
+td.n{position:relative;width:96px}
+td.n input{width:96px;min-width:0}
+td.n input:focus{position:absolute;right:3px;left:auto;top:50%;transform:translateY(-50%);width:320px;z-index:6;box-shadow:0 6px 20px rgba(0,0,0,.5)}   /* Notas: se ensancha al escribir */
 td select{height:30px;width:118px}
 td.mod input,td.mod select{border-color:rgba(255,197,51,.6);background:rgba(255,197,51,.08)}
 td input.bad{border-color:var(--err)!important;background:rgba(255,107,107,.12)!important}
@@ -204,7 +206,7 @@ tfoot input.bad,tfoot select.bad{border-color:var(--err)!important;background:rg
 /* Aviso de cambio de jornada (la decisión es del regidor) */
 .daybar{display:flex;align-items:center;justify-content:center;gap:14px;padding:8px 16px;background:#16301f;border-bottom:1px solid rgba(61,220,151,.45);color:var(--ok);font-weight:800}
 .daybar[hidden]{display:none}
-.rowbtns{display:flex;gap:2px;white-space:nowrap}
+.rowbtns{display:flex;gap:2px;white-space:nowrap;align-items:center}
 .dupbtn:hover{color:var(--ok)!important;border-color:rgba(61,220,151,.45)!important;background:rgba(61,220,151,.08)!important}
 
 /* ── Pestañas de jornadas ── */
@@ -310,7 +312,6 @@ body[data-ps="escenario"] .cfg-h{background:#000}
   main{grid-template-columns:minmax(220px,260px) minmax(0,1fr)}
   td.name{min-width:170px}
   td.name input[type=text]{min-width:110px}
-  td.n input{min-width:90px}
   td.tp select{width:100px}
   td.f select{width:108px}
   td.t2 input{width:56px}
@@ -377,13 +378,43 @@ body[data-ps="escenario"] .mpanel{box-shadow:none}
 .dchip .ic{width:14px;height:14px}
 .dchip.absorb{color:var(--call);border-color:rgba(255,197,51,.5);background:rgba(255,197,51,.08)}
 .dchip.over{color:#ff6b62;border-color:rgba(255,59,48,.6);background:rgba(255,59,48,.12)}
-.dchip.early{color:#34d399;border-color:rgba(16,185,129,.5);background:rgba(16,185,129,.1)}
+.dchip.early{color:var(--call);border-color:rgba(255,197,51,.5);background:rgba(255,197,51,.08)}
 .dchip.ok{color:var(--muted)}
 .dchip.ok .ic{color:#10b981}
 .dchip.acc{color:var(--call);border-color:rgba(255,197,51,.5);background:rgba(255,197,51,.08)}
 .realc{display:block;font-size:11px;font-weight:700;color:var(--muted);margin-top:2px;white-space:nowrap}
-.realc.late{color:var(--call)}
-.realc.early{color:#34d399}
+.realc b{font-weight:800;font-variant-numeric:tabular-nums}
+.realc b.chg{color:var(--call)}   /* ámbar: la hora real no es la programada (salida tarde, fin antes o después) */
+tr:not(.started) .livebtn.pasv{display:none}   /* ■ sin ▶: solo desde su hora */
+tr.ended .livebtn{display:none}   /* sin Alargar se para a su hora: ya no hay ▶ ni ■ */
+.dw-over{display:flex;flex-direction:column;gap:6px;flex:1}
+.dwo{display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap;padding:6px 10px;border:1px solid rgba(255,197,51,.4);border-radius:8px;background:rgba(255,197,51,.06);color:var(--call)}
+.dwo b{color:var(--text)}
+/* Estimado / Real (decisión 82): lo calcula la app */
+th.prev-h{text-align:left}
+th.est-h{color:var(--call)}
+td.est{white-space:nowrap;font-variant-numeric:tabular-nums;padding-left:10px;padding-right:10px;min-width:96px}
+td.est .estt{font-size:13px;font-weight:700;color:var(--text)}
+td.est .estt b{font-weight:800}
+td.est.same .estt{color:var(--dim);font-weight:600}
+td.est b.chg,td.est small.chg{color:var(--call)}
+td.est b.clash,td.est small.clash{color:#ff3b30}
+td.est small{display:block;font-size:11px;font-weight:700;color:var(--muted);margin-top:1px}
+td.est.live .estt b:last-child{animation:estlive 1.2s ease-in-out infinite}
+@keyframes estlive{50%{opacity:.45}}
+.xtrabtn{height:28px;padding:0 9px;border-radius:999px;border:1px solid var(--line2);background:transparent;color:var(--muted);font:inherit;font-size:12px;font-weight:800;white-space:nowrap;cursor:pointer;display:inline-flex;align-items:center;gap:5px}
+.xtrabtn .ic{width:14px;height:14px}
+.xtrabtn:hover{color:var(--call);border-color:rgba(255,197,51,.6)}
+.xtrabtn.on{color:#000;background:var(--call);border-color:var(--call)}
+.v-row .xtrabtn{margin-top:6px}
+.xtrabtn.sq{width:28px;padding:0;justify-content:center}
+/* Exportar log del evento */
+.lx .dw-row.top{align-items:flex-start}
+.lx .dtog{padding:0}
+.dtog.radio button::before{border-radius:50%}
+.lx-hint{max-width:520px;line-height:1.4}
+.lx-sum{padding:10px 12px;border:1px solid var(--line2);border-radius:8px;background:rgba(255,255,255,.03);font-size:13px;color:var(--muted)}
+.lx-sum b{color:var(--text)} .lx-sum b.chg{color:var(--call)} .lx-sum .hint{margin-top:4px}
 .livebtn{color:#10b981}
 .livebtn.on{color:#ff6b62}
 .mchip{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:800;color:var(--muted);white-space:nowrap}
@@ -420,8 +451,17 @@ body[data-ps="escenario"] .mpanel{box-shadow:none}
 @media (max-width:1380px){ .mbtn .mtxt{display:none} }
 @media (max-width:1180px){ #btn-undo span{display:none} .menus{margin-left:0} }
 .rowbtns .delbtn{width:28px}
+/* Directo (▶ ■ Tiempo extra) al principio de la fila; Duplicar/Borrar en el desplegable «⋯» del final */
+th.lv,td.lv{width:1%;white-space:nowrap}
+td.lv .rowbtns{gap:3px}
+td.mo,th.mo{width:34px}
+.more{position:relative;display:flex;justify-content:flex-end}
+.morep{position:absolute;right:100%;top:50%;transform:translateY(-50%);display:none;gap:4px;padding:4px;margin-right:4px;border-radius:9px;background:rgba(20,23,30,.94);border:1px solid rgba(255,255,255,.16);box-shadow:0 8px 24px rgba(0,0,0,.5);z-index:8;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+.more:hover .morep,.more.open .morep{display:flex}
+.morep .delbtn{width:auto;padding:0 10px;gap:6px;font:inherit;font-size:12px;font-weight:700;color:var(--muted)}
+.morep .delb:hover{color:#ff6b62;border-color:rgba(255,107,98,.45);background:rgba(255,107,98,.08)}
+.more.open .morebtn,.more:hover .morebtn{color:var(--text)}
 @media (max-width:1600px){
-  td.n input{min-width:64px}
   td.f select{width:102px}
   td.tp select{width:96px}
   .gapbtn{padding:0 7px;font-size:11px;gap:4px}
@@ -639,3 +679,56 @@ body[data-ps="escenario"] .mpanel,body[data-ps="escenario"] .cfg,body[data-ps="e
 .mt-attr a{color:var(--dim)}
 .form.mt{grid-template-columns:auto minmax(0,1fr)}
 .form.mt input,.form.mt select{min-width:0;max-width:100%}
+
+/* Tabla compacta (decisión 84): que Directo → ⋯ quepa sin desplazar en un portátil */
+@media (max-width:1600px){
+  th.dl,td.dl{width:30px}
+  td.f select{width:94px}
+  td.tp select{width:92px}
+  td.stage input[type=text]{min-width:104px}
+  td.est{min-width:0;padding-left:5px;padding-right:5px}
+  #btn-add{padding:0 10px}
+}
+@media (max-width:1600px){
+  th.dl{font-size:9px;letter-spacing:.04em}
+  td.f .real{white-space:normal;font-size:10px;line-height:1.15;max-width:94px}
+  td.t2 input{width:48px}
+  td.t2 input + input{width:38px}
+  td.name{min-width:128px}
+  td.name input[type=text]{min-width:84px}
+  td.est .estt{font-size:12px}
+}
+@media (max-width:1600px){
+  #add-jornada{width:94px}
+  th.est-h{white-space:normal;line-height:1.15;max-width:90px}
+}
+@media (max-width:1600px){ #btn-add{padding:0 8px;font-size:12px;gap:4px} }
+@media (max-width:1600px){
+  td.stage input[type=text],#add-escenario{min-width:0;width:min(var(--escw,140px),100px)}
+  td.name{min-width:150px}
+  td.name input[type=text]{min-width:110px}
+}
+/* «⋯» (Duplicar · Borrar) siempre visible: pegado al borde derecho aunque la tabla no quepa */
+th.mo,td.mo{position:sticky;right:0;z-index:3;background:var(--panel);box-shadow:-8px 0 10px -8px rgba(0,0,0,.7)}
+thead th.mo{z-index:4}
+tbody tr.playing td.mo{background:color-mix(in srgb,var(--accent) 12%,var(--panel))}
+tbody tr.next td.mo{background:color-mix(in srgb,#fff 3.5%,var(--panel))}
+tbody tr.done td.mo{opacity:1}
+
+/* Añadir: botón bajo el reloj (cabecera de la tabla) y ventana central (decisión 86) */
+.list-h .addnew{margin-left:auto;flex:0 0 auto;align-self:center}
+.addbox{max-width:520px}
+.addform{grid-template-columns:auto 1fr}
+.addform input[type=text],.addform select{width:100%}
+.addform .addt{display:flex;align-items:center;gap:8px}
+.addform .addt input{width:100px;text-align:center;font-weight:700}
+.addform .addcall{width:100px!important;text-align:center}
+.addform input:disabled{opacity:.35}
+.addform .addmsg{grid-column:1/-1;min-height:18px;display:flex;flex-direction:column;gap:2px}
+.addform.k-hito .addfin{display:none}
+/* Real: mejor filas más altas que columnas anchas */
+td.est{white-space:normal}
+td.est .estt{white-space:nowrap}
+td.est small{white-space:normal;max-width:96px;line-height:1.2}
+.addform #add-escenario{width:100%!important;min-width:0!important}
+.addform #add-jornada{width:auto!important}

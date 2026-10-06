@@ -84,6 +84,7 @@
     FEST = Dt.getFestival();
     ORIG = Dt.getOriginal();
     CONFIG = Dt.getConfig();
+    if (FEST && !Dt.READONLY) { const f2 = M.withBlk(FEST, CONFIG); if (f2 !== FEST) { FEST = f2; Dt.setFestival(FEST); } }
     compute();
   }
 
@@ -98,23 +99,72 @@
     MARGINS = C.hitoMargins(FEST, allB, Math.floor(C.nowAbs()));
   }
 
-  /** Aplica un festival nuevo hecho por el regidor: guarda deshacer, sincroniza y pinta. */
-  function commitFestival(next, msg) {
-    UNDO.push(JSON.stringify(FEST));
+  /** Aplica un festival nuevo hecho por el regidor: guarda deshacer, sincroniza, lo apunta en el log y pinta.
+   *  lctx (log): { src: 'panel'|'mando', t, ev: [incidencias de la orden], noTimes, skip } */
+  function commitFestival(next0, msg, lctx) {
+    const prev = FEST, next = M.withBlk(next0, CONFIG);   // los bloqueos del menú Retrasos viajan con el evento (el desborde los respeta)
+    UNDO.push({ s: JSON.stringify(FEST), m: undoTxt(msg) });
     if (UNDO.length > UNDO_MAX) UNDO.shift();
     FEST = next;
     Dt.setFestival(FEST);
+    logCommit(prev, next, lctx);
     compute();
     renderAll();
     if (msg) toast(msg);
   }
+  /** Descripción del paso para «Deshecho: …» en el log. */
+  function undoTxt(msg) { return String(msg || '').replace(/^Desde el dispositivo del regidor · /, '').replace(/ \(Deshacer para recuperarla\)$/, ''); }
 
   function undo() {
     if (!UNDO.length) return;
-    FEST = JSON.parse(UNDO.pop());
+    const u = UNDO.pop();
+    FEST = M.withBlk(JSON.parse(u.s), CONFIG);
     Dt.setFestival(FEST);
+    if (u.m) logEvent('undo', u.m);      // el log nunca borra: apunta lo que se deshizo («Deshecho: …»)
     compute(); renderAll();
     toast('Deshecho');
+  }
+
+  // ── Event Log (caja negra): solo añade. Vive en este navegador y viaja dentro de «Exportar JSON». ──
+  const Lg = window.ShowtimeLog;
+  const LOG_KEY = 'showtime.log', LOG_PREV = 'showtime.log.prev';
+  let LOG = null, LOG_WARN = false;
+  function logLoad() {
+    try { LOG = Lg ? Lg.norm(JSON.parse(localStorage.getItem(LOG_KEY) || 'null')) : null; } catch (e) { LOG = null; }
+    if (!LOG && Lg && FEST) LOG = Lg.empty(FEST);
+  }
+  function logSave() {
+    if (!LOG) return;
+    try { localStorage.setItem(LOG_KEY, JSON.stringify(LOG)); LOG_WARN = false; }
+    catch (e) { if (!LOG_WARN) { LOG_WARN = true; toast('No se puede guardar el log del evento: el almacenamiento del navegador está lleno. Exporta el JSON.', true); } }
+  }
+  function logSet(next) { if (next && next !== LOG) { LOG = next; logSave(); } }
+  function logNow() { return Math.floor(C.nowAbs()); }
+  /** El log anterior se guarda como copia antes de empezar otro (abrir o crear otro evento). */
+  function logArchive() { if (LOG && LOG.entries.length) { try { localStorage.setItem(LOG_PREV, JSON.stringify(LOG)); } catch (e) {} } }
+  /** Cambio del festival (lo llama commitFestival): foto de la jornada si falta, lo que cambió y la orden. */
+  function logCommit(prev, next, ctx) {
+    if (!Lg || !(prev || next)) return;
+    if (!LOG) LOG = Lg.empty(next || prev);
+    let lg = Lg.commit(LOG, prev, next, Object.assign({ src: 'panel', t: logNow() }, ctx || {}));
+    const k = Lg.eventKey(next || prev);
+    if (lg.ev !== k) lg = Object.assign({}, lg, { ev: k });           // el log sigue al evento aunque se renombre
+    logSet(lg);
+  }
+  /** Incidencia que no cambia el horario: mensajes, el tiempo, Deshacer. */
+  function logEvent(type, text, ctx) {
+    if (!Lg || !FEST) return;
+    if (!LOG) LOG = Lg.empty(FEST);
+    const c = Object.assign({ src: 'panel', t: logNow() }, ctx || {});
+    logSet(Lg.record(Lg.ensureFoto(LOG, FEST, c.t), [{ type, text, jors: c.jors, amber: c.amber }], c, FEST));
+  }
+  /** Foto del horario al empezar la jornada (o la primera vez que el Dashboard la ve). */
+  function logFoto() { if (!Lg || !FEST) return; if (!LOG) LOG = Lg.empty(FEST); logSet(Lg.ensureFoto(LOG, FEST, logNow())); }
+  /** Incidencia del desborde que empuja un ▶ / ■. */
+  function pushedEv(r) {
+    const p = r && r.pushed;
+    if (!p) return [];
+    return [{ type: 'delay', amber: true, jors: [p.jornada], text: 'Desborde de «' + p.who + '»: +' + p.minutes + ' min en ' + p.zone + (p.moved ? ' · ' + nEnt(p.moved, 'movida') : ' · nada que mover (bloqueado o en rojo)') + (p.kept ? ' · ' + keptTxt(p.kept) : '') }];
   }
 
   /** Jornadas que se ofrecen: las del festival (primera → última) y las que ya tengan bandas. */
@@ -211,22 +261,46 @@
   function keptTxt(n) { return n === 1 ? '1 en rojo no se mueve' : n + ' en rojo no se mueven'; }
   // ── Regiduría en vivo: horas reales, Empezar / Terminar (opcionales) ──
   let MARGINS = [];
-  function realChip(b) {
-    if (!b || (b.ri === null && b.rf === null)) return '';
-    const d = b.delta, sign = d > 0 ? '+' + d : d < 0 ? '−' + (-d) : '±0';
-    const cls = d > 0 ? 'late' : d < 0 ? 'early' : '';
-    return '<span class="realc ' + cls + '" title="Hora real registrada (Deshacer para quitarla)">real ' + C.fmtHM(b.ri !== null ? b.ri : b.si) + (b.rf !== null ? '–' + C.fmtHM(b.rf) : '') + ' · ' + sign + '</span>';
+  /** Columna ESTIMADO / REAL (decisión 82): la calcula la app. Ámbar = distinto de lo previsto · rojo = entrada fija pisada. */
+  function estCell(b) {
+    if (!b || b.si === null) return '<td class="est"><span class="dash">—</span></td>';
+    const hito = b.kind === 'hito';
+    const dig = (x, p) => '<b class="' + (b.clash ? 'clash' : x !== p ? 'chg' : '') + '">' + C.fmtHM(x) + '</b>';
+    const d = b.si - b.psi;
+    let sub = '';
+    if (b.clash) sub = '<small class="clash">pisada por ' + esc(b.clashWith) + '</small>';
+    else if (b.live) sub = '<small class="chg">tiempo extra · +' + Math.round(b.sf - b.nf) + ' min</small>';
+    else if (b.ri !== null || b.rf !== null) sub = '<small class="' + (b.delta ? 'chg' : '') + '">real' + (b.rf !== null && b.psf !== null && b.rf < b.psf ? ' · acaba ' + (b.psf - b.rf) + ' min antes' : '') + '</small>';
+    else if (d) sub = '<small class="chg">' + (d > 0 ? '+' : '−') + Math.abs(d) + ' min · estimado</small>';
+    const same = !b.clash && !b.live && b.ri === null && b.rf === null && !d && (hito || b.sf === b.psf);
+    const tip = (b.ri !== null ? 'Inicio real ' + C.fmtHM(b.ri) + '. ' : '') + (b.rf !== null ? 'Fin real ' + C.fmtHM(b.rf) + '. ' : '') +
+      (b.man ? 'Retraso manual +' + b.man + ' min. ' : '') + (b.push ? 'Desborde de la anterior: +' + b.push + ' min. ' : '') +
+      (b.alargar ? 'TIEMPO EXTRA activado: puede gastar el colchón del cambio. ' : '') + (b.clash ? 'Está fija (DELAY rojo o bloqueada) y la anterior la pisa. ' : '') +
+      'Previsto ' + C.fmtHM(b.psi) + (b.psf !== null ? '–' + C.fmtHM(b.psf) : '') + '.';
+    return '<td class="est' + (same ? ' same' : '') + (b.live ? ' live' : '') + '" title="' + esc(tip) + '"><span class="estt">' + dig(b.si, b.psi) +
+      (hito || b.sf === null ? '' : '–' + dig(b.sf, b.psf)) + '</span>' + sub + '</td>';
   }
+  /** Botón TIEMPO EXTRA (antes «Alargar»): la banda puede pasarse de su hora; gasta el colchón y, pasado, retrasa lo que viene hasta ■. */
+  /** Minutos que lleva de tiempo extra (con Tiempo extra activado y pasada su hora), o null. */
+  function xtraOver(b, now) { return b && b.alargar && b.rf === null && b.nf !== null && now >= b.nf ? Math.max(0, Math.floor(now - b.nf)) : null; }
+  function xtraBtn(b, compact) {
+    return '<button class="xtrabtn' + (compact ? ' sq' : '') + (b.alargar ? ' on' : '') + '" data-act="stretch" data-key="' + esc(b.key) + '" data-on="' + (b.alargar ? '0' : '1') + '" title="' +
+      (b.alargar ? 'TIEMPO EXTRA activado: puede pasarse de su hora; gasta el colchón del cambio y, pasado, retrasa lo que viene de su zona hasta que pulses ■. Clic: desactivar'
+        : 'Tiempo extra: si va a pasarse de su hora, actívalo. Gasta el colchón del cambio y, pasado, retrasa lo que viene de su zona hasta que pulses ■. Sin activarlo, se para a su hora') +
+      '"><svg class="ic"><use href="#i-stretch"/></svg>' + (compact ? '' : b.alargar ? 'Tiempo extra ✓' : 'Tiempo extra') + '</button>';
+  }
+  /** ▶ si no tiene inicio real. ■ si ya empezó (con ▶ o, sin ▶, porque ya es su hora: modo pasivo). Tiempo extra hasta ■. */
   function liveBtns(b, band) {
-    if (!b || !band) return '';
-    if (b.ri === null) return '<button class="delbtn livebtn" data-act="start" title="Empezar ahora: registra la hora real de inicio (opcional; sin pulsar, se da por en hora)"><svg class="ic"><use href="#i-play"/></svg></button>';
-    if (b.rf === null) return '<button class="delbtn livebtn on" data-act="stop" title="Terminar ahora: registra la hora real de fin"><svg class="ic"><use href="#i-stop"/></svg></button>';
-    return '';
+    if (!b || !band || b.rf !== null) return '';
+    const stop = '<button class="delbtn livebtn on' + (b.ri === null ? ' pasv' : '') + '" data-act="stop" title="' + (b.ri === null ? 'Terminar ahora: fin real = ahora; el inicio se da por a su hora (' + C.fmtHM(b.si) + ')' : 'Terminar ahora: registra la hora real de fin') + '"><svg class="ic"><use href="#i-stop"/></svg></button>';
+    const alg = xtraBtn(b, true);
+    if (b.ri === null) return '<button class="delbtn livebtn" data-act="start" title="Empezar ahora: registra la hora real de inicio (opcional; sin pulsar, se da por a su hora)"><svg class="ic"><use href="#i-play"/></svg></button>' + stop + alg;
+    return stop + alg;
   }
   function marginChip(m) {
-    if (m.level === 'ok') return '<span class="mchip ok" title="Margen hasta el hito con el retraso actual (' + esc(m.band.name) + ' acaba ' + C.fmtHM(m.projEnd) + ')">Margen ' + m.margin + ' min</span>';
-    if (m.level === 'tight') return '<span class="mchip tight" title="' + esc(m.band.name) + ' acaba ' + C.fmtHM(m.projEnd) + '"><svg class="ic"><use href="#i-alert"/></svg>Margen ' + m.margin + ' min</span>';
-    return '<span class="mchip over" title="' + esc(m.band.name) + ' acaba ' + C.fmtHM(m.projEnd) + '"><svg class="ic"><use href="#i-alert"/></svg>Rebasado +' + (-m.margin) + ' min</span>';
+    if (m.level === 'ok') return '<span class="mchip ok" title="Margen hasta el hito con el retraso actual (' + esc(m.band.name) + ' acaba ' + C.fmtHM(m.projEnd) + ')">Margen ' + m.margin + '′</span>';
+    if (m.level === 'tight') return '<span class="mchip tight" title="' + esc(m.band.name) + ' acaba ' + C.fmtHM(m.projEnd) + '"><svg class="ic"><use href="#i-alert"/></svg>Margen ' + m.margin + '′</span>';
+    return '<span class="mchip over" title="' + esc(m.band.name) + ' acaba ' + C.fmtHM(m.projEnd) + '"><svg class="ic"><use href="#i-alert"/></svg>Rebasado +' + (-m.margin) + '′</span>';
   }
 
   /** Registra la hora real y, si desborda el colchón, empuja SOLO el desborde en lo autorizado (Retrasos ▾) de su zona.
@@ -235,7 +309,7 @@
     const r = M.realPlan(FEST, CONFIG, tr.dataset.key, which, Math.floor(C.nowAbs()));
     if (!r.ok) { toast(r.error, true); return; }
     if (r.clashes.length) setTimeout(() => toast('Choque con entrada en rojo: ' + r.clashes.map(c => c.name + ' / ' + c.with).join(', '), true), 2800);
-    commitFestival(r.state, r.msg);
+    commitFestival(r.state, r.msg, { noTimes: true, ev: pushedEv(r) });
   }
 
   /** Barra de estado: desfase por zona (ámbar absorbiendo · rojo desborde · verde adelanto). */
@@ -285,31 +359,35 @@
     if (b && band) {
       const co = C.changeoverBefore(ALL_MODE, ALL_MODE.find(x => x.key === b.key) || b, TAREAS);
       if (!co) gap = '<span class="dash" title="Primera actuación de su zona">—</span>';
-      else if (co.mins < 0) gap = '<span class="gapbtn ovl" title="Empieza antes de que acabe ' + esc(co.prev.name) + '">Solapa ' + (-co.mins) + ' min</span>';
+      else if (co.mins < 0) gap = '<span class="gapbtn ovl" title="Solapa ' + (-co.mins) + ' min: empieza antes de que acabe ' + esc(co.prev.name) + '">−' + (-co.mins) + '′</span>';
       else gap = b.standby
-        ? '<button class="gapbtn sb" data-act="standby" data-on="0" title="Marcado como STANDBY. Pulsa para volver a CHANGEOVER"><svg class="ic"><use href="#i-pause"/></svg>Standby · ' + co.mins + ' min</button>'
+        ? '<button class="gapbtn sb" data-act="standby" data-on="0" title="STANDBY · ' + co.mins + ' min. Pulsa para volver a CHANGEOVER"><svg class="ic"><use href="#i-pause"/></svg>' + co.mins + '′</button>'
         : co.idle
-        ? '<button class="gapbtn idle" data-act="standby" data-on="1" title="Sin actividad: no es un cambio (misma banda, o hay una tarea de la zona en medio). Pulsa para marcarlo como STANDBY">Sin actividad · ' + co.mins + ' min</button>'
-        : '<button class="gapbtn" data-act="standby" data-on="1" title="CHANGEOVER. Pulsa para marcarlo como STANDBY (zona cerrada o descanso)"><svg class="ic"><use href="#i-swap"/></svg>Cambio · ' + co.mins + ' min</button>';
+        ? '<button class="gapbtn idle" data-act="standby" data-on="1" title="Sin actividad · ' + co.mins + ' min: no es un cambio (misma banda, o hay una tarea de la zona en medio). Pulsa para marcarlo como STANDBY">— ' + co.mins + '′</button>'
+        : '<button class="gapbtn" data-act="standby" data-on="1" title="CHANGEOVER · ' + co.mins + ' min. Pulsa para marcarlo como STANDBY (zona cerrada o descanso)"><svg class="ic"><use href="#i-swap"/></svg>' + co.mins + '′</button>';
     }
     const off = '<span class="dash" title="' + (tipo === 'hito' ? 'Un hito es un momento: no tiene fin ni CALL' : 'Las tareas no tienen CALL') + '">—</span>';
     const cls = [isNew ? 'nueva' : '', 'k-' + (band ? mode : tipo)].filter(Boolean).join(' ');
     return '<tr data-id="' + esc(a.id) + '" data-mode="' + mode + '"' + (b ? ' data-key="' + esc(b.key) + '"' : '') + ' class="' + cls + '">' +
       ledCell(a, b, band, mode) +
+      '<td class="lv"><div class="rowbtns">' + liveBtns(b, band) + '</div></td>' +
+      // Orden de hoja de ruta (decisión 85): jornada · previsto · real · tipo · zona · nombre · CALL · cambio · notas
+      td('fecha', 'f', jornadaSelect(jor, 'data-k="jornada" data-orig="' + esc(jor) + '"') + real) +
+      td('inicio', 't', inp('inicio')) +
+      td('fin', 't', tipo === 'hito' ? off : inp('fin', '—')) +
+      estCell(b) +
       td('tipo', 'tp', tipoSelect(a, mode, 'data-k="tipo" data-orig="' + tipo + '"')) +
       td('escenario', 'stage', '<input type="text" list="zones-dl" data-k="zona" value="' + esc(esc0 ? esc0.nombre : '') + '" data-orig="' + esc(esc0 ? esc0.nombre : '') + '" placeholder="' + (band ? '— zona —' : '— ninguna —') + '" style="--sc:' + scol + '" title="Elige una zona o escribe una nueva para crearla" autocomplete="off" spellcheck="false">') +
       '<td class="name' + (isMod('nombre') || isMod('color') ? ' mod' : '') + '"><div class="nm">' +
         '<input type="color" data-k="color" value="' + col + '" data-orig="' + col + '" title="Color de la banda">' +
         '<input type="text" data-k="nombre" value="' + esc(a.nombre || '') + '" data-orig="' + esc(a.nombre || '') + '" autocomplete="off" spellcheck="false">' +
         (isNew ? '<span class="tag" title="Creada desde la última importación/exportación">NUEVA</span>' : '') + '</div></td>' +
-      td('fecha', 'f', jornadaSelect(jor, 'data-k="jornada" data-orig="' + esc(jor) + '"') + real) +
-      td('inicio', 't', inp('inicio') + realChip(b)) +
-      td('fin', 't', tipo === 'hito' ? off : inp('fin', '—')) +
       td('call', 't', band ? inp('call', '—') : off) +
-      td('notas', 'n', inp('notas')) +
       td('standby', 'gap', gap) +
-      '<td><div class="rowbtns">' + liveBtns(b, band) + '<button class="delbtn dupbtn" data-act="dup" title="Duplicar en otra jornada"><svg class="ic"><use href="#i-copy"/></svg></button>' +
-        '<button class="delbtn" data-act="del" title="Borrar ' + TIPO_TXT[tipo] + '"><svg class="ic"><use href="#i-trash"/></svg></button></div></td>' +
+      td('notas', 'n', inp('notas')) +
+      '<td class="mo"><div class="more"><button class="delbtn morebtn" data-act="more" title="Más: duplicar, borrar"><svg class="ic"><use href="#i-dots"/></svg></button>' +
+        '<div class="morep"><button class="delbtn dupbtn" data-act="dup" title="Duplicar en otra jornada"><svg class="ic"><use href="#i-copy"/></svg><span>Duplicar</span></button>' +
+        '<button class="delbtn delb" data-act="del" title="Borrar ' + TIPO_TXT[tipo] + '"><svg class="ic"><use href="#i-trash"/></svg><span>Borrar</span></button></div></div></td>' +
       '</tr>';
   }
 
@@ -330,13 +408,13 @@
       const a = FEST.artists.find(x => String(x.id) === String(b.id));
       return a ? rowHtml(a, b, mods, nuevas.has(String(a.id))) : '';
     });
-    $('tbody').innerHTML = rows.join('') || '<tr><td colspan="11" class="hint" style="padding:16px">' +
+    $('tbody').innerHTML = rows.join('') || '<tr><td colspan="13" class="hint" style="padding:16px">' +
       (FEST.artists.length ? 'No hay ' + viewOf().what + ' en esta jornada. Añádelos abajo.' : 'Todavía no hay nada. Añade la primera entrada en la fila de abajo.') + '</td></tr>';
     // Las vistas son FILTROS PUROS: Shows = solo shows, Soundchecks = solo soundchecks.
     // Solo en Jornada completa se listan las entradas sin ningún horario (si no, no se verían en ninguna parte).
     const sin = mode === 'all' ? FEST.artists.filter(a => !C.entersMode(a, 'all')) : [];
     $('tbody-sin').innerHTML = sin.length
-      ? '<tr class="sec"><td colspan="11">Sin horario (' + sin.length + ') · elige jornada y escribe el inicio</td></tr>' + sin.map(a => rowHtml(a, null, mods, nuevas.has(String(a.id)))).join('')
+      ? '<tr class="sec"><td colspan="13">Sin horario (' + sin.length + ') · elige jornada y escribe el inicio</td></tr>' + sin.map(a => rowHtml(a, null, mods, nuevas.has(String(a.id)))).join('')
       : '';
     markRows(Math.floor(C.nowAbs()));
   }
@@ -360,10 +438,13 @@
   function syncAddTipo() {
     const t = $('add-tipo').value;
     $('btn-add').lastChild.textContent = 'Añadir ' + ADD_LABEL[t];
+    $('addm-t').textContent = 'Añadir ' + ADD_LABEL[t];
     $('add-nombre').placeholder = ADD_PH[t];
-    ['add-fin', 'add-duracion'].forEach(id => { $(id).disabled = t === 'hito'; if (t === 'hito') $(id).value = ''; });
+    $('add-fin').disabled = t === 'hito'; if (t === 'hito') $('add-fin').value = '';
     $('add-call').disabled = t === 'tarea' || t === 'hito'; if ($('add-call').disabled) $('add-call').value = '';
-    $('addrow').querySelector('tr.add').className = 'add k-' + t;
+    $('add-call-hint').textContent = $('add-call').disabled ? 'las tareas y los hitos no llevan CALL'
+      : 'vacío = ' + Dt.callMinsOf(FEST, CONFIG) + ' min antes del inicio (el de Configuración › Evento)';
+    $('addrow').className = 'form addform k-' + t;
     updateAddHint();
   }
 
@@ -372,7 +453,8 @@
     const t = g('add-tipo');
     return { tipo: t === 'tarea' || t === 'hito' ? t : 'banda', modo: t === 'sc' ? 'sc' : 'show',
       nombre: g('add-nombre'), escenarioId: g('add-escenario'), jornada: g('add-jornada'), inicio: g('add-inicio'),
-      fin: g('add-fin'), duracion: g('add-duracion'), call: g('add-call'), notas: g('add-notas') };
+      // Fin: hora (23:30) o duración con «+» (+60 = 60 min desde el inicio)
+      fin: /^\s*\+/.test(g('add-fin')) ? '' : g('add-fin'), duracion: /^\s*\+/.test(g('add-fin')) ? g('add-fin').replace(/^\s*\+\s*/, '').trim() : '', call: g('add-call'), notas: g('add-notas') };
   }
 
   function updateAddHint() {
@@ -396,21 +478,21 @@
     const r = C.addArtist(z.state, v.modo, v);
     if (!r.ok) {
       $('add-err').textContent = r.error;
-      const f = r.field && document.querySelector('#addrow [data-f="' + r.field + '"]');
+      const f = r.field && document.querySelector('#addrow [data-f="' + (r.field === 'duracion' ? 'fin' : r.field) + '"]');
       if (f) { f.classList.add('bad'); f.focus(); }
       return;
     }
     $('add-err').textContent = '';
     const name = (r.state.artists.find(x => x.id === r.id) || {}).nombre || '';
-    ['add-nombre', 'add-inicio', 'add-fin', 'add-duracion', 'add-call', 'add-notas'].forEach(id => { $(id).value = ''; });
+    ['add-nombre', 'add-inicio', 'add-fin', 'add-call', 'add-notas'].forEach(id => { $(id).value = ''; });
     // Si la jornada nueva no es la que se está viendo, no se cambia el filtro: se avisa.
     const jor = $('add-jornada').value, t = $('add-tipo').value;
     const fuera = CONFIG.mode !== 'all' && t !== CONFIG.mode;
     commitFestival(r.state, 'Añadido (' + ADD_LABEL[t] + '): ' + name +
       (fuera ? ' · se ve en Jornada completa' : CONFIG.day !== 'all' && CONFIG.day !== jor ? ' (en ' + fmtDay(jor) + ', no en la jornada que estás viendo)' : ''));
+    closeAdd();
     const row = document.querySelector('#tbody tr[data-id="' + r.id + '"]');
-    if (row) { row.classList.add('flash'); row.scrollIntoView({ block: 'nearest' }); }
-    $('add-nombre').focus();
+    if (row) { row.classList.add('flash'); row.scrollIntoView({ block: 'center' }); }
   }
 
   $('addrow').addEventListener('keydown', e => {
@@ -422,6 +504,20 @@
     if (e.target.id === 'add-tipo') syncAddTipo(); else updateAddHint();
   });
   $('btn-add').addEventListener('click', addBand);
+  /** Ventana «Añadir»: en medio de la pantalla; al aceptar, la entrada se coloca sola por su hora. */
+  function openAdd() {
+    if (!FEST) { toast('Primero crea o abre un evento', true); return; }
+    closeMenus(); closeConfig();
+    $('add-err').textContent = '';
+    renderAddRow();
+    $('addm').hidden = false;
+    $('add-nombre').focus();
+  }
+  function closeAdd() { $('addm').hidden = true; }
+  $('btn-new-row').addEventListener('click', openAdd);
+  $('addm-cancel').addEventListener('click', closeAdd);
+  $('addm').addEventListener('click', e => { if (e.target.id === 'addm') closeAdd(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('addm').hidden) closeAdd(); });
 
   // Filas que suenan / siguientes / pasadas (solo clases: no rehace las casillas)
   function markRows(nowInt) {
@@ -431,7 +527,9 @@
       const key = tr.dataset.key, b = BLOCKS.find(x => x.key === key);
       tr.classList.toggle('playing', playing.has(key));
       tr.classList.toggle('next', next.has(key));
-      tr.classList.toggle('done', !!b && b.si !== null && C.blockEnd(b) <= nowInt);
+      tr.classList.toggle('done', !!b && b.si !== null && !(b.alargar && b.rf === null) && C.blockEnd(b) <= nowInt);
+      tr.classList.toggle('started', !!b && b.si !== null && nowInt >= b.si);     // ■ pasivo visible desde su hora (estimada)
+      tr.classList.toggle('ended', !!b && C.isBand(b) && b.rf === null && !b.alargar && b.nf !== null && nowInt >= b.nf);   // sin Alargar: parada a su hora
     });
   }
 
@@ -444,7 +542,7 @@
       const col = safeColor(b.stageColor || b.color, '#888'), p = C.progress(b, nowInt);
       rows.push({ o: order(b.stageId), h: '<div class="v-row" style="--c:' + col + '"><div class="v-name">' + esc(b.name) + '</div>' +
         '<div class="v-meta">' + kindTag(b) + C.fmtHM(b.si) + '–' + C.fmtHM(b.sf) + (b.stage ? ' · ' + esc(b.stage) : '') + '</div>' +
-        '<div class="v-rem" style="color:' + col + '">' + p.remaining + ' min restantes</div></div>' });
+        '<div class="v-rem" style="color:' + col + '">' + (xtraOver(b, nowInt) !== null ? 'TIEMPO EXTRA · +' + xtraOver(b, nowInt) + ' min' : p.remaining + ' min restantes' + (b.alargar && b.rf === null ? ' · tiempo extra' : '')) + '</div>' + (b.rf === null ? xtraBtn(b) : '') + '</div>' });
     });
     C.changeoversNow(BLOCKS, nowMins, TAREAS).forEach(co => {
       const col = safeColor(co.stageColor || co.next.color, '#888');
@@ -474,7 +572,7 @@
       const col = safeColor(b.stageColor || b.color, '#888'), co = C.changeoverBefore(BLOCKS, b, TAREAS);
       const badge = co ? (co.mins < 0 ? 'Solapa ' + (-co.mins) + ' min' : b.standby ? 'Standby ' + co.mins + ' min' : co.idle ? '' : 'Cambio ' + co.mins + ' min') : '';
       return '<div class="v-row" style="--c:' + col + '"><div class="v-name">' + esc(b.name) + '</div>' +
-        '<div class="v-meta">' + kindTag(b) + C.fmtHM(b.si) + '–' + C.fmtHM(b.sf) + (b.stage ? ' · ' + esc(b.stage) : '') + (badge ? ' · ' + badge : '') + '</div></div>';
+        '<div class="v-meta">' + kindTag(b) + C.fmtHM(b.si) + '–' + C.fmtHM(b.sf) + (b.stage ? ' · ' + esc(b.stage) : '') + (badge ? ' · ' + badge : '') + '</div>' + xtraBtn(b) + '</div>';
     }).join('') : '<div class="v-empty">—</div>';
 
     const done = new Set(Dt.getCallDone());
@@ -500,6 +598,10 @@
     if ($('lv-closeall')) $('lv-closeall').hidden = nOpen < 2;
     meteoTick();
     if (!FEST) return;
+    logFoto();
+    const mNow = Math.floor(C.nowAbs(d));
+    if (LAST_MIN !== null && mNow !== LAST_MIN) { compute(); if (BLOCKS.some(b => b.alargar && b.rf === null)) renderTable(); }   // el estimado en directo (Alargar)
+    LAST_MIN = mNow;
     renderMeteo();
     const nowMins = C.nowAbs(d), nowInt = Math.floor(nowMins);
     renderLive(nowMins, nowInt);
@@ -509,6 +611,7 @@
     renderDaybar(nowInt);
   }
 
+  let LAST_MIN = null;
   // ── Edición en la lista ──────────────────────────────────────────────
   /** Aplica la casilla. `then` = casilla a la que iba el foco (para no perderlo al repintar). */
   function applyEdit(el, then) {
@@ -575,6 +678,15 @@
     tb.addEventListener('click', e => {
       const lv = e.target.closest('[data-act="start"], [data-act="stop"]');
       if (lv) { registerReal(lv.closest('tr'), lv.dataset.act === 'start' ? 'i' : 'f'); return; }
+      const mo = e.target.closest('[data-act="more"]');
+      if (mo) { const m = mo.parentNode, on = !m.classList.contains('open'); document.querySelectorAll('.more.open').forEach(x => x.classList.remove('open')); m.classList.toggle('open', on); return; }
+      const sg = e.target.closest('[data-act="stretch"]');
+      if (sg) {
+        const r = M.stretchPlan(FEST, sg.dataset.key || sg.closest('tr').dataset.key, sg.dataset.on === '1', logNow());
+        if (!r.ok) { toast(r.error, true); return; }
+        commitFestival(r.state, r.msg, { noTimes: true, ev: [{ type: 'buffer', text: r.msg }] });
+        return;
+      }
       const led = e.target.closest('[data-act="fija"]');
       if (led) {
         // Clic = el contrario de lo que se ve. Si coincide con lo que dice su categoría, la entrada vuelve a seguir a la categoría.
@@ -592,6 +704,7 @@
         if (r.ok && r.changed) commitFestival(r.state, on ? 'Hueco marcado como STANDBY' : 'Hueco vuelve a CHANGEOVER');
         return;
       }
+      document.querySelectorAll('.more.open').forEach(x => x.classList.remove('open'));
       const del = e.target.closest('[data-act="del"]');
       if (del) askDelete(del.closest('tr').dataset.id);
       const dup = e.target.closest('[data-act="dup"]');
@@ -651,6 +764,14 @@
     CONFIG = Dt.setConfig({ day: d }); compute(); renderAll();
     toast('Jornada: ' + fmtDay(d));
   });
+
+  // TIEMPO EXTRA desde la tarjeta EN ESCENA
+  ['v-now', 'v-next'].forEach(id => $(id).addEventListener('click', e => {
+    const sg = e.target.closest('[data-act="stretch"]'); if (!sg) return;
+    const r = M.stretchPlan(FEST, sg.dataset.key, sg.dataset.on === '1', logNow());
+    if (!r.ok) { toast(r.error, true); return; }
+    commitFestival(r.state, r.msg, { noTimes: true, ev: [{ type: 'buffer', text: r.msg }] });
+  }));
 
   // OK de CALL desde el Panel
   $('v-call').addEventListener('click', e => {
@@ -768,7 +889,7 @@
     const r = C.updateEvent(FEST, readFestForm());
     if (!r.ok) { $('f-err').textContent = r.error; return; }
     if (CONFIG.callMins) CONFIG = Dt.setConfig({ callMins: null });   // un único aviso CALL: el del festival
-    if (r.changed) { document.activeElement && document.activeElement.blur(); commitFestival(r.state, 'Datos del evento guardados'); }
+    if (r.changed) { document.activeElement && document.activeElement.blur(); commitFestival(r.state, 'Datos del evento guardados', { skip: true }); }
     else toast('Sin cambios');
   }
 
@@ -875,7 +996,7 @@
     // Las acciones cierran el menú (los toggles de Retrasos no: se marcan varios seguidos)
     m.querySelectorAll('.mitem').forEach(it => it.addEventListener('click', () => setMenu(m, false)));
   });
-  document.addEventListener('pointerdown', e => { if (!e.target.closest('.menus, #m-live')) closeMenus(); });
+  document.addEventListener('pointerdown', e => { if (!e.target.closest('.menus, #m-live')) closeMenus(); if (!e.target.closest('.more')) document.querySelectorAll('.more.open').forEach(x => x.classList.remove('open')); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenus(); });
 
   // ── Retrasos: categorías BLOQUEADAS («Bloquear retraso»). De entrada todo se mueve; lo marcado no. ──
@@ -921,6 +1042,7 @@
     else c[b.dataset.cat] = !c[b.dataset.cat];
     const blk = Object.assign({}, CONFIG.delayBlock || {}); blk[zv] = c;
     CONFIG = Dt.setConfig({ delayBlock: blk });
+    if (FEST) { FEST = M.withBlk(FEST, CONFIG); Dt.setFestival(FEST); compute(); }   // el estimado respeta los bloqueos al momento
     renderDelayCats();
     renderTable();                         // los LED de la tabla reflejan el bloqueo
   });
@@ -948,12 +1070,14 @@
       '<div class="dw-row"><span class="dw-l">Zonas</span><div class="dtog" id="dw-zones"><button data-z="*">Todas</button>' + zones.map(z => '<button data-z="' + esc(z.id) + '">' + esc(z.nombre) + '</button>').join('') + (hasNoZone ? '<button data-z="">Sin zona</button>' : '') + '</div></div>' +
       '<div class="dw-row"><span class="dw-l">Jornada</span>' + jornadaSelect(W.day, 'id="dw-day"') + '<span class="dw-l" style="width:auto;margin-left:8px">desde</span><input id="dw-from" type="text" value="' + W.from + '" placeholder="inicio" style="width:80px"><span class="hint">vacío = toda la jornada · solo lo que aún no ha empezado</span></div>' +
       '<div class="dw-row"><span class="dw-l">Bloquear</span><span class="hint dw-hint">además de lo que ya está en rojo</span></div><div class="dw-row"><span class="dw-l"></span><div class="dtog block" id="dw-cats">' + ['all', 'show', 'sc', 'tarea', 'hito'].map(k => '<button data-cat="' + k + '">' + ({ all: 'Todos', show: 'Shows', sc: 'Soundchecks', tarea: 'Tareas', hito: 'Hitos' })[k] + '</button>').join('') + '</div></div>' +
+      dwOverHtml(W.day, ZK) +
       '<div id="dw-prev" class="dw-prev"></div></div>';
     modal('Aplicar retraso en cascada', html, [{ label: 'Cancelar' }, { label: 'Aplicar retraso en cascada', kind: 'primary', run: () => {
       const r = dwCompute(W);
       if (!r || !r.moved.length) { toast('No hay nada que mover con esa selección', true); return false; }
       const zl = W.zones.length === ZK.length ? 'todas las zonas' : W.zones.map(z => z ? (C.getEscenario(FEST, z) || {}).nombre : 'sin zona').join(', ');
-      commitFestival(r.state, 'Retraso +' + W.mins + ' min (' + zl + '): ' + nEnt(r.moved.length, 'movida') + (r.kept.length ? ' · ' + keptTxt(r.kept.length) : ''));
+      const dmsg = 'Retraso +' + W.mins + ' min (' + zl + (W.from ? ', desde ' + C.normHM(W.from) : '') + '): ' + nEnt(r.moved.length, 'movida') + (r.kept.length ? ' · ' + keptTxt(r.kept.length) : '');
+      commitFestival(r.state, dmsg, { noTimes: true, ev: [{ type: 'delay', text: dmsg, jors: [W.day], amber: true }] });
     } }], { wide: true });
     const box = $('modal-body');
     const paint = () => {
@@ -982,6 +1106,14 @@
       paint();
     });
     $('dw-from').addEventListener('change', e => { W.from = e.target.value; paint(); });
+    // Desbordes del día: aplicar los mismos minutos a otras zonas
+    box.querySelectorAll('[data-over]').forEach(b => b.addEventListener('click', () => {
+      W.mins = +b.dataset.over; $('dw-n').value = W.mins;
+      W.zones = ZK.filter(z => z !== b.dataset.zone);
+      if (W.day === C.jornadaOfAbs(FEST, logNow())) { W.from = C.fmtHM(logNow()); $('dw-from').value = W.from; }
+      paint();
+      toast('Desborde de ' + b.dataset.who + ': +' + W.mins + ' min a las demás zonas · revisa y aplica');
+    }));
     $('dw-day').addEventListener('change', e => { W.day = e.target.value; paint(); });
     $('dw-cats').addEventListener('click', e => {
       const b = e.target.closest('[data-cat]'); if (!b) return;
@@ -989,6 +1121,14 @@
       paint();
     });
     paint();
+  }
+  /** Desbordes de la jornada (bandas con Alargar que se pasaron del colchón): ya están en su zona; desde aquí, a otras. */
+  function dwOverHtml(day, ZK) {
+    const list = C.buildBlocks(FEST, { mode: 'all', day: day }).filter(b => C.isBand(b) && b.push > 0);
+    if (!list.length) return '';
+    return '<div class="dw-row top"><span class="dw-l">Desbordes</span><div class="dw-over">' + list.map(b =>
+      '<div class="dwo"><span><b>' + esc(b.pushFrom) + '</b> · +' + b.push + ' min en ' + esc(b.stage || 'Sin zona') + ' <span class="hint">(ya aplicado en su zona)</span></span>' +
+      (ZK.length > 1 ? '<button type="button" class="btn" data-over="' + b.push + '" data-zone="' + esc(b.stageId || '') + '" data-who="' + esc(b.pushFrom) + '">Aplicar a otras zonas</button>' : '') + '</div>').join('') + '</div></div>';
   }
   /** Calcula el retraso de la ventana (sin aplicarlo). «Desde» se toma en la jornada actual. */
   function dwCompute(W) {
@@ -998,7 +1138,8 @@
     const from = hm ? C.toAbs(C.fechaFor(FEST, jor, hm), hm) : C.toAbs(jor, C.fmtHM(C.cutoffMins(FEST)));   // vacío: desde el inicio de la jornada
     // Bloqueos: los del menú Retrasos (por zona) + los que se marquen aquí solo para este retraso
     const cats = b => !W.block[b.kind] && !isBlocked(b.kind, b.stageId || '');
-    return C.shiftEntries(FEST, { minutes: W.mins, zone: W.zones, cats: cats, fromAbs: from, day: jor });
+    void cats;
+    return C.addRetraso(FEST, { minutes: W.mins, zone: W.zones, blocked: CONFIG.delayBlock || {}, extra: W.block, fromAbs: from, day: jor, at: logNow(), src: 'panel' });
   }
   $('btn-undo').addEventListener('click', undo);
   $('btn-new2').addEventListener('click', askNew);
@@ -1101,6 +1242,16 @@
 
   /** Sustituye el festival activo (abrir, crear o demo). Es la nueva referencia de «cambios sin exportar». */
   function loadNew(state, msg) {
+    // Log del evento: el que venga dentro del archivo; si es el mismo evento que el abierto, sigue el que va más lleno;
+    // si es otro evento, se empieza uno nuevo (el anterior queda como copia en este navegador).
+    const fromFile = Lg && state.showtimeLog ? Lg.norm(state.showtimeLog) : null;
+    delete state.showtimeLog;
+    if (Lg) {
+      const k = Lg.eventKey(state), same = !!(LOG && LOG.ev === k);
+      if (fromFile && !(same && LOG.entries.length > fromFile.entries.length)) { if (!same) logArchive(); LOG = Object.assign(fromFile, { ev: k }); }
+      else if (!same) { logArchive(); LOG = Lg.empty(state); }
+      logSave();
+    }
     FEST = state; ORIG = JSON.parse(JSON.stringify(state));
     UNDO.length = 0;
     Dt.setOriginal(ORIG);
@@ -1116,7 +1267,7 @@
     const d = new Date();
     const slug = String((FEST.event && FEST.event.nombre) || 'evento').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'evento';
     const name = slug + '-showtime-' + d.getFullYear() + pad2(d.getMonth() + 1) + pad2(d.getDate()) + '-' + pad2(d.getHours()) + pad2(d.getMinutes()) + '.json';
-    const blob = new Blob([JSON.stringify(FEST, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify(Lg && LOG ? Object.assign({}, FEST, { showtimeLog: LOG }) : FEST, null, 2)], { type: 'application/json' });   // con el log del evento
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob); a.download = name;
     document.body.appendChild(a); a.click(); a.remove();
@@ -1126,6 +1277,82 @@
     renderAll();
     toast('Exportado: ' + name);
   }
+
+  // ── Archivo › Exportar log del evento… (PDF por la impresión del navegador · TXT · CSV) ──
+  const LX = { day: null, cats: { show: true, sc: true, tarea: true, hito: true, inc: true }, fmt: 'pdf' };
+  function slugOf(st) { return String((st && st.event && st.event.nombre) || 'evento').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'evento'; }
+  function download(name, text, type) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  }
+  /** Abre el informe en una ventana y lanza la impresión («Guardar como PDF»). Si el navegador frena la ventana, va por un marco oculto. */
+  function printReport(html) {
+    const w = window.open('', 'showtime-log', 'popup=yes,width=1040,height=820');
+    if (w) {
+      w.document.open(); w.document.write(html); w.document.close();
+      try { w.focus(); } catch (e) {}
+      setTimeout(() => { try { w.print(); } catch (e) {} }, 350);
+      return;
+    }
+    const f = document.createElement('iframe');
+    f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+    document.body.appendChild(f);
+    f.contentDocument.open(); f.contentDocument.write(html); f.contentDocument.close();
+    setTimeout(() => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { toast('No se pudo abrir la impresión', true); } setTimeout(() => f.remove(), 60000); }, 350);
+  }
+  function openLogExport() {
+    if (!FEST || !Lg) { toast('Primero crea o abre un evento', true); return; }
+    closeMenus(); closeConfig();
+    logFoto();
+    const days = Lg.reportDays(LOG, FEST), jNow = C.jornadaOfAbs(FEST, logNow());
+    if (!LX.day || (LX.day !== 'all' && days.indexOf(LX.day) < 0)) LX.day = days.indexOf(jNow) >= 0 ? jNow : CONFIG.day !== 'all' && days.indexOf(CONFIG.day) >= 0 ? CONFIG.day : (days[0] || 'all');
+    const CK = [['show', 'Shows'], ['sc', 'Soundchecks'], ['tarea', 'Tareas'], ['hito', 'Hitos / Eventos'], ['inc', 'Incidencias']];
+    const html = '<div class="dw lx">' +
+      '<div class="dw-row"><span class="dw-l">Jornada</span><select id="lx-day">' + days.map(d => '<option value="' + d + '">' + esc(fmtDay(d)) + (d === jNow ? ' · hoy' : '') + '</option>').join('') + '<option value="all">Todo el evento</option></select></div>' +
+      '<div class="dw-row top"><span class="dw-l">Incluir</span><div class="dtog" id="lx-cats"><button type="button" data-c="all">Todos los tipos</button>' + CK.map(([k, t]) => '<button type="button" data-c="' + k + '">' + t + '</button>').join('') + '</div></div>' +
+      '<div class="dw-row"><span class="dw-l"></span><span class="hint lx-hint">Incidencias: retrasos, horas reales que se salen del horario, mensajes a las pantallas, avisos del tiempo y su «Visto», altas, cambios y borrados.</span></div>' +
+      '<div class="dw-row"><span class="dw-l">Formato</span><div class="dtog radio" id="lx-fmt"><button type="button" data-f="pdf">PDF</button><button type="button" data-f="txt">TXT</button><button type="button" data-f="csv">CSV</button></div></div>' +
+      '<div class="dw-row"><span class="dw-l"></span><span class="hint" id="lx-fhint"></span></div>' +
+      '<div id="lx-sum" class="lx-sum"></div></div>';
+    modal('Exportar log del evento', html, [{ label: 'Cancelar' }, { label: 'Exportar', kind: 'primary', run: () => {
+      const rep = Lg.report(LOG, FEST, { day: LX.day, cats: LX.cats, nowMs: Date.now() });
+      if (!rep.sections.some(x => x.rows.length)) { toast('No hay nada que exportar con esos filtros', true); return false; }
+      const d = new Date(), stamp = pad2(d.getHours()) + pad2(d.getMinutes());
+      const base = slugOf(FEST) + '-log-' + (LX.day === 'all' ? 'evento' : LX.day) + '-' + stamp;
+      if (LX.fmt === 'pdf') { printReport(Lg.toHtml(rep)); toast('Informe listo: en la impresión, elige «Guardar como PDF»'); }
+      else if (LX.fmt === 'txt') { download(base + '.txt', Lg.toTxt(rep), 'text/plain;charset=utf-8'); toast('Exportado: ' + base + '.txt'); }
+      else { download(base + '.csv', Lg.toCsv(rep), 'text/csv;charset=utf-8'); toast('Exportado: ' + base + '.csv'); }
+    } }], { wide: true });
+    const box = $('modal-body');
+    const FH = { pdf: 'Se abre el informe y la ventana de impresión: elige «Guardar como PDF». Sin librerías y sin internet.', txt: 'Texto plano, para leer en cualquier sitio o pegar en un correo.', csv: 'Tabla para Excel o Numbers (separada por «;»).' };
+    const paint = () => {
+      $('lx-day').value = LX.day;
+      const all = CK.every(([k]) => LX.cats[k]);
+      box.querySelectorAll('#lx-cats [data-c]').forEach(b => b.classList.toggle('on', b.dataset.c === 'all' ? all : !!LX.cats[b.dataset.c]));
+      box.querySelectorAll('#lx-fmt [data-f]').forEach(b => b.classList.toggle('on', b.dataset.f === LX.fmt));
+      $('lx-fhint').textContent = FH[LX.fmt];
+      const rep = Lg.report(LOG, FEST, { day: LX.day, cats: LX.cats });
+      const st = rep.sections.reduce((a, x) => { Object.keys(x.stats).forEach(k => { a[k] = (a[k] || 0) + x.stats[k]; }); return a; }, {});
+      const sec = rep.sections[0];
+      $('lx-sum').innerHTML = rep.sections.length && rep.sections.some(x => x.rows.length)
+        ? '<b>' + (st.plan || 0) + '</b> previstas · <b class="' + (st.chg ? 'chg' : '') + '">' + (st.chg || 0) + '</b> con hora cambiada · <b class="' + (st.del ? 'chg' : '') + '">' + (st.del || 0) + '</b> borradas o movidas · <b class="' + (st.add ? 'chg' : '') + '">' + (st.add || 0) + '</b> añadidas · <b class="' + (st.inc ? 'chg' : '') + '">' + (st.inc || 0) + '</b> incidencias' +
+          (LX.day !== 'all' && sec ? '<div class="hint">' + (sec.foto ? 'Previsto: el horario tal como estaba a las ' + C.fmtHM(sec.fotoAt) + ' (foto de la jornada).' : 'Esta jornada aún no tiene foto: lo previsto es el horario actual.') + '</div>' : '')
+        : '<span class="hint">Nada que exportar con estos filtros.</span>';
+      $('modal-actions').querySelector('.primary').disabled = !CK.some(([k]) => LX.cats[k]);
+    };
+    $('lx-day').addEventListener('change', e => { LX.day = e.target.value; paint(); });
+    $('lx-cats').addEventListener('click', e => {
+      const b = e.target.closest('[data-c]'); if (!b) return;
+      if (b.dataset.c === 'all') { const v = !CK.every(([k]) => LX.cats[k]); CK.forEach(([k]) => { LX.cats[k] = v; }); }
+      else LX.cats[b.dataset.c] = !LX.cats[b.dataset.c];
+      paint();
+    });
+    $('lx-fmt').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (!b) return; LX.fmt = b.dataset.f; paint(); });
+    paint();
+  }
+  $('btn-log').addEventListener('click', openLogExport);
 
   $('btn-import2').addEventListener('click', () => $('file').click());
   $('file').addEventListener('change', e => { readFile(e.target.files[0]); e.target.value = ''; });
@@ -1348,6 +1575,7 @@
     const t = String(text || '').replace(/\s+/g, ' ').trim();
     if (!t) return;
     Dt.setFlash(t, MSG_TO, MSG_ZONES);
+    logEvent('msg', '«' + t + '» → ' + Vs.targetsTxt(MSG_TO, MSG_ZONES, zoneLabel));
     closeMenus();
     $('msg-text').value = '';
     renderFlash();
@@ -1421,6 +1649,17 @@
   const MT_ACK_KEY = 'showtime.meteoAck';
   let MT_BUSY = false, MT_LAST = 0, MT_ACT = [], MT_ACKS = {}, MT_HTML = '';
   try { MT_ACKS = JSON.parse(localStorage.getItem(MT_ACK_KEY) || '{}') || {}; } catch (e) { MT_ACKS = {}; }
+  // Avisos ya apuntados en el log (misma regla que «Visto»: se vuelve a apuntar si empeora o si desaparece y vuelve)
+  const MT_LOG_KEY = 'showtime.meteoLogged';
+  let MT_LOGGED = {};
+  try { MT_LOGGED = JSON.parse(localStorage.getItem(MT_LOG_KEY) || '{}') || {}; } catch (e) { MT_LOGGED = {}; }
+  function mtLog(list, pending) {
+    if (!FEST) return;
+    let next = W.pruneAcks(MT_LOGGED, list), ch = JSON.stringify(next) !== JSON.stringify(MT_LOGGED);
+    W.pendingAlerts(pending, next).forEach(a => { logEvent('meteo', 'Aviso (previsión): ' + a.text, { amber: true }); next = W.ack(next, a); ch = true; });
+    MT_LOGGED = next;
+    if (ch) { try { localStorage.setItem(MT_LOG_KEY, JSON.stringify(MT_LOGGED)); } catch (e) {} }
+  }
   function mtCfg() { return CONFIG.meteo || W.normMeteo(); }
   function mtKey(c) { return c.source + '|' + c.lat + '|' + c.lon + '|' + c.url; }
   function mtSaveAcks() { try { localStorage.setItem(MT_ACK_KEY, JSON.stringify(MT_ACKS)); } catch (e) {} }
@@ -1457,7 +1696,9 @@
     MT_ACT = list.map(a => a.kind);
     const pr = W.pruneAcks(MT_ACKS, list);
     if (JSON.stringify(pr) !== JSON.stringify(MT_ACKS)) { MT_ACKS = pr; mtSaveAcks(); }
-    return { c, m, snap, sum, list, pending: W.pendingAlerts(list, MT_ACKS) };
+    const pending = W.pendingAlerts(list, MT_ACKS);
+    if (c.on) mtLog(list, pending);
+    return { c, m, snap, sum, list, pending };
   }
   const MT_SRC = { openmeteo: 'Open-Meteo · previsión', url: 'Estación propia', manual: 'Manual' };
   function mtNum(v, d) { return v === null || v === undefined ? '—' : (d ? W.fmt1(v) : String(Math.round(v))); }
@@ -1506,7 +1747,7 @@
     const b = e.target.closest('[data-act="mt-ack"]');
     if (b) {
       const st = meteoState(), a = st.list.find(x => x.kind === b.dataset.k);
-      if (a) { MT_ACKS = W.ack(MT_ACKS, a); mtSaveAcks(); }
+      if (a) { MT_ACKS = W.ack(MT_ACKS, a); mtSaveAcks(); logEvent('meteo', 'Visto: ' + a.text); }
       renderMeteo(); if (FEST) renderDrift(Math.floor(C.nowAbs()));
       return;
     }
@@ -1647,30 +1888,37 @@
     if (cmd.op === 'start' || cmd.op === 'stop') {
       const r = M.realPlan(FEST, CONFIG, a.key, cmd.op === 'start' ? 'i' : 'f', abs);
       if (!r.ok) return { ok: false, msg: r.error };
-      commitFestival(r.state, from + r.msg);
+      commitFestival(r.state, from + r.msg, { src: 'mando', t: abs, noTimes: true, ev: pushedEv(r) });
       if (r.clashes.length) setTimeout(() => toast('Choque con entrada en rojo: ' + r.clashes.map(c => c.name + ' / ' + c.with).join(', '), true), 2800);
       return { ok: true, msg: r.msg + (r.clashes.length ? ' · ¡choque con entrada en rojo!' : '') };
     }
     if (cmd.op === 'onTime') {
-      const r = M.onTimePlan(FEST, a.key);
+      const r = M.onTimePlan(FEST, a.key, abs);
       if (!r.ok) return { ok: false, msg: r.error };
-      commitFestival(r.state, from + r.msg);
+      commitFestival(r.state, from + r.msg, { src: 'mando', t: abs, noTimes: true });
+      return { ok: true, msg: r.msg };
+    }
+    if (cmd.op === 'stretch') {
+      const r = M.stretchPlan(FEST, a.key, a.on, abs);
+      if (!r.ok) return { ok: false, msg: r.error };
+      commitFestival(r.state, from + r.msg, { src: 'mando', t: abs, noTimes: true, ev: [{ type: 'buffer', text: r.msg }] });
       return { ok: true, msg: r.msg };
     }
     if (cmd.op === 'delay') {
-      const r = M.delayPlan(FEST, CONFIG, { minutes: a.minutes, zones: a.zones, from: a.from });
+      const r = M.delayPlan(FEST, CONFIG, { minutes: a.minutes, zones: a.zones, from: a.from, src: 'mando' });
       if (!r.ok) return { ok: false, msg: r.error };
       if (M.delayStamp(r) !== a.stamp) return { ok: false, msg: 'El horario ha cambiado desde el resumen: revísalo y confirma otra vez', data: { stale: true } };
       if (!r.moved.length) return { ok: false, msg: 'No hay nada que mover con esa selección' };
       const zl = a.zones === 'all' ? 'todas las zonas' : a.zones.map(z => z ? ((C.getEscenario(FEST, z) || {}).nombre || z) : 'sin zona').join(', ');
-      const msg = 'Retraso +' + r.minutes + ' min (' + zl + '): ' + nEnt(r.moved.length, 'movida') + (r.kept.length ? ' · ' + keptTxt(r.kept.length) : '');
-      commitFestival(r.state, from + msg);
+      const msg = 'Retraso +' + r.minutes + ' min (' + zl + ', desde ' + C.fmtHM(Math.floor(a.from)) + '): ' + nEnt(r.moved.length, 'movida') + (r.kept.length ? ' · ' + keptTxt(r.kept.length) : '');
+      commitFestival(r.state, from + msg, { src: 'mando', t: abs, noTimes: true, ev: [{ type: 'delay', text: msg, jors: [r.jornada], amber: true }] });
       return { ok: true, msg };
     }
     if (cmd.op === 'flash') {
       const t = String(a.text).replace(/\s+/g, ' ').trim();
       const to = Vs.normTargets(a.to), zs = Vs.normZones(a.zones);
       Dt.setFlash(t, to, zs); renderFlash(); toast(from + 'Mensaje → ' + Vs.targetsTxt(to, zs, zoneLabel) + ': «' + t + '»');
+      logEvent('msg', '«' + t + '» → ' + Vs.targetsTxt(to, zs, zoneLabel), { src: 'mando', t: abs });
       return { ok: true, msg: 'Mensaje → ' + Vs.targetsTxt(to, zs, zoneLabel) + ': «' + t + '»' };
     }
     if (cmd.op === 'flashOff') {
@@ -1818,6 +2066,7 @@
 
   // ── Arranque ─────────────────────────────────────────────────────────
   loadState();
+  logLoad();
   renderAll();
   tick();
   setInterval(tick, 1000);
