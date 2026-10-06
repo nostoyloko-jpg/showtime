@@ -12,7 +12,7 @@
 
   // ── Estado (declarado antes de usarse) ───────────────────────────────
   let FEST = null, ORIG = null, CONFIG = Dt.getConfig();
-  let BLOCKS = [], ALL_MODE = [], DAY_MISSING = '';
+  let BLOCKS = [], ALL_MODE = [], TAREAS = [], DAY_MISSING = '';
   const UNDO = [];                 // festivales anteriores (JSON), para «Deshacer»
   const UNDO_MAX = 30;
   const LIVES = new Map();            // ventanas Live abiertas desde aquí: nombre → ventana (una por vista; Confidence, una por zona)
@@ -88,12 +88,14 @@
   }
 
   function compute() {
-    if (!FEST) { BLOCKS = []; ALL_MODE = []; DAY_MISSING = ''; MARGINS = []; return; }
+    if (!FEST) { BLOCKS = []; ALL_MODE = []; TAREAS = []; DAY_MISSING = ''; MARGINS = []; return; }
     const day = CONFIG.day || 'all';
     DAY_MISSING = (day !== 'all' && C.festivalDays(FEST, CONFIG.mode).indexOf(day) < 0) ? day : '';
     BLOCKS = DAY_MISSING ? [] : C.buildBlocks(FEST, { mode: CONFIG.mode, day: day });
     ALL_MODE = C.buildBlocks(FEST, { mode: CONFIG.mode, day: 'all' });
-    MARGINS = C.hitoMargins(FEST, C.buildBlocks(FEST, { mode: 'all', day: 'all' }), Math.floor(C.nowAbs()));
+    const allB = C.buildBlocks(FEST, { mode: 'all', day: 'all' });
+    TAREAS = allB.filter(b => b.kind === 'tarea');   // para «Sin actividad» aunque la vista no pinte tareas (decisión 76)
+    MARGINS = C.hitoMargins(FEST, allB, Math.floor(C.nowAbs()));
   }
 
   /** Aplica un festival nuevo hecho por el regidor: guarda deshacer, sincroniza y pinta. */
@@ -281,11 +283,13 @@
     let gap = '<span class="dash"' + (band ? '' : ' title="Las tareas y los hitos no tienen changeover ni solapes"') + '>—</span>';
     if (b && tipo === 'hito') { const hm = (MARGINS || []).find(x => x.hito.key === b.key); if (hm) gap = marginChip(hm); }
     if (b && band) {
-      const co = C.changeoverBefore(ALL_MODE, ALL_MODE.find(x => x.key === b.key) || b);
+      const co = C.changeoverBefore(ALL_MODE, ALL_MODE.find(x => x.key === b.key) || b, TAREAS);
       if (!co) gap = '<span class="dash" title="Primera actuación de su zona">—</span>';
       else if (co.mins < 0) gap = '<span class="gapbtn ovl" title="Empieza antes de que acabe ' + esc(co.prev.name) + '">Solapa ' + (-co.mins) + ' min</span>';
       else gap = b.standby
         ? '<button class="gapbtn sb" data-act="standby" data-on="0" title="Marcado como STANDBY. Pulsa para volver a CHANGEOVER"><svg class="ic"><use href="#i-pause"/></svg>Standby · ' + co.mins + ' min</button>'
+        : co.idle
+        ? '<button class="gapbtn idle" data-act="standby" data-on="1" title="Sin actividad: no es un cambio (misma banda, o hay una tarea de la zona en medio). Pulsa para marcarlo como STANDBY">Sin actividad · ' + co.mins + ' min</button>'
         : '<button class="gapbtn" data-act="standby" data-on="1" title="CHANGEOVER. Pulsa para marcarlo como STANDBY (zona cerrada o descanso)"><svg class="ic"><use href="#i-swap"/></svg>Cambio · ' + co.mins + ' min</button>';
     }
     const off = '<span class="dash" title="' + (tipo === 'hito' ? 'Un hito es un momento: no tiene fin ni CALL' : 'Las tareas no tienen CALL') + '">—</span>';
@@ -442,8 +446,13 @@
         '<div class="v-meta">' + kindTag(b) + C.fmtHM(b.si) + '–' + C.fmtHM(b.sf) + (b.stage ? ' · ' + esc(b.stage) : '') + '</div>' +
         '<div class="v-rem" style="color:' + col + '">' + p.remaining + ' min restantes</div></div>' });
     });
-    C.changeoversNow(BLOCKS, nowMins).forEach(co => {
+    C.changeoversNow(BLOCKS, nowMins, TAREAS).forEach(co => {
       const col = safeColor(co.stageColor || co.next.color, '#888');
+      if (!co.standby && co.kind === 'idle') {      // hueco sin cambio real (decisión 76)
+        rows.push({ o: order(co.stageId), h: '<div class="v-row co idle" style="--c:' + col + '"><div class="v-name" style="color:var(--muted)">— SIN ACTIVIDAD —' + (co.stage ? ' · ' + esc(co.stage) : '') + '</div>' +
+          '<div class="v-meta">después <b>' + esc(co.next.name) + '</b> · ' + C.fmtHM(co.next.si) + '</div></div>' });
+        return;
+      }
       rows.push({ o: order(co.stageId), h: '<div class="v-row co' + (co.standby ? ' sb' : '') + '" style="--c:' + col + '"><div class="v-name" style="color:' + (co.standby ? 'var(--muted)' : col) + '">' +
         (co.standby ? 'STANDBY' : 'CHANGEOVER') + (co.stage ? ' · ' + esc(co.stage) : '') + '</div>' +
         '<div class="v-meta">' + (co.standby ? 'después' : 'entra') + ' <b>' + esc(co.next.name) + '</b> · ' + C.fmtHM(co.next.si) + '</div>' +
@@ -451,9 +460,10 @@
     });
     // Tareas en curso (operativa del día): debajo de los escenarios, sin cuenta de cambio
     C.tasksNow(BLOCKS, nowInt).forEach(b => {
-      const p = C.progress(b, nowInt);
-      rows.push({ o: 1000, h: '<div class="v-row tarea"><div class="v-name">Tarea · ' + esc(b.name) + '</div>' +
-        '<div class="v-meta">' + C.fmtHM(b.si) + '–' + C.fmtHM(C.blockEnd(b)) + (b.stage ? ' · ' + esc(b.stage) : '') + ' · quedan ' + p.remaining + ' min</div></div>' });
+      const p = C.progress(b, nowInt), nb = C.nextBandIn(BLOCKS, b.stageId, nowInt);
+      rows.push({ o: b.stageId ? order(b.stageId) : 1000, h: '<div class="v-row tarea"><div class="v-name">Tarea · ' + esc(b.name) + '</div>' +
+        '<div class="v-meta">' + C.fmtHM(b.si) + '–' + C.fmtHM(C.blockEnd(b)) + (b.stage ? ' · ' + esc(b.stage) : '') + ' · quedan ' + p.remaining + ' min</div>' +
+        (nb ? '<div class="v-meta">después <b>' + esc(nb.name) + '</b> · ' + C.fmtHM(nb.si) + '</div>' : '') + '</div>' });
     });
     rows.sort((a, b) => a.o - b.o);
     const r = C.pickBlocks(BLOCKS, nowInt, 1);
@@ -461,8 +471,8 @@
 
     const next = C.nextPerStage(BLOCKS, nowInt);
     $('v-next').innerHTML = next.length ? next.map(b => {
-      const col = safeColor(b.stageColor || b.color, '#888'), co = C.changeoverBefore(BLOCKS, b);
-      const badge = co ? (co.mins < 0 ? 'Solapa ' + (-co.mins) + ' min' : (b.standby ? 'Standby ' : 'Cambio ') + co.mins + ' min') : '';
+      const col = safeColor(b.stageColor || b.color, '#888'), co = C.changeoverBefore(BLOCKS, b, TAREAS);
+      const badge = co ? (co.mins < 0 ? 'Solapa ' + (-co.mins) + ' min' : b.standby ? 'Standby ' + co.mins + ' min' : co.idle ? '' : 'Cambio ' + co.mins + ' min') : '';
       return '<div class="v-row" style="--c:' + col + '"><div class="v-name">' + esc(b.name) + '</div>' +
         '<div class="v-meta">' + kindTag(b) + C.fmtHM(b.si) + '–' + C.fmtHM(b.sf) + (b.stage ? ' · ' + esc(b.stage) : '') + (badge ? ' · ' + badge : '') + '</div></div>';
     }).join('') : '<div class="v-empty">—</div>';

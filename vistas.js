@@ -101,7 +101,8 @@
    * → { mode: 'show' | 'changeover' | 'wait' | 'end' | 'pickzone' | 'nofest', zoneId, zone, band, next, remSec, totalSec, frac, level, blink }
    *   show: banda en escena (con ▶ y sin ■, o según horario); la cuenta puede ser negativa (sobretiempo).
    *   changeover: entre la banda anterior y la siguiente, cuenta atrás hasta la siguiente.
-   *   wait: antes de la primera banda del día (sin barra).
+   *   wait: antes de la primera banda del día, o hueco sin cambio real — misma banda SC→show o una tarea
+   *         de la zona en medio (decisión 76) — (sin barra). STANDBY marcado a mano sale como changeover+standby.
    */
   function confidence(state, zoneId, now, screens) {
     if (!state) return { mode: 'nofest' };
@@ -110,7 +111,8 @@
     let z = zoneId;
     if (z === null || z === undefined) { if (zs.length === 1) z = zs[0]; else return { mode: 'pickzone', zones: zs.map(id => ({ id, name: zoneName(state, id) })) }; }
     const base = { zoneId: z, zone: zoneName(state, z) };
-    const bands = C.buildBlocks(state, { mode: 'all', day: jor }).filter(b => C.isBand(b) && b.psi !== null && (b.stageId || '') === z).sort((a, b) => a.si - b.si);
+    const dayB = C.buildBlocks(state, { mode: 'all', day: jor });
+    const bands = dayB.filter(b => C.isBand(b) && b.psi !== null && (b.stageId || '') === z).sort((a, b) => a.si - b.si);
     const cur = bands.find(b => b.ri !== null && b.rf === null) || bands.find(b => b.ri === null && b.rf === null && b.si <= n && n < C.blockEnd(b));
     if (cur) {
       const total = Math.max(1, (C.blockEnd(cur) - cur.si) * 60), rem = (C.blockEnd(cur) - n) * 60;
@@ -122,7 +124,7 @@
     const before = bands.filter(b => b !== next && b.si < next.si);
     const prev = before.length ? before[before.length - 1] : null;
     const rem = (next.si - n) * 60;
-    if (!prev) return Object.assign(base, { mode: 'wait', next, remSec: rem, totalSec: null, frac: null, level: 'ok' });
+    if (!prev || (!next.standby && C.gapIdle(prev, next, dayB))) return Object.assign(base, { mode: 'wait', next, remSec: rem, totalSec: null, frac: null, level: 'ok' });
     const prevEnd = prev.rf !== null ? prev.rf : C.blockEnd(prev);
     const total = Math.max(1, (next.si - Math.min(prevEnd, n)) * 60);
     const lv = level(rem, S.conf.coWarn, S.conf.coDanger);

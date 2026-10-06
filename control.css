@@ -64,6 +64,7 @@ main[hidden]{display:none}
 .v-row:last-child{margin-bottom:0}
 .v-row.co{border-left-style:dashed}
 .v-row.sb{border-left-style:dotted}
+.v-row.idle{border-left-style:dotted}
 .v-name{font-weight:800;font-size:15px;overflow-wrap:anywhere}
 .v-meta{color:var(--muted);font-size:12px}
 .v-meta b{color:var(--text)}
@@ -100,6 +101,7 @@ td input.bad{border-color:var(--err)!important;background:rgba(255,107,107,.12)!
 td.gap{white-space:nowrap}
 .gapbtn{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 10px;border-radius:999px;border:1px solid var(--line2);background:rgba(255,255,255,.05);color:var(--text);font:inherit;font-size:12px;font-weight:800;cursor:pointer}
 .gapbtn.sb{border-style:dashed;color:var(--muted);background:transparent}
+.gapbtn.idle{color:var(--muted);font-weight:700}
 .gapbtn.ovl{color:var(--call);border-color:rgba(255,197,51,.5);cursor:default}
 td.gap.mod .gapbtn{box-shadow:0 0 0 2px rgba(255,197,51,.45)}
 .dash{color:var(--dim)}

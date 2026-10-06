@@ -192,11 +192,57 @@
     eq(c[0].remaining, 70); eq(c[0].total, 75); eq(Math.round(c[0].pct), 7);
     deq(C.changeoversNow(SHOW, at(D10, '22:40')).map(x => x.stage + '→' + x.next.name), ['Principal→Cabeza de Cartel', 'Carpa→DJ de Cierre']);
   });
-  test('changeover: no hay antes de la primera banda del escenario, ni si suena alguien, ni al final', () => {
-    deq(C.changeoversNow(SHOW, at(D10, '21:10')), [], 'Principal suena; Carpa aún no ha tenido banda');
+  test('changeover: no hay antes de la primera banda del escenario (SIN ACTIVIDAD), ni si suena alguien, ni al final', () => {
+    deq(C.changeoversNow(SHOW, at(D10, '21:10')).map(x => x.stage + ':' + x.kind + '→' + x.next.name), ['Carpa:idle→Banda Demo'], 'Principal suena; Carpa antes de su primera banda = sin actividad');
+    eq(C.changeoversNow(SHOW, at(D10, '21:10'))[0].prev, null);
     deq(C.changeoversNow(SHOW, at(D11, '05:00')), []);
     const r = C.changeoversNow(SHOW, at(D10, '23:29') + 0.5);
     eq(r[0].remaining, 0.5, 'cuenta atrás con segundos');
+  });
+
+  // ── Decisión 76: CHANGEOVER solo entre dos bandas distintas seguidas ──
+  const ALL76 = C.buildBlocks(FEST, { mode: 'all', day: 'all' });
+  const allKey = k => ALL76.find(b => b.key === k);
+  test('76: soundcheck → show de la misma banda no es changeover (sin actividad)', () => {
+    // Principal: SC Los Ejemplos 16:00–16:45, SC Cabeza 18:00–19:00, show Los Ejemplos 21:00, show Cabeza 23:30
+    const f = JSON.parse(JSON.stringify(FEST));
+    f.artists = f.artists.filter(a => a.id === 1);
+    const B = C.buildBlocks(f, { mode: 'all', day: 'all' });
+    const co = C.changeoverBefore(B, B.find(b => b.key === '1:show'));
+    eq(co.prev.key, '1:sc'); ok(co.idle, 'misma entrada');
+    const n = C.changeoversNow(B, at(D10, '17:00'));
+    eq(n.length, 1); eq(n[0].kind, 'idle'); eq(n[0].next.key, '1:show');
+  });
+  test('76: entre dos bandas distintas sí es changeover; un hito en medio no lo rompe', () => {
+    const co = C.changeoverBefore(ALL76, allKey('3:sc'));
+    eq(co.prev.key, '1:sc'); ok(!co.idle);
+    const f = JSON.parse(JSON.stringify(FEST));
+    f.artists.push({ id: 9, showtimeTipo: 'hito', nombre: 'Puertas', escenarioId: 'esc1', fecha: '2026-07-10', inicio: '17:00' });
+    const B = C.buildBlocks(f, { mode: 'all', day: 'all' });
+    ok(!C.changeoverBefore(B, B.find(b => b.key === '3:sc')).idle, 'hito no rompe');
+    eq(C.changeoversNow(B, at(D10, '17:10')).find(x => x.stageId === 'esc1').kind, 'changeover');
+  });
+  test('76: una tarea de la zona dentro del hueco lo deja en sin actividad; en curso, manda la tarea', () => {
+    const f = JSON.parse(JSON.stringify(FEST));
+    f.artists.push({ id: 9, showtimeTipo: 'tarea', nombre: 'Montaje luces', escenarioId: 'esc1', fecha: '2026-07-10', inicio: '17:00', fin: '17:45' });
+    f.artists.push({ id: 10, showtimeTipo: 'tarea', nombre: 'Limpieza Carpa', escenarioId: 'esc2', fecha: '2026-07-10', inicio: '16:50', fin: '17:50' });
+    const B = C.buildBlocks(f, { mode: 'all', day: 'all' });
+    ok(C.changeoverBefore(B, B.find(b => b.key === '3:sc')).idle, 'tarea de Principal en el hueco 16:45–18:00');
+    eq(C.changeoversNow(B, at(D10, '17:10')).filter(x => x.stageId === 'esc1').length, 0, 'tarea en curso: no hay tarjeta de hueco');
+    eq(C.changeoversNow(B, at(D10, '17:50')).find(x => x.stageId === 'esc1').kind, 'idle', 'tras la tarea: sin actividad');
+    eq(C.nextBandIn(B, 'esc1', at(D10, '17:10')).key, '3:sc', 'después: la próxima banda de la zona');
+    // En la vista de solo shows (sin tareas) se clasifica igual si se le pasan las tareas
+    const S = C.buildBlocks(f, { mode: 'sc', day: 'all' });
+    ok(!C.changeoverBefore(S, S.find(b => b.key === '3:sc')).idle, 'sin tareas en la lista: changeover');
+    ok(C.changeoverBefore(S, S.find(b => b.key === '3:sc'), B).idle, 'con las tareas: sin actividad');
+    eq(C.changeoversNow(S, at(D10, '17:10'), B).find(x => x.stageId === 'esc1').kind, 'idle', 'la tarea no se pinta: sale sin actividad');
+  });
+  test('76: el STANDBY manual se mantiene en cualquier hueco entre bandas', () => {
+    const f = JSON.parse(JSON.stringify(FEST));
+    f.artists = f.artists.filter(a => a.id === 1);
+    const s = C.setStandby(f, 1, 'show', true).state;
+    const n = C.changeoversNow(C.buildBlocks(s, { mode: 'all', day: 'all' }), at(D10, '17:00'));
+    ok(n[0].standby); eq(n[0].kind, 'idle', 'el tipo no cambia; la marca manda en la etiqueta');
   });
 
   // ── CALL por margen ───────────────────────────────────────────────────

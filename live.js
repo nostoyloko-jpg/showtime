@@ -403,34 +403,44 @@
       '<div class="tbar"><div style="width:' + p.pct + '%;background:' + col + '"></div></div></div>';
   }
 
-  // EN ESCENA: tarea en curso (operativa del día, solo en Jornada completa)
+  // «después: BANDA · hh:mm» (la próxima banda de la zona)
+  function despuesHtml(nb) {
+    return nb ? '<div class="tmeta entra">después <b>' + esc(nb.name.toUpperCase()) + '</b>&nbsp;&nbsp;&middot;&nbsp;&nbsp;' + C.fmtHM(nb.si) + '</div>' : '';
+  }
+
+  // EN ESCENA: tarea en curso (operativa del día, solo en Jornada completa). Manda sobre el hueco de su zona (decisión 76)
   function taskHtml(b, nowInt) {
     const p = C.progress(b, nowInt);
     return '<div class="trow tarea"><div class="tname fit">' + esc(b.name.toUpperCase()) + '</div>' + metaHtml(b, '#7dd3fc') +
+      despuesHtml(C.nextBandIn(BLOCKS, b.stageId, nowInt)) +
       '<div class="trem" style="color:#7dd3fc">quedan ' + p.remaining + ' min</div></div>';
   }
 
-  // EN ESCENA: escenario en cambio (o en STANDBY si el regidor lo ha marcado), banda que entra y cuenta atrás
+  // EN ESCENA: hueco de una zona. CHANGEOVER solo entre dos bandas distintas seguidas; STANDBY si el regidor lo marca;
+  // si no, «— SIN ACTIVIDAD —» con la banda que viene (decisión 76)
   function changeoverHtml(co) {
     const col = safeColor(co.stageColor || co.next.color, '#888');
-    const sb = co.standby;
+    const sb = co.standby, idle = !sb && co.kind === 'idle';
+    const stage = co.stage ? '<div class="tmeta"><span class="tstage" style="color:' + col + '">' + esc(co.stage.toUpperCase()) + '</span></div>' : '';
+    if (idle) return '<div class="trow co idle" style="--c:' + col + '"><div class="tname">— SIN ACTIVIDAD —</div>' + stage +
+      despuesHtml(co.next) + '</div>';
     return '<div class="trow co' + (sb ? ' sb' : '') + '" style="--c:' + col + '">' +
-      '<div class="tname"><svg class="ic"><use href="' + (sb ? '#i-pause' : '#i-swap') + '"/></svg>' + (sb ? 'STANDBY' : 'CHANGEOVER') + '</div>' +
-      (co.stage ? '<div class="tmeta"><span class="tstage" style="color:' + col + '">' + esc(co.stage.toUpperCase()) + '</span></div>' : '') +
+      '<div class="tname"><svg class="ic"><use href="' + (sb ? '#i-pause' : '#i-swap') + '"/></svg>' + (sb ? 'STANDBY' : 'CHANGEOVER') + '</div>' + stage +
       '<div class="tmeta entra">' + (sb ? 'después' : 'entra') + ' <b>' + esc(co.next.name.toUpperCase()) + '</b>&nbsp;&nbsp;&middot;&nbsp;&nbsp;' + C.fmtHM(co.next.si) + '</div>' +
       '<div class="trem">quedan ' + fmtCountdown(co.remaining) + '</div>' +
       '<div class="tbar"><div style="width:' + co.pct + '%;background:' + col + '"></div></div></div>';
   }
 
-  // SIGUIENTE: tres líneas — nombre / horario · escenario / píldora de cambio (o standby)
+  // SIGUIENTE: tres líneas — nombre / horario · escenario / píldora de cambio (o standby; sin píldora si no hay cambio real)
   function nextHtml(b) {
     const col = safeColor(b.stageColor || b.color, '#888');
-    const co = C.changeoverBefore(BLOCKS, b);
+    const co = C.changeoverBefore(BLOCKS, b, ALLB);
     let badge = '';
     if (co) badge = co.mins < 0
       ? '<div class="tbadge warn"><svg class="ic"><use href="#i-swap"/></svg>Solapa: ' + (-co.mins) + ' min</div>'
       : b.standby
         ? '<div class="tbadge sb"><svg class="ic"><use href="#i-pause"/></svg>Standby: ' + co.mins + ' min</div>'
+        : co.idle ? ''
         : '<div class="tbadge"><svg class="ic"><use href="#i-swap"/></svg>Cambio: ' + co.mins + ' min</div>';
     return '<div class="trow" style="--c:' + col + '"><div class="tname fit">' + esc(b.name.toUpperCase()) + '</div>' +
       metaHtml(b, col) + badge + '</div>';
@@ -444,8 +454,8 @@
 
   function renderTopPanels(nowMins, nowInt, ended) {
     const playing = C.playingNow(BLOCKS, nowInt).map(b => ({ o: stageOrder(b.stageId), h: playingHtml(b, nowInt) }));
-    const changing = C.changeoversNow(BLOCKS, nowMins).map(co => ({ o: stageOrder(co.stageId), h: changeoverHtml(co) }));
-    const tasks = (C.tasksNow ? C.tasksNow(BLOCKS, nowInt) : []).map(b => ({ o: 1000, h: taskHtml(b, nowInt) }));
+    const changing = C.changeoversNow(BLOCKS, nowMins, ALLB).map(co => ({ o: stageOrder(co.stageId), h: changeoverHtml(co) }));
+    const tasks = (C.tasksNow ? C.tasksNow(BLOCKS, nowInt) : []).map(b => ({ o: b.stageId ? stageOrder(b.stageId) : 1000, h: taskHtml(b, nowInt) }));
     const scene = playing.concat(changing).concat(tasks).sort((a, b) => a.o - b.o);   // sort estable: misma posición, primero el que suena
     const next = C.nextPerStage(BLOCKS, nowInt);
     // Backstage: el CALL sigue a la vista hasta que arranca el show (con OK sale como «avisado»)

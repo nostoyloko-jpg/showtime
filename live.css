@@ -58,6 +58,8 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 /* STANDBY (marcado a mano por el regidor) */
 .trow.co.sb{border-left-style:dotted}
 .trow.co.sb .tname{color:var(--muted)}
+.trow.co.idle{border-left-style:dotted}
+.trow.co.idle .tname{color:var(--muted);letter-spacing:.14em;font-weight:800;font-size:min(7cqw,3vh);white-space:normal;overflow-wrap:normal}
 .tbadge.sb{color:var(--muted);border-style:dashed}
 /* Aviso visible (sin festival, día sin datos): se enseña, no se corrige solo */
 #banner{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:150;max-width:80vw;background:var(--call);color:#000;

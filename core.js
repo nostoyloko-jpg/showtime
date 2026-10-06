@@ -278,10 +278,13 @@
   function stageKey(b) { return b.stageId || b.stage || '__none__'; }
 
   /** Changeover antes de un bloque: hueco desde el final del anterior del MISMO escenario.
-   *  Devuelve { prev, mins } o null si es el primero de su escenario. mins < 0 = solapan. */
+   *  Devuelve { prev, mins, idle } o null si es el primero de su escenario. mins < 0 = solapan. */
   /** Solo dentro de la MISMA jornada: la primera banda de cada día no tiene cambio previo. */
   /** Solo entre BANDAS (show o soundcheck): tareas e hitos no tienen changeover ni solapan. */
-  function changeoverBefore(blocks, b) {
+  /** idle = el hueco NO es un cambio real (decisión 76): misma entrada (soundcheck → show de la misma banda)
+   *  o una tarea de la misma zona dentro del hueco. Los hitos (puertas…) no rompen el cambio.
+   *  `tareas` (opcional): tareas a tener en cuenta (por defecto, las que haya en `blocks`). Solo etiqueta: no toca Δ/A. */
+  function changeoverBefore(blocks, b, tareas) {
     if (!hasStart(b) || !isBand(b)) return null;
     const k = stageKey(b);
     let prev = null;
@@ -290,30 +293,60 @@
       if ((x.jornada || '') !== (b.jornada || '')) return;
       if (!prev || x.si > prev.si) prev = x;
     });
-    return prev ? { prev: prev, mins: Math.round(b.si - blockEnd(prev)) } : null;
+    return prev ? { prev: prev, mins: Math.round(b.si - blockEnd(prev)), idle: gapIdle(prev, b, tareas || blocks) } : null;
   }
 
-  /** Escenarios en CAMBIO (changeover) ahora: ya tocó alguien, ahora no suena nadie y hay otro después.
-   *  Devuelve [{ stage, stageId, stageColor, prev, next, start, end, total, remaining, pct }] en el orden
-   *  de los bloques. remaining/total en minutos (con fracción, para cuenta atrás con segundos). */
-  function changeoversNow(blocks, now) {
+  /** ¿El hueco entre prev y b (misma zona) es «sin actividad» y no un changeover? */
+  function gapIdle(prev, b, tareas) {
+    if (!prev) return true;
+    if (prev.id && prev.id === b.id) return true;                 // soundcheck → show de la misma banda
+    const k = stageKey(b), s = blockEnd(prev), e = b.si;
+    return (tareas || []).some(x => x.kind === 'tarea' && hasStart(x) && stageKey(x) === k && x.si < e && blockEnd(x) > s);
+  }
+
+  /** Próxima banda de una zona después de `now` (para «después: …» de tareas y huecos). */
+  function nextBandIn(blocks, stageId, now) {
+    const k = stageId || '__none__';
+    let best = null;
+    blocks.forEach(x => { if (isBand(x) && hasStart(x) && stageKey(x) === k && x.si > now && (!best || x.si < best.si)) best = x; });
+    return best;
+  }
+
+  /** Escenarios SIN BANDA ahora con una banda después (decisión 76):
+   *  - con una tarea en curso en la zona (de las de `blocks`) no sale nada: manda la tarjeta de la tarea;
+   *  - kind 'changeover': cambio real entre dos bandas consecutivas (la anterior ya acabó);
+   *  - kind 'idle': hueco sin cambio (tarea en medio, misma banda SC→show, o antes de la primera banda del día);
+   *  - standby: marcado a mano (manda sobre el tipo; solo en huecos entre dos bandas).
+   *  Devuelve [{ kind, stage, stageId, stageColor, standby, prev, next, start, end, total, remaining, pct }].
+   *  remaining/total en minutos (con fracción). En 'idle' antes de la primera banda: prev/start null, pct 0.
+   *  `tareas` (opcional): tareas para clasificar el hueco aunque la vista no las pinte. */
+  function changeoversNow(blocks, now, tareas) {
     const out = [], seen = new Set();
-    const busy = new Set(blocks.filter(b => isBand(b) && isPlaying(b, now)).map(stageKey));
+    const busy = new Set(blocks.filter(b => (isBand(b) || b.kind === 'tarea') && isPlaying(b, now)).map(stageKey));
+    // Jornada «en curso» (para no anunciar la primera banda de otro día en la vista de todos los días)
+    let cur = null;
+    blocks.forEach(b => { if (hasStart(b) && b.si <= now && (!cur || b.si >= cur.si)) cur = b; });
+    if (!cur) blocks.forEach(b => { if (hasStart(b) && (!cur || b.si < cur.si)) cur = b; });
+    const curJor = cur ? (cur.jornada || '') : '';
     blocks.forEach(b => {
       if (!isBand(b) || !hasStart(b) || b.si <= now) return;
       const k = stageKey(b);
       if (seen.has(k) || busy.has(k)) return;
       seen.add(k);                                   // b = el próximo de su escenario
-      const co = changeoverBefore(blocks, b);
-      if (!co || blockEnd(co.prev) > now) return;    // primero del día, o solapa con el anterior
-      const start = blockEnd(co.prev), end = b.si, total = Math.max(0, end - start);
-      out.push({
-        stage: b.stage, stageId: b.stageId, stageColor: b.stageColor,
-        standby: !!b.standby,
-        prev: co.prev, next: b, start: start, end: end, total: total,
-        remaining: Math.max(0, end - now),
+      const co = changeoverBefore(blocks, b, tareas);
+      const base = { stage: b.stage, stageId: b.stageId, stageColor: b.stageColor, next: b, end: b.si, remaining: Math.max(0, b.si - now) };
+      if (!co) {                                     // primera banda del día en su zona
+        if ((b.jornada || '') !== curJor) return;
+        out.push(Object.assign(base, { kind: 'idle', standby: false, prev: null, start: null, total: null, pct: 0 }));
+        return;
+      }
+      if (blockEnd(co.prev) > now) return;           // solapa con el anterior
+      const start = blockEnd(co.prev), total = Math.max(0, b.si - start);
+      out.push(Object.assign(base, {
+        kind: co.idle ? 'idle' : 'changeover', standby: !!b.standby,
+        prev: co.prev, start: start, total: total,
         pct: total > 0 ? Math.max(0, Math.min(100, (now - start) / total * 100)) : 100
-      });
+      }));
     });
     return out;
   }
@@ -1033,7 +1066,7 @@
     pad2, parseHM, fmtHM, dayIndex, isoOfDay, shiftDate, toAbs, adjustEnd, nowAbs,
     cutoffMins, festivalDateOf, entersMode, festivalDays, TIPOS, tipoOf, isBand, isAll, entriesOf, tasksNow, hitosOf,
     getEscenario, artistColor, callAbsFor, buildBlocks,
-    blockEnd, isPlaying, playingNow, nextPerStage, progress, changeoverBefore, changeoversNow, callKey, callAt, callList,
+    blockEnd, isPlaying, playingNow, nextPerStage, progress, changeoverBefore, changeoversNow, gapIdle, nextBandIn, callKey, callAt, callList,
     pickBlocks, stripLabel, stripLabels, validateProject,
     demoFestival, FIELDS, normHM, fieldValue, editArtist, setStandby, modifiedFields, countModified,
     fechaFor, jornadaOf, eventDays, checkEvent, newFestival, updateEvent, STAGE_COLORS,

@@ -116,6 +116,29 @@
     eq(r.mode, 'changeover'); eq(r.totalSec, 40 * 60, 'de 21:20 a 22:00');
   });
 
+  test('Confidence (decisión 76): tarea de la zona en el hueco = EN ESPERA; hito no rompe; STANDBY manda', () => {
+    let F = fest();
+    let s = C.addArtist(F.s, 'show', { jornada: JOR, nombre: 'Montaje', tipo: 'tarea', escenarioId: F.P, inicio: '21:35', fin: '21:50' }).state;
+    let r = V.confidence(s, F.P, at('21:40'));
+    eq(r.mode, 'wait', 'tarea en curso en el hueco'); eq(r.next.name, 'Banda B'); eq(r.frac, null);
+    eq(V.confidence(s, F.P, at('21:55')).mode, 'wait', 'después de la tarea sigue sin actividad');
+    s = C.addArtist(F.s, 'show', { jornada: JOR, nombre: 'Puertas', tipo: 'hito', escenarioId: F.P, inicio: '21:45' }).state;
+    eq(V.confidence(s, F.P, at('21:40')).mode, 'changeover', 'un hito no rompe el changeover');
+    s = C.addArtist(F.s, 'show', { jornada: JOR, nombre: 'Montaje', tipo: 'tarea', escenarioId: F.K, inicio: '21:35', fin: '21:50' }).state;
+    eq(V.confidence(s, F.P, at('21:40')).mode, 'changeover', 'la tarea de otra zona no cuenta');
+    s = C.addArtist(F.s, 'show', { jornada: JOR, nombre: 'Montaje', tipo: 'tarea', escenarioId: F.P, inicio: '21:35', fin: '21:50' }).state;
+    s = C.setStandby(s, F.ids['Banda B'], 'show', true).state;
+    r = V.confidence(s, F.P, at('21:40')); eq(r.mode, 'changeover'); ok(r.standby, 'STANDBY manual');
+  });
+
+  test('Confidence (decisión 76): soundcheck → show de la misma banda = EN ESPERA', () => {
+    const F = fest();
+    let s = C.editArtist(F.s, F.ids['Banda A'], 'sc', 'fecha', JOR).state;
+    s = C.editArtist(s, F.ids['Banda A'], 'sc', 'inicio', '18:00').state; s = C.editArtist(s, F.ids['Banda A'], 'sc', 'fin', '18:45').state;
+    const r = V.confidence(s, F.P, at('19:00'));
+    eq(r.mode, 'wait'); eq(r.next.name, 'Banda A');
+  });
+
   test('Confidence: antes de la primera banda (espera) y fin de jornada', () => {
     const F = fest();
     const w = V.confidence(F.s, F.P, at('19:00')); eq(w.mode, 'wait'); eq(w.next.name, 'Banda A'); eq(w.frac, null);
