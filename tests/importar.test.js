@@ -98,22 +98,23 @@
     const pv = I.preview(S, recs, { mode: 'show', ctx: CTX, defaultJornada: '2026-07-12', defaultStageId: 'esc1' });
     deq(pv.rows.map(r => r.status), ['warn', 'warn']); deq(pv.outside, ['2026-07-12']);
   });
-  test('vista previa: duplicada en la misma jornada → desmarcada; misma banda otro día → nueva', () => {
+  test('vista previa: igual en la misma jornada → aviso «Revisar» y sigue marcada; misma banda otro día → nueva sin aviso', () => {
     let s = C.addArtist(S, 'show', { nombre: 'Los Ejemplos', escenarioId: 'esc1', jornada: '2026-07-10', inicio: '21:00', fin: '22:00' }).state;
     const recs = I.read('Banda\tEscenario\tJornada\tInicio\nlos ejemplos\tPrincipal\t10/07\t21:00\nLos Ejemplos\tPrincipal\t11/07\t21:00', CTX).records;
     const pv = I.preview(s, recs, { mode: 'show', ctx: CTX });
-    eq(pv.rows[0].action, 'duplicada'); eq(pv.rows[0].include, false);
+    eq(pv.rows[0].action, 'duplicada'); eq(pv.rows[0].include, true); eq(pv.rows[0].status, 'warn');
     eq(pv.rows[1].action, 'nueva'); eq(pv.rows[1].include, true);
   });
-  test('soundcheck de una banda que ya existe en show → completa la misma banda (no duplica)', () => {
+  test('soundcheck de una banda que ya tiene show → entrada NUEVA e independiente (cero fusiones)', () => {
     let s = C.addArtist(S, 'show', { nombre: 'Los Ejemplos', escenarioId: 'esc1', jornada: '2026-07-10', inicio: '21:00', fin: '22:00' }).state;
-    const recs = I.read('Banda\tJornada\tInicio\tFin\tCALL\nLos Ejemplos\t10/07\t16:00\t16:45\t15:30', CTX).records;
+    const recs = I.read('Banda\tEscenario\tJornada\tInicio\tFin\tCALL\nLos Ejemplos\tPrincipal\t10/07\t16:00\t16:45\t15:30', CTX).records;
     const pv = I.preview(s, recs, { mode: 'sc', ctx: CTX });
-    eq(pv.rows[0].action, 'completar'); eq(pv.rows[0].status, 'warn');
+    eq(pv.rows[0].action, 'nueva'); eq(pv.rows[0].include, true);
     const ap = I.apply(s, pv, { mode: 'sc' });
-    eq(ap.updated, 1); eq(ap.added, 0); eq(ap.state.artists.length, 1);
-    const a = ap.state.artists[0];
-    eq(a.soundcheckInicio, '16:00'); eq(a.soundcheckFin, '16:45'); eq(a.soundcheckCall, '15:30'); eq(a.inicio, '21:00');
+    eq(ap.updated, 0); eq(ap.added, 1); eq(ap.state.artists.length, 2);
+    const a = ap.state.artists[1];
+    eq(a.soundcheckInicio, '16:00'); eq(a.soundcheckCall, '15:30'); eq(a.inicio, undefined, 'la nueva solo tiene soundcheck');
+    eq(ap.state.artists[0].soundcheckInicio, undefined, 'la existente no se toca');
   });
   test('vista previa: solape con una banda existente del mismo escenario y jornada', () => {
     let s = C.addArtist(S, 'show', { nombre: 'Ya', escenarioId: 'esc1', jornada: '2026-07-10', inicio: '21:00', fin: '22:00' }).state;
@@ -140,11 +141,11 @@
     eq(pv.rows[0].status, 'err'); eq(I.apply(S, pv, { mode: 'show', createStages: { club: false } }).added, 0);
   });
 
-  test('banda repetida sin escenario: toma el de la banda existente y queda desmarcada', () => {
+  test('entrada igual ya existente (mismo nombre, tipo y jornada): solo aviso «Revisar»; casilla marcada como las demás; no toma nada de la otra', () => {
     const s2 = C.addArtist(S, 'show', { nombre: 'Uno', escenarioId: S.escenarios[1].id, jornada: '2026-07-10', inicio: '21:00', fin: '22:00' }).state;
     const recs = I.read('VIERNES 10 JULIO\n21:00-22:00 Uno', I.contextOf(s2)).records;
-    const pv = I.preview(s2, recs, { mode: 'show', ctx: I.contextOf(s2) });
-    eq(pv.rows[0].action, 'duplicada'); eq(pv.rows[0].escenario, 'Carpa'); eq(pv.rows[0].status, 'warn'); eq(pv.rows[0].include, false);
+    const pv = I.preview(s2, recs, { mode: 'show', ctx: I.contextOf(s2), defaultStageId: S.escenarios[0].id });
+    eq(pv.rows[0].action, 'duplicada'); eq(pv.rows[0].escenario, 'Principal', 'escenario por defecto, no el de la otra'); eq(pv.rows[0].include, true); eq(pv.rows[0].status, 'warn');
   });
 
   test('separar palabras pegadas de PDF, con excepciones', () => {
@@ -177,10 +178,11 @@
     ok(!pv.rows[0].warns.some(w => /solapa/i.test(w)), 'la tarea no da solapes');
     ok(pv.rows[5].warns.some(w => /solapa con Uno/i.test(w)), 'las bandas sí');
     const ap = I.apply(S, pv, {});
-    eq(pv.rows[4].action, 'unir'); eq(ap.added, 6, '4 tareas/hitos + Uno (soundcheck) + Dos; el show de Uno se une'); eq(ap.updated, 1);
+    eq(pv.rows[4].action, 'nueva'); eq(ap.added, 7, 'cada línea, una entrada: la prueba y el show de Uno van por separado'); eq(ap.updated, 0);
     const st = ap.state;
     eq(st.artists.filter(a => a.showtimeTipo === 'hito').length, 2); eq(st.artists.filter(a => a.showtimeTipo === 'tarea').length, 2);
-    const uno = st.artists.find(a => a.nombre === 'Uno'); eq(uno.soundcheckInicio, '16:00'); eq(uno.inicio, '21:00');
+    const unos = st.artists.filter(a => a.nombre === 'Uno'); eq(unos.length, 2);
+    ok(unos.some(a => a.soundcheckInicio === '16:00' && !a.inicio) && unos.some(a => a.inicio === '21:00' && !a.soundcheckInicio));
     eq(C.buildBlocks(st, { mode: 'all', day: '2026-07-10' }).length, 7);
   });
   test('tipo cambiado a mano en la vista previa', () => {

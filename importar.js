@@ -412,7 +412,6 @@
     (state.escenarios || []).forEach(e => { stagesByNorm[norm(e.nombre)] = e; });
     const evDays = C.eventDays(state);
     const newStages = [], seenNew = {}, outside = [];
-    const newBands = {};   // bandas nuevas de esta misma importación: norm(nombre) → { show: idx, sc: idx }
     const rows = records.map((r0, idx) => {
       const ed = (o.edits && o.edits[idx]) || null;
       const r = Object.assign({}, r0, ed ? reinterpretEdits(r0, ed, o.ctx) : {});
@@ -427,11 +426,11 @@
       const band = tipo === 'show' || tipo === 'sc';
       const mode = tipo === 'sc' ? 'sc' : 'show';
       if (!r.banda) errs.push(band ? 'Falta el nombre de la banda' : 'Falta el nombre');
-      // ¿Ya existe? (se mira antes: si se completa una banda existente, su escenario vale)
+      // Cada línea es una ENTRADA INDEPENDIENTE: nunca se une a otra por el nombre.
+      // Solo se AVISA si ya hay una entrada igual (mismo nombre, tipo y jornada), por si se pega dos veces.
       const jornada0 = r.jornada || o.defaultJornada || '';
-      const same = (state.artists || []).filter(a => norm(a.nombre) === norm(r.banda) && r.banda && (band ? C.tipoOf(a) === 'banda' : C.tipoOf(a) === tipo));
-      const sameDay = same.find(a => C.entersMode(a, band ? mode : 'all') && C.jornadaOf(state, a, mode) === jornada0);
-      const empty = band ? same.find(a => !C.entersMode(a, mode)) : null;
+      const sameDay = (state.artists || []).find(a => r.banda && norm(a.nombre) === norm(r.banda) &&
+        (band ? C.tipoOf(a) === 'banda' && C.entersMode(a, mode) : C.tipoOf(a) === tipo) && C.jornadaOf(state, a, mode) === jornada0);
       // Escenario
       let stage = null, stageNew = '';
       if (r.escenario) {
@@ -442,8 +441,7 @@
           if (o.createStages && o.createStages[norm(r.escenario)] === false) errs.push('El escenario «' + r.escenario + '» no existe (marca «crear» o cámbialo)');
           else warns.push('Escenario nuevo: ' + r.escenario);
         }
-      } else if ((sameDay || empty) && (sameDay || empty).escenarioId && C.getEscenario(state, (sameDay || empty).escenarioId)) stage = C.getEscenario(state, (sameDay || empty).escenarioId);
-      else if (!band) { /* tareas e hitos: escenario opcional */ }
+      } else if (!band) { /* tareas e hitos: escenario opcional */ }
       else if (o.defaultStageId) stage = C.getEscenario(state, o.defaultStageId);
       else if ((state.escenarios || []).length) errs.push('Falta el escenario (elige uno por defecto o una columna)');
       // Jornada
@@ -469,23 +467,11 @@
       if (!band && call) { warns.push((tipo === 'hito' ? 'Los hitos' : 'Las tareas') + ' no tienen CALL: se ignora ' + call); call = ''; }
       if (r.inicio && fin && C.parseHM(fin) <= C.parseHM(r.inicio)) warns.push('Cruza medianoche: termina al día siguiente');
       if (r.inicio && jornada && C.fechaFor(state, jornada, r.inicio) !== jornada) warns.push('Antes de la hora de corte: fecha real ' + C.fechaFor(state, jornada, r.inicio));
-      // ¿Banda que ya existe?
+      // ¿Ya hay una igual? Solo AVISO; la casilla no se toca: el regidor decide.
       let action = 'nueva', target = null;
-      if (sameDay) { action = 'duplicada'; target = sameDay.id; warns.push('Ya existe en esta jornada (' + TIPO_LABEL[tipo].toLowerCase() + ' ' + C.fieldValue(sameDay, mode, 'inicio') + ')'); }
-      else if (empty) {
-        action = 'completar'; target = empty.id;
-        warns.push('Completa el ' + (mode === 'sc' ? 'soundcheck' : 'show') + ' de la banda existente «' + empty.nombre + '»');
-        if (stage && empty.escenarioId && stage.id !== empty.escenarioId) warns.push('Escenario distinto al de la banda existente: se mantiene el suyo');
-      }
-      // Show y soundcheck de la misma banda nueva en esta importación: una sola banda
-      if (band && action === 'nueva' && r.banda) {
-        const k = norm(r.banda), nb = newBands[k] || (newBands[k] = {});
-        const other = nb[mode === 'sc' ? 'show' : 'sc'];
-        if (other !== undefined && nb[mode] === undefined) { action = 'unir'; target = other; warns.push('Se une a «' + r.banda + '» de esta importación (' + (mode === 'sc' ? 'show' : 'soundcheck') + ')'); }
-        if (nb[mode] === undefined) nb[mode] = idx;
-      }
+      if (sameDay) { action = 'duplicada'; target = sameDay.id; warns.push('Ya hay una entrada igual en esta jornada (' + TIPO_LABEL[tipo].toLowerCase() + ' ' + C.fieldValue(sameDay, mode, 'inicio') + '): ¿pegada dos veces?'); }
       const status = errs.length ? 'err' : warns.length ? 'warn' : 'ok';
-      const defInclude = status !== 'err' && action !== 'duplicada';
+      const defInclude = status !== 'err';
       const include = o.include && o.include[idx] !== undefined ? (o.include[idx] && status !== 'err') : defInclude;
       return { idx, src: r.src, raw: r.raw, banda: r.banda, tipo, tipoWhy, escenario: stage ? stage.nombre : stageNew, stageId: stage ? stage.id : '', stageNew,
         jornada, inicio: r.inicio, fin: fin || '', finTxt: r.fin, duracion: r.duracion, call: call, notas: r.notas,
@@ -528,7 +514,7 @@
   }
 
   /** Aplica la importación confirmada. Cada fila entra con SU tipo (show, soundcheck, tarea o hito).
-   *  opts: { createStages:{normName:bool}, extendEvent:bool }. Devuelve { ok, state, added, updated, stagesCreated, errors } */
+   *  opts: { createStages:{normName:bool}, extendEvent:bool }. Devuelve { ok, state, added, updated (siempre 0), stagesCreated, errors } */
   function apply(state, pv, opts) {
     const o = opts || {};
     let s = state;
@@ -545,24 +531,16 @@
       const u = C.updateEvent(s, { fechaInicio: all[0], fechaFin: all[all.length - 1] });
       if (u.ok) s = u.state;
     }
-    let added = 0, updated = 0; const errors = [];
-    const createdId = {};   // índice de fila → id de la banda creada
+    let added = 0; const errors = [];
     rows.forEach(r => {
       const esc = r.stageId || (r.stageNew ? stageId[norm(r.stageNew)] : '') || '';
       const tipo = r.tipo || (o.mode === 'sc' ? 'sc' : 'show');
       const mode = tipo === 'sc' ? 'sc' : 'show';
-      const target = r.action === 'unir' ? createdId[r.target] : r.target;
-      if ((r.action === 'completar' || (r.action === 'unir' && target != null)) && target != null) {
-        let st = s;
-        const steps = [['jornada', r.jornada], ['inicio', r.inicio]].concat(r.fin ? [['fin', r.fin]] : []).concat(r.call ? [['call', r.call]] : []).concat(r.notas ? [['notas', r.notas]] : []);
-        for (const [k, v] of steps) { const e = C.editArtist(st, target, mode, k, v); if (!e.ok) { errors.push(r.banda + ': ' + e.error); return; } st = e.state; }
-        s = st; updated++;
-      } else {
-        const a = C.addArtist(s, mode, { tipo: (tipo === 'tarea' || tipo === 'hito') ? tipo : 'banda', nombre: r.banda, escenarioId: esc, jornada: r.jornada, inicio: r.inicio, fin: r.fin, call: r.call, notas: r.notas });
-        if (a.ok) { s = a.state; added++; createdId[r.idx] = a.id; } else errors.push(r.banda + ': ' + a.error);
-      }
+      // Siempre una entrada nueva e independiente (nunca se completa ni se une a otra)
+      const a = C.addArtist(s, mode, { tipo: (tipo === 'tarea' || tipo === 'hito') ? tipo : 'banda', nombre: r.banda, escenarioId: esc, jornada: r.jornada, inicio: r.inicio, fin: r.fin, call: r.call, notas: r.notas });
+      if (a.ok) { s = a.state; added++; } else errors.push(r.banda + ': ' + a.error);
     });
-    return { ok: true, state: s, added, updated, stagesCreated, errors };
+    return { ok: true, state: s, added, updated: 0, stagesCreated, errors };
   }
 
   /** Contexto para leer fechas y escenarios con el evento actual. */

@@ -239,10 +239,11 @@
     });
     $('tbody').innerHTML = rows.join('') || '<tr><td colspan="10" class="hint" style="padding:16px">' +
       (FEST.artists.length ? 'No hay ' + viewOf().what + ' en esta jornada. Añádelos abajo.' : 'Todavía no hay nada. Añade la primera entrada en la fila de abajo.') + '</td></tr>';
-    // Sin horario en esta vista: solo bandas (en Shows/Soundchecks) o cualquier entrada sin horario (Jornada completa)
-    const sin = FEST.artists.filter(a => !C.entersMode(a, mode) && (mode === 'all' || C.tipoOf(a) === 'banda'));
+    // Las vistas son FILTROS PUROS: Shows = solo shows, Soundchecks = solo soundchecks.
+    // Solo en Jornada completa se listan las entradas sin ningún horario (si no, no se verían en ninguna parte).
+    const sin = mode === 'all' ? FEST.artists.filter(a => !C.entersMode(a, 'all')) : [];
     $('tbody-sin').innerHTML = sin.length
-      ? '<tr class="sec"><td colspan="10">Sin horario' + (mode === 'all' ? '' : ' de ' + modeName()) + ' (' + sin.length + ') · elige jornada y escribe el inicio</td></tr>' + sin.map(a => rowHtml(a, null, mods, nuevas.has(String(a.id)))).join('')
+      ? '<tr class="sec"><td colspan="10">Sin horario (' + sin.length + ') · elige jornada y escribe el inicio</td></tr>' + sin.map(a => rowHtml(a, null, mods, nuevas.has(String(a.id)))).join('')
       : '';
     markRows(Math.floor(C.nowAbs()));
   }
@@ -868,7 +869,7 @@
       $('imp-prev').innerHTML = head + '<tbody>' + pv.rows.map(r =>
         '<tr class="st-' + r.status + (r.include ? '' : ' off') + '" title="' + esc(r.raw || '') + '">' +
         '<td class="chk"><input type="checkbox" data-inc="' + r.idx + '"' + (r.include ? ' checked' : '') + (r.status === 'err' ? ' disabled' : '') + '></td>' +
-        '<td class="st">' + st[r.status] + (r.action === 'completar' ? '<div class="hint">completa</div>' : r.action === 'unir' ? '<div class="hint">se une</div>' : r.action === 'duplicada' ? '<div class="hint">ya existe</div>' : '') + '</td>' +
+        '<td class="st">' + st[r.status] + (r.action === 'duplicada' ? '<div class="hint">ya existe</div>' : '') + '</td>' +
         '<td class="tp"><select data-row="' + r.idx + '" data-k="tipo" class="tipo tipo-' + r.tipo + '">' + I.TIPO_KEYS.map(k => '<option value="' + k + '"' + (k === r.tipo ? ' selected' : '') + '>' + I.TIPO_LABEL[k] + '</option>').join('') + '</select>' +
           (r.tipoWhy ? '<div class="hint" title="Tipo propuesto: compruébalo">por ' + esc(r.tipoWhy) + '</div>' : '') + '</td>' +
         inp(r, 'escenario', r.escenario, 'e') + inp(r, 'banda', r.banda, 'b') +
@@ -898,7 +899,6 @@
     const hidden = CONFIG.mode !== 'all' && Array.from(used).some(t => t !== CONFIG.mode);
     closeImport();
     let msg = 'Importado: ' + r.added + (r.added === 1 ? ' entrada nueva' : ' entradas nuevas');
-    if (r.updated) msg += ', ' + r.updated + ' completada' + (r.updated === 1 ? '' : 's');
     if (r.stagesCreated) msg += ', ' + r.stagesCreated + ' escenario' + (r.stagesCreated === 1 ? '' : 's') + ' nuevo' + (r.stagesCreated === 1 ? '' : 's');
     if (hidden) msg += ' · todo junto en Jornada completa';
     commitFestival(r.state, msg);
