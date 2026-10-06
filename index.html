@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Showtime · Dashboard</title>
-<link rel="stylesheet" href="control.css?v=20261021">
+<link rel="stylesheet" href="control.css?v=20261022">
 </head>
 <body>
 
@@ -38,6 +38,15 @@
   <symbol id="i-expand" viewBox="0 0 20 20"><path d="M11.5 3.5h5v5M8.5 16.5h-5v-5M16.5 3.5l-5.5 5.5M3.5 16.5L9 11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-msg" viewBox="0 0 20 20"><path d="M4 5.5h12a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H9l-3.5 3v-3H4a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
   <symbol id="i-sun" viewBox="0 0 20 20"><circle cx="10" cy="10" r="3.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M10 2.5v2M10 15.5v2M2.5 10h2M15.5 10h2M4.7 4.7l1.4 1.4M13.9 13.9l1.4 1.4M4.7 15.3l1.4-1.4M13.9 6.1l1.4-1.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-thermo" viewBox="0 0 20 20"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2a1.8 1.8 0 0 0-1.8 1.8v6.8a3.3 3.3 0 1 0 3.6 0V5A1.8 1.8 0 0 0 10 3.2z"/><path d="M10 8.5v5.2"/></g></symbol>
+  <symbol id="i-drop" viewBox="0 0 20 20"><path d="M10 3.2s-4.6 5.1-4.6 8.4a4.6 4.6 0 0 0 9.2 0C14.6 8.3 10 3.2 10 3.2z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+  <symbol id="i-wind" viewBox="0 0 20 20"><path d="M2.8 8h9.6a2.5 2.5 0 1 0-2.5-2.5M2.8 11.5h12.2a2.5 2.5 0 1 1-2.5 2.5M2.8 15h5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-cloud" viewBox="0 0 20 20"><path d="M6 15.5h8.6a3.4 3.4 0 0 0 .3-6.8 5 5 0 0 0-9.6 1.4A2.8 2.8 0 0 0 6 15.5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+  <symbol id="i-csun" viewBox="0 0 20 20"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2.8v1.3M2.8 7h1.3M4 4l.9.9M10 4l-.9.9"/><path d="M4.9 9.3a2.6 2.6 0 0 1 4.7-2.1"/><path d="M7.6 16.5h7.2a3 3 0 0 0 .2-6 4.3 4.3 0 0 0-8.2 1.3 2.4 2.4 0 0 0 .8 4.7z"/></g></symbol>
+  <symbol id="i-rain" viewBox="0 0 20 20"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12h8.6a3.2 3.2 0 0 0 .3-6.4 4.7 4.7 0 0 0-9.1 1.3A2.6 2.6 0 0 0 6 12z"/><path d="M7.2 14.5l-.9 2.3M10.6 14.5l-.9 2.3M14 14.5l-.9 2.3"/></g></symbol>
+  <symbol id="i-snow" viewBox="0 0 20 20"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12h8.6a3.2 3.2 0 0 0 .3-6.4 4.7 4.7 0 0 0-9.1 1.3A2.6 2.6 0 0 0 6 12z"/><path d="M7 15.2v.1M10 16.5v.1M13 15.2v.1"/></g></symbol>
+  <symbol id="i-storm" viewBox="0 0 20 20"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12h8.6a3.2 3.2 0 0 0 .3-6.4 4.7 4.7 0 0 0-9.1 1.3A2.6 2.6 0 0 0 6 12z"/><path d="M10.6 12.6l-2 3h3l-2 3"/></g></symbol>
+  <symbol id="i-ext" viewBox="0 0 20 20"><path d="M11.5 3.5h5v5M16.5 3.5l-7 7M14 11.5v4a1 1 0 0 1-1 1H4.5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
 </svg>
 
 <header class="bar">
@@ -99,7 +108,7 @@
       </div>
     </div>
     <div class="menu" id="m-cast">
-      <button class="mbtn" aria-haspopup="true" aria-expanded="false" title="Emisión a móviles"><svg class="ic"><use href="#i-cast"/></svg><span class="mtxt">Emisión</span><span id="cast-on" class="mdot" hidden></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
+      <button class="mbtn" aria-haspopup="true" aria-expanded="false" title="Emisión a dispositivos"><svg class="ic"><use href="#i-cast"/></svg><span class="mtxt">Emisión</span><span id="cast-on" class="mdot" hidden></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
       <div class="mpanel cast" role="menu">
         <div class="ctabs" role="tablist">
           <button class="ctab on" data-tab="staff" role="tab" aria-selected="true"><svg class="ic"><use href="#i-phone"/></svg>Staff · solo lectura</button>
@@ -147,6 +156,7 @@
     <div class="card"><h3 class="h-now">En escena</h3><div id="v-now"></div></div>
     <div class="card"><h3>Siguiente</h3><div id="v-next"></div></div>
     <div class="card" id="card-call"><h3 class="h-call">CALL</h3><div id="v-call"></div></div>
+    <div class="card" id="card-meteo" hidden><h3 class="h-meteo">Meteo</h3><div id="v-meteo"></div></div>
   </aside>
   <section class="list">
     <div class="list-h">
@@ -238,7 +248,7 @@
       <label for="sc-tbg">Fondo</label><input id="sc-tbg" type="color" class="swatch" data-sc="ticker.bg">
       <label for="sc-tfg">Texto</label><input id="sc-tfg" type="color" class="swatch" data-sc="ticker.fg">
       <div id="sc-tprev" class="tkprev crawl"><div class="tkp-track"><span class="tkp-run"><span>PRINCIPAL · RETRASO +10 MIN</span><i></i><span>CURFEW 01:30</span><i></i></span><span class="tkp-run" aria-hidden="true"><span>PRINCIPAL · RETRASO +10 MIN</span><i></i><span>CURFEW 01:30</span><i></i></span></div></div>
-      <div class="note">Se aplican al momento en todas las Pantallas Live abiertas y en los móviles de Staff.</div>
+      <div class="note">Se aplican al momento en todas las Pantallas Live abiertas y en los dispositivos de Staff.</div>
     </div>
   </section>
   <section class="cfg-s" id="cfg-s-msg">
@@ -249,6 +259,52 @@
       <label for="cfg-msg-secs">Duración</label><select id="cfg-msg-secs"><option value="10">10 s</option><option value="20">20 s</option><option value="30">30 s</option><option value="60">60 s</option><option value="0">Hasta retirarlo</option></select>
       <div id="cfg-msg-prev" class="msg-prev"><span>5 MINUTOS</span></div>
       <div class="note"><button id="cfg-msg-reset" class="btn" type="button">Colores por defecto</button> Cada mensaje sale con los colores y la duración que haya al enviarlo.</div>
+    </div>
+  </section>
+  <section class="cfg-s" id="cfg-s-meteo">
+    <h3>Meteo</h3>
+    <div class="form mt">
+      <span></span><label class="chk" title="Tarjeta METEO, Live Manager y cinta de Backstage"><input id="mt-on" type="checkbox"> Mostrar el tiempo</label>
+      <label for="mt-src">Fuente</label><select id="mt-src"><option value="openmeteo">Open-Meteo · previsión</option><option value="url">URL JSON propia (estación del evento)</option><option value="manual">Manual</option></select>
+      <div class="mt-g" data-src="openmeteo">
+        <label for="mt-q">Lugar</label><span class="nrow wide"><input id="mt-q" type="text" placeholder="Ciudad o recinto" autocomplete="off" spellcheck="false"><button id="mt-find" class="btn" type="button">Buscar</button></span>
+        <span></span><div id="mt-res" class="mt-res"></div>
+        <label for="mt-lat">Coordenadas</label><span class="nrow"><input id="mt-lat" type="text" placeholder="lat" autocomplete="off"><input id="mt-lon" type="text" placeholder="lon" autocomplete="off"></span>
+        <span></span><div id="mt-place" class="mt-place"></div>
+      </div>
+      <div class="mt-g" data-src="url" hidden>
+        <label for="mt-url">URL</label><input id="mt-url" type="text" inputmode="url" placeholder="https://…" autocomplete="off" spellcheck="false">
+        <label>Temperatura (°C)</label><input data-mp="temp" type="text" placeholder="p. ej. data.temp" autocomplete="off" spellcheck="false">
+        <label>Lluvia (mm/h)</label><input data-mp="rain" type="text" placeholder="p. ej. data.rain" autocomplete="off" spellcheck="false">
+        <label>Viento (km/h)</label><input data-mp="wind" type="text" placeholder="p. ej. data.wind.avg" autocomplete="off" spellcheck="false">
+        <label>Ráfagas (km/h)</label><input data-mp="gust" type="text" placeholder="p. ej. data.wind.gust" autocomplete="off" spellcheck="false">
+        <div class="note">Ruta del dato dentro del JSON, con puntos e índices (<b>list.0.temp</b>). El servidor debe permitir leerlo desde el navegador. La URL no se emite a los dispositivos de Staff. Sin previsión: solo avisa de lo que mide ahora.</div>
+      </div>
+      <div class="mt-g" data-src="manual" hidden>
+        <label>Temperatura (°C)</label><span class="nrow"><input data-mn="temp" type="number" step="0.1"></span>
+        <label>Lluvia (mm/h)</label><span class="nrow"><input data-mn="rain" type="number" min="0" step="0.1"></span>
+        <label>Viento (km/h)</label><span class="nrow"><input data-mn="wind" type="number" min="0"></span>
+        <label>Ráfagas (km/h)</label><span class="nrow"><input data-mn="gust" type="number" min="0"></span>
+        <label>Índice UV</label><span class="nrow"><input data-mn="uv" type="number" min="0" max="20"></span>
+        <div class="note">Cada cambio queda con la hora en que lo escribes.</div>
+      </div>
+      <label for="mt-ref" class="mt-auto">Actualizar cada</label><select id="mt-ref" class="mt-auto"><option value="5">5 min</option><option value="10">10 min</option><option value="15">15 min</option><option value="30">30 min</option></select>
+      <div class="fsub">Avisos · previsión, no aviso oficial</div>
+      <label for="mt-th-gust">Ráfagas desde</label><span class="nrow"><input id="mt-th-gust" data-th="gust" type="number" min="1" placeholder="—"> km/h</span>
+      <label for="mt-th-wind">Viento medio desde</label><span class="nrow"><input id="mt-th-wind" data-th="wind" type="number" min="1" placeholder="—"> km/h</span>
+      <div class="note">Vacío = sin aviso. La cifra la marca el plan de autoprotección o el fabricante de la estructura.</div>
+      <label for="mt-th-rain">Lluvia desde</label><span class="nrow"><input id="mt-th-rain" data-th="rain" type="number" min="0.1" step="0.1" placeholder="—"> mm/h</span>
+      <label for="mt-th-heat">Calor desde</label><span class="nrow"><input id="mt-th-heat" data-th="heat" type="number" placeholder="—"> °C</span>
+      <span></span><div class="chks">
+        <label class="chk"><input type="checkbox" data-th="storm"> Tormenta prevista</label>
+        <label class="chk"><input type="checkbox" data-th="uvOn"> Índice UV desde <input class="mini" data-th="uv" type="number" min="1" max="20"></label>
+        <label class="chk" title="Para episodios de calima o humo de incendios. Apagado por defecto"><input type="checkbox" data-th="aqiOn"> Calidad del aire desde <select class="mini" data-th="aqi"><option value="60">Mala</option><option value="80">Muy mala</option><option value="100">Extremadamente mala</option></select></label>
+      </div>
+      <label for="mt-hz">Mirar las próximas</label><select id="mt-hz"><option value="1">1 hora</option><option value="2">2 horas</option><option value="3">3 horas</option><option value="6">6 horas</option><option value="12">12 horas</option></select>
+      <div class="note">Los avisos solo informan: salen en el Dashboard (con «Visto»), en la Live Manager y en la cinta de Backstage. No mandan mensajes a escena, no salen en Confidence y no tocan el horario.</div>
+      <span></span><div class="row mt-acts"><button id="mt-now" class="btn" type="button">Actualizar ahora</button><a class="btn" id="mt-aemet" target="_blank" rel="noopener"><svg class="ic"><use href="#i-ext"/></svg>Avisos oficiales AEMET</a></div>
+      <span></span><div id="mt-st" class="mt-st"></div>
+      <div class="mt-attr">Data by <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a> (CC BY 4.0) · Calidad del aire: Copernicus Atmosphere Monitoring Service</div>
     </div>
   </section>
 </aside>
@@ -296,13 +352,14 @@
 <datalist id="zones-dl"></datalist>
 <div id="toast" class="toast" hidden></div>
 
-<script src="core.js?v=20261021"></script>
-<script src="datos.js?v=20261021"></script>
-<script src="importar.js?v=20261021"></script>
-<script src="qr.js?v=20261021"></script>
-<script src="emision.js?v=20261021"></script>
-<script src="mando.js?v=20261021"></script>
-<script src="vistas.js?v=20261021"></script>
-<script src="control.js?v=20261021"></script>
+<script src="core.js?v=20261022"></script>
+<script src="meteo.js?v=20261022"></script>
+<script src="datos.js?v=20261022"></script>
+<script src="importar.js?v=20261022"></script>
+<script src="qr.js?v=20261022"></script>
+<script src="emision.js?v=20261022"></script>
+<script src="mando.js?v=20261022"></script>
+<script src="vistas.js?v=20261022"></script>
+<script src="control.js?v=20261022"></script>
 </body>
 </html>

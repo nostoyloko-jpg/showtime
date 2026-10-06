@@ -248,7 +248,7 @@
     }).join('');
     const tight = MARGINS.filter(m => m.level !== 'ok').map(m => '<span class="dchip ' + (m.level === 'over' ? 'over' : 'absorb') + '"><svg class="ic"><use href="#i-alert"/></svg>' +
       esc(m.hito.name) + ' ' + C.fmtHM(m.hito.psi) + ' · ' + (m.level === 'over' ? 'rebasado +' + (-m.margin) + ' min' : 'margen ' + m.margin + ' min') + '</span>').join('');
-    const h = html + tight;
+    const h = html + tight + meteoChips(meteoState());
     if ($('drift').innerHTML !== h) $('drift').innerHTML = h;
   }
 
@@ -498,7 +498,9 @@
     document.querySelectorAll('#m-live [data-on]').forEach(el => el.classList.toggle('on', liveOpen(el.dataset.on)));
     document.querySelectorAll('#m-live [data-close]').forEach(el => { el.hidden = !liveOpen(el.dataset.close); });
     if ($('lv-closeall')) $('lv-closeall').hidden = nOpen < 2;
+    meteoTick();
     if (!FEST) return;
+    renderMeteo();
     const nowMins = C.nowAbs(d), nowInt = Math.floor(nowMins);
     renderLive(nowMins, nowInt);
     renderDrift(nowInt);
@@ -733,6 +735,7 @@
     $('cfg-style-live').value = CONFIG.style;
     fillMsgCfg();
     fillScreensCfg();
+    fillMeteoCfg();
   }
   // Pantallas Live y vistas (2e-A)
   function fillScreensCfg() {
@@ -1411,6 +1414,173 @@
     if (e.target.closest('#msg-off, [data-act="msg-off"]')) { Dt.setFlash(null); renderFlash(); toast('Mensaje retirado de la Pantalla Live'); }
   });
 
+  // ── El tiempo (2e-B) ─────────────────────────────────────────────────
+  // Solo el Dashboard pide el dato (Open-Meteo, URL propia o manual); las Live y los dispositivos lo reciben.
+  // Avisos de PREVISIÓN e informativos: umbrales del regidor, «Visto» para que no insistan, nunca tocan escena ni horarios.
+  const W = window.ShowtimeMeteo;
+  const MT_ACK_KEY = 'showtime.meteoAck';
+  let MT_BUSY = false, MT_LAST = 0, MT_ACT = [], MT_ACKS = {}, MT_HTML = '';
+  try { MT_ACKS = JSON.parse(localStorage.getItem(MT_ACK_KEY) || '{}') || {}; } catch (e) { MT_ACKS = {}; }
+  function mtCfg() { return CONFIG.meteo || W.normMeteo(); }
+  function mtKey(c) { return c.source + '|' + c.lat + '|' + c.lon + '|' + c.url; }
+  function mtSaveAcks() { try { localStorage.setItem(MT_ACK_KEY, JSON.stringify(MT_ACKS)); } catch (e) {} }
+  async function meteoFetch(byHand) {
+    const c = mtCfg();
+    if (!c.on || MT_BUSY) return;
+    MT_BUSY = true; MT_LAST = Date.now();
+    const prev = Dt.getMeteo() || {}, key = mtKey(c);
+    try {
+      const snap = await W.fetchSnap(c, (u, o) => fetch(u, o));
+      Dt.setMeteo({ snap, err: '', errAt: null, key });
+      if (byHand) toast('El tiempo, actualizado');
+    } catch (e) {
+      // El último dato bueno se conserva (con su hora): así se ve «SIN DATOS DESDE HH:MM» y no un dato viejo como si fuera de ahora
+      Dt.setMeteo({ snap: prev.key === key ? (prev.snap || null) : null, err: e.message || 'Error', errAt: Date.now(), key });
+      if (byHand) toast('El tiempo: ' + (e.message || 'error'), true);
+    }
+    MT_BUSY = false;
+    renderMeteo();
+    if (!$('cfg').hidden) fillMeteoStatus();
+  }
+  /** Programa: cada «Actualizar cada» minutos (y al cambiar la fuente o el lugar). */
+  function meteoTick() {
+    const c = mtCfg();
+    if (c.on && !MT_BUSY && Date.now() - MT_LAST >= c.refresh * 60000) meteoFetch(false);
+  }
+  /** Estado actual: dato, resumen y avisos (con histéresis). */
+  function meteoState() {
+    const c = mtCfg(), m = Dt.getMeteo();
+    const snap = m && m.key === mtKey(c) ? m.snap : null;
+    const now = Date.now();
+    const sum = snap ? W.summary(snap, c, now) : null;
+    const list = snap ? W.alerts(snap, c, now, MT_ACT) : [];
+    MT_ACT = list.map(a => a.kind);
+    const pr = W.pruneAcks(MT_ACKS, list);
+    if (JSON.stringify(pr) !== JSON.stringify(MT_ACKS)) { MT_ACKS = pr; mtSaveAcks(); }
+    return { c, m, snap, sum, list, pending: W.pendingAlerts(list, MT_ACKS) };
+  }
+  const MT_SRC = { openmeteo: 'Open-Meteo · previsión', url: 'Estación propia', manual: 'Manual' };
+  function mtNum(v, d) { return v === null || v === undefined ? '—' : (d ? W.fmt1(v) : String(Math.round(v))); }
+  /** Chips de la barra de estado: solo lo que no se ha marcado «Visto» (y el aviso de datos viejos). */
+  function meteoChips(st) {
+    if (!st.c.on) return '';
+    let h = '';
+    if (st.sum && st.sum.stale) h += '<span class="dchip over" title="El último dato del tiempo es de las ' + W.hhmm(st.sum.at) + (st.m && st.m.err ? ' · ' + esc(st.m.err) : '') + '"><svg class="ic"><use href="#i-alert"/></svg>Meteo: ' + esc(st.sum.staleTxt) + '</span>';
+    st.pending.forEach(a => {
+      h += '<span class="dchip absorb mtchip" title="Previsión del modelo, no es un aviso oficial"><svg class="ic"><use href="#i-' + (a.kind === 'storm' ? 'storm' : a.kind === 'rain' ? 'rain' : a.kind === 'uv' ? 'sun' : a.kind === 'heat' ? 'thermo' : a.kind === 'aqi' ? 'cloud' : 'wind') + '"/></svg>Previsión · ' + esc(a.text) +
+        '<button class="chipx" data-act="mt-ack" data-k="' + a.kind + '" title="Visto: no insiste salvo que empeore">Visto</button></span>';
+    });
+    return h;
+  }
+  /** Tarjeta METEO (columna izquierda, bajo CALL). */
+  function renderMeteo() {
+    const card = $('card-meteo');
+    const st = meteoState(), c = st.c;
+    card.hidden = !c.on;
+    if (!c.on) { MT_HTML = ''; return st; }
+    let h = '';
+    const where = c.source === 'openmeteo' ? (c.place || (c.lat !== null ? c.lat + ', ' + c.lon : '')) : MT_SRC[c.source];
+    if (!st.sum) {
+      const need = c.source === 'openmeteo' && (c.lat === null || c.lon === null) ? 'Elige el lugar del evento' : c.source === 'url' && !c.url ? 'Falta la URL de la estación' : c.source === 'manual' ? 'Escribe los valores' : '';
+      h = '<div class="mt-none">' + (need ? esc(need) + ' en <button class="linkbtn" data-act="mt-cfg">Configuración › Meteo</button>' : (st.m && st.m.err ? 'SIN DATOS · ' + esc(st.m.err) : 'Cargando…')) + '</div>';
+    } else {
+      const s = st.sum;
+      h += '<div class="mt-now' + (s.stale ? ' stale' : '') + '"><svg class="ic mt-sky"><use href="#i-' + s.icon + '"/></svg><span class="mt-t">' + (s.temp === null ? '—' : Math.round(s.temp) + '°') + '</span><span class="mt-sk">' + esc(s.sky || '') + (where ? '<small>' + esc(where) + '</small>' : '') + '</span></div>';
+      if (s.stale) h += '<div class="mt-stale"><svg class="ic"><use href="#i-alert"/></svg>' + esc(s.staleTxt) + (st.m && st.m.err ? '<small>' + esc(st.m.err) + '</small>' : '') + '</div>';
+      h += '<div class="mt-grid">' +
+        '<span><svg class="ic"><use href="#i-drop"/></svg>Lluvia <b>' + mtNum(s.rain, true) + '</b> mm/h</span>' +
+        '<span><svg class="ic"><use href="#i-wind"/></svg>Viento <b>' + mtNum(s.wind) + '</b> km/h</span>' +
+        '<span class="mt-gmax"><svg class="ic"><use href="#i-wind"/></svg>Ráfagas máx. <b>' + mtNum(s.gustMax !== null ? s.gustMax : s.gust) + '</b> km/h' +
+          (s.gustMaxAt ? ' <small>· ' + W.hhmm(s.gustMaxAt) + '</small>' : '') + (st.snap.hours.length ? ' <small>(próx. ' + s.horizon + ' h)</small>' : ' <small>(ahora)</small>') + '</span>' +
+        (s.uv !== null || s.uvMax !== null ? '<span><svg class="ic"><use href="#i-sun"/></svg>UV <b>' + mtNum(s.uvMax !== null ? s.uvMax : s.uv) + '</b> ' + W.uvText(s.uvMax !== null ? s.uvMax : s.uv) + '</span>' : '') +
+        (c.th.aqiOn && s.aqi !== null ? '<span><svg class="ic"><use href="#i-cloud"/></svg>Aire <b>' + W.aqiText(s.aqi) + '</b></span>' : '') +
+        '</div>';
+      if (st.list.length) h += '<div class="mt-alerts">' + st.list.map(a => '<div class="mt-al' + (st.pending.indexOf(a) >= 0 ? ' new' : '') + '"><svg class="ic"><use href="#i-alert"/></svg><span>' + esc(a.text) + '</span>' +
+        (st.pending.indexOf(a) >= 0 ? '<button class="chipx" data-act="mt-ack" data-k="' + a.kind + '">Visto</button>' : '<small>visto</small>') + '</div>').join('') + '</div>';
+      h += '<div class="mt-foot">' + esc(MT_SRC[s.src] || '') + ' · dato ' + W.hhmm(s.at) + ' · previsión, no aviso oficial · <a href="' + W.AEMET_URL + '" target="_blank" rel="noopener">Avisos AEMET<svg class="ic"><use href="#i-ext"/></svg></a></div>';
+    }
+    if (h !== MT_HTML) { MT_HTML = h; $('v-meteo').innerHTML = h; }
+    return st;
+  }
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-act="mt-ack"]');
+    if (b) {
+      const st = meteoState(), a = st.list.find(x => x.kind === b.dataset.k);
+      if (a) { MT_ACKS = W.ack(MT_ACKS, a); mtSaveAcks(); }
+      renderMeteo(); if (FEST) renderDrift(Math.floor(C.nowAbs()));
+      return;
+    }
+    if (e.target.closest('[data-act="mt-cfg"]')) openConfig('meteo');
+  });
+
+  // Configuración › Meteo
+  function fillMeteoStatus() {
+    const st = meteoState(), m = st.m;
+    let t = '';
+    if (!st.c.on) t = 'Apagado.';
+    else if (st.sum) t = 'Último dato: ' + W.hhmm(st.sum.at) + (st.sum.stale ? ' · <b class="bad">' + esc(st.sum.staleTxt) + '</b>' : '') + (m && m.err ? ' · último intento: ' + esc(m.err) : '');
+    else if (m && m.err) t = '<b class="bad">Sin datos</b> · ' + esc(m.err);
+    else t = MT_BUSY ? 'Pidiendo el dato…' : 'Sin datos todavía.';
+    $('mt-st').innerHTML = t;
+  }
+  function fillMeteoCfg() {
+    const c = mtCfg(), ae = document.activeElement;
+    const set = (el, v) => { if (el && el !== ae) { if (el.type === 'checkbox') el.checked = !!v; else el.value = v === null || v === undefined ? '' : v; } };
+    set($('mt-on'), c.on); set($('mt-src'), c.source); set($('mt-lat'), c.lat); set($('mt-lon'), c.lon); set($('mt-url'), c.url);
+    set($('mt-ref'), String(c.refresh)); set($('mt-hz'), String(c.horizon));
+    document.querySelectorAll('#cfg-s-meteo [data-mp]').forEach(el => set(el, c.map[el.dataset.mp]));
+    document.querySelectorAll('#cfg-s-meteo [data-mn]').forEach(el => set(el, c.manual[el.dataset.mn]));
+    document.querySelectorAll('#cfg-s-meteo [data-th]').forEach(el => set(el, el.dataset.th === 'aqi' ? String(c.th.aqi) : c.th[el.dataset.th]));
+    document.querySelectorAll('#cfg-s-meteo .mt-g').forEach(g => { g.hidden = g.dataset.src !== c.source; });
+    document.querySelectorAll('#cfg-s-meteo .mt-auto').forEach(el => { el.hidden = c.source === 'manual'; });
+    $('mt-place').textContent = c.place ? c.place + (c.lat !== null ? ' · ' + c.lat + ', ' + c.lon : '') : '';
+    $('mt-aemet').href = W.AEMET_URL;
+    fillMeteoStatus();
+  }
+  function readMeteoCfg(extra) {
+    const c = JSON.parse(JSON.stringify(mtCfg()));
+    c.on = $('mt-on').checked; c.source = $('mt-src').value;
+    c.lat = $('mt-lat').value; c.lon = $('mt-lon').value; c.url = $('mt-url').value.trim();
+    c.refresh = Number($('mt-ref').value); c.horizon = Number($('mt-hz').value);
+    document.querySelectorAll('#cfg-s-meteo [data-mp]').forEach(el => { c.map[el.dataset.mp] = el.value.trim(); });
+    let manualChanged = false;
+    document.querySelectorAll('#cfg-s-meteo [data-mn]').forEach(el => { const v = el.value === '' ? null : Number(el.value); if (v !== c.manual[el.dataset.mn]) manualChanged = true; c.manual[el.dataset.mn] = v; });
+    if (manualChanged) c.manual.at = Date.now();
+    document.querySelectorAll('#cfg-s-meteo [data-th]').forEach(el => { c.th[el.dataset.th] = el.type === 'checkbox' ? el.checked : el.value === '' ? null : Number(el.value); });
+    return Object.assign(c, extra || {});
+  }
+  function saveMeteo(extra) {
+    const before = mtCfg(), next = W.normMeteo(readMeteoCfg(extra));
+    if ($('mt-url').value.trim() && !next.url) toast('La URL tiene que empezar por https://', true);
+    CONFIG = Dt.setConfig({ meteo: next });
+    const c = mtCfg();
+    // Fuente, lugar, URL, calidad del aire o valores manuales nuevos: se pide el dato ya
+    if (mtKey(c) !== mtKey(before) || c.th.aqiOn !== before.th.aqiOn || JSON.stringify(c.map) !== JSON.stringify(before.map) || c.manual.at !== before.manual.at || (c.on && !before.on)) MT_LAST = 0;
+    fillMeteoCfg(); renderMeteo(); meteoTick();
+  }
+  document.querySelectorAll('#cfg-s-meteo input, #cfg-s-meteo select').forEach(el => {
+    if (el.id === 'mt-q') return;
+    el.addEventListener('change', () => saveMeteo());
+  });
+  async function meteoFind() {
+    const q = $('mt-q').value.trim(); if (!q) return;
+    $('mt-res').innerHTML = '<span class="hint">Buscando…</span>';
+    try {
+      const r = await fetch(W.geoUrl(q));
+      if (!r.ok) throw new Error('El servidor respondió ' + r.status);
+      const list = W.parseGeo(await r.json());
+      $('mt-res').innerHTML = list.length ? list.map((p, i) => '<button class="mt-pick" type="button" data-i="' + i + '"><b>' + esc(p.name) + '</b><small>' + esc(p.detail) + ' · ' + p.lat + ', ' + p.lon + '</small></button>').join('') : '<span class="hint">No se encuentra. Prueba con otro nombre o escribe las coordenadas.</span>';
+      $('mt-res').querySelectorAll('.mt-pick').forEach(b => b.addEventListener('click', () => {
+        const p = list[Number(b.dataset.i)];
+        $('mt-lat').value = p.lat; $('mt-lon').value = p.lon; $('mt-res').innerHTML = ''; $('mt-q').value = '';
+        saveMeteo({ place: p.name + (p.detail ? ' (' + p.detail + ')' : '') });
+      }));
+    } catch (e) { $('mt-res').innerHTML = '<span class="hint bad">No se ha podido buscar: ' + esc(e.message) + '. Escribe las coordenadas.</span>'; }
+  }
+  $('mt-find').addEventListener('click', meteoFind);
+  $('mt-q').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); meteoFind(); } });
+  $('mt-now').addEventListener('click', () => { if (!mtCfg().on) { toast('Activa primero «Mostrar el tiempo»', true); return; } meteoFetch(true); });
+
   // ── Emisión a los móviles (2d-A) y mando del regidor (2d-B) ──────────
   // El Mac publica el estado cifrado y firmado en dos repetidores públicos; los móviles lo leen con el QR de Staff.
   // El QR PRIVADO del regidor añade la clave del mando: solo esas órdenes se obedecen (y entran en el Deshacer).
@@ -1434,14 +1604,14 @@
       if (!emRoom) { const saved = emLoad(); emRoom = saved ? saved.room : await Em.newRoom(); }
       EM = new Em.Emisor({ room: emRoom, getSnapshot: Dt.getSnapshot, onCommand: emCommand, onStatus: st => { EMST = st; renderCast(); } });
       await EM.start(); emSave(true); renderCast();
-      toast(resumed ? 'Emisión reanudada (estaba activa antes de recargar el Dashboard)' : 'Emitiendo: escanea el QR con el móvil');
+      toast(resumed ? 'Emisión reanudada (estaba activa antes de recargar el Dashboard)' : 'Emitiendo: escanea el QR con el dispositivo');
     } catch (e) { console.error(e); EM = null; renderCast(); toast('No se pudo empezar la emisión: ' + (e && e.message || e), true); }
   }
   async function emStop(quiet) {
     if (!EM) return;
     const e = EM; EM = null; EMST = null; emSave(false); renderCast();
     await e.stop();
-    if (!quiet) toast('Emisión parada: los móviles muestran «Emisión detenida»');
+    if (!quiet) toast('Emisión parada: los dispositivos muestran «Emisión detenida»');
   }
   function emRegen() {
     modal('Regenerar claves', '<p>Se crea una sala nueva con claves nuevas. <b>Los dos QR anteriores (Staff y Regidor) dejan de funcionar</b>: habrá que escanear los nuevos.</p>', [
@@ -1473,7 +1643,7 @@
     if (!FEST && ['flash', 'flashOff'].indexOf(cmd.op) < 0) return { ok: false, msg: 'No hay evento abierto en el Dashboard' };
     const at = Math.abs(Date.now() - cmd.t) < 120000 ? cmd.t : Date.now();     // la hora en que se pulsó en el móvil
     const abs = Math.floor(C.nowAbs(new Date(at)));
-    const from = 'Desde el móvil · ';
+    const from = 'Desde el dispositivo del regidor · ';
     if (cmd.op === 'start' || cmd.op === 'stop') {
       const r = M.realPlan(FEST, CONFIG, a.key, cmd.op === 'start' ? 'i' : 'f', abs);
       if (!r.ok) return { ok: false, msg: r.error };
@@ -1522,7 +1692,7 @@
     const links = (EMST ? EMST.links : Em.BROKERS.map(b => ({ name: b.name, state: 'connecting' })))
       .map(l => '<span class="clink ' + (l.state === 'on' ? 'on' : '') + '" title="' + esc(l.state === 'on' ? 'Conectado' : l.err ? 'Sin conexión: ' + l.err : 'Conectando…') + '">' + esc(l.name) + '</span>').join('');
     const v = EMST ? EMST.viewers : 0, r = EMST ? EMST.remotes : 0;
-    const who = kind === 'remote' ? (r ? '<b class="cok">Mando conectado</b>' : 'Sin mando conectado') : (v === 1 ? '1 móvil conectado' : v + ' móviles conectados');
+    const who = kind === 'remote' ? (r ? '<b class="cok">Mando conectado</b>' : 'Sin mando conectado') : (v === 1 ? '1 dispositivo conectado' : v + ' dispositivos conectados');
     return '<div class="cstate"><span class="cdot ' + cls + '"></span><b>' + txt + '</b></div><div class="cview">' + who + '</div><div class="clinks">' + links + '</div>';
   }
   // QR de Staff por pantalla (2e-A): Manager · Confidence (con zona) · Backstage
@@ -1556,7 +1726,7 @@
         + '<button class="btn ghost" type="button" data-act="cast-regen">Regenerar claves…</button>';
     const note = kind === 'remote'
       ? '<p class="cwarn"><svg class="ic"><use href="#i-alert"/></svg><span><b>Privado.</b> Quien tenga este QR puede mandar al Mac (▶ / ■, En hora, retrasos, mensajes, CALL). No lo compartas; si se escapa, «Nueva clave del mando».</span></p>'
-      : '<p class="mnote">Abre la Pantalla Live en el móvil, en solo lectura. Si el Mac se duerme o se cierra el Dashboard, la emisión se corta y los móviles lo avisan.</p>';
+      : '<p class="mnote">Abre la Pantalla Live en el dispositivo (móvil, tablet…), en solo lectura. Si el Mac se duerme o se cierra el Dashboard, la emisión se corta y los dispositivos lo avisan.</p>';
     return (kind === 'staff' ? castPickHtml() : '') + '<div class="cgrid"><div class="cqr" title="QR ' + (kind === 'remote' ? 'del regidor' : 'de Staff · ' + Vs.VISTA_TXT[CAST_VISTA]) + '">' + QR.svg(url, { ecl: 'M', margin: 3 }) + '</div>'
       + '<div class="cside"><div class="cst" data-k="' + kind + '"></div>' + side + '</div></div>' + note;
   }
@@ -1571,11 +1741,11 @@
       if (!on) {
         box.dataset.url = '';
         box.innerHTML = (kind === 'remote'
-          ? '<p class="cintro">Con el <b>mando del regidor</b> manejas el Mac desde tu móvil: ▶ / ■, En hora, retrasos con resumen y Confirmar, mensajes y CALL. Necesita que la emisión esté activa.</p>'
-          : '<p class="cintro">Emite el horario en directo a los móviles del equipo (técnicos, producción, managers…). Lo ven <b>solo en lectura</b>: nadie puede cambiar nada desde el móvil.</p>')
+          ? '<p class="cintro">Con el <b>mando del regidor</b> manejas el Mac desde tu dispositivo: ▶ / ■, En hora, retrasos con resumen y Confirmar, mensajes y CALL. Necesita que la emisión esté activa.</p>'
+          : '<p class="cintro">Emite el horario en directo a los dispositivos del equipo (técnicos, producción, managers…). Lo ven <b>solo en lectura</b>: nadie puede cambiar nada desde ellos.</p>')
           + '<div class="cbtns"><button class="btn primary" type="button" data-act="cast-start"><svg class="ic"><use href="#i-cast"/></svg>Empezar a emitir</button>'
           + (emRoom && kind === 'staff' ? '<button class="btn" type="button" data-act="cast-regen">Regenerar claves…</button>' : '') + '</div>'
-          + '<p class="mnote">Necesita internet en el Mac y en los móviles (4G o Wi-Fi con salida). Todo va cifrado: los repetidores públicos solo ven datos ilegibles y no guardan nada.</p>';
+          + '<p class="mnote">Necesita internet en el Mac y en los dispositivos (4G o Wi-Fi con salida). Todo va cifrado: los repetidores públicos solo ven datos ilegibles y no guardan nada.</p>';
         return;
       }
       const url = emUrl(kind);
@@ -1621,7 +1791,7 @@
   document.addEventListener('click', e => { const b = e.target.closest('#cast-staff [data-cv]'); if (!b) return; CAST_VISTA = b.dataset.cv; renderCast(); });
   document.addEventListener('change', e => { if (e.target.matches('#cast-staff [data-cz]')) { CAST_ZONA = e.target.value; renderCast(); } });
   // Cada cambio guardado (en este Panel o llegado de la Live, p. ej. un OK de CALL) sale hacia los móviles
-  const EM_KEYS = [Dt.KEYS.festival, Dt.KEYS.config, Dt.KEYS.callDone, Dt.KEYS.flash];
+  const EM_KEYS = [Dt.KEYS.festival, Dt.KEYS.config, Dt.KEYS.callDone, Dt.KEYS.flash, Dt.KEYS.meteo];
   Dt.onWrite(k => { if (EM && EM_KEYS.indexOf(k) >= 0) EM.push(); });
   (function () { const saved = emLoad(); if (saved) emRoom = saved.room; renderCast(); if (saved && saved.on) emStart(true); })();
 
@@ -1629,6 +1799,7 @@
   Dt.onChange(type => {
     if (type === 'callDone') { tick(); return; }
     if (type === 'flash') { renderFlash(); return; }
+    if (type === 'meteo') { renderMeteo(); return; }
     loadState(); renderAll();
   });
 

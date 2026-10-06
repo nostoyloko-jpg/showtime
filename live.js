@@ -543,8 +543,10 @@
     const d = new Date();
     const nowMins = C.nowAbs(d), nowInt = Math.floor(nowMins);
     $('clk').textContent = pad2(d.getHours()) + ':' + pad2(d.getMinutes());
-    if (VISTA === 'confidence') { renderConf(); return; }
-    if (VISTA === 'backstage') renderTicker(nowMins);
+    if (VISTA === 'confidence') { renderConf(); return; }   // Confidence: sin el tiempo (decisión 77)
+    const mt = meteoNow();
+    if (VISTA === 'backstage') renderTicker(nowMins, mt);
+    renderMeteoPill(mt);
     $('dat').textContent = d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }).toUpperCase();
 
     renderDrift(nowInt);
@@ -558,6 +560,32 @@
       drawStrip(cv, b, nowMins, r.ended, i);
     });
     renderTopPanels(nowMins, nowInt, r.ended);
+  }
+
+  // ── El tiempo (2e-B): píldora discreta en Manager y aviso en la cinta de Backstage. Nunca en Confidence. ──
+  const Wm = window.ShowtimeMeteo;
+  let MT_ACT = [], mtKeyL = '';
+  function meteoNow() {
+    const c = CONFIG && CONFIG.meteo;
+    if (!Wm || !c || !c.on) return null;
+    const m = Dt.getMeteo ? Dt.getMeteo() : null, snap = m && m.snap, now = Date.now();
+    const sum = snap ? Wm.summary(snap, c, now) : null;
+    const list = snap ? Wm.alerts(snap, c, now, MT_ACT) : [];
+    MT_ACT = list.map(a => a.kind);
+    return { c, m, sum, list };
+  }
+  function renderMeteoPill(mt) {
+    const el = $('meteo'); if (!el) return;
+    let h = '', cls = 'mtpill';
+    if (mt && VISTA === 'manager') {
+      if (mt.sum) {
+        cls += mt.sum.stale ? ' stale' : mt.list.length ? ' warn' : '';
+        h = '<div class="mt-l1"><svg class="ic"><use href="#i-' + (mt.sum.stale ? 'alert' : mt.sum.icon) + '"/></svg><span>' + esc(Wm.pillText(mt.sum)) + '</span></div>';
+        if (!mt.sum.stale && mt.list.length) h += '<div class="mt-l2">PREVISIÓN · ' + esc(mt.list[0].short) + (mt.list.length > 1 ? ' · +' + (mt.list.length - 1) : '') + '</div>';
+      } else if (mt.m && mt.m.err) { cls += ' stale'; h = '<div class="mt-l1"><svg class="ic"><use href="#i-alert"/></svg><span>EL TIEMPO: SIN DATOS</span></div>'; }
+    }
+    const k = cls + h;
+    if (k !== mtKeyL) { mtKeyL = k; el.className = cls; el.innerHTML = h; }
   }
 
   function redraw() {
@@ -849,10 +877,10 @@
 
   // Cinta de avisos (Backstage): retrasos, hitos y (en la 2e-B) el tiempo
   let tickerKey = '';
-  function renderTicker(nowMins) {
+  function renderTicker(nowMins, mt) {
     const t = screensCfg().ticker;
     if (!screensCfg().back.ticker) return;
-    const items = Vs.tickerItems(FEST, screensCfg(), nowMins, null);
+    const items = Vs.tickerItems(FEST, screensCfg(), nowMins, mt && Wm ? Wm.tickerList(mt.sum, mt.list) : null);
     const k = t.mode + t.bg + t.fg + JSON.stringify(items);
     if (k === tickerKey) return;
     tickerKey = k;

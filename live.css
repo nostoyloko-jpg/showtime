@@ -343,3 +343,14 @@ body[data-vista="confidence"] .conf{padding-bottom:max(4vh,calc(env(safe-area-in
 .cf-full:hover{opacity:1}
 body[data-vista="confidence"] .cf-full{display:flex!important}
 @media (max-aspect-ratio:1/1){ .cf-top{white-space:normal;font-size:min(7vw,5vh);line-height:1.15} .cf-foot{white-space:normal;font-size:min(5.5vw,4.5vh)} }
+/* ── El tiempo (2e-B): píldora discreta en Manager ───────────────── */
+.mtpill{margin-top:8px;max-width:100%;display:flex;flex-direction:column;gap:2px}
+.mtpill:empty{display:none}
+.mtpill .mt-l1{display:inline-flex;align-items:center;gap:.4em;font-size:clamp(10px,1.5vh,15px);font-weight:900;letter-spacing:.06em;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.mtpill .mt-l1 span{overflow:hidden;text-overflow:ellipsis}
+.mtpill .ic{width:1.3em;height:1.3em;flex:0 0 auto;color:#7dd3fc}
+.mtpill .mt-l2{font-size:clamp(10px,1.4vh,14px);font-weight:900;letter-spacing:.06em;color:var(--call);white-space:normal;overflow-wrap:normal}
+.mtpill.warn .ic{color:var(--call)}
+.mtpill.stale .mt-l1,.mtpill.stale .ic{color:#ff6b62}
+body:not([data-vista="manager"]) .mtpill{display:none}
+.tk-it.meteo.warn{font-weight:900}

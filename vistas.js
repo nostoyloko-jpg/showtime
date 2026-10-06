@@ -153,7 +153,8 @@
         out.push({ kind: 'hito', level: 'ok', text: h.name.toUpperCase() + ' ' + C.fmtHM(h.psi) });
       });
     }
-    if (t.meteo && meteo && meteo.text) out.push({ kind: 'meteo', level: meteo.level || 'ok', text: String(meteo.text).toUpperCase() });
+    // El tiempo (2e-B): lista de meteo.js (tickerList) o un solo aviso { level, text }
+    if (t.meteo && meteo) (Array.isArray(meteo) ? meteo : [meteo]).forEach(m => { if (m && m.text) out.push({ kind: 'meteo', level: m.level || 'ok', text: String(m.text).toUpperCase() }); });
     return out;
   }
 

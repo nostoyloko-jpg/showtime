@@ -17,7 +17,8 @@
     config:   'showtime.config',       // { mode: show|sc|all, day, style, callMins }
     callDone: 'showtime.callDone',     // [callKey, ...] avisos marcados con OK
     original: 'showtime.original',     // copia del festival tal como se importó (para marcar cambios)
-    flash:    'showtime.flash'         // mensaje flash activo en la Pantalla Live: { id, text, at (ms) } o null
+    flash:    'showtime.flash',        // mensaje flash activo en la Pantalla Live: { id, text, at (ms) } o null
+    meteo:    'showtime.meteo'         // el tiempo (2e-B): { snap, err, errAt } — lo pide el Dashboard; la Live y los dispositivos lo leen
   };
   const STYLES = ['clasico', 'escenario', 'neutro', 'raycast'];
   const DEFAULT_CONFIG = { mode: 'show', day: 'all', style: 'clasico', callMins: null, msgBg: '#000000', msgFg: '#ffb347', msgSecs: 20 };
@@ -67,6 +68,7 @@
     o.msgSecs = MSG_SECS.indexOf(Number(o.msgSecs)) >= 0 ? Number(o.msgSecs) : DEFAULT_CONFIG.msgSecs;
     // Pantallas Live y vistas (2e-A): umbrales de Confidence, bloques de Backstage y cinta de avisos
     if (root.ShowtimeVistas) o.screens = root.ShowtimeVistas.normScreens(o.screens);
+    if (root.ShowtimeMeteo) o.meteo = root.ShowtimeMeteo.normMeteo(o.meteo);   // el tiempo (2e-B): fuente, lugar y umbrales del regidor
     o.delayZone = typeof o.delayZone === 'string' ? o.delayZone : 'all';   // zona que se está editando en el menú Retrasos
     return o;
   }
@@ -83,6 +85,8 @@
   /** Milisegundos que le quedan (null si no se cierra solo). */
   function flashLeft(f) { const ms = flashMs(f); return ms ? Math.max(0, ms - (Date.now() - f.at)) : null; }
   /** Mensaje flash vigente (o null si no hay o ya caducó). */
+  /** El tiempo: último dato recibido y último error ({ snap, err, errAt } o null). */
+  function getMeteo() { const m = read(K.meteo, null); return m && typeof m === 'object' ? m : null; }
   function getFlash() { const f = read(K.flash, null); return f && f.text && (flashMs(f) === 0 || Date.now() - f.at < flashMs(f)) ? f : null; }
 
   /** Minutos de aviso efectivos: los de la configuración o, si no hay, los del festival. */
@@ -107,7 +111,7 @@
   const listeners = [], peerListeners = [];
 
   function addPeer(win) { if (win) peers.add(win); }
-  function snapshot() { return { app: APP, type: 'snapshot', festival: getFestival(), config: getConfig(), callDone: getCallDone(), flash: getFlash() }; }
+  function snapshot() { return { app: APP, type: 'snapshot', festival: getFestival(), config: getConfig(), callDone: getCallDone(), flash: getFlash(), meteo: getMeteo() }; }
 
   function send(msg) {
     if (READONLY) return;
@@ -128,12 +132,14 @@
     else if (m.type === 'config') write(K.config, normConfig(m.config));
     else if (m.type === 'callDone') write(K.callDone, m.callDone || []);
     else if (m.type === 'flash') write(K.flash, m.flash || null);
-    else if (m.type === 'hello') { send({ type: 'snapshot', festival: getFestival(), config: getConfig(), callDone: getCallDone(), flash: getFlash() }); return; }
+    else if (m.type === 'meteo') write(K.meteo, m.meteo || null);
+    else if (m.type === 'hello') { send(snapshot()); return; }
     else if (m.type === 'snapshot') {
       if (m.festival) write(K.festival, m.festival);
       if (m.config) write(K.config, normConfig(m.config));
       if (m.callDone) write(K.callDone, m.callDone);
       if (m.flash !== undefined) write(K.flash, m.flash);
+      if (m.meteo !== undefined) write(K.meteo, m.meteo);
     } else return;
     listeners.forEach(fn => { try { fn(m.type); } catch (e) { console.error(e); } });
   }
@@ -155,7 +161,7 @@
     receive(m);
   });
   if (!READONLY) root.addEventListener('storage', e => {
-    const type = e.key === K.festival ? 'festival' : e.key === K.config ? 'config' : e.key === K.callDone ? 'callDone' : e.key === K.flash ? 'flash' : null;
+    const type = e.key === K.festival ? 'festival' : e.key === K.config ? 'config' : e.key === K.callDone ? 'callDone' : e.key === K.flash ? 'flash' : e.key === K.meteo ? 'meteo' : null;
     if (type) listeners.forEach(fn => { try { fn(type); } catch (err) { console.error(err); } });
   });
 
@@ -163,11 +169,16 @@
   /** Avisa de cada escritura en este navegador (cambios propios o recibidos de otra ventana). */
   function onWrite(fn) { writeHooks.push(fn); }
   /** Estado completo para la emisión. */
-  function getSnapshot() { return { festival: getFestival(), config: getConfig(), callDone: getCallDone(), flash: read(K.flash, null) }; }
+  function getSnapshot() {
+    const c = getConfig();
+    if (root.ShowtimeMeteo && c.meteo) c.meteo = root.ShowtimeMeteo.publicMeteo(c.meteo);   // sin la URL propia (puede llevar una clave)
+    return { festival: getFestival(), config: c, callDone: getCallDone(), flash: read(K.flash, null), meteo: getMeteo() };
+  }
   /** Modo Staff: aplica el estado recibido por la emisión y avisa a la Live. */
   function loadSnapshot(s) {
     if (!READONLY || !s) return;
     write(K.festival, s.festival || null); write(K.config, normConfig(s.config)); write(K.callDone, Array.isArray(s.callDone) ? s.callDone : []); write(K.flash, s.flash || null);
+    write(K.meteo, s.meteo || null);
     listeners.forEach(fn => { try { fn('snapshot'); } catch (e) { console.error(e); } });
   }
   function onPeer(fn) { peerListeners.push(fn); }
@@ -198,12 +209,14 @@
     listeners.forEach(fn => { try { fn('flash'); } catch (e) { console.error(e); } });
     return f;
   }
+  /** El tiempo: guarda el dato (o el error) y lo manda a las Live abiertas. Solo el Dashboard lo pide. */
+  function setMeteo(m) { if (READONLY) return; write(K.meteo, m || null); send({ type: 'meteo', meteo: m || null }); }
   /** Pide los datos a las otras ventanas (útil al abrir la Live con doble clic en Firefox). */
   function hello() { send({ type: 'hello' }); }
 
   root.ShowtimeDatos = {
     KEYS: K, STYLES, normStyle, normConfig,
-    getFestival, getConfig, getCallDone, getFlash, setFlash, FLASH_MS, MSG_SECS, flashMs, flashLeft, callMinsOf, getOriginal, setOriginal,
+    getFestival, getConfig, getCallDone, getFlash, setFlash, getMeteo, setMeteo, FLASH_MS, MSG_SECS, flashMs, flashLeft, callMinsOf, getOriginal, setOriginal,
     setFestival, setConfig, markCallDone, pruneCallDone,
     onChange, onPeer, addPeer, send, hello, ping,
     READONLY, onWrite, getSnapshot, loadSnapshot
