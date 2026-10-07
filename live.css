@@ -379,3 +379,15 @@ body:not([data-vista="manager"]) .mtpill{display:none}
 .pnote{position:fixed;left:50%;bottom:76px;transform:translateX(-50%);z-index:210;background:rgba(0,0,0,.88);border:1px solid rgba(255,255,255,.25);color:#fff;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:700}
 .pnote.bad{border-color:#ff6363;color:#ff8a8a}
 .pnote[hidden]{display:none}
+/* Producción: modal «¿Dónde lo mandas?» */
+.pmodal{position:fixed;inset:0;z-index:260;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.pmodal[hidden]{display:none}
+.pm-box{width:min(440px,100%);display:flex;flex-direction:column;gap:12px;padding:18px;border-radius:14px;background:rgba(22,24,30,.92);border:1px solid rgba(255,255,255,.14);box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.pm-t{font-size:12px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.6)}
+.pm-txt{font-size:18px;font-weight:800;color:#fff;word-break:break-word}
+.pm-opts{display:flex;flex-direction:column;gap:8px}
+.pm-opts button{display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:12px 14px;border-radius:10px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.05);color:#fff;font:inherit;text-align:left;cursor:pointer}
+.pm-opts button:hover,.pm-opts button:focus-visible{border-color:var(--call);background:rgba(255,197,51,.1)}
+.pm-opts b{font-size:14px}
+.pm-opts small{font-size:12px;color:rgba(255,255,255,.6)}
+.pm-no{align-self:flex-end}

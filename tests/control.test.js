@@ -148,6 +148,48 @@
     eq(t2.read('showtime.flash'), null);
   });
 
+  // ── Avisos (puntual / permanente) ─────────────────────────────────────
+  const avisos = t => (t.read('showtime.avisos') || []);
+  test('Aviso puntual de Producción: se guarda, dura lo de Configuración › Mensajes y queda en el log', () => {
+    const t = dashboard();
+    t.prod({ type: 'aviso', from: 'prod_001', text: 'Lluvia en 10 min', perm: false });
+    const a = avisos(t); eq(a.length, 1); eq(a[0].text, 'Lluvia en 10 min'); ok(a[0].ms > 0, 'puntual: con duración'); eq(a[0].from, 'Producción (Marta)');
+    const m = ((t.read('showtime.log') || {}).entries || []).filter(e => e.type === 'msg');
+    eq(m.length, 1); eq(m[0].src, 'produccion'); ok(m[0].text.indexOf('Aviso puntual') === 0 && m[0].text.indexOf('Marta') > 0, m[0].text);
+  });
+
+  test('Aviso permanente: sin caducidad y varios a la vez', () => {
+    const t = dashboard();
+    t.prod({ type: 'aviso', from: 'prod_001', text: 'Prohibido fumar', perm: true });
+    t.prod({ type: 'aviso', from: 'prod_001', text: 'Lluvia', perm: false });
+    const a = avisos(t); eq(a.length, 2, 'se suman'); eq(a[0].ms, 0, 'permanente');
+    const Dt = t.env.win.ShowtimeDatos;
+    const viejo = a.map(x => Object.assign({}, x, { at: x.at - 3600 * 1000 }));   // una hora después
+    t.env.storage.set('showtime.avisos', JSON.stringify(viejo));
+    const v = Dt.getAvisos(); eq(v.length, 1, 'el puntual caduca solo'); eq(v[0].text, 'Prohibido fumar', 'el permanente sigue');
+  });
+
+  test('Avisos en el Dashboard: salen con su ✕ y la ✕ los quita (y lo apunta en el log)', () => {
+    const t = dashboard();
+    t.prod({ type: 'aviso', from: 'prod_001', text: 'Prohibido fumar', perm: true });
+    const html = t.env.innerLog.filter(x => x[0] === 'drift').map(x => x[1]).pop() || '';
+    ok(html.indexOf('Prohibido fumar') >= 0 && html.indexOf('data-aviso-x="') >= 0, 'chip con ✕: ' + html.slice(0, 200));
+    const id = avisos(t)[0].id;
+    t.env.fire('document', 'click', { target: { id: '', matches: () => false, closest: sel => sel === '[data-aviso-x]' ? { dataset: { avisoX: id } } : null } });
+    eq(t.env.win.ShowtimeDatos.getAvisos().length, 0, 'quitado');
+    const m = ((t.read('showtime.log') || {}).entries || []).filter(e => e.text.indexOf('Aviso retirado') === 0);
+    eq(m.length, 1); eq(m[0].src, 'panel');
+    eq(t.env.errors.length, 0, t.env.errors.join(' | '));
+  });
+
+  test('Avisos: viajan en la emisión (snapshot) y uno vacío o manipulado no entra', () => {
+    const t = dashboard();
+    t.prod({ type: 'aviso', from: 'prod_001', text: '   ' }); t.prod({ type: 'aviso', from: '<x>', text: 'hola' });
+    eq(avisos(t).length, 0);
+    t.prod({ type: 'aviso', from: 'prod_001', text: 'Hola', perm: true });
+    eq(t.env.win.ShowtimeDatos.getSnapshot().avisos.length, 1, 'los móviles y la Live de Producción lo reciben');
+  });
+
   // ── Ejecutor ─────────────────────────────────────────────────────────
   let pass = 0, fail = 0;
   tests.forEach(([name, fn]) => {

@@ -140,17 +140,19 @@
   // ── Cinta de avisos (Backstage) ──────────────────────────────────────
   /**
    * Avisos de la cinta en el instante `now`: retrasos por zona, hitos que vienen (con su margen) y el tiempo.
-   * → [{ kind: 'delay'|'hito'|'meteo', level: 'ok'|'warn'|'over', text }]
+   * → [{ kind: 'aviso'|'delay'|'hito'|'meteo', level: 'ok'|'warn'|'over', text }]
    */
-  function tickerItems(state, screens, now, meteo) {
+  function tickerItems(state, screens, now, meteo, avisos) {
     const t = normScreens(screens).ticker, out = [];
+    // Avisos escritos a mano (Producción / Stage Manager): siempre delante, en ámbar
+    (Array.isArray(avisos) ? avisos : []).forEach(a => { if (a && a.text) out.push({ kind: 'aviso', level: 'warn', text: String(a.text).toUpperCase() }); });
     if (!state) return out;
     const n = Math.floor(now), jor = C.jornadaOfAbs(state, n);
     if (t.delays && C.delayByZone) {
       const late = C.delayByZone(state, n).filter(z => z.acc > 0 || z.live > 0);
       late.forEach(z => out.push({ kind: 'delay', level: z.status === 'overflow' ? 'over' : 'warn',
         text: (z.zone || 'Sin zona').toUpperCase() + ' · RETRASO +' + z.acc + ' MIN' + (z.live > 0 ? ' (+' + z.live + ' EN VIVO)' : '') }));
-      if (!late.length) out.push({ kind: 'delay', level: 'ok', text: 'HORARIO EN HORA' });
+      if (!late.length) out.push({ kind: 'delay', level: 'ok', text: 'EN HORA · SIN INCIDENCIAS' });
       // Tiempo extra en curso (activado y pasada su hora)
       C.buildBlocks(state, { mode: 'all', day: jor, now: n }).filter(b => C.isBand(b) && b.alargar && b.rf === null && b.nf !== null && n >= b.nf && b.si <= n).forEach(b =>
         out.push({ kind: 'delay', level: 'warn', text: (b.stage || 'Sin zona').toUpperCase() + ' · ' + b.name.toUpperCase() + ' · TIEMPO EXTRA +' + Math.floor(n - b.nf) + ' MIN' }));

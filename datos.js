@@ -18,6 +18,7 @@
     callDone: 'showtime.callDone',     // [callKey, ...] avisos marcados con OK
     original: 'showtime.original',     // copia del festival tal como se importó (para marcar cambios)
     flash:    'showtime.flash',        // mensaje flash activo en la Pantalla Live: { id, text, at (ms) } o null
+    avisos:   'showtime.avisos',       // avisos escritos a mano (cinta de Backstage + barra del Dashboard): [{ id, text, at, ms (0 = permanente), from }]
     meteo:    'showtime.meteo'         // el tiempo (2e-B): { snap, err, errAt } — lo pide el Dashboard; la Live y los dispositivos lo leen
   };
   const STYLES = ['clasico', 'escenario', 'neutro', 'raycast'];
@@ -89,6 +90,16 @@
   function getMeteo() { const m = read(K.meteo, null); return m && typeof m === 'object' ? m : null; }
   function getFlash() { const f = read(K.flash, null); return f && f.text && (flashMs(f) === 0 || Date.now() - f.at < flashMs(f)) ? f : null; }
 
+  /** Avisos vigentes: válidos y sin caducar (los permanentes, ms = 0, no caducan: solo los quita el Stage Manager). */
+  const AVISOS_MAX = 20;
+  function normAvisos(list, now) {
+    if (!Array.isArray(list)) return [];
+    return list.filter(a => a && typeof a.id === 'string' && typeof a.text === 'string' && a.text.trim() && Number.isFinite(a.at) && Number.isFinite(a.ms) && a.ms >= 0
+      && (a.ms === 0 || now - a.at < a.ms)).slice(-AVISOS_MAX)
+      .map(a => ({ id: a.id, text: a.text.slice(0, 140), at: a.at, ms: a.ms, from: typeof a.from === 'string' ? a.from.slice(0, 80) : '' }));
+  }
+  function getAvisos() { return normAvisos(read(K.avisos, []), Date.now()); }
+
   /** Minutos de aviso efectivos: los de la configuración o, si no hay, los del festival. */
   function callMinsOf(festival, config) {
     if (config && config.callMins) return config.callMins;
@@ -111,7 +122,7 @@
   const listeners = [], peerListeners = [];
 
   function addPeer(win) { if (win) peers.add(win); }
-  function snapshot() { return { app: APP, type: 'snapshot', festival: getFestival(), config: getConfig(), callDone: getCallDone(), flash: getFlash(), meteo: getMeteo() }; }
+  function snapshot() { return { app: APP, type: 'snapshot', festival: getFestival(), config: getConfig(), callDone: getCallDone(), flash: getFlash(), avisos: getAvisos(), meteo: getMeteo() }; }
 
   function send(msg) {
     if (READONLY) return;
@@ -133,6 +144,7 @@
     else if (m.type === 'callDone') write(K.callDone, m.callDone || []);
     else if (m.type === 'flash') write(K.flash, m.flash || null);
     else if (m.type === 'meteo') write(K.meteo, m.meteo || null);
+    else if (m.type === 'avisos') write(K.avisos, normAvisos(m.avisos, Date.now()));
     else if (m.type === 'hello') { send(snapshot()); return; }
     else if (m.type === 'snapshot') {
       if (m.festival) write(K.festival, m.festival);
@@ -140,6 +152,7 @@
       if (m.callDone) write(K.callDone, m.callDone);
       if (m.flash !== undefined) write(K.flash, m.flash);
       if (m.meteo !== undefined) write(K.meteo, m.meteo);
+      if (m.avisos !== undefined) write(K.avisos, normAvisos(m.avisos, Date.now()));
     } else return;
     listeners.forEach(fn => { try { fn(m.type); } catch (e) { console.error(e); } });
   }
@@ -161,7 +174,7 @@
     receive(m);
   });
   if (!READONLY) root.addEventListener('storage', e => {
-    const type = e.key === K.festival ? 'festival' : e.key === K.config ? 'config' : e.key === K.callDone ? 'callDone' : e.key === K.flash ? 'flash' : e.key === K.meteo ? 'meteo' : null;
+    const type = e.key === K.festival ? 'festival' : e.key === K.config ? 'config' : e.key === K.callDone ? 'callDone' : e.key === K.flash ? 'flash' : e.key === K.meteo ? 'meteo' : e.key === K.avisos ? 'avisos' : null;
     if (type) listeners.forEach(fn => { try { fn(type); } catch (err) { console.error(err); } });
   });
 
@@ -172,13 +185,13 @@
   function getSnapshot() {
     const c = getConfig();
     if (root.ShowtimeMeteo && c.meteo) c.meteo = root.ShowtimeMeteo.publicMeteo(c.meteo);   // sin la URL propia (puede llevar una clave)
-    return { festival: getFestival(), config: c, callDone: getCallDone(), flash: read(K.flash, null), meteo: getMeteo() };
+    return { festival: getFestival(), config: c, callDone: getCallDone(), flash: read(K.flash, null), avisos: getAvisos(), meteo: getMeteo() };
   }
   /** Modo Staff: aplica el estado recibido por la emisión y avisa a la Live. */
   function loadSnapshot(s) {
     if (!READONLY || !s) return;
     write(K.festival, s.festival || null); write(K.config, normConfig(s.config)); write(K.callDone, Array.isArray(s.callDone) ? s.callDone : []); write(K.flash, s.flash || null);
-    write(K.meteo, s.meteo || null);
+    write(K.avisos, normAvisos(s.avisos, Date.now())); write(K.meteo, s.meteo || null);
     listeners.forEach(fn => { try { fn('snapshot'); } catch (e) { console.error(e); } });
   }
   function onPeer(fn) { peerListeners.push(fn); }
@@ -211,12 +224,32 @@
   }
   /** El tiempo: guarda el dato (o el error) y lo manda a las Live abiertas. Solo el Dashboard lo pide. */
   function setMeteo(m) { if (READONLY) return; write(K.meteo, m || null); send({ type: 'meteo', meteo: m || null }); }
+  /** Aviso nuevo (puntual: dura lo de Configuración › Mensajes; permanente: hasta que lo quite el Stage Manager). Se suma a los que haya. */
+  function addAviso(text, perm, from) {
+    if (READONLY) return null;
+    const t = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 140);
+    if (!t) return null;
+    const c = getConfig(), now = Date.now();
+    const a = { id: now.toString(36) + Math.random().toString(36).slice(2, 6), text: t, at: now, ms: perm ? 0 : ((c.msgSecs || 0) * 1000 || FLASH_MS), from: String(from || '').slice(0, 80) };
+    const list = getAvisos().concat([a]).slice(-AVISOS_MAX);
+    write(K.avisos, list); send({ type: 'avisos', avisos: list });
+    listeners.forEach(fn => { try { fn('avisos'); } catch (e) { console.error(e); } });
+    return a;
+  }
+  /** Quitar un aviso (solo el Dashboard del Stage Manager). */
+  function removeAviso(id) {
+    if (READONLY) return getAvisos();
+    const list = getAvisos().filter(a => a.id !== id);
+    write(K.avisos, list); send({ type: 'avisos', avisos: list });
+    listeners.forEach(fn => { try { fn('avisos'); } catch (e) { console.error(e); } });
+    return list;
+  }
   /** Pide los datos a las otras ventanas (útil al abrir la Live con doble clic en Firefox). */
   function hello() { send({ type: 'hello' }); }
 
   root.ShowtimeDatos = {
     KEYS: K, STYLES, normStyle, normConfig,
-    getFestival, getConfig, getCallDone, getFlash, setFlash, getMeteo, setMeteo, FLASH_MS, MSG_SECS, flashMs, flashLeft, callMinsOf, getOriginal, setOriginal,
+    getFestival, getConfig, getCallDone, getFlash, setFlash, getAvisos, addAviso, removeAviso, normAvisos, getMeteo, setMeteo, FLASH_MS, MSG_SECS, flashMs, flashLeft, callMinsOf, getOriginal, setOriginal,
     setFestival, setConfig, markCallDone, pruneCallDone,
     onChange, onPeer, addPeer, send, hello, ping,
     READONLY, onWrite, getSnapshot, loadSnapshot

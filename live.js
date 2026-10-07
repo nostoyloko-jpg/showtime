@@ -814,11 +814,29 @@
       else { const i = to.indexOf(b.dataset.to); if (i >= 0) to.splice(i, 1); else to.push(b.dataset.to); if (to.length === 2) to = []; }   // Manager + Backstage = «Todas» (Producción nunca manda a Confidence)
       paint();
     });
-    $('md-form').addEventListener('submit', async e => {
+    // Al enviar se elige dónde va: Ventanas Live (mensaje grande), aviso puntual o aviso permanente (cinta de Backstage + Dashboard)
+    const pm = $('pmodal');
+    const destTxt = () => !to.length ? 'Manager y Backstage' : to.map(v => Vs.VISTA_TXT[v]).join(' y ');
+    const pmClose = () => { pm.hidden = true; };
+    $('md-form').addEventListener('submit', e => {
       e.preventDefault();
       const text = input.value.trim(); if (!text) return;
-      if (await prodSend({ type: 'flash', from: PRODID, text, to: to.slice() }, 'Mensaje enviado a las pantallas')) { input.value = ''; input.blur(); set(false); }
+      $('pm-txt').textContent = '«' + text + '»';
+      $('pm-live-sub').textContent = 'Mensaje grande en ' + destTxt();
+      pm.hidden = false;
     });
+    pm.addEventListener('click', async e => {
+      const b = e.target.closest('[data-pm]');
+      if (!b) { if (e.target === pm) pmClose(); return; }
+      const kind = b.dataset.pm, text = input.value.trim();
+      pmClose();
+      if (kind === 'no' || !text) return;
+      const ok = kind === 'live'
+        ? await prodSend({ type: 'flash', from: PRODID, text, to: to.slice() }, 'Mensaje enviado a las pantallas')
+        : await prodSend({ type: 'aviso', from: PRODID, text, perm: kind === 'perm' }, kind === 'perm' ? 'Aviso permanente enviado' : 'Aviso enviado');
+      if (ok) { input.value = ''; input.blur(); set(false); }
+    });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && !pm.hidden) pmClose(); });
   }
 
   // ── Modo Staff (2d-A): Pantalla Live de solo lectura abierta desde el QR ──
@@ -950,14 +968,14 @@
   function renderTicker(nowMins, mt) {
     const t = screensCfg().ticker;
     if (!screensCfg().back.ticker) return;
-    const items = Vs.tickerItems(FEST, screensCfg(), nowMins, mt && Wm ? Wm.tickerList(mt.sum, mt.list) : null);
+    const items = Vs.tickerItems(FEST, screensCfg(), nowMins, mt && Wm ? Wm.tickerList(mt.sum, mt.list) : null, Dt.getAvisos ? Dt.getAvisos() : []);
     const k = t.mode + t.bg + t.fg + JSON.stringify(items);
     if (k === tickerKey) return;
     tickerKey = k;
     const tk = $('ticker');
     tk.style.setProperty('--tbg', t.bg); tk.style.setProperty('--tfg', t.fg);
     tk.className = 'ticker ' + t.mode;
-    const ic = { delay: '#i-clock', hito: '#i-flag', meteo: '#i-sun' };
+    const ic = { aviso: '#i-msg', delay: '#i-clock', hito: '#i-flag', meteo: '#i-sun' };
     const html = items.length ? items.map(x => '<span class="tk-it ' + x.kind + ' ' + x.level + '"><svg class="ic"><use href="' + ic[x.kind] + '"/></svg>' + esc(x.text) + '</span>').join('<span class="tk-sep"></span>')
       : '<span class="tk-it">SIN AVISOS</span>';
     if (t.mode === 'crawl') {

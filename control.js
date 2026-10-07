@@ -322,7 +322,10 @@
     }).join('');
     const tight = MARGINS.filter(m => m.level !== 'ok').map(m => '<span class="dchip ' + (m.level === 'over' ? 'over' : 'absorb') + '"><svg class="ic"><use href="#i-alert"/></svg>' +
       esc(m.hito.name) + ' ' + C.fmtHM(m.hito.psi) + ' · ' + (m.level === 'over' ? 'rebasado +' + (-m.margin) + ' min' : 'margen ' + m.margin + ' min') + '</span>').join('');
-    const h = html + tight + meteoChips(meteoState());
+    // Avisos escritos a mano (Producción): delante; la ✕ es solo del Stage Manager
+    const av = (Dt.getAvisos ? Dt.getAvisos() : []).map(a => '<span class="dchip absorb aviso" title="' + esc((a.from ? a.from + ' · ' : '') + (a.ms ? 'aviso puntual' : 'aviso permanente: solo se quita con la ✕')) + '"><svg class="ic"><use href="#i-msg"/></svg>' +
+      esc(a.text) + '<button class="avx" type="button" data-aviso-x="' + esc(a.id) + '" title="Quitar aviso" aria-label="Quitar aviso"><svg class="ic"><use href="#i-x"/></svg></button></span>').join('');
+    const h = av + html + tight + meteoChips(meteoState());
     if ($('drift').innerHTML !== h) $('drift').innerHTML = h;
   }
 
@@ -1952,6 +1955,15 @@
     CALL_LOGGED.forEach(k => { if (now.indexOf(k) < 0) CALL_LOGGED.delete(k); });
   }
 
+  // Quitar un aviso (✕ de su chip): solo desde aquí, el Dashboard del Stage Manager
+  document.addEventListener('click', e => {
+    const b = e.target.closest && e.target.closest('[data-aviso-x]'); if (!b) return;
+    const id = b.dataset.avisoX, a = Dt.getAvisos().find(x => x.id === id);
+    Dt.removeAviso(id);
+    if (a) { logEvent('msg', 'Aviso retirado por el Stage Manager: «' + a.text + '»', { src: 'panel' }); toast('Aviso retirado'); }
+    if (FEST) renderDrift(Math.floor(C.nowAbs()));
+  });
+
   // Mensajes de Producción (llegan cifrados desde su Live): OK de CALL, mensajes a las pantallas y chat.
   function emProdMessage(raw) {
     const msg = Em && Em.cleanProdMsg ? Em.cleanProdMsg(raw) : null;
@@ -1968,6 +1980,11 @@
       Dt.setFlash(msg.text, to, null); renderFlash();
       toast(who + ' → ' + Vs.targetsTxt(to, null, zoneLabel) + ': «' + msg.text + '»');
       logEvent('msg', '«' + msg.text + '» → ' + Vs.targetsTxt(to, null, zoneLabel) + ' · ' + who, { src: 'produccion' });
+    } else if (msg.type === 'aviso') {
+      if (!Dt.addAviso(msg.text, msg.perm, who)) return;
+      if (FEST) renderDrift(Math.floor(C.nowAbs()));
+      toast(who + ' · aviso ' + (msg.perm ? 'permanente' : 'puntual') + ': «' + msg.text + '»');
+      logEvent('msg', 'Aviso ' + (msg.perm ? 'permanente' : 'puntual') + ': «' + msg.text + '» · ' + who, { src: 'produccion' });
     } else if (msg.type === 'chat') {
       const chatList = $('chat-list'), chatEmpty = $('chat-empty');
       if (chatList) {
@@ -2229,13 +2246,14 @@
   document.addEventListener('change', e => { if (e.target.matches('#cast-staff [data-cz]')) { CAST_ZONA = e.target.value; renderCast(); } });
   document.addEventListener('click', e => { if (e.target.id === 'prod-qr-display') closeProducerQR(); });
   // Cada cambio guardado (en este Panel o llegado de la Live, p. ej. un OK de CALL) sale hacia los móviles
-  const EM_KEYS = [Dt.KEYS.festival, Dt.KEYS.config, Dt.KEYS.callDone, Dt.KEYS.flash, Dt.KEYS.meteo];
+  const EM_KEYS = [Dt.KEYS.festival, Dt.KEYS.config, Dt.KEYS.callDone, Dt.KEYS.flash, Dt.KEYS.avisos, Dt.KEYS.meteo];
   Dt.onWrite(k => { if (EM && EM_KEYS.indexOf(k) >= 0) EM.push(); });
   (function () { loadProducers(); const saved = emLoad(); if (saved) emRoom = saved.room; renderCast(); if (saved && saved.on) emStart(true); })();
 
   // ── Sincronización con la Pantalla Live ──────────────────────────────
   Dt.onChange(type => {
     if (type === 'callDone') { logLiveCallOks(); tick(); return; }
+    if (type === 'avisos') { if (FEST) renderDrift(Math.floor(C.nowAbs())); return; }
     if (type === 'flash') { renderFlash(); return; }
     if (type === 'meteo') { renderMeteo(); return; }
     loadState(); renderAll();

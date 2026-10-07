@@ -32,7 +32,7 @@
   const PUBLIC_BASE = 'https://nostoyloko-jpg.github.io/showtime/';
   // Versión publicada: va en los enlaces de los QR para que el móvil no abra una copia vieja guardada en su caché
   // (súbela junto con los ?v= de index.html / live.html / remote.html).
-  const BUILD = '20261025';
+  const BUILD = '20261027';
   const CHUNK = 24000;           // bytes por trozo (los repetidores públicos limitan el tamaño de mensaje)
   const BEAT_MS = 10000;         // latido del Mac
   const PRESENCE_MS = 30000;     // presencia de cada móvil
@@ -247,7 +247,7 @@
   /** Enlace de Producción: la Live de Manager (solo lectura) + «id» del productor, que activa sus mandos (OK de CALL, mensajes). */
   function productionUrl(room, base, prodId) { return (base || publicBase()) + 'live.html?vista=manager&b=' + BUILD + '#sala=' + room.sala + '&k=' + room.k + '&p=' + room.p + '&id=' + encodeURIComponent(prodId); }
   /** Mensajes de Producción (productor → Dashboard). Entrada NO fiable: se valida todo y se devuelve un objeto limpio o null.
-   *  { type:'call', from, key } · { type:'flash', from, text, to } · { type:'chat', from, text } */
+   *  { type:'call', from, key } · { type:'flash', from, text, to } · { type:'aviso', from, text, perm } · { type:'chat', from, text } */
   const PROD_VISTAS = ['manager', 'backstage'];   // Producción NUNCA manda a Confidence (monitor de los músicos)
   function cleanProdMsg(m) {
     if (!m || typeof m !== 'object') return null;
@@ -263,6 +263,10 @@
       const pedidos = Array.isArray(m.to) ? m.to : [], to = PROD_VISTAS.filter(v => pedidos.indexOf(v) >= 0);
       if (pedidos.length && !to.length) return null;   // pedía solo Confidence (o algo raro): no se manda a ningún sitio
       return { type: 'flash', from, text, to: to.length ? to : PROD_VISTAS.slice() };   // sin destino = Manager y Backstage
+    }
+    if (m.type === 'aviso') {
+      const text = typeof m.text === 'string' ? m.text.replace(/\s+/g, ' ').trim().slice(0, 140) : '';
+      return text ? { type: 'aviso', from, text, perm: m.perm === true } : null;
     }
     if (m.type === 'chat' || (m.type === undefined && typeof m.text === 'string')) {
       const text = typeof m.text === 'string' ? m.text.trim().slice(0, 500) : '';

@@ -246,6 +246,11 @@
     eq(C({ type: 'flash', from: 'p1', text: 'Hola', to: [] }).to.join(), 'manager,backstage', 'sin destino = Manager y Backstage');
     eq(C({ type: 'flash', from: 'p1', text: 'Hola' }).to.join(), 'manager,backstage', 'sin «to» = Manager y Backstage');
     eq(C({ type: 'flash', from: 'p1', text: '   ' }), null, 'mensaje vacío');
+    eq(JSON.stringify(C({ type: 'aviso', from: 'p1', text: '  Lluvia   en 10 min ' })), JSON.stringify({ type: 'aviso', from: 'p1', text: 'Lluvia en 10 min', perm: false }));
+    eq(C({ type: 'aviso', from: 'p1', text: 'x', perm: true }).perm, true);
+    eq(C({ type: 'aviso', from: 'p1', text: 'x', perm: 'sí' }).perm, false, 'permanente solo con true');
+    eq(C({ type: 'aviso', from: 'p1', text: '  ' }), null, 'aviso vacío');
+    eq(C({ type: 'aviso', from: 'p1', text: 'x'.repeat(300) }).text.length, 140);
     eq(C({ type: 'chat', from: 'p1', text: 'ey' }).type, 'chat');
     eq(C({ from: 'p1', text: 'antiguo sin type' }).type, 'chat', 'formato antiguo del chat');
   });

@@ -173,7 +173,7 @@
   test('cinta: en hora, hitos (solo nombre y hora) y retraso por zona', () => {
     const F = fest();
     let it = V.tickerItems(F.s, null, at('20:00'));
-    eq(it[0].text, 'HORARIO EN HORA'); ok(it.some(x => x.kind === 'hito' && x.text === 'CURFEW 23:30'), 'el hito con su hora, sin margen: ' + JSON.stringify(it));
+    eq(it[0].text, 'EN HORA · SIN INCIDENCIAS'); ok(it.some(x => x.kind === 'hito' && x.text === 'CURFEW 23:30'), 'el hito con su hora, sin margen: ' + JSON.stringify(it));
     const s = M.delayPlan(F.s, {}, { minutes: 20, zones: [F.P], from: at('20:00') }).state;
     it = V.tickerItems(s, null, at('20:00'));
     ok(it.some(x => x.kind === 'delay' && x.text === 'PRINCIPAL · RETRASO +20 MIN' && x.level === 'warn'), JSON.stringify(it));
@@ -212,6 +212,13 @@
     const ipad = { left: -1024, top: 0, width: 1024, height: 768, isPrimary: false, isInternal: true };
     eq(V.pickScreen([lap, tv], lap), tv); eq(V.pickScreen([lap, ipad, tv], lap), tv);
     eq(V.pickScreen([lap], lap), null); eq(V.pickScreen([tv, lap], tv), lap, 'Dashboard en la tele: abre en el portátil');
+  });
+
+  test('Cinta: los avisos escritos a mano van delante, en ámbar y en mayúsculas', () => {
+    const it = V.tickerItems(null, null, 0, null, [{ id: 'a', text: 'Lluvia en 10 min' }, { id: 'b', text: 'Prohibido fumar' }]);
+    eq(it.length, 2, 'salen aunque no haya festival'); eq(it[0].kind, 'aviso'); eq(it[0].level, 'warn'); eq(it[0].text, 'LLUVIA EN 10 MIN'); eq(it[1].text, 'PROHIBIDO FUMAR');
+    eq(V.tickerItems(null, null, 0, null).length, 0, 'sin avisos: nada');
+    eq(V.tickerItems(null, null, 0, null, [{ id: 'c', text: '' }, null]).length, 0, 'avisos vacíos no salen');
   });
 
   test('Producción: solo ve Manager y Backstage (sin Confidence)', () => {

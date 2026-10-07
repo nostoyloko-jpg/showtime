@@ -20,7 +20,7 @@
   function arrancar(opts) {
     const env = D.makeEnv(Object.assign({ cripto: true }, opts));
     const sent = [];
-    env.getEl('msgdock').hidden = true;                 // como en live.html
+    env.getEl('msgdock').hidden = true; env.getEl('pmodal').hidden = true;   // como en live.html
     D.cargar(env, MODULOS.slice(0, 4));
     env.win.ShowtimeEmision.Receptor.prototype.sendProdMessage = async function (m) { sent.push(m); return { ok: true, msg: 'Enviado' }; };
     D.cargar(env, MODULOS.slice(4));
@@ -73,17 +73,54 @@
     eq(t.sent.length, 1); eq(JSON.stringify(t.sent[0]), JSON.stringify({ type: 'call', from: 'prod_001', key: 'Banda A@1000' }));
   });
 
-  test('Producción: el mensaje sale con el destino elegido (y vacío no sale)', async () => {
-    ROOM = ROOM || await E.newRoom();
-    const t = arrancar({ hash: hashOf(E.productionUrl(ROOM, 'http://x/', 'prod_001')) });
-    const send = text => { t.env.getEl('md-text').value = text; t.env.fire('md-form', 'submit', { preventDefault() {} }); return new Promise(r => setImmediate(r)); };
-    await send('   '); eq(t.sent.length, 0, 'vacío no sale');
-    await send('Abrid puertas');
+  /** Escribe, pulsa Enviar (abre el modal) y, si se indica, elige una opción del modal. */
+  async function enviar(t, text, opcion) {
+    t.env.getEl('md-text').value = text;
+    t.env.fire('md-form', 'submit', { preventDefault() {} });
+    if (opcion) t.env.fire('pmodal', 'click', { target: { closest: sel => sel === '[data-pm]' ? { dataset: { pm: opcion } } : null } });
+    await new Promise(r => setImmediate(r));
+  }
+  async function prod() { ROOM = ROOM || await E.newRoom(); return arrancar({ hash: hashOf(E.productionUrl(ROOM, 'http://x/', 'prod_001')) }); }
+
+  test('Producción: al enviar sale el modal «¿Dónde lo mandas?» y no se manda nada hasta elegir', async () => {
+    const t = await prod();
+    await enviar(t, '   '); eq(t.env.getEl('pmodal').hidden, true, 'vacío: ni modal');
+    await enviar(t, 'Abrid puertas');
+    eq(t.env.getEl('pmodal').hidden, false, 'modal abierto'); eq(t.sent.length, 0, 'aún no se manda');
+    eq(t.env.getEl('pm-txt').textContent, '«Abrid puertas»');
+  });
+
+  test('Producción: «Ventanas Live» manda el mensaje con el destino elegido', async () => {
+    const t = await prod();
+    await enviar(t, 'Abrid puertas', 'live');
     eq(t.sent.length, 1); eq(t.sent[0].type, 'flash'); eq(t.sent[0].from, 'prod_001'); eq(t.sent[0].text, 'Abrid puertas'); eq(t.sent[0].to.length, 0, 'sin elegir = todas');
-    t.env.fire('md-to', 'click', { target: { closest: () => ({ dataset: { to: 'backstage' } }) } });
-    await send('Solo backstage');
-    eq(t.sent[1].to.join(), 'backstage');
+    eq(t.env.getEl('pmodal').hidden, true, 'el modal se cierra');
     eq(t.env.getEl('md-text').value, '', 'el campo se vacía al enviar');
+    t.env.fire('md-to', 'click', { target: { closest: () => ({ dataset: { to: 'backstage' } }) } });
+    await enviar(t, 'Solo backstage', 'live');
+    eq(t.sent[1].to.join(), 'backstage');
+  });
+
+  test('Producción: aviso puntual y aviso permanente', async () => {
+    const t = await prod();
+    await enviar(t, 'Lluvia en 10 min', 'aviso');
+    eq(JSON.stringify(t.sent[0]), JSON.stringify({ type: 'aviso', from: 'prod_001', text: 'Lluvia en 10 min', perm: false }));
+    await enviar(t, 'Prohibido fumar en backstage', 'perm');
+    eq(t.sent[1].type, 'aviso'); eq(t.sent[1].perm, true);
+  });
+
+  test('Producción: «Cancelar» no manda nada y deja el texto', async () => {
+    const t = await prod();
+    await enviar(t, 'Borrador', 'no');
+    eq(t.sent.length, 0); eq(t.env.getEl('md-text').value, 'Borrador'); eq(t.env.getEl('pmodal').hidden, true);
+    await enviar(t, 'Borrador');
+    t.env.fire('document', 'keydown', { key: 'Escape', target: { tagName: 'BODY' } });
+    eq(t.env.getEl('pmodal').hidden, true, 'Escape cierra el modal'); eq(t.sent.length, 0);
+  });
+
+  test('Staff y Producción no pueden crear ni quitar avisos por su cuenta (solo lectura)', async () => {
+    const t = await prod();
+    eq(t.env.win.ShowtimeDatos.addAviso('hola', true, 'x'), null);
   });
 
   test('Menú de mensajes de Producción: no ofrece Confidence', () => {
