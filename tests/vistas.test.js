@@ -236,6 +236,18 @@
     const sin = fest(); eq(V.confidence(sin.s, sin.P, now, null).mode === 'show', false, 'sin nada sonando, no');
   });
 
+  test('Cinta: la última banda de la noche tocando con retraso NO sale como «EN HORA»', () => {
+    const J = '2026-07-10', at2 = (d, h) => C.toAbs(d, h);
+    let s = C.newFestival({ nombre: 'x', fechaInicio: J, fechaFin: J, dayCutoff: '06:00', coMin: 15 }).state;
+    s = C.addStage(s, 'Principal').state;
+    s = C.addArtist(s, 'show', { jornada: J, nombre: 'Última', escenarioId: s.escenarios[0].id, inicio: '04:30', fin: '05:30' }).state;
+    const d = M.delayPlan(s, {}, { minutes: 60, zones: 'all', from: at2('2026-07-11', '04:00') });
+    const it = V.tickerItems(d.state, null, at2('2026-07-11', '05:50'), null).map(x => x.text);
+    ok(it.indexOf('EN HORA · SIN INCIDENCIAS') < 0, 'no dice en hora: ' + JSON.stringify(it));
+    ok(it.some(x => /PRINCIPAL · RETRASO \+60 MIN/.test(x)), 'dice el retraso real: ' + JSON.stringify(it));
+    ok(V.tickerItems(s, null, at2('2026-07-11', '04:50'), null).some(x => x.text === 'EN HORA · SIN INCIDENCIAS'), 'sin retraso, sí está en hora');
+  });
+
   // ── Ejecutar ──────────────────────────────────────────────────────────
   let pass = 0; const fails = [];
   tests.forEach(([n, f]) => { try { f(); pass++; } catch (e) { fails.push([n, e.message]); } });

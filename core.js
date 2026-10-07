@@ -938,7 +938,10 @@
     return order.filter(k => groups[k]).map(k => {
       const list = groups[k].slice().sort((x, y) => x.pmi - y.pmi);
       const pend = list.filter(b => b.ri === null && b.rf === null && !b.live && b.si > n);
-      const acc = pend.reduce((m, b) => Math.max(m, b.si - b.psi), 0);
+      // + la que está sonando ahora con su retraso (sin ▶: se dio por empezada a su hora estimada). Así la última banda de la
+      //   noche con desfase no sale como «EN HORA» solo porque ya no queda nada pendiente detrás.
+      const cur = list.find(b => b.ri === null && b.rf === null && !b.live && b.si <= n && n < blockEnd(b) && b.si > b.psi);
+      const acc = Math.max(pend.reduce((m, b) => Math.max(m, b.si - b.psi), 0), cur ? cur.si - cur.psi : 0);
       let lb = null;
       list.forEach(b => { if ((b.ri !== null || b.rf !== null || b.live) && b.si <= n) lb = b; });
       let next = lb ? list[list.indexOf(lb) + 1] || null : null;

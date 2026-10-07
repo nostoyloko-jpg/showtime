@@ -206,6 +206,16 @@
     }
   });
 
+  test('Móvil: zonas seguras, 16 px en los campos, 44 px táctiles y contraste', () => {
+    const css = D.src('live.css'), rc = D.src('remote.css');
+    ['.mdock{left:calc(14px + var(--sa-l));bottom:calc(14px + var(--sa-b))}', '#zoomctl{right:calc(14px + var(--sa-r));bottom:calc(14px + var(--sa-b))}'].forEach(x => ok(css.indexOf(x) > 0, x));
+    ok(/@media \(pointer:coarse\)\{[^@]*#md-text,#cd-text\{font-size:16px;height:44px\}/.test(css), 'campos de 16 px y 44 px');
+    ok(/@media \(max-width:700px\)\{[^@]*#zoomctl\.open #dockbody\{flex-wrap:wrap/.test(css), 'el dock de la derecha no se sale en 390 px');
+    ok(/--dim:rgba\(255,255,255,\.5\)/.test(css) && /--dim:rgba\(255,255,255,\.55\)/.test(rc), 'texto atenuado con contraste');
+    ok(/body\[data-lv="escenario"\] \.mdock,body\[data-lv="escenario"\] \.cdock/.test(css), 'docks con el estilo de la pantalla');
+    ok(/input,select,textarea\{font-size:16px\}/.test(rc) && /\.act\.stop\{background:#d70015/.test(rc), 'mando: 16 px y TERMINAR legible');
+  });
+
   test('Menú de mensajes de Producción: no ofrece Confidence', () => {
     const html = D.src('live.html'), dock = html.slice(html.indexOf('id="msgdock"'), html.indexOf('<script src="core.js'));
     ok(dock.indexOf('data-to="manager"') > 0 && dock.indexOf('data-to="backstage"') > 0, 'faltan Manager/Backstage');

@@ -7,9 +7,14 @@ const fs = require('fs'), path = require('path'), vm = require('vm');
 const ROOT = path.join(__dirname, '..');
 const src = f => fs.readFileSync(path.join(ROOT, f), 'utf8');
 
-/** opts: { cripto, hash, search, storage:{clave:valor} } */
+/** opts: { cripto, hash, search, storage:{clave:valor}, now: ms (reloj simulado: la hora no depende de cuándo se pasen los tests) } */
 function makeEnv(opts) {
   opts = opts || {};
+  let DateC = Date;
+  if (Number.isFinite(opts.now)) {
+    const NOW = opts.now;
+    DateC = class extends Date { constructor(...a) { if (a.length) super(...a); else super(NOW); } static now() { return NOW; } };
+  }
   const errors = [], handlers = {}, innerLog = [], els = new Map();
   function stub(name) {
     const classes = new Set(), listeners = {};
@@ -54,7 +59,7 @@ function makeEnv(opts) {
     getComputedStyle: () => ({ getPropertyValue: () => '' }), URLSearchParams,
     open() { return null; }, close() {}, print() {}, focus() {}, alert() {}, confirm: () => true, prompt: () => null,
     fetch: () => Promise.reject(new Error('sin red')), URL, Blob: function () {}, FileReader: function () {},
-    Intl, Date, Math, JSON, Promise, Map, Set, Array, Object, String, Number, Boolean, RegExp, Error, TypeError, Uint8Array, TextEncoder, TextDecoder, encodeURIComponent, decodeURIComponent,
+    Intl, Date: DateC, Math, JSON, Promise, Map, Set, Array, Object, String, Number, Boolean, RegExp, Error, TypeError, Uint8Array, TextEncoder, TextDecoder, encodeURIComponent, decodeURIComponent,
     parseInt, parseFloat, isNaN, Symbol, WeakMap, atob: s => Buffer.from(s, 'base64').toString('binary'), btoa: s => Buffer.from(s, 'binary').toString('base64')
   };
   if (opts.cripto) { win.crypto = require('crypto').webcrypto; win.WebSocket = function () {}; }

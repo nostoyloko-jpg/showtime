@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Showtime · Dashboard</title>
-<link rel="stylesheet" href="control.css?v=20261031">
+<link rel="stylesheet" href="control.css?v=20261034">
 </head>
 <body>
 <div id="savewarn" class="savewarn" role="alert" hidden><b>NO SE ESTÁ GUARDANDO</b> · el navegador no tiene espacio. Lo que cambies se ve y se emite, pero se pierde si recargas: guarda el evento en un archivo (.json), exporta el log y libera espacio.</div>
@@ -55,9 +55,9 @@
 
 <header class="bar">
   <div class="brand">SHOWTIME</div>
-  <div class="fest"><span id="fest-name">Sin evento</span><span id="mods" class="chip warn" hidden></span></div>
+  <div class="fest"><span id="fest-name">Sin evento</span></div>
   <input id="file" type="file" accept=".json,application/json" hidden>
-  <nav class="menus" aria-label="Menús">
+  <nav class="menus mleft" aria-label="Archivo">
     <div class="menu" id="m-file">
       <button class="mbtn" aria-haspopup="true" aria-expanded="false">Archivo<svg class="ic chev"><use href="#i-chev"/></svg></button>
       <div class="mpanel" role="menu">
@@ -69,16 +69,21 @@
         <button id="btn-paste" class="mitem" role="menuitem" title="Pegar un horario de Excel, Numbers, Sheets, PDF o WhatsApp, o abrir un .csv / .tsv"><svg class="ic"><use href="#i-paste"/></svg>Pegar horario</button>
       </div>
     </div>
+  </nav>
+  <button id="btn-undo" class="btn ghost" title="Deshacer el último cambio (⌘Z)"><svg class="ic"><use href="#i-undo"/></svg><span>Deshacer</span></button>
+  <span id="mods" class="chip mods" hidden></span>
+  <span class="bsep" aria-hidden="true"></span>
+  <nav class="menus mcenter" aria-label="Filtros y acciones">
     <div class="menu" id="m-view">
-      <button class="mbtn" aria-haspopup="true" aria-expanded="false"><span class="mlbl">Vista</span><b id="view-lbl">Jornada completa</b><svg class="ic chev"><use href="#i-chev"/></svg></button>
+      <button class="mbtn" aria-haspopup="true" aria-expanded="false"><span class="mlbl">Ver:</span><b id="view-lbl">Todo</b><svg class="ic chev"><use href="#i-chev"/></svg></button>
       <div class="mpanel" role="menu">
-        <button class="mitem" data-mode="all" role="menuitemradio" title="Todo el día en orden: hitos, tareas, soundchecks y shows">Jornada completa</button>
+        <button class="mitem" data-mode="all" role="menuitemradio" title="Todo el día en orden: hitos, tareas, soundchecks y shows">Todo</button>
         <button class="mitem" data-mode="show" role="menuitemradio" title="Solo los conciertos">Shows</button>
         <button class="mitem" data-mode="sc" role="menuitemradio" title="Solo las pruebas de sonido">Soundchecks</button>
       </div>
     </div>
     <div class="menu" id="m-days">
-      <button class="mbtn" aria-haspopup="true" aria-expanded="false"><span class="mlbl">Jornada</span><b id="day-lbl">Todas</b><svg class="ic chev"><use href="#i-chev"/></svg></button>
+      <button class="mbtn" aria-haspopup="true" aria-expanded="false"><span class="mlbl">Día:</span><b id="day-lbl">Todos</b><svg class="ic chev"><use href="#i-chev"/></svg></button>
       <div class="mpanel" role="menu"><nav id="days" class="days" aria-label="Jornadas"></nav></div>
     </div>
     <div class="menu" id="m-delay">
@@ -137,7 +142,7 @@
     </div>
   </nav>
   <div class="grow"></div>
-  <button id="btn-undo" class="btn"><svg class="ic"><use href="#i-undo"/></svg><span>Deshacer</span></button>
+  <div class="bright">
   <div class="menu" id="m-live">
     <button id="btn-live" class="mbtn btn primary mlive" aria-haspopup="true" aria-expanded="false"><svg class="ic"><use href="#i-screen"/></svg>Live<span id="live-state" class="state off" title="Ninguna Pantalla Live abierta"></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
     <div class="mpanel wide lvpanel" role="menu">
@@ -153,15 +158,14 @@
       <p class="mnote" id="lv-note">Con un segundo monitor conectado, la ventana se abre en él (Chrome, Edge o Brave). En la ventana: <b>F</b> pantalla completa · <b>V</b> cambia de vista.</p>
     </div>
   </div>
-  <span class="sep"></span>
-  <button id="btn-cfg" class="btn" aria-controls="cfg" aria-expanded="false"><svg class="ic"><use href="#i-gear"/></svg>Configuración</button>
+  <button id="wake" class="wake" type="button" aria-pressed="false" title="Sin reposo: mientras Showtime esté abierto, el equipo no apaga la pantalla ni entra en reposo. Clic: activar / desactivar" hidden><span class="led" aria-hidden="true"></span><svg class="ic"><use href="#i-screen"/></svg><span class="wtxt">Sin reposo</span></button>
+  <div id="clock" class="clock" aria-label="Hora">--:--:--</div>
+  <button id="btn-cfg" class="btn ghost icon" aria-controls="cfg" aria-expanded="false" title="Configuración" aria-label="Configuración"><svg class="ic"><use href="#i-gear"/></svg></button>
+  </div>
 </header>
 
 <section class="tools">
   <div id="drift" class="drift" aria-live="polite"></div>
-  <div class="grow"></div>
-  <span id="wake" class="wake" title="Mientras Showtime esté abierto, este equipo no apagará la pantalla ni entrará en reposo" hidden><svg class="ic"><use href="#i-screen"/></svg>Sin reposo</span>
-  <div id="clock" class="clock">--:--:--</div>
 </section>
 
 <div id="warn" class="warnbar" role="status" hidden></div>
@@ -177,14 +181,15 @@
   </aside>
   <section class="list">
     <div class="list-h">
-      <h2 id="list-title">Artistas</h2>
-      <span class="hint">Intro o salir de la casilla: aplica · Esc: descarta · Jornada = día del evento (lo de antes de la hora de corte cuenta como la noche anterior)</span>
-      <button id="btn-new-row" class="btn primary addnew" title="Añadir una entrada (show, soundcheck, tarea o hito): se coloca sola en su sitio por hora"><svg class="ic"><use href="#i-plus"/></svg>Añadir</button>
+      <h2 id="list-title" class="sr-only">Artistas</h2>
+      <button id="btn-focus" class="btn ghost focusbtn" type="button" aria-pressed="false" title="Modo foco: solo lo de directo, filas y letra más grandes (⇧⌘F)"><span class="fdot" aria-hidden="true"></span><span class="ftxt">Foco</span></button>
+      <button id="btn-help" class="btn ghost icon helpbtn" type="button" title="Atajos y ayuda (⌘/)" aria-label="Atajos y ayuda">?</button>
+      <button id="btn-new-row" class="btn addnew" title="Añadir una entrada (show, soundcheck, tarea o hito): se coloca sola en su sitio por hora"><svg class="ic"><use href="#i-plus"/></svg>Añadir</button>
     </div>
     <div class="tblwrap">
       <table id="tbl">
         <thead><tr>
-          <th class="dl" title="Verde: se mueve con los retrasos · Rojo: fija, no se mueve">Delay</th><th class="lv" title="Directo: ▶ empezar · ■ terminar · Tiempo extra">Directo</th><th>Jornada</th><th colspan="2" class="prev-h" title="Horario previsto (la escaleta): lo que escribes. Los retrasos no lo cambian">Previsto · inicio – fin</th><th class="est-h" title="Lo que ha pasado (▶ / ■) y, para lo que aún no ha pasado, la hora estimada con los retrasos, desbordes y Tiempo extra. Ámbar = distinto de lo previsto · rojo = una entrada fija pisada">Real</th><th>Tipo</th><th>Zona</th><th>Nombre</th><th>CALL</th><th title="Tiempo de cambio con la banda anterior de la misma zona (shows y soundchecks)">Cambio</th><th>Notas</th><th class="mo"></th>
+          <th class="dl" title="Verde: se mueve con los retrasos · Rojo: fija, no se mueve">Delay</th><th class="lv" title="Directo: ▶ empezar · ■ terminar · Tiempo extra">Directo</th><th class="c-jor">Jornada</th><th colspan="2" class="prev-h" title="Horario previsto (la escaleta): lo que escribes. Los retrasos no lo cambian">Previsto · inicio – fin</th><th class="est-h" title="Lo que ha pasado (▶ / ■) y, para lo que aún no ha pasado, la hora estimada con los retrasos, desbordes y Tiempo extra. Ámbar = distinto de lo previsto · rojo = una entrada fija pisada">Real</th><th class="c-tp">Tipo</th><th>Zona</th><th>Nombre</th><th>CALL</th><th title="Tiempo de cambio con la banda anterior de la misma zona (shows y soundchecks)">Cambio</th><th class="c-n">Notas</th><th class="mo"></th>
         </tr></thead>
         <tbody id="tbody"></tbody>
         <tbody id="tbody-sin"></tbody>
@@ -375,15 +380,15 @@
 <datalist id="zones-dl"></datalist>
 <div id="toast" class="toast" hidden></div>
 
-<script src="core.js?v=20261031"></script>
-<script src="meteo.js?v=20261031"></script>
-<script src="datos.js?v=20261031"></script>
-<script src="importar.js?v=20261031"></script>
-<script src="qr.js?v=20261031"></script>
-<script src="emision.js?v=20261031"></script>
-<script src="mando.js?v=20261031"></script>
-<script src="vistas.js?v=20261031"></script>
-<script src="log.js?v=20261031"></script>
-<script src="control.js?v=20261031"></script>
+<script src="core.js?v=20261034"></script>
+<script src="meteo.js?v=20261034"></script>
+<script src="datos.js?v=20261034"></script>
+<script src="importar.js?v=20261034"></script>
+<script src="qr.js?v=20261034"></script>
+<script src="emision.js?v=20261034"></script>
+<script src="mando.js?v=20261034"></script>
+<script src="vistas.js?v=20261034"></script>
+<script src="log.js?v=20261034"></script>
+<script src="control.js?v=20261034"></script>
 </body>
 </html>

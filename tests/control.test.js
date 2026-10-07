@@ -26,10 +26,10 @@
     return { s, key: C.callKey(b) };
   }
   /** Dashboard arrancado con festival y una persona de Producción (Marta = prod_001). */
-  function dashboard(extra) {
+  function dashboard(extra, now) {
     const F = fest();
     const storage = Object.assign({ 'showtime.festival': JSON.stringify(F.s), 'showtime.producers': JSON.stringify({ producers: [{ id: 'prod_001', name: 'Marta' }, { id: 'prod_002', name: 'Luis' }], counter: 2, defaultId: 'prod_001' }) }, extra || {});
-    const env = D.makeEnv({ cripto: true, storage });
+    const env = D.makeEnv({ cripto: true, storage, now });
     D.cargar(env, MODULOS);
     const read = k => { const v = env.storage.get(k); return v ? JSON.parse(v) : null; };
     const callLog = () => ((read('showtime.log') || {}).entries || []).filter(e => e.type === 'call');
@@ -275,6 +275,148 @@
     t.env.fire('document', 'click', { target: { closest: sel => sel === '[data-prod-del]' ? { dataset: { prodDel: '0' } } : null } });
     eq(t.env.getEl('modal-title').textContent, 'Quitar acceso a Marta');
     eq(JSON.parse(t.env.storage.get('showtime.producers')).producers.map(p => p.id).join(), 'prod_002', 'quitada de la lista');
+  });
+
+  // ── Tanda 2: interfaz ────────────────────────────────────────────────
+  const HTML = D.src('index.html');
+  const seccion = (abre, cierra) => { const i = HTML.indexOf(abre), j = HTML.indexOf(cierra, i); return i < 0 || j < 0 ? '' : HTML.slice(i, j); };
+  test('Barra superior en 3 bloques: Archivo y Deshacer · filtros y acciones · Live, Sin reposo, reloj y ⚙', () => {
+    const izq = seccion('<header class="bar">', 'class="bsep"'), centro = seccion('class="menus mcenter"', '<div class="bright">'), der = seccion('<div class="bright">', '</header>');
+    ok(/class="brand"/.test(izq) && /id="m-file"/.test(izq) && /id="btn-undo"/.test(izq) && /id="mods"/.test(izq), 'izquierda');
+    ['m-view', 'm-days', 'm-delay', 'm-msg', 'm-cast', 'm-chat'].forEach(id => ok(centro.indexOf('id="' + id + '"') > 0, 'centro: ' + id));
+    ['m-live', 'id="wake"', 'id="clock"', 'id="btn-cfg"'].forEach(x => ok(der.indexOf(x) > 0, 'derecha: ' + x));
+    ok(/<span class="mlbl">Ver:<\/span>/.test(HTML) && /<span class="mlbl">Día:<\/span>/.test(HTML), 'Ver: / Día:');
+    ok(!/id="mods" class="chip warn"/.test(HTML), 'la píldora de cambios no es amarilla');
+    ok(!/Configuración<\/button>/.test(der), '⚙ sin texto');
+  });
+  test('Sin subtítulo repetido ni texto fijo encima de la tabla: ayuda «?» y ⌘/', () => {
+    const lh = seccion('<div class="list-h">', '<div class="tblwrap">');
+    ok(/class="sr-only"/.test(lh), 'el título queda solo para lectores de pantalla');
+    ok(lh.indexOf('Intro o salir de la casilla') < 0, 'el texto fijo ya no está');
+    ok(/id="btn-help"/.test(lh) && !/class="btn primary addnew"/.test(lh), '«?» y Añadir neutro');
+    const t = dashboard();
+    t.env.fire('btn-help', 'click', {});
+    eq(t.env.getEl('modal-title').textContent, 'Atajos y ayuda');
+    ok(/Intro.*Esc/.test(t.env.getEl('modal-body').innerHTML), 'los atajos están en la ayuda');
+    t.env.getEl('modal-title').textContent = '';
+    t.env.fire('document', 'keydown', { key: '/', metaKey: true, preventDefault() {} });
+    eq(t.env.getEl('modal-title').textContent, 'Atajos y ayuda', '⌘/');
+  });
+  test('Etiquetas cortas: «Ver: Todo» y «Día: Todos»', () => {
+    const t = dashboard({ 'showtime.config': JSON.stringify({ mode: 'all', day: 'all' }) });
+    eq(t.env.getEl('view-lbl').textContent, 'Todo'); eq(t.env.getEl('day-lbl').textContent, 'Todos');
+  });
+  test('Hitos: tarjeta neutra; ámbar solo con margen < 15 min; roja si se rebasa', () => {
+    const J = '2026-07-10', at2 = h => C.toAbs(J, h);
+    let s = C.newFestival({ nombre: 'x', fechaInicio: J, fechaFin: J, dayCutoff: '06:00', coMin: 15 }).state;
+    s = C.addStage(s, 'P').state; const P = s.escenarios[0].id;
+    const add = o => { const r = C.addArtist(s, o.tipo === 'hito' ? 'show' : 'show', Object.assign({ jornada: J, escenarioId: P }, o)); if (!r.ok) throw new Error(r.error); s = r.state; };
+    add({ nombre: 'Banda', inicio: '20:00', fin: '21:50' });
+    add({ nombre: 'Puertas', tipo: 'hito', inicio: '22:00' });        // margen 10 → ámbar
+    add({ nombre: 'Curfew', tipo: 'hito', inicio: '23:30' });         // margen 100 → neutro
+    const t = dashboard({ 'showtime.festival': JSON.stringify(s) });
+    const h = t.env.win.ShowtimePanel._test.hitoChips(at2('21:00'));
+    ok(/dchip absorb[^>]*>.*Puertas 22:00 · margen 10 min/.test(h), 'puertas en ámbar: ' + h);
+    ok(/dchip hito[^>]*>.*Curfew 23:30 · margen 100 min/.test(h), 'curfew neutro: ' + h);
+    ok(!/Puertas/.test(t.env.win.ShowtimePanel._test.hitoChips(at2('22:05'))), 'los hitos que ya pasaron no salen');
+  });
+  test('Sin reposo: interruptor con LED; se puede apagar y la elección se recuerda', async () => {
+    const F = fest();
+    const env = D.makeEnv({ cripto: true, storage: { 'showtime.festival': JSON.stringify(F.s) } });
+    let rel = 0;
+    env.win.navigator.wakeLock = { request: async () => ({ release: async () => { rel++; }, addEventListener() {} }) };
+    env.win.document.visibilityState = 'visible';
+    D.cargar(env, MODULOS);
+    await new Promise(r => setTimeout(r, 0));
+    const w = env.getEl('wake');
+    eq(w.hidden, false); ok(w.classList.contains('on'), 'activo al abrir');
+    env.fire('wake', 'click', {}); await new Promise(r => setTimeout(r, 0));
+    ok(!w.classList.contains('on'), 'apagado'); eq(rel, 1); eq(env.storage.get('showtime.wake'), 'off', 'se recuerda');
+    env.fire('wake', 'click', {}); await new Promise(r => setTimeout(r, 0));
+    ok(w.classList.contains('on'), 'encendido otra vez'); eq(env.storage.has('showtime.wake'), false);
+  });
+  test('Estilos del Dashboard: tabla limpia en reposo, Añadir neutro, Live en rojo y números tabulares', () => {
+    const css = D.src('control.css');
+    ok(/#tbl tbody td select\{[^}]*appearance:none/.test(css), 'sin flechas en reposo');
+    ok(/#tbl tbody tr:hover td input\[type=text\],#tbl tbody tr:hover td select\{[^}]*border-color/.test(css), 'controles al pasar el ratón');
+    ok(/\.btn\.addnew\{[^}]*background:#14151b/.test(css), 'Añadir neutro');
+    ok(/#m-live \.mbtn\.btn\.primary\{background:var\(--live\)/.test(css), 'Live en rojo');
+    ok(/\.bar \.clock\{[^}]*color:#fff[^}]*tabular-nums/.test(css), 'reloj blanco y tabular');
+    ok(/--dim:#8a8f98/.test(css), 'texto atenuado con contraste');
+  });
+
+  // ── Tanda 2 (remate): modo foco, SIGUIENTE sin Tiempo extra, bis en el CHANGEOVER ──
+  test('Modo foco: desde «Ver ▾» o ⇧⌘F; oculta Jornada, Tipo, Notas y «···»; se recuerda en este equipo', () => {
+    const t = dashboard(), body = t.env.getEl('body');
+    ok(!body.classList.contains('focus'), 'apagado de entrada');
+    t.env.fire('btn-focus', 'click', {});
+    ok(body.classList.contains('focus'), 'encendido'); eq(t.env.storage.get('showtime.panel.focus'), '1');
+    ok(/· Foco$/.test(t.env.getEl('view-lbl').textContent), 'se ve en «Ver»: ' + t.env.getEl('view-lbl').textContent);
+    t.env.fire('document', 'keydown', { key: 'F', metaKey: true, shiftKey: true, preventDefault() {} });
+    ok(!body.classList.contains('focus'), '⇧⌘F lo apaga'); eq(t.env.storage.has('showtime.panel.focus'), false);
+    const t2 = dashboard({ 'showtime.panel.focus': '1' });
+    ok(t2.env.getEl('body').classList.contains('focus'), 'al volver a abrir, sigue en modo foco');
+    const css = D.src('control.css');
+    ['.c-jor', 'td.f', '.c-tp', 'td.tp', '.c-n', 'td.n', 'th.mo', 'td.mo'].forEach(c => ok(css.indexOf('body.focus #tbl ' + c) >= 0, 'oculta ' + c));
+    ok(/body\.focus #tbl tbody td\{[^}]*font-size:16px/.test(css), 'letra más grande');
+    ['class="c-jor"', 'class="c-tp"', 'class="c-n"', 'id="btn-focus"'].forEach(x => ok(HTML.indexOf(x) > 0, x));
+  });
+  /** Reloj simulado: varias horas fijas, incluida la franja delicada de 04:00 a 08:00 (corte a las 06:00) y la medianoche. */
+  const RELOJES = [[2026, 6, 10, 12, 0], [2026, 6, 10, 23, 50], [2026, 6, 11, 0, 20], [2026, 6, 11, 5, 30], [2026, 6, 11, 6, 40]].map(a => new Date(a[0], a[1], a[2], a[3], a[4]).getTime());
+  const hhmm = ms => { const d = new Date(ms); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
+  /** Festival alrededor de la hora simulada: cada banda en la jornada que le toca por su hora de inicio. */
+  function festEn(nowMs, fn) {
+    const n = Math.floor(C.nowAbs(new Date(nowMs))), cut = { event: { dayCutoff: '06:00' } }, hm = m => C.fmtHM(((m % 1440) + 1440) % 1440);
+    const bandas = []; fn((nombre, a, b) => bandas.push({ nombre, a, b }));
+    const jors = bandas.map(x => C.jornadaOfAbs(cut, n + x.a)).sort();
+    let s = C.newFestival({ nombre: 'x', fechaInicio: jors[0], fechaFin: jors[jors.length - 1], dayCutoff: '06:00', coMin: 15 }).state;
+    s = C.addStage(s, 'P').state; const P = s.escenarios[0].id;
+    bandas.forEach(x => { const r = C.addArtist(s, 'show', { jornada: C.jornadaOfAbs(cut, n + x.a), nombre: x.nombre, escenarioId: P, inicio: hm(n + x.a), fin: hm(n + x.b) }); if (!r.ok) throw new Error(r.error); s = r.state; });
+    return s;
+  }
+  const ultimo = (t, id) => t.env.innerLog.filter(x => x[0] === id).map(x => x[1]).pop() || '';
+  test('SIGUIENTE: sin botón de Tiempo extra (solo para la que suena o el bis) · reloj simulado a 5 horas distintas', () => {
+    RELOJES.forEach(now => {
+      const t = dashboard({ 'showtime.festival': JSON.stringify(festEn(now, add => { add('Suena', -30, 30); add('Viene', 45, 105); })) }, now);
+      const next = ultimo(t, 'v-next'), enEscena = ultimo(t, 'v-now'), h = hhmm(now);
+      eq(t.env.getEl('clock').textContent.slice(0, 5), h, 'el Dashboard usa el reloj simulado');
+      ok(/Viene/.test(next), h + ': la siguiente sale: ' + next.slice(0, 120));
+      ok(!/data-act="stretch"/.test(next), h + ': sin Tiempo extra en SIGUIENTE');
+      ok(/Suena/.test(enEscena) && /data-act="stretch"/.test(enEscena), h + ': en EN ESCENA sí: ' + enEscena.slice(0, 160));
+      eq(t.env.errors.length, 0, h + ': ' + t.env.errors.join(' | '));
+    });
+  });
+  test('CHANGEOVER: botón «↺ Bis» mientras la banda que acaba de terminar se puede rescatar · reloj simulado a 5 horas distintas', () => {
+    RELOJES.forEach(now => {
+      const h = hhmm(now);
+      const t = dashboard({ 'showtime.festival': JSON.stringify(festEn(now, add => { add('Acaba', -25, -5); add('Entra', 10, 70); })) }, now);
+      const co = ultimo(t, 'v-now');
+      ok(/CHANGEOVER/.test(co) && /xtrabtn bis[^>]*data-act="stretch"/.test(co) && /#i-undo/.test(co) && /Bis · Acaba/.test(co), h + ': bis en el cambio: ' + co.slice(0, 300));
+      // Si ya se le dio ■ (terminó de verdad), no hay bis que rescatar
+      let s2 = festEn(now, add => { add('Acaba', -25, -5); add('Entra', 10, 70); });
+      const ac = s2.artists.find(x => x.nombre === 'Acaba');
+      s2 = C.setReal(C.setReal(s2, ac.id, 'show', 'i', Math.floor(C.nowAbs(new Date(now))) - 25).state, ac.id, 'show', 'f', Math.floor(C.nowAbs(new Date(now))) - 5).state;
+      const t2 = dashboard({ 'showtime.festival': JSON.stringify(s2) }, now);
+      ok(/CHANGEOVER/.test(ultimo(t2, 'v-now')) && !/xtrabtn bis/.test(ultimo(t2, 'v-now')), h + ': con ■ dado, sin bis');
+    });
+  });
+  test('Toast del modo foco: efímero (2 s) y con fundido de salida', () => {
+    const src = D.src('control.js'), css = D.src('control.css');
+    ok(/toast\(focusOn\(\) \? 'Modo foco activado' : 'Modo foco desactivado', false, 2000\)/.test(src), '2 s al cambiar el modo foco');
+    ok(/toastOut = setTimeout\(\(\) => t\.classList\.add\('out'\)/.test(src) && /\.toast\.out\{opacity:0/.test(css), 'se va con fundido');
+    const t = dashboard(); t.env.fire('btn-focus', 'click', {});
+    eq(t.env.getEl('toast').textContent, 'Modo foco activado'); eq(t.env.getEl('toast').hidden, false);
+  });
+  test('Botón Foco visible junto a «?» y Añadir: un clic, «Foco» ↔ «Foco activo»', () => {
+    const lh = seccion('<div class="list-h">', '<div class="tblwrap">');
+    ok(/id="btn-focus"[\s\S]*id="btn-help"[\s\S]*id="btn-new-row"/.test(lh), 'orden: Foco · ? · Añadir');
+    ok(seccion('<div class="menu" id="m-view">', '<div class="menu" id="m-days">').indexOf('btn-focus') < 0, 'ya no está dentro de «Ver»');
+    const t = dashboard(), b = t.env.getEl('btn-focus'), tx = { textContent: '' };
+    b.querySelector = () => tx;   // el comodín no tiene hijos: se le da el texto del botón
+    t.env.fire('btn-focus', 'click', {});
+    ok(b.classList.contains('on')); eq(tx.textContent, 'Foco activo');
+    t.env.fire('btn-focus', 'click', {});
+    ok(!b.classList.contains('on')); eq(tx.textContent, 'Foco');
   });
 
   // ── Clave propia de Producción ─────────────────────────────────────────

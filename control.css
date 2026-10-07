@@ -783,3 +783,136 @@ td.est small{white-space:normal;max-width:96px;line-height:1.2}
 /* Almacenamiento lleno: aviso fijo arriba */
 .savewarn{position:fixed;top:0;left:0;right:0;z-index:400;padding:10px 16px calc(10px);padding-top:calc(10px + env(safe-area-inset-top,0px));background:#b91c1c;color:#fff;font-size:13px;font-weight:600;text-align:center;box-shadow:0 4px 18px rgba(0,0,0,.4)}
 .savewarn[hidden]{display:none}
+
+/* ═══ Tanda 2 · Raycast / Linear Pro ═══════════════════════════════════════════════════════════════ */
+:root{--dim:#8a8f98;--hair:rgba(255,255,255,.07);--hair2:rgba(255,255,255,.13);--accent-fill:#d6334f;--live:#d9363e;--chip:rgba(255,255,255,.04)}
+body[data-ps="raycast"]{--accent-fill:#d9363e}
+body[data-ps="neutro"]{--accent-fill:var(--accent)}
+.sr-only{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+/* Color de relleno con texto blanco legible (≥ 4,5:1) */
+.btn.primary,.seg button.on,.days button.on,.dtb.on{background:var(--accent-fill,var(--accent));border-color:var(--accent-fill,var(--accent))}
+
+/* ── Barra superior en 3 bloques ── */
+.bar{gap:6px;padding:8px 14px;border-bottom:1px solid var(--hair)}
+.brand{color:var(--text);opacity:.9;letter-spacing:.26em;font-size:13px;margin-right:2px}
+.fest{font-weight:600;color:var(--muted);font-size:13px;max-width:200px;overflow:hidden}
+.fest span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.menus.mleft{margin-left:2px}
+.menus.mcenter{margin-left:0}
+.bsep{flex:0 0 1px;align-self:stretch;margin:6px 6px;background:var(--hair2)}
+.bright{display:flex;align-items:center;gap:10px}
+.btn.ghost{background:transparent;border:1px solid var(--hair2);border-bottom-width:1px;height:32px}
+.btn.ghost:hover:not(:disabled){background:rgba(255,255,255,.06);filter:none}
+.btn.icon{width:32px;padding:0;justify-content:center}
+#btn-cfg.btn{font-size:inherit}
+#btn-undo.btn.ghost{border-color:transparent;color:var(--muted)}
+#btn-undo.btn.ghost:not(:disabled){color:var(--text)}
+#btn-undo.btn.ghost:hover:not(:disabled){border-color:var(--hair2)}
+.chip.mods{height:22px;padding:0 8px;font-size:11px;font-weight:600;color:var(--muted);border:1px solid var(--hair2);background:var(--chip);border-radius:999px;display:inline-flex;align-items:center;white-space:nowrap}
+#m-live .mbtn.btn.primary{background:var(--live);border-color:var(--live);color:#fff}
+body[data-ps="escenario"] #m-live .mbtn.btn.primary{background:#FFD600;border-color:#FFD600;color:#000}
+.bar .clock{font-size:18px;font-weight:800;color:#fff;font-variant-numeric:tabular-nums;letter-spacing:.02em;min-width:88px;text-align:right}
+body[data-ps="escenario"] .bar .clock{color:#FFD600}
+/* Sin reposo: interruptor con micro-LED */
+.wake{height:28px;padding:0 10px 0 9px;gap:6px;border:1px solid var(--hair2);border-radius:999px;background:transparent;color:var(--muted);font:inherit;font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center}
+.wake:hover{background:rgba(255,255,255,.05)}
+.wake .ic{width:14px;height:14px}
+.wake .led{width:6px;height:6px;border-radius:50%;background:#5b5f67;flex:0 0 auto}
+.wake.on{color:var(--text)}
+.wake.on .led{background:var(--ok);box-shadow:0 0 6px var(--ok)}
+.wake[hidden]{display:none}
+@media (max-width:1600px){ .mbtn .mlbl{display:inline} #btn-cfg{font-size:inherit;padding:0} }
+@media (max-width:1500px){ .wake .wtxt{display:none} }
+@media (max-width:1280px){ .mbtn .mlbl{display:none} .fest{display:none} }
+
+/* ── Fila de estado: solo los chips (sin reloj, ya está arriba) ── */
+.tools{padding:8px 14px;border-bottom:1px solid var(--hair);min-height:0}
+.tools:has(#drift:empty){display:none}
+.dchip{border-color:var(--hair2)}
+.dchip.hito{color:var(--text);background:var(--chip);border-color:var(--hair2)}
+.dchip.hito .ic{color:var(--muted)}
+
+/* ── Cabecera de la lista: sin subtítulo; ayuda «?» y Añadir neutro ── */
+.list-h{justify-content:flex-end;align-items:center;gap:8px}
+.helpbtn{font-weight:800;color:var(--muted)}
+.btn.addnew{background:#14151b;border:1px solid var(--hair2);border-bottom-width:1px;color:var(--text);margin-left:0}
+.btn.addnew:hover:not(:disabled){background:#1b1d24;filter:none}
+body[data-ps="escenario"] .btn.addnew{background:#000;border-color:rgba(255,214,0,.55);color:#FFD600}
+dl.keys{display:grid;grid-template-columns:auto 1fr;gap:8px 16px;margin-bottom:12px}
+dl.keys dt{color:var(--text);font-weight:600;white-space:nowrap}
+dl.keys dd{color:var(--muted)}
+kbd{display:inline-block;min-width:20px;padding:1px 6px;border:1px solid var(--hair2);border-bottom-width:2px;border-radius:5px;background:var(--chip);font:600 12px/1.4 inherit;text-align:center;color:var(--text)}
+
+/* ── Tabla en reposo: limpia y tipográfica; los controles aparecen al pasar el ratón o al editar ── */
+#tbl{font-variant-numeric:tabular-nums}
+#tbl thead th{border-bottom:1px solid var(--hair)}
+#tbl tbody td{border-bottom:1px solid var(--hair)}
+#tbl tbody td input[type=text],#tbl tbody td select{background-color:transparent;border-color:transparent;box-shadow:none;transition:border-color .12s,background-color .12s}
+#tbl tbody td select{-webkit-appearance:none;appearance:none;background-image:none;padding-right:16px;cursor:pointer}
+#tbl tbody td.stage input[type=text]{border-left:3px solid var(--sc,#555)}
+#tbl tbody tr:hover td input[type=text],#tbl tbody tr:hover td select{border-color:var(--hair2);background-color:var(--field)}
+#tbl tbody tr:hover td.stage input[type=text]{border-left-color:var(--sc,#555)}
+#tbl tbody tr:hover td select,#tbl tbody td select:focus{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23a3a7b0' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 5px center;background-size:9px 6px}
+#tbl tbody td input[type=text]:focus,#tbl tbody td select:focus{outline:none;border-color:var(--accent);background-color:var(--field)}
+#tbl tbody td.stage input[type=text]:focus{border-left-color:var(--sc,#555)}
+#tbl tbody td.mod input[type=text],#tbl tbody td.mod select{border-color:rgba(255,197,51,.6)!important;background-color:rgba(255,197,51,.08)!important}
+/* Previsto «11:30 → 14:00» y Real con el mismo formato */
+#tbl td.ti{position:relative}
+#tbl td.ti::after{content:'→';position:absolute;right:-7px;top:50%;transform:translateY(-50%);color:var(--dim);font-size:11px;pointer-events:none}
+td.est .arr{margin:0 5px;color:var(--dim);font-weight:400}
+td.est{font-variant-numeric:tabular-nums}
+/* Números que cambian en directo: sin saltos */
+.v-meta,.v-rem,.dchip,.mchip,.gapbtn,td.f .real,.estt,.drift{font-variant-numeric:tabular-nums}
+.chip.mods[hidden]{display:none}
+.wake{white-space:nowrap}
+.bright{padding-left:12px;margin-left:6px;border-left:1px solid var(--hair2);align-self:stretch}
+#tbl tbody tr:hover td.ti::after,#tbl tbody tr:focus-within td.ti::after{opacity:0}
+tr.k-hito td.ti::after{display:none}
+.bar .mbtn{padding:0 8px}
+.bar .brand{letter-spacing:.2em}
+@media (max-width:1560px){ .fest{max-width:120px} }
+@media (max-width:1480px){ .fest{display:none} .bar .mbtn{padding:0 6px} .bright{gap:8px;padding-left:10px} }
+@media (max-width:1280px){ .mbtn .mlbl{display:inline} }
+@media (max-width:1180px){ .mbtn .mlbl{display:none} }
+
+/* ── Zona: el nombre entero (p. ej. «Secundario»), sin cortes feos ── */
+#tbl td.stage input[type=text]{width:var(--escw,140px);min-width:110px;max-width:220px;text-overflow:ellipsis}
+@media (max-width:1600px){ #tbl td.stage input[type=text]{width:var(--escw,140px);min-width:104px;max-width:170px} }
+
+/* ── Bis desde la tarjeta de CHANGEOVER ── */
+.xtrabtn.bis{color:var(--call);border-color:rgba(255,197,51,.5);background:rgba(255,197,51,.08);margin-top:6px}
+.xtrabtn.bis:hover{background:rgba(255,197,51,.16)}
+
+/* ── Modo foco: para operar en directo a 1-2 m de la mesa ── */
+.focusitem{display:flex;align-items:center;gap:8px}
+.focusitem kbd{margin-left:auto;font-size:11px}
+.focusitem .fbox{width:14px;height:14px;border-radius:4px;border:1.5px solid var(--muted);flex:0 0 auto;position:relative}
+.focusitem.on .fbox{background:var(--accent-fill,var(--accent));border-color:var(--accent-fill,var(--accent))}
+.focusitem.on .fbox::after{content:'';position:absolute;left:4px;top:1px;width:4px;height:8px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
+body.focus #tbl .c-jor,body.focus #tbl td.f,body.focus #tbl .c-tp,body.focus #tbl td.tp,body.focus #tbl .c-n,body.focus #tbl td.n,body.focus #tbl th.mo,body.focus #tbl td.mo{display:none}
+body.focus #tbl thead th{font-size:12px;padding-top:9px;padding-bottom:9px}
+body.focus #tbl tbody td{padding:9px 7px;font-size:16px}
+body.focus #tbl tbody td input[type=text]{height:40px;font-size:16px}
+body.focus #tbl td.t input{width:80px}
+body.focus #tbl td.name input[type=text]{font-size:18px;font-weight:800}
+body.focus #tbl td.stage input[type=text]{font-size:14px}
+body.focus #tbl td.est{font-size:15px}
+body.focus #tbl td.est small{font-size:12px}
+body.focus #tbl .delbtn.livebtn,body.focus #tbl .xtrabtn.sq{width:40px;height:40px}
+body.focus #tbl .delbtn.livebtn .ic,body.focus #tbl .xtrabtn.sq .ic{width:20px;height:20px}
+body.focus #tbl .led{width:30px;height:30px}
+body.focus #tbl .gapbtn{font-size:14px}
+
+/* ── Botón Foco, visible junto a «?» y Añadir (un clic) ── */
+.btn.focusbtn{gap:7px;color:var(--muted)}
+.btn.focusbtn .fdot{width:12px;height:12px;border-radius:50%;border:1.5px solid currentColor;flex:0 0 auto;position:relative}
+.btn.focusbtn.on{color:#fff;background:color-mix(in srgb,var(--accent-fill,var(--accent)) 22%,transparent);border-color:var(--accent-fill,var(--accent))}
+.btn.focusbtn.on .fdot{border-color:var(--accent-fill,var(--accent))}
+.btn.focusbtn.on .fdot::after{content:'';position:absolute;inset:2px;border-radius:50%;background:var(--accent-fill,var(--accent))}
+body[data-ps="escenario"] .btn.focusbtn.on{background:#FFD600;color:#000;border-color:#FFD600}
+body[data-ps="escenario"] .btn.focusbtn.on .fdot{border-color:#000}
+body[data-ps="escenario"] .btn.focusbtn.on .fdot::after{background:#000}
+/* ── Aviso efímero: entra y se va con un fundido suave ── */
+.toast{transition:opacity .3s ease,transform .3s ease;animation:toastin .2s ease-out}
+.toast.out{opacity:0;transform:translateX(-50%) translateY(6px)}
+@keyframes toastin{from{opacity:0;transform:translateX(-50%) translateY(6px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}

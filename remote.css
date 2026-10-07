@@ -1,6 +1,6 @@
 /* Showtime — remote.css · Mando del regidor (móvil, una mano, alto contraste) */
 :root{
-  --bg:#000; --card:#0f1115; --line:rgba(255,255,255,.14); --text:#fff; --muted:rgba(255,255,255,.62); --dim:rgba(255,255,255,.4);
+  --bg:#000; --card:#0f1115; --line:rgba(255,255,255,.14); --text:#fff; --muted:rgba(255,255,255,.66); --dim:rgba(255,255,255,.55);   /* ≥ 4,5:1 (WCAG) */
   --green:#10b981; --red:#ff3b30; --amber:#ffb347; --accent:#e94560;
   --safe-b:env(safe-area-inset-bottom,0px);
 }
@@ -104,7 +104,7 @@ main{padding:12px 12px 0;display:flex;flex-direction:column;gap:12px}
 .act{height:76px;border-radius:16px;border:2px solid;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-weight:900;font-size:14px;letter-spacing:.08em}
 .act .ic{width:28px;height:28px}
 .act.start{background:var(--green);border-color:var(--green);color:#000}
-.act.stop{background:var(--red);border-color:var(--red);color:#fff}
+.act.stop{background:#d70015;border-color:#d70015;color:#fff}   /* rojo más profundo: texto blanco legible (5,4:1) */
 .act.ontime{background:transparent;border-color:var(--amber);color:var(--amber)}
 .act:active:not(:disabled){transform:scale(.97)}
 .act:disabled{opacity:.22;filter:grayscale(.6)}
@@ -157,3 +157,11 @@ body.busy .act:not(:disabled),body.busy .tbtn{opacity:.5}
 .zrow button{flex:0 0 auto;height:38px;padding:0 12px;border-radius:19px;border:1px solid var(--line);background:transparent;font-weight:800;font-size:13px;color:var(--muted);display:inline-flex;align-items:center;gap:6px}
 .zrow button[data-z]:not([data-z="*"])::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--zc,#888)}
 .zrow button.on{background:#fff;color:#000;border-color:#fff}
+
+/* ═══ Tanda 2 · contraste, zonas seguras y táctil ═══════════════════════════════════════════════════ */
+.bst,.call-t b,.call-t span,.dchip,.dbig,.nrow input,.clk{font-variant-numeric:tabular-nums}
+.actbar{padding-left:calc(12px + env(safe-area-inset-left,0px));padding-right:calc(12px + env(safe-area-inset-right,0px))}
+.sheet-box{max-height:88dvh}
+.bpos .link{padding:12px 4px;margin:-12px 0}
+.zrow button,.zchip{height:44px}
+input,select,textarea{font-size:16px}   /* en iPhone, menos de 16 px hace zoom al tocar */

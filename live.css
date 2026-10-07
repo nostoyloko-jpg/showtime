@@ -5,7 +5,7 @@
 
 :root{
   --bg:#0d0f14; --bg2:#0a0c10; --panel:rgba(255,255,255,.03); --panel-line:rgba(255,255,255,.08);
-  --accent:#e94560; --text:#fff; --muted:rgba(255,255,255,.55); --dim:rgba(255,255,255,.32);
+  --accent:#e94560; --text:#fff; --muted:rgba(255,255,255,.62); --dim:rgba(255,255,255,.5);   /* ≥ 4,5:1 sobre el panel (WCAG) */
   --call:#ffb347; --line:rgba(255,255,255,.08); --hover:rgba(233,69,96,.5);
   --btn-bg:rgba(255,255,255,.08); --btn-line:rgba(255,255,255,.18); --btn-text:#fff;
   --info-w:340px; --top-h:50vh;
@@ -27,7 +27,7 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .tpanel-b{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:8px;justify-content:safe center;--ps:1}
 .tempty{font-size:min(10cqw,4vh);font-weight:900;color:var(--dim)}
 .tempty.fin{font-size:min(7cqw,3.4vh);letter-spacing:.08em}
-.tempty.idle{font-size:min(5.5cqw,2.6vh);letter-spacing:.18em;font-weight:800;opacity:.55;text-align:center}
+.tempty.idle{font-size:min(5.5cqw,2.6vh);letter-spacing:.18em;font-weight:800;color:var(--muted);text-align:center}
 .vsplit{flex:0 0 10px;cursor:col-resize;position:relative;transition:background .12s;touch-action:none}
 .vsplit:hover,.vsplit.active{background:var(--hover)}
 .vsplit::after{content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:2px;height:28px;background:rgba(255,255,255,.2);border-radius:1px}
@@ -412,3 +412,40 @@ body:not([data-vista="manager"]) .mtpill{display:none}
 .cd-m small{display:block;font-size:10.5px;font-weight:700;color:rgba(255,255,255,.55);margin-bottom:2px}
 #cd-form{display:flex;gap:6px}
 #cd-text{flex:1;min-width:0;height:32px;padding:0 10px;border-radius:6px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:#fff;font:inherit;font-size:13px}
+
+/* ═══ Tanda 2 · móvil, zonas seguras, táctil y coherencia de los docks ═══════════════════════════════ */
+:root{--hair:rgba(255,255,255,.08);--hair2:rgba(255,255,255,.14);--sa-t:env(safe-area-inset-top,0px);--sa-r:env(safe-area-inset-right,0px);--sa-b:env(safe-area-inset-bottom,0px);--sa-l:env(safe-area-inset-left,0px)}
+/* Números que cambian en directo */
+.dz,.acall,.tbadge,.tk-it,.trem,.cf-foot,#zlbl,#rlbl{font-variant-numeric:tabular-nums}
+/* Zonas seguras (muesca, barra de inicio, barras de gestos) */
+#zoomctl{right:calc(14px + var(--sa-r));bottom:calc(14px + var(--sa-b))}
+.mdock{left:calc(14px + var(--sa-l));bottom:calc(14px + var(--sa-b))}
+.cdock{left:calc(14px + var(--sa-l));bottom:calc(66px + var(--sa-b))}
+.pnote{bottom:calc(76px + var(--sa-b))}
+.rx{top:calc(6px + var(--sa-t))}
+body.ro .rx{top:calc(10px + var(--sa-t))}
+#close{top:calc(14px + var(--sa-t));right:calc(14px + var(--sa-r))}
+.cf-full{right:calc(14px + var(--sa-r));bottom:calc(14px + var(--sa-b))}
+#banner{top:calc(12px + var(--sa-t))}
+body.ro #banner{top:calc(50px + var(--sa-t))}   /* debajo de la píldora de conexión, sin taparla */
+/* El aviso de línea de tiempo desplazada siempre visible, aunque el dock esté plegado */
+#zoomctl.dock:has(#docktag:not(:empty)){opacity:1}
+/* Docks: los mismos bordes finos y radios en los cuatro estilos */
+.mdock,.cdock,#zoomctl{border-color:var(--hair2)}
+body[data-lv="raycast"] .mdock,body[data-lv="raycast"] .cdock{background:rgba(0,0,0,.8);border-color:rgba(255,255,255,.14);border-radius:10px}
+body[data-lv="neutro"] .mdock,body[data-lv="neutro"] .cdock{background:rgba(26,26,28,.9);border-color:rgba(255,255,255,.1);border-radius:8px}
+body[data-lv="escenario"] .mdock,body[data-lv="escenario"] .cdock{background:#000;border-color:#FFD600}
+body[data-lv="escenario"] .md-send{background:#FFD600;color:#000}
+/* Móvil en vertical: el dock de la derecha abierto no se sale de la pantalla ni tapa los de la izquierda */
+@media (max-width:700px){
+  #zoomctl.open{left:calc(14px + var(--sa-l));z-index:210}
+  #zoomctl.open #dockbody{flex-wrap:wrap;justify-content:flex-end;max-width:calc(100vw - 80px)}
+  #rmin,#rlbl,#rmax,.zsep{display:none!important}
+}
+/* Táctil: 44 px mínimo y letra de 16 px en los campos (Safari en iPhone no hace zoom) */
+@media (pointer:coarse){
+  #md-text,#cd-text{font-size:16px;height:44px}
+  .txtbtn,.md-to button,.pm-opts button,.pm-no{min-height:44px}
+  .md-to button{padding:0 14px}
+  .cdock{bottom:calc(76px + var(--sa-b))}
+}

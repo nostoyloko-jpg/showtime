@@ -25,7 +25,7 @@
   const KEY_LABEL = { nombre: 'nombre', escenario: 'zona', color: 'color', tipo: 'tipo', jornada: 'jornada', fecha: 'fecha', inicio: 'inicio', fin: 'fin', call: 'CALL', notas: 'notas' };
   const TIPO_TXT = { banda: 'banda', tarea: 'tarea', hito: 'hito' };
   // Vistas: Jornada completa (todo) · Shows · Soundchecks
-  const VIEW = { all: { title: 'Jornada completa', what: 'entradas' }, show: { title: 'Shows', what: 'shows' }, sc: { title: 'Soundchecks', what: 'soundchecks' } };
+  const VIEW = { all: { title: 'Jornada completa', short: 'Todo', what: 'entradas' }, show: { title: 'Shows', what: 'shows' }, sc: { title: 'Soundchecks', what: 'soundchecks' } };
 
   // ── Utilidades ────────────────────────────────────────────────────────
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
@@ -43,13 +43,28 @@
     return pad2(Math.floor(s / 60)) + ':' + pad2(s % 60);
   }
   let toastT = 0;
-  function toast(msg, bad) {
-    const t = $('toast');
+  /** Aviso efímero abajo: entra y se va solo, con un fundido suave. ms: cuánto se ve (por defecto 2,6 s; los errores 4,5 s). */
+  let toastOut = 0;
+  function toast(msg, bad, ms) {
+    const t = $('toast'), d = ms || (bad ? 4500 : 2600);
     t.textContent = msg; t.className = 'toast' + (bad ? ' bad' : ''); t.hidden = false;
-    clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, bad ? 4500 : 2600);
+    clearTimeout(toastT); clearTimeout(toastOut);
+    toastOut = setTimeout(() => t.classList.add('out'), Math.max(0, d - 300));
+    toastT = setTimeout(() => { t.hidden = true; t.classList.remove('out'); }, d);
   }
   function modeName(m) { return (m || CONFIG.mode) === 'sc' ? 'soundcheck' : 'show'; }
   function viewOf(m) { return VIEW[m || CONFIG.mode] || VIEW.show; }
+  function viewLabel() { return (viewOf().short || viewOf().title) + (focusOn() ? ' · Foco' : ''); }
+  // ── Modo foco (para operar en directo a 1-2 m): menos columnas, filas y letra más grandes. Preferencia de este equipo ──
+  const FOCUS_KEY = 'showtime.panel.focus';
+  function focusOn() { try { return localStorage.getItem(FOCUS_KEY) === '1'; } catch (e) { return false; } }
+  function applyFocus() {
+    const on = focusOn(), b = document.getElementById('btn-focus');
+    document.body.classList.toggle('focus', on);
+    if (b) { b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); const tx = b.querySelector('.ftxt'); if (tx) tx.textContent = on ? 'Foco activo' : 'Foco'; }
+    const l = document.getElementById('view-lbl'); if (l) l.textContent = viewLabel();
+  }
+  function setFocus(on) { try { if (on) localStorage.setItem(FOCUS_KEY, '1'); else localStorage.removeItem(FOCUS_KEY); } catch (e) {} applyFocus(); }
   /** Modo de los campos de una fila (show o soundcheck), según su bloque. */
   function rowModeOf(b) { return b && b.kind === 'sc' ? 'sc' : CONFIG.mode === 'sc' && !b ? 'sc' : 'show'; }
 
@@ -199,8 +214,8 @@
 
   function renderTools() {
     document.querySelectorAll('#m-view [data-mode]').forEach(b => { b.classList.toggle('on', b.dataset.mode === CONFIG.mode); b.setAttribute('aria-checked', String(b.dataset.mode === CONFIG.mode)); });
-    $('view-lbl').textContent = viewOf().title;
-    $('day-lbl').textContent = CONFIG.day === 'all' ? 'Todas' : fmtDay(CONFIG.day);
+    $('view-lbl').textContent = viewLabel();
+    $('day-lbl').textContent = CONFIG.day === 'all' ? 'Todos' : fmtDay(CONFIG.day);
     renderDelayCats();
     // Pestañas de jornadas: «Todas» + de la primera a la última del festival (las vacías, atenuadas)
     const days = jornadaOptions();
@@ -276,9 +291,9 @@
     const tip = (b.ri !== null ? 'Inicio real ' + C.fmtHM(b.ri) + '. ' : '') + (b.rf !== null ? 'Fin real ' + C.fmtHM(b.rf) + '. ' : '') +
       (b.man ? 'Retraso manual +' + b.man + ' min. ' : '') + (b.push ? 'Desborde de la anterior: +' + b.push + ' min. ' : '') +
       (b.alargar ? 'TIEMPO EXTRA activado: puede gastar el colchón del cambio. ' : '') + (b.clash ? 'Está fija (DELAY rojo o bloqueada) y la anterior la pisa. ' : '') +
-      'Previsto ' + C.fmtHM(b.psi) + (b.psf !== null ? '–' + C.fmtHM(b.psf) : '') + '.' + (!hito && C.isBand(b) ? ' Doble clic: corregir la hora real de inicio.' : '');
+      'Previsto ' + C.fmtHM(b.psi) + (b.psf !== null ? ' → ' + C.fmtHM(b.psf) : '') + '.' + (!hito && C.isBand(b) ? ' Doble clic: corregir la hora real de inicio.' : '');
     return '<td class="est' + (same ? ' same' : '') + (b.live ? ' live' : '') + '" title="' + esc(tip) + '"><span class="estt">' + dig(b.si, b.psi) +
-      (hito || b.sf === null ? '' : '–' + dig(b.sf, b.psf)) + '</span>' + sub + '</td>';
+      (hito || b.sf === null ? '' : '<span class="arr">→</span>' + dig(b.sf, b.psf)) + '</span>' + sub + '</td>';
   }
   /** Botón TIEMPO EXTRA (antes «Alargar»): la banda puede pasarse de su hora; gasta el colchón y, pasado, retrasa lo que viene hasta ■. */
   /** Minutos que lleva de tiempo extra (con Tiempo extra activado y pasada su hora), o null. */
@@ -348,6 +363,21 @@
     commitFestival(r.state, r.msg, { noTimes: true, ev: pushedEv(r) });
   }
 
+  /** Hitos que vienen (puertas, curfew…): tarjeta NEUTRA; ámbar solo si el margen baja de 15 min; rojo si se rebasa. */
+  const HITO_MAX = 4;
+  function hitoChips(nowInt) {
+    if (!FEST) return '';
+    const jor = C.activeJornada(FEST, nowInt);
+    const margins = C.hitoMargins(FEST, C.buildBlocks(FEST, { mode: 'all', day: 'all', now: nowInt }), nowInt);
+    return C.buildBlocks(FEST, { mode: 'all', day: jor, now: nowInt }).filter(b => b.kind === 'hito' && b.psi !== null && b.psi >= nowInt).slice(0, HITO_MAX).map(h => {
+      const m = margins.find(x => x.hito.key === h.key), lv = m ? m.level : 'none';
+      const cls = lv === 'over' ? 'over' : lv === 'tight' ? 'absorb' : 'hito';
+      const tail = !m ? '' : lv === 'over' ? ' · rebasado +' + (-m.margin) + ' min' : ' · margen ' + m.margin + ' min';
+      const tip = m ? m.band.name + ' acaba ' + C.fmtHM(m.projEnd) : 'Sin bandas antes en su zona';
+      return '<span class="dchip ' + cls + '" title="' + esc(tip) + '"><svg class="ic"><use href="#' + (cls === 'hito' ? 'i-clock' : 'i-alert') + '"/></svg>' + esc(h.name) + ' ' + C.fmtHM(h.psi) + tail + '</span>';
+    }).join('');
+  }
+
   /** Barra de estado: desfase por zona (ámbar absorbiendo · rojo desborde · verde adelanto). */
   function renderDrift(nowInt) {
     MARGINS = C.hitoMargins(FEST, C.buildBlocks(FEST, { mode: 'all', day: 'all' }), nowInt);
@@ -356,8 +386,7 @@
       const ic = p.cls === 'over' ? '#i-alert' : '#i-clock';
       return '<span class="dchip ' + p.cls + '" title="' + esc(p.title) + '"><svg class="ic"><use href="' + ic + '"/></svg>' + esc(p.text) + '</span>';
     }).join('');
-    const tight = MARGINS.filter(m => m.level !== 'ok').map(m => '<span class="dchip ' + (m.level === 'over' ? 'over' : 'absorb') + '"><svg class="ic"><use href="#i-alert"/></svg>' +
-      esc(m.hito.name) + ' ' + C.fmtHM(m.hito.psi) + ' · ' + (m.level === 'over' ? 'rebasado +' + (-m.margin) + ' min' : 'margen ' + m.margin + ' min') + '</span>').join('');
+    const tight = hitoChips(nowInt);
     // Avisos escritos a mano (Producción): delante; la ✕ es solo del Stage Manager
     const av = (Dt.getAvisos ? Dt.getAvisos() : []).map(a => '<span class="dchip absorb aviso" title="' + esc((a.from ? a.from + ' · ' : '') + (a.ms ? 'aviso puntual' : 'aviso permanente: solo se quita con la ✕')) + '"><svg class="ic"><use href="#i-msg"/></svg>' +
       esc(a.text) + '<button class="avx" type="button" data-aviso-x="' + esc(a.id) + '" title="Quitar aviso" aria-label="Quitar aviso"><svg class="ic"><use href="#i-x"/></svg></button></span>').join('');
@@ -412,7 +441,7 @@
       '<td class="lv"><div class="rowbtns">' + liveBtns(b, band) + '</div></td>' +
       // Orden de hoja de ruta (decisión 85): jornada · previsto · real · tipo · zona · nombre · CALL · cambio · notas
       td('fecha', 'f', jornadaSelect(jor, 'data-k="jornada" data-orig="' + esc(jor) + '"') + real) +
-      td('inicio', 't', inp('inicio')) +
+      td('inicio', 't ti', inp('inicio')) +
       td('fin', 't', tipo === 'hito' ? off : inp('fin', '—')) +
       estCell(b) +
       td('tipo', 'tp', tipoSelect(a, mode, 'data-k="tipo" data-orig="' + tipo + '"')) +
@@ -442,7 +471,7 @@
     $('list-title').textContent = viewOf().title + (CONFIG.day === 'all' ? ' · todas las jornadas' : ' · ' + fmtDay(CONFIG.day));
     // Ancho del selector de escenario según el nombre más largo (que «Escenario Alhambra» se lea entero)
     const longest = Math.max(8, ...(FEST.escenarios || []).map(e => String(e.nombre || '').length));
-    $('tbl').style.setProperty('--escw', 'calc(' + Math.min(longest, 26) * 0.9 + 'ch + 30px)');
+    $('tbl').style.setProperty('--escw', 'calc(' + (Math.min(longest, 26) * 1.12).toFixed(1) + 'ch + 26px)');   // negrita: un poco más que 1ch por letra
     const rows = BLOCKS.map(b => {
       const a = FEST.artists.find(x => String(x.id) === String(b.id));
       return a ? rowHtml(a, b, mods, nuevas.has(String(a.id))) : '';
@@ -572,6 +601,15 @@
     });
   }
 
+  /** En el CHANGEOVER: «Bis · Tiempo extra» si la banda que acaba de terminar en esa zona aún se puede rescatar (ventana del bis). */
+  function bisBtn(stageId, nowInt) {
+    const prev = BLOCKS.filter(b => C.isBand(b) && (b.stageId || '') === (stageId || '') && b.rf === null && !b.alargar && b.nf !== null && b.nf <= nowInt).sort((x, y) => y.nf - x.nf)[0];
+    if (!prev) return '';
+    const p = M.stretchPlan(FEST, prev.key, true, nowInt);
+    if (!p.ok || p.late === null || p.late === undefined) return '';
+    return '<button class="xtrabtn bis" data-act="stretch" data-key="' + esc(prev.key) + '" data-on="1" title="' + esc(prev.name) + ' acabó hace ' + p.late + ' min: rescátala si hay bis (Tiempo extra tardío)"><svg class="ic"><use href="#i-undo"/></svg>Bis · ' + esc(prev.name) + '</button>';
+  }
+
   // Vista en vivo (mismas reglas que la Pantalla Live)
   function renderLive(nowMins, nowInt) {
     const order = id => { const i = ((FEST && FEST.escenarios) || []).findIndex(e => e.id === id); return i < 0 ? 999 : i; };
@@ -593,7 +631,7 @@
       rows.push({ o: order(co.stageId), h: '<div class="v-row co' + (co.standby ? ' sb' : '') + '" style="--c:' + col + '"><div class="v-name" style="color:' + (co.standby ? 'var(--muted)' : col) + '">' +
         (co.standby ? 'STANDBY' : 'CHANGEOVER') + (co.stage ? ' · ' + esc(co.stage) : '') + '</div>' +
         '<div class="v-meta">' + (co.standby ? 'después' : 'entra') + ' <b>' + esc(co.next.name) + '</b> · ' + C.fmtHM(co.next.si) + '</div>' +
-        '<div class="v-rem">quedan ' + fmtCountdown(co.remaining) + '</div></div>' });
+        '<div class="v-rem">quedan ' + fmtCountdown(co.remaining) + '</div>' + bisBtn(co.stageId, nowInt) + '</div>' });
     });
     // Tareas en curso (operativa del día): debajo de los escenarios, sin cuenta de cambio
     C.tasksNow(BLOCKS, nowInt).forEach(b => {
@@ -611,7 +649,7 @@
       const col = safeColor(b.stageColor || b.color, '#888'), co = C.changeoverBefore(BLOCKS, b, TAREAS);
       const badge = co ? (co.mins < 0 ? 'Solapa ' + (-co.mins) + ' min' : b.standby ? 'Standby ' + co.mins + ' min' : co.idle ? '' : 'Cambio ' + co.mins + ' min') : '';
       return '<div class="v-row" style="--c:' + col + '"><div class="v-name">' + esc(b.name) + '</div>' +
-        '<div class="v-meta">' + kindTag(b) + C.fmtHM(b.si) + '–' + C.fmtHM(b.sf) + (b.stage ? ' · ' + esc(b.stage) : '') + (badge ? ' · ' + badge : '') + '</div>' + xtraBtn(b) + '</div>';
+        '<div class="v-meta">' + kindTag(b) + C.fmtHM(b.si) + '–' + C.fmtHM(b.sf) + (b.stage ? ' · ' + esc(b.stage) : '') + (badge ? ' · ' + badge : '') + '</div></div>';   // sin Tiempo extra: solo tiene sentido para la que suena (o el bis)
     }).join('') : '<div class="v-empty">—</div>';
 
     const done = new Set(Dt.getCallDone());
@@ -2322,16 +2360,54 @@
     loadState(); renderAll();
   });
 
+  // ── Atajos y ayuda («?» o ⌘/): lo que antes era texto fijo encima de la tabla ──
+  function openHelp() {
+    modal('Atajos y ayuda', '<dl class="keys">' +
+      '<dt><kbd>Intro</kbd> o salir de la casilla</dt><dd>Aplica el cambio</dd>' +
+      '<dt><kbd>Esc</kbd></dt><dd>Descarta lo que estabas escribiendo (y cierra menús y ventanas)</dd>' +
+      '<dt><kbd>Tab</kbd></dt><dd>Pasa a la casilla siguiente</dd>' +
+      '<dt>Doble clic en la hora real</dt><dd>Corrige la hora real de inicio de una banda que ya empezó</dd>' +
+      '<dt><kbd>⇧</kbd> <kbd>⌘</kbd> <kbd>F</kbd></dt><dd>Modo foco: solo lo de directo, filas y letra más grandes</dd>' +
+      '<dt><kbd>⌘</kbd> <kbd>/</kbd></dt><dd>Abre esta ayuda</dd>' +
+      '</dl><p class="hint">Jornada = día del evento: lo que empieza antes de la hora de corte cuenta como la noche anterior. En la Pantalla Live: <kbd>F</kbd> pantalla completa · <kbd>V</kbd> cambia de vista.</p>',
+      [{ label: 'Cerrar', kind: 'primary' }]);
+  }
+  $('btn-help').addEventListener('click', openHelp);
+  $('btn-focus').addEventListener('click', () => { setFocus(!focusOn()); toast(focusOn() ? 'Modo foco activado' : 'Modo foco desactivado', false, 2000); });
+  document.addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'f' || e.key === 'F')) { e.preventDefault(); setFocus(!focusOn()); toast(focusOn() ? 'Modo foco activado' : 'Modo foco desactivado', false, 2000); } });
+  applyFocus();
+  document.addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && (e.key === '/' || e.key === '?')) { e.preventDefault(); openHelp(); } });
+
   // ── Pantalla siempre encendida ───────────────────────────────────────
+  // Sin reposo: botón con micro-LED (verde = activo). Se puede apagar; la elección se recuerda en este equipo.
   let wakeLock = null;
+  const WAKE_KEY = 'showtime.wake';
+  function wakeWanted() { try { return localStorage.getItem(WAKE_KEY) !== 'off'; } catch (e) { return true; } }
+  function paintWake() {
+    const b = $('wake'); if (!b) return;
+    if (!('wakeLock' in navigator)) { b.hidden = true; return; }
+    b.hidden = false; b.classList.toggle('on', !!wakeLock); b.setAttribute('aria-pressed', String(!!wakeLock));
+  }
   async function requestWake() {
-    if (!('wakeLock' in navigator) || document.visibilityState !== 'visible' || wakeLock) return;
+    if (!('wakeLock' in navigator) || !wakeWanted() || document.visibilityState !== 'visible' || wakeLock) { paintWake(); return; }
     try {
       wakeLock = await navigator.wakeLock.request('screen');
-      $('wake').hidden = false;
-      wakeLock.addEventListener('release', () => { wakeLock = null; $('wake').hidden = true; });
-    } catch (e) { $('wake').hidden = true; }
+      wakeLock.addEventListener('release', () => { wakeLock = null; paintWake(); });
+    } catch (e) { wakeLock = null; }
+    paintWake();
   }
+  $('wake').addEventListener('click', async () => {
+    if (wakeLock) {
+      try { localStorage.setItem(WAKE_KEY, 'off'); } catch (e) {}
+      const w = wakeLock; wakeLock = null;
+      try { await w.release(); } catch (e) {}
+      paintWake(); toast('Sin reposo desactivado: el equipo puede apagar la pantalla');
+    } else {
+      try { localStorage.removeItem(WAKE_KEY); } catch (e) {}
+      await requestWake();
+      toast(wakeLock ? 'Sin reposo activado: la pantalla no se apaga' : 'Este navegador no permite mantener la pantalla encendida', !wakeLock);
+    }
+  });
   document.addEventListener('visibilitychange', requestWake);
   document.addEventListener('pointerdown', requestWake);
 
@@ -2349,5 +2425,5 @@
     if (ok) toast('Se vuelve a guardar con normalidad');
   });
 
-  window.ShowtimePanel = { reload: () => { loadState(); renderAll(); }, _test: { emProdMessage, emRegenProd, room: () => emRoom } };   // _test: solo para tests/control.test.js
+  window.ShowtimePanel = { reload: () => { loadState(); renderAll(); }, _test: { emProdMessage, emRegenProd, hitoChips, room: () => emRoom } };   // _test: solo para tests/control.test.js
 })();
