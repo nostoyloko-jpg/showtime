@@ -116,10 +116,20 @@
       <div class="mpanel cast" role="menu">
         <div class="ctabs" role="tablist">
           <button class="ctab on" data-tab="staff" role="tab" aria-selected="true"><svg class="ic"><use href="#i-phone"/></svg>Staff · solo lectura</button>
-          <button class="ctab" data-tab="remote" role="tab" aria-selected="false"><svg class="ic"><use href="#i-remote"/></svg>Regidor · mando</button>
+          <button class="ctab" data-tab="remote" role="tab" aria-selected="false"><svg class="ic"><use href="#i-remote"/></svg>Stage Manager · mando</button>
+          <button class="ctab" data-tab="produccion" role="tab" aria-selected="false"><svg class="ic"><use href="#i-remote"/></svg>Producción</button>
         </div>
         <div class="cpane" id="cast-staff"></div>
         <div class="cpane" id="cast-remote" hidden></div>
+        <div class="cpane" id="cast-produccion" hidden></div>
+      </div>
+    </div>
+    <div class="menu" id="m-chat">
+      <button class="mbtn" aria-haspopup="true" aria-expanded="false" title="Chat con Producción"><svg class="ic"><use href="#i-msg"/></svg><span class="mtxt">Chat</span><span id="chat-on" class="mdot" hidden></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
+      <div class="mpanel wide" role="menu">
+        <div class="mhead">Mensajes de Producción</div>
+        <div id="chat-list" class="chat-list"></div>
+        <div id="chat-empty" class="mnote">Sin mensajes nuevos</div>
       </div>
     </div>
   </nav>

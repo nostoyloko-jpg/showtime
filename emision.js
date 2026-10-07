@@ -39,7 +39,7 @@
   const VIEWER_TTL = 75000;      // un móvil cuenta como conectado si se ha presentado en este tiempo
   const STALE_MS = 25000;        // sin noticias del Mac en este tiempo → «sin conexión con la sala»
   const RETRY = [1000, 2000, 5000, 10000, 15000];
-  const K_STATE = 1, K_BEAT = 2, K_END = 3, K_ACK = 4, K_HELLO = 16, K_CMD = 32;
+  const K_STATE = 1, K_BEAT = 2, K_END = 3, K_ACK = 4, K_HELLO = 16, K_CMD = 32, K_PROD_MSG = 33;
   const CMD_WINDOW = 120000;     // una orden con más de 2 min de diferencia con el reloj del Mac se rechaza
   const CMD_TIMEOUT = 8000;      // el mando espera la respuesta del Mac este tiempo
   const VER = 1;
@@ -241,8 +241,10 @@
     const q = '?' + (v ? 'vista=' + v + (v === 'confidence' && o.zona !== null && o.zona !== undefined ? '&zona=' + encodeURIComponent(o.zona) : '') + '&' : '') + 'b=' + BUILD;
     return (base || publicBase()) + 'live.html' + q + '#sala=' + room.sala + '&k=' + room.k + '&p=' + room.p;
   }
-  /** QR PRIVADO del regidor: lo mismo que el de Staff + la clave del mando. */
+  /** QR PRIVADO del Stage Manager: lo mismo que el de Staff + la clave del mando. */
   function remoteUrl(room, base) { return (base || publicBase()) + 'remote.html?b=' + BUILD + '#sala=' + room.sala + '&k=' + room.k + '&p=' + room.p + '&c=' + room.c; }
+  /** QR para Producción: con ID único personalizado. */
+  function productionUrl(room, base, prodId) { return (base || publicBase()) + 'produccion.html?b=' + BUILD + '#sala=' + room.sala + '&k=' + room.k + '&p=' + room.p + '&id=' + encodeURIComponent(prodId); }
   /** Lee «#sala=…&k=…&p=…». null si falta algo o no tiene el formato esperado. */
   function parseHash(hash) {
     const h = String(hash || '').replace(/^#/, ''), o = {};
@@ -313,8 +315,8 @@
     this.on = true;
     const brokers = this.o.brokers || BROKERS;
     this.links = brokers.map(b => new Link(b, {
-      WebSocket: this.o.WebSocket, topics: [topic(this.K.sala, 'h'), topic(this.K.sala, 'c')],
-      onMessage: (t, payload) => { if (t === topic(this.K.sala, 'c')) this.onCmd(payload); else this.onHello(payload); },
+      WebSocket: this.o.WebSocket, topics: [topic(this.K.sala, 'h'), topic(this.K.sala, 'c'), topic(this.K.sala, 'prod')],
+      onMessage: (t, payload) => { if (t === topic(this.K.sala, 'c')) this.onCmd(payload); else if (t === topic(this.K.sala, 'prod')) this.onProdMessage(payload); else this.onHello(payload); },
       onState: l => { if (l.state === 'on') this.push(0); this.status(); }
     }));
     this.links.forEach(l => l.start());
@@ -358,6 +360,13 @@
     map.set(h.id, Date.now());
     if (h.want) this.push(Math.max(0, 1500 - (Date.now() - this.lastPush)));   // como mucho un reenvío cada 1,5 s
     if (isNew || h.want) this.status();
+  };
+  Emisor.prototype.onProdMessage = async function (payload) {
+    try {
+      const raw = await subtle.decrypt({ name: 'AES-GCM', iv: payload.subarray(0, 12), additionalData: aad(this.K.sala, K_PROD_MSG) }, this.K.aes, payload.subarray(12));
+      const msg = JSON.parse(dec.decode(raw));
+      if (this.o.onProdMessage) this.o.onProdMessage(msg);
+    } catch (e) { }
   };
   /** Clave de mando nueva sin cortar la emisión (el QR de Staff sigue valiendo). */
   Emisor.prototype.setCmdKey = async function (c) { this.o.room = Object.assign({}, this.o.room, { c }); if (this.K) this.K.cmd = await hmacKey(c); this.remotes.clear(); this.status(); };
@@ -405,9 +414,12 @@
   Receptor.prototype.start = async function () {
     this.V = await viewerKeys(this.o.params);
     const brokers = this.o.brokers || BROKERS;
+    const topics = [topic(this.V.sala, 's')];
+    // Si es productor, suscribirse también al canal de chat
+    if (this.o.params.id) topics.push(topic(this.V.sala, 'prod'));
     this.links = brokers.map(b => new Link(b, {
-      WebSocket: this.o.WebSocket, topics: [topic(this.V.sala, 's')],
-      onMessage: (t, payload) => { this.queue = (this.queue || Promise.resolve()).then(() => this.onFrame(payload)).catch(e => console.error(e)); },
+      WebSocket: this.o.WebSocket, topics,
+      onMessage: (t, payload) => { this.queue = (this.queue || Promise.resolve()).then(() => this.onMessage(t, payload)).catch(e => console.error(e)); },
       onState: l => { if (l.state === 'on') this.hello(true, l); this.status(); }
     }));
     this.links.forEach(l => l.start());
@@ -419,6 +431,13 @@
     if (want) this.lastAsk = Date.now();
     const f = await sealHello(this.V, { id: this.id, want: !!want, r: this.V.cmd ? 1 : 0 });
     (only ? [only] : this.links).forEach(l => l.publish(topic(this.V.sala, 'h'), f));
+  };
+  Receptor.prototype.onMessage = async function (t, payload) {
+    if (t === topic(this.V.sala, 'prod')) {
+      this.onProdMessage(payload);
+    } else {
+      this.onFrame(payload);
+    }
   };
   Receptor.prototype.onFrame = async function (payload) {
     const m = await openFrame(this.V, payload);
@@ -440,6 +459,13 @@
     }
     this.status();
   };
+  Receptor.prototype.onProdMessage = async function (payload) {
+    try {
+      const raw = await subtle.decrypt({ name: 'AES-GCM', iv: payload.subarray(0, 12), additionalData: aad(this.V.sala, K_PROD_MSG) }, this.V.aes, payload.subarray(12));
+      const msg = JSON.parse(dec.decode(raw));
+      if (this.o.onProdMessage) this.o.onProdMessage(msg);
+    } catch (e) { }
+  };
   Receptor.prototype.state = function () {
     if (this.ended) return 'end';
     if (!this.applied) return 'connecting';
@@ -460,11 +486,21 @@
       this.pending.set(cmd.id, { resolve, timer });
     });
   };
+  /** Productor: envía un mensaje de chat encriptado. */
+  Receptor.prototype.sendProdMessage = async function (msg) {
+    if (!this.o.params.id) return { ok: false, msg: 'Este enlace no es de productor' };
+    const iv = rand(12);
+    const payload = enc.encode(JSON.stringify(msg));
+    const ct = new Uint8Array(await subtle.encrypt({ name: 'AES-GCM', iv, additionalData: aad(this.V.sala, K_PROD_MSG) }, this.V.aes, payload));
+    const frame = concat(iv, ct);
+    const live = this.links.filter(l => l.publish(topic(this.V.sala, 'prod'), frame)).length;
+    return { ok: live > 0, msg: live > 0 ? 'Enviado' : 'Sin conexión' };
+  };
   Receptor.prototype.stop = function () { this.timers.forEach(t => clearInterval(t)); this.links.forEach(l => l.stop()); };
 
   const API = {
-    BROKERS, PUBLIC_BASE, BUILD, PROTO, STALE_MS, VIEWER_TTL, CMD_WINDOW, K_STATE, K_BEAT, K_END, K_ACK, K_HELLO, K_CMD,
-    newRoom, validRoom, withCmdKey, newCmdKey, staffUrl, remoteUrl, parseHash, publicBase, Emisor, Receptor, CmdGuard,
+    BROKERS, PUBLIC_BASE, BUILD, PROTO, STALE_MS, VIEWER_TTL, CMD_WINDOW, K_STATE, K_BEAT, K_END, K_ACK, K_HELLO, K_CMD, K_PROD_MSG,
+    newRoom, validRoom, withCmdKey, newCmdKey, staffUrl, remoteUrl, productionUrl, parseHash, publicBase, Emisor, Receptor, CmdGuard,
     // internos (para los tests)
     _: { b64u, unb64u, concat, MQ, varLen, pack, unpack, splitChunks, Assembler, macKeys, viewerKeys, seal, openFrame, sealHello, openHello, sealCmd, openCmd, fingerprint, topic, Link }
   };
