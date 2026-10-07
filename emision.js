@@ -32,7 +32,7 @@
   const PUBLIC_BASE = 'https://nostoyloko-jpg.github.io/showtime/';
   // Versión publicada: va en los enlaces de los QR para que el móvil no abra una copia vieja guardada en su caché
   // (súbela junto con los ?v= de index.html / live.html / remote.html).
-  const BUILD = '20261027';
+  const BUILD = '20261028';
   const CHUNK = 24000;           // bytes por trozo (los repetidores públicos limitan el tamaño de mensaje)
   const BEAT_MS = 10000;         // latido del Mac
   const PRESENCE_MS = 30000;     // presencia de cada móvil
@@ -268,8 +268,9 @@
       const text = typeof m.text === 'string' ? m.text.replace(/\s+/g, ' ').trim().slice(0, 140) : '';
       return text ? { type: 'aviso', from, text, perm: m.perm === true } : null;
     }
+    if (m.type === 'chatsync') return { type: 'chatsync', from };   // «pásame el chat» (al conectar o al abrir el chat)
     if (m.type === 'chat' || (m.type === undefined && typeof m.text === 'string')) {
-      const text = typeof m.text === 'string' ? m.text.trim().slice(0, 500) : '';
+      const text = typeof m.text === 'string' ? m.text.replace(/\s+/g, ' ').trim().slice(0, 300) : '';
       return text ? { type: 'chat', from, text } : null;
     }
     return null;
@@ -398,6 +399,21 @@
       if (this.o.onProdMessage) this.o.onProdMessage(msg);
     } catch (e) { }
   };
+  /** Dashboard → Producción: mensaje cifrado por el canal de Producción (p. ej. el chat entero). Solo lo escuchan los enlaces con «id». */
+  Emisor.prototype.sendProd = async function (msg) {
+    if (!this.on || !this.K) return false;
+    const iv = rand(12);
+    const ct = new Uint8Array(await subtle.encrypt({ name: 'AES-GCM', iv, additionalData: aad(this.K.sala, K_PROD_MSG) }, this.K.aes, enc.encode(JSON.stringify(msg))));
+    const f = concat(iv, ct);
+    return this.links.filter(l => l.publish(topic(this.K.sala, 'prod'), f)).length > 0;
+  };
+  /** Chat que llega al productor: se valida entero (entrada no fiable) → [{ id, at, from, pid, text, sm }] */
+  function cleanChatLog(m) {
+    if (!m || m.type !== 'chatlog' || !Array.isArray(m.list)) return null;
+    return m.list.filter(x => x && typeof x.id === 'string' && typeof x.text === 'string' && Number.isFinite(x.at)).slice(-CHAT_SEND)
+      .map(x => ({ id: x.id.slice(0, 40), at: x.at, from: typeof x.from === 'string' ? x.from.slice(0, 80) : '', pid: typeof x.pid === 'string' ? x.pid.slice(0, 40) : '', text: x.text.slice(0, 300), sm: x.sm === true }));
+  }
+  const CHAT_SEND = 60;   // últimos mensajes que se mandan (cada envío cabe de sobra en los repetidores)
   /** Clave de mando nueva sin cortar la emisión (el QR de Staff sigue valiendo). */
   Emisor.prototype.setCmdKey = async function (c) { this.o.room = Object.assign({}, this.o.room, { c }); if (this.K) this.K.cmd = await hmacKey(c); this.remotes.clear(); this.status(); };
   /** Orden del mando: se comprueba (firma, hora, repetida), se ejecuta en el Mac (opts.onCommand) y se contesta. */
@@ -530,7 +546,7 @@
 
   const API = {
     BROKERS, PUBLIC_BASE, BUILD, PROTO, STALE_MS, VIEWER_TTL, CMD_WINDOW, K_STATE, K_BEAT, K_END, K_ACK, K_HELLO, K_CMD, K_PROD_MSG,
-    newRoom, validRoom, withCmdKey, newCmdKey, staffUrl, remoteUrl, productionUrl, parseHash, cleanProdMsg, publicBase, Emisor, Receptor, CmdGuard,
+    newRoom, validRoom, withCmdKey, newCmdKey, staffUrl, remoteUrl, productionUrl, parseHash, cleanProdMsg, cleanChatLog, CHAT_SEND, publicBase, Emisor, Receptor, CmdGuard,
     // internos (para los tests)
     _: { b64u, unb64u, concat, MQ, varLen, pack, unpack, splitChunks, Assembler, macKeys, viewerKeys, seal, openFrame, sealHello, openHello, sealCmd, openCmd, fingerprint, topic, Link }
   };

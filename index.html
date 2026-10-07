@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Showtime · Dashboard</title>
-<link rel="stylesheet" href="control.css?v=20261027">
+<link rel="stylesheet" href="control.css?v=20261028">
 </head>
 <body>
 
@@ -127,9 +127,11 @@
     <div class="menu" id="m-chat">
       <button class="mbtn" aria-haspopup="true" aria-expanded="false" title="Chat con Producción"><svg class="ic"><use href="#i-msg"/></svg><span class="mtxt">Chat</span><span id="chat-on" class="mdot" hidden></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
       <div class="mpanel wide" role="menu">
-        <div class="mhead">Mensajes de Producción</div>
+        <div class="mhead">Chat con Producción</div>
         <div id="chat-list" class="chat-list"></div>
-        <div id="chat-empty" class="mnote">Sin mensajes nuevos</div>
+        <div id="chat-empty" class="mnote">Sin mensajes todavía</div>
+        <form id="chat-form" class="chat-form" autocomplete="off"><input id="chat-text" type="text" maxlength="300" placeholder="Responder a Producción…" spellcheck="false" enterkeyhint="send"><button class="btn primary" type="submit">Enviar</button></form>
+        <p id="chat-off" class="mnote" hidden>Producción solo recibe el chat con la emisión activa.</p>
       </div>
     </div>
   </nav>
@@ -371,15 +373,15 @@
 <datalist id="zones-dl"></datalist>
 <div id="toast" class="toast" hidden></div>
 
-<script src="core.js?v=20261027"></script>
-<script src="meteo.js?v=20261027"></script>
-<script src="datos.js?v=20261027"></script>
-<script src="importar.js?v=20261027"></script>
-<script src="qr.js?v=20261027"></script>
-<script src="emision.js?v=20261027"></script>
-<script src="mando.js?v=20261027"></script>
-<script src="vistas.js?v=20261027"></script>
-<script src="log.js?v=20261027"></script>
-<script src="control.js?v=20261027"></script>
+<script src="core.js?v=20261028"></script>
+<script src="meteo.js?v=20261028"></script>
+<script src="datos.js?v=20261028"></script>
+<script src="importar.js?v=20261028"></script>
+<script src="qr.js?v=20261028"></script>
+<script src="emision.js?v=20261028"></script>
+<script src="mando.js?v=20261028"></script>
+<script src="vistas.js?v=20261028"></script>
+<script src="log.js?v=20261028"></script>
+<script src="control.js?v=20261028"></script>
 </body>
 </html>

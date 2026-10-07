@@ -255,6 +255,38 @@
     eq(C({ from: 'p1', text: 'antiguo sin type' }).type, 'chat', 'formato antiguo del chat');
   });
 
+  test('Chat: cleanProdMsg y cleanChatLog validan lo que llega', async () => {
+    const C = E.cleanProdMsg;
+    eq(JSON.stringify(C({ type: 'chatsync', from: 'p1' })), JSON.stringify({ type: 'chatsync', from: 'p1' }));
+    eq(C({ type: 'chat', from: 'p1', text: '  hola   qué tal ' }).text, 'hola qué tal');
+    eq(C({ type: 'chat', from: 'p1', text: 'x'.repeat(900) }).text.length, 300);
+    eq(E.cleanChatLog({ type: 'otra', list: [] }), null); eq(E.cleanChatLog(null), null);
+    const l = E.cleanChatLog({ type: 'chatlog', list: [{ id: 'a', at: 1, from: 'Marta', pid: 'p1', text: 'hola', sm: false }, { id: 'b', at: 2, text: 'ok', sm: true }, { id: 3, at: 3, text: 'mal' }, null, { id: 'c', at: 'x', text: 'mal' }] });
+    eq(l.length, 2, 'solo los válidos'); eq(l[1].sm, true); eq(l[1].from, ''); eq(l[0].pid, 'p1');
+    const muchos = Array.from({ length: 200 }, (_, i) => ({ id: 'm' + i, at: i, text: 't' + i }));
+    eq(E.cleanChatLog({ type: 'chatlog', list: muchos }).length, E.CHAT_SEND, 'como mucho los últimos CHAT_SEND');
+  });
+
+  test('Chat: va y vuelve cifrado; los enlaces de Staff (sin id) no lo reciben', async () => {
+    const R = rig(), room = await E.newRoom();
+    const aDash = [], aProd = [], aStaff = [];
+    const tx = new E.Emisor({ room, brokers: R.brokers, WebSocket: R.WS, getSnapshot: () => ({ real: true }), onProdMessage: m => aDash.push(m) });
+    await tx.start();
+    const prod = new E.Receptor({ params: { sala: room.sala, k: room.k, p: room.p, id: 'prod_001' }, brokers: R.brokers, WebSocket: R.WS, onSnapshot() {}, onStatus() {}, onProdMessage: m => aProd.push(m) });
+    const staff = new E.Receptor({ params: { sala: room.sala, k: room.k, p: room.p }, brokers: R.brokers, WebSocket: R.WS, onSnapshot() {}, onStatus() {}, onProdMessage: m => aStaff.push(m) });
+    await prod.start(); await staff.start();
+    await sleep(150);
+    const r = await prod.sendProdMessage({ type: 'chat', from: 'prod_001', text: 'Hola SM' });
+    ok(r.ok, 'enviado');
+    await until(() => aDash.some(m => m.type === 'chat'), 3000, 'el Dashboard recibe el chat');
+    ok(await tx.sendProd({ type: 'chatlog', list: [{ id: 'a', at: 1, text: 'Recibido', sm: true }] }), 'el Dashboard lo manda');
+    await until(() => aProd.some(m => m.type === 'chatlog'), 3000, 'Producción recibe el chat');
+    await sleep(200);
+    eq(aStaff.length, 0, 'Staff no recibe nada del canal de Producción');
+    eq(R.brokers.length > 0, true);
+    prod.stop(); staff.stop(); await tx.stop();
+  });
+
   // ── Ejecutor asíncrono ────────────────────────────────────────────────
   (async () => {
     let pass = 0; const fails = [];

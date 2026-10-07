@@ -1851,13 +1851,13 @@
     try {
       if (!emRoom) { const saved = emLoad(); emRoom = saved ? saved.room : await Em.newRoom(); }
       EM = new Em.Emisor({ room: emRoom, getSnapshot: Dt.getSnapshot, onCommand: emCommand, onStatus: st => { EMST = st; renderCast(); }, onProdMessage: emProdMessage });
-      await EM.start(); emSave(true); renderCast();
+      await EM.start(); emSave(true); renderCast(); renderChat(); emPushChat();
       toast(resumed ? 'Emisión reanudada (estaba activa antes de recargar el Dashboard)' : 'Emitiendo: escanea el QR con el dispositivo');
     } catch (e) { console.error(e); EM = null; renderCast(); toast('No se pudo empezar la emisión: ' + (e && e.message || e), true); }
   }
   async function emStop(quiet) {
     if (!EM) return;
-    const e = EM; EM = null; EMST = null; emSave(false); renderCast();
+    const e = EM; EM = null; EMST = null; emSave(false); renderCast(); renderChat();
     await e.stop();
     if (!quiet) toast('Emisión parada: los dispositivos muestran «Emisión detenida»');
   }
@@ -1964,6 +1964,30 @@
     if (FEST) renderDrift(Math.floor(C.nowAbs()));
   });
 
+  // ── Chat Producción ↔ Stage Manager: un canal común; cada mensaje con su autor. Se guarda aquí y se manda entero a Producción ──
+  function hhmmOf(ms) { const d = new Date(ms); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
+  function renderChat() {
+    const list = Dt.getChat(), box = $('chat-list'); if (!box) return;
+    box.innerHTML = list.slice(-100).map(m => '<div class="chat-list-item' + (m.sm ? ' sm' : '') + '"><div class="chat-list-item-from">' + esc(m.sm ? 'Stage Manager' : m.from) +
+      '<small>' + hhmmOf(m.at) + '</small></div><div class="chat-list-item-text">' + esc(m.text) + '</div></div>').join('');
+    $('chat-empty').hidden = list.length > 0;
+    $('chat-off').hidden = !!EM;
+    box.scrollTop = box.scrollHeight;
+  }
+  /** Manda el chat (últimos mensajes) a los enlaces de Producción. Solo con la emisión activa. */
+  function emPushChat() {
+    if (!EM || !EM.sendProd) return;
+    EM.sendProd({ type: 'chatlog', list: Dt.getChat().slice(-Em.CHAT_SEND) }).catch(e => console.error(e));
+  }
+  $('chat-form').addEventListener('submit', e => {
+    e.preventDefault();
+    const inp = $('chat-text');
+    if (!Dt.addChat(inp.value, 'Stage Manager', '', true)) return;
+    inp.value = ''; renderChat(); emPushChat();
+  });
+  $('m-chat').querySelector('.mbtn').addEventListener('click', () => { $('chat-on').hidden = true; renderChat(); });
+  setInterval(() => { if (Dt.getChat().length) emPushChat(); }, 20000);   // quien se conecta tarde lo recibe en poco tiempo
+
   // Mensajes de Producción (llegan cifrados desde su Live): OK de CALL, mensajes a las pantallas y chat.
   function emProdMessage(raw) {
     const msg = Em && Em.cleanProdMsg ? Em.cleanProdMsg(raw) : null;
@@ -1986,18 +2010,13 @@
       toast(who + ' · aviso ' + (msg.perm ? 'permanente' : 'puntual') + ': «' + msg.text + '»');
       logEvent('msg', 'Aviso ' + (msg.perm ? 'permanente' : 'puntual') + ': «' + msg.text + '» · ' + who, { src: 'produccion' });
     } else if (msg.type === 'chat') {
-      const chatList = $('chat-list'), chatEmpty = $('chat-empty');
-      if (chatList) {
-        const item = document.createElement('div');
-        item.className = 'chat-list-item';
-        item.innerHTML = '<div class="chat-list-item-from">' + esc(prodName(msg.from)) + '</div><div class="chat-list-item-text">' + esc(msg.text) + '</div>';
-        chatList.appendChild(item);
-        chatList.scrollTop = chatList.scrollHeight;
-        if (chatEmpty) chatEmpty.hidden = true;
-      }
-      const chatOn = $('chat-on');
-      if (chatOn) chatOn.hidden = false;
-      if (CONFIG && CONFIG.prodChatPopup !== false) toast('Mensaje de ' + who + ': ' + msg.text.slice(0, 100));
+      Dt.addChat(msg.text, prodName(msg.from), msg.from, false);
+      renderChat();
+      if (!$('m-chat').classList.contains('open')) $('chat-on').hidden = false;   // sin leer
+      if (CONFIG && CONFIG.prodChatPopup !== false) toast('Chat · ' + prodName(msg.from) + ': ' + msg.text.slice(0, 100));
+      emPushChat();
+    } else if (msg.type === 'chatsync') {
+      emPushChat();
     }
   }
 
@@ -2248,12 +2267,13 @@
   // Cada cambio guardado (en este Panel o llegado de la Live, p. ej. un OK de CALL) sale hacia los móviles
   const EM_KEYS = [Dt.KEYS.festival, Dt.KEYS.config, Dt.KEYS.callDone, Dt.KEYS.flash, Dt.KEYS.avisos, Dt.KEYS.meteo];
   Dt.onWrite(k => { if (EM && EM_KEYS.indexOf(k) >= 0) EM.push(); });
-  (function () { loadProducers(); const saved = emLoad(); if (saved) emRoom = saved.room; renderCast(); if (saved && saved.on) emStart(true); })();
+  (function () { renderChat(); loadProducers(); const saved = emLoad(); if (saved) emRoom = saved.room; renderCast(); if (saved && saved.on) emStart(true); })();
 
   // ── Sincronización con la Pantalla Live ──────────────────────────────
   Dt.onChange(type => {
     if (type === 'callDone') { logLiveCallOks(); tick(); return; }
     if (type === 'avisos') { if (FEST) renderDrift(Math.floor(C.nowAbs())); return; }
+    if (type === 'chat') { renderChat(); return; }
     if (type === 'flash') { renderFlash(); return; }
     if (type === 'meteo') { renderMeteo(); return; }
     loadState(); renderAll();

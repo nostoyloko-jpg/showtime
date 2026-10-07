@@ -839,6 +839,56 @@
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && !pm.hidden) pmClose(); });
   }
 
+  // ── Producción: chat con el Stage Manager (canal común; el Dashboard guarda el chat y lo manda entero) ──
+  let CHAT = [], CHAT_PEND = [], CHAT_SEEN = null, chatAsked = false;
+  const hhmm = ms => { const d = new Date(ms); return pad2(d.getHours()) + ':' + pad2(d.getMinutes()); };
+  function renderChat() {
+    const box = $('cd-list'); if (!box) return;
+    const row = (m, pend) => '<div class="cd-m' + (m.pid === PRODID ? ' me' : '') + (m.sm ? ' sm' : '') + (pend ? ' pend' : '') + '"><small>' +
+      esc(m.pid === PRODID ? 'Tú' : m.sm ? 'Stage Manager' : m.from) + ' · ' + (pend ? 'enviando…' : hhmm(m.at)) + '</small>' + esc(m.text) + '</div>';
+    box.innerHTML = CHAT.length || CHAT_PEND.length ? CHAT.map(m => row(m)).join('') + CHAT_PEND.map(m => row(m, true)).join('') : '<div class="cd-empty">Sin mensajes todavía</div>';
+    box.scrollTop = box.scrollHeight;
+  }
+  /** Llega el chat entero desde el Dashboard. */
+  function chatIn(m) {
+    const list = _EM && _EM.cleanChatLog ? _EM.cleanChatLog(m) : null;
+    if (!list) return;
+    CHAT = list;
+    CHAT_PEND = CHAT_PEND.filter(p => !list.some(x => x.pid === PRODID && x.text === p.text && x.at >= p.at - 60000));
+    const last = list.length ? list[list.length - 1].id : null;
+    const open = $('chatdock').classList.contains('open');
+    if (CHAT_SEEN === null) CHAT_SEEN = open ? last : (list.some(x => x.pid !== PRODID) ? '' : last);   // primera vez: aviso si hay algo que no es mío
+    if (open) CHAT_SEEN = last;
+    $('cd-dot').hidden = open || !last || last === CHAT_SEEN || list[list.length - 1].pid === PRODID;
+    renderChat();
+  }
+  /** Al conectar con la sala, se pide el chat (no se guarda en el teléfono: llega del Dashboard). */
+  function chatOnStatus(st) {
+    if (!st || st.state !== 'live' || chatAsked || !PROD_R) return;
+    chatAsked = true;
+    PROD_R.sendProdMessage({ type: 'chatsync', from: PRODID }).catch(() => {});
+  }
+  function initChat() {
+    const dock = $('chatdock'), input = $('cd-text');
+    dock.hidden = false;
+    const set = on => {
+      dock.classList.toggle('open', on); $('cdbtn').setAttribute('aria-expanded', String(on));
+      if (on) { CHAT_SEEN = CHAT.length ? CHAT[CHAT.length - 1].id : CHAT_SEEN; $('cd-dot').hidden = true; renderChat(); input.focus();
+        if (PROD_R) PROD_R.sendProdMessage({ type: 'chatsync', from: PRODID }).catch(() => {}); }
+    };
+    $('cdbtn').addEventListener('click', () => set(!dock.classList.contains('open')));
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && dock.classList.contains('open') && $('pmodal').hidden) set(false); });
+    $('cd-form').addEventListener('submit', async e => {
+      e.preventDefault();
+      const text = input.value.replace(/\s+/g, ' ').trim(); if (!text) return;
+      const p = { text, at: Date.now(), pid: PRODID, from: '' };
+      CHAT_PEND.push(p); input.value = ''; renderChat();
+      let r; try { r = await PROD_R.sendProdMessage({ type: 'chat', from: PRODID, text }); } catch (err) { r = { ok: false }; }
+      if (!r || !r.ok) { CHAT_PEND = CHAT_PEND.filter(x => x !== p); input.value = text; renderChat(); prodNote('No se pudo enviar: sin conexión', true); }
+    });
+    renderChat();
+  }
+
   // ── Modo Staff (2d-A): Pantalla Live de solo lectura abierta desde el QR ──
   // Los datos llegan cifrados por la emisión del Mac; aquí no se puede cambiar nada (sin OK de CALL ni cerrar mensajes).
   function startStaff() {
@@ -859,8 +909,8 @@
       rx.title = st ? st.links.map(l => l.name + ': ' + (l.state === 'on' ? 'conectado' : 'sin conexión')).join(' · ') : '';
     }
     if (!params || !(window.crypto && crypto.subtle) || !('WebSocket' in window)) { render(null); return; }
-    const R = new Em.Receptor({ params, onSnapshot: snap => Dt.loadSnapshot(snap), onStatus: render });
-    if (PRODID) { PROD_R = R; document.body.classList.add('prod'); initProdDock(); }
+    const R = new Em.Receptor({ params, onSnapshot: snap => Dt.loadSnapshot(snap), onStatus: st => { render(st); if (PRODID) chatOnStatus(st); }, onProdMessage: m => { if (PRODID) chatIn(m); } });
+    if (PRODID) { PROD_R = R; document.body.classList.add('prod'); initProdDock(); initChat(); }
     R.start().catch(e => { console.error(e); render(null); });
   }
 

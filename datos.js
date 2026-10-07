@@ -18,6 +18,7 @@
     callDone: 'showtime.callDone',     // [callKey, ...] avisos marcados con OK
     original: 'showtime.original',     // copia del festival tal como se importó (para marcar cambios)
     flash:    'showtime.flash',        // mensaje flash activo en la Pantalla Live: { id, text, at (ms) } o null
+    chat:     'showtime.chat',         // chat Producción ↔ Stage Manager: [{ id, at, from, pid, text, sm }] (NO va en la emisión general: solo a los enlaces de Producción)
     avisos:   'showtime.avisos',       // avisos escritos a mano (cinta de Backstage + barra del Dashboard): [{ id, text, at, ms (0 = permanente), from }]
     meteo:    'showtime.meteo'         // el tiempo (2e-B): { snap, err, errAt } — lo pide el Dashboard; la Live y los dispositivos lo leen
   };
@@ -99,6 +100,8 @@
       .map(a => ({ id: a.id, text: a.text.slice(0, 140), at: a.at, ms: a.ms, from: typeof a.from === 'string' ? a.from.slice(0, 80) : '' }));
   }
   function getAvisos() { return normAvisos(read(K.avisos, []), Date.now()); }
+  const CHAT_MAX = 300;
+  function getChat() { const a = read(K.chat, []); return Array.isArray(a) ? a.filter(x => x && typeof x.text === 'string') : []; }
 
   /** Minutos de aviso efectivos: los de la configuración o, si no hay, los del festival. */
   function callMinsOf(festival, config) {
@@ -145,6 +148,7 @@
     else if (m.type === 'flash') write(K.flash, m.flash || null);
     else if (m.type === 'meteo') write(K.meteo, m.meteo || null);
     else if (m.type === 'avisos') write(K.avisos, normAvisos(m.avisos, Date.now()));
+    else if (m.type === 'chat') write(K.chat, Array.isArray(m.chat) ? m.chat : []);
     else if (m.type === 'hello') { send(snapshot()); return; }
     else if (m.type === 'snapshot') {
       if (m.festival) write(K.festival, m.festival);
@@ -174,7 +178,7 @@
     receive(m);
   });
   if (!READONLY) root.addEventListener('storage', e => {
-    const type = e.key === K.festival ? 'festival' : e.key === K.config ? 'config' : e.key === K.callDone ? 'callDone' : e.key === K.flash ? 'flash' : e.key === K.meteo ? 'meteo' : e.key === K.avisos ? 'avisos' : null;
+    const type = e.key === K.festival ? 'festival' : e.key === K.config ? 'config' : e.key === K.callDone ? 'callDone' : e.key === K.flash ? 'flash' : e.key === K.meteo ? 'meteo' : e.key === K.avisos ? 'avisos' : e.key === K.chat ? 'chat' : null;
     if (type) listeners.forEach(fn => { try { fn(type); } catch (err) { console.error(err); } });
   });
 
@@ -236,6 +240,17 @@
     listeners.forEach(fn => { try { fn('avisos'); } catch (e) { console.error(e); } });
     return a;
   }
+  /** Mensaje de chat (solo el Dashboard lo guarda: los del productor llegan por la emisión y los del Stage Manager se escriben aquí). */
+  function addChat(text, from, pid, sm) {
+    if (READONLY) return null;
+    const t = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 300);
+    if (!t) return null;
+    const now = Date.now();
+    const m = { id: now.toString(36) + Math.random().toString(36).slice(2, 6), at: now, from: String(from || '').slice(0, 80), pid: String(pid || '').slice(0, 40), text: t, sm: !!sm };
+    const list = getChat().concat([m]).slice(-CHAT_MAX);
+    write(K.chat, list); send({ type: 'chat', chat: list });
+    return m;
+  }
   /** Quitar un aviso (solo el Dashboard del Stage Manager). */
   function removeAviso(id) {
     if (READONLY) return getAvisos();
@@ -249,7 +264,7 @@
 
   root.ShowtimeDatos = {
     KEYS: K, STYLES, normStyle, normConfig,
-    getFestival, getConfig, getCallDone, getFlash, setFlash, getAvisos, addAviso, removeAviso, normAvisos, getMeteo, setMeteo, FLASH_MS, MSG_SECS, flashMs, flashLeft, callMinsOf, getOriginal, setOriginal,
+    getFestival, getConfig, getCallDone, getFlash, setFlash, getAvisos, addAviso, removeAviso, normAvisos, getChat, addChat, getMeteo, setMeteo, FLASH_MS, MSG_SECS, flashMs, flashLeft, callMinsOf, getOriginal, setOriginal,
     setFestival, setConfig, markCallDone, pruneCallDone,
     onChange, onPeer, addPeer, send, hello, ping,
     READONLY, onWrite, getSnapshot, loadSnapshot

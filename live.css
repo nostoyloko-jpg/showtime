@@ -391,3 +391,24 @@ body:not([data-vista="manager"]) .mtpill{display:none}
 .pm-opts b{font-size:14px}
 .pm-opts small{font-size:12px;color:rgba(255,255,255,.6)}
 .pm-no{align-self:flex-end}
+/* Producción: chat (encima del menú de mensajes) */
+.cdock{position:fixed;left:14px;bottom:66px;z-index:205;display:flex;flex-direction:column-reverse;align-items:flex-start;gap:6px;background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.15);border-radius:9px;padding:4px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);opacity:.55;transition:opacity .2s}
+.cdock[hidden]{display:none}
+.cdock:hover,.cdock.open{opacity:1}
+#cdbtn{position:relative;border-color:transparent;background:transparent}
+.cdock.open #cdbtn{border-color:var(--btn-line);background:var(--btn-bg)}
+.cd-dot{position:absolute;top:3px;right:3px;width:9px;height:9px;border-radius:50%;background:var(--call);box-shadow:0 0 6px var(--call)}
+.cd-dot[hidden]{display:none}
+.cdock:has(.cd-dot:not([hidden])){opacity:1}
+#cdbody{display:none;flex-direction:column;gap:8px;padding:4px 6px 6px;width:min(360px,84vw)}
+.cdock.open #cdbody{display:flex}
+.cd-h{font-size:11px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.55)}
+.cd-list{display:flex;flex-direction:column;gap:6px;max-height:min(46vh,420px);overflow-y:auto}
+.cd-empty{font-size:12px;color:rgba(255,255,255,.45);padding:6px 0}
+.cd-m{max-width:88%;padding:6px 10px;border-radius:10px;background:rgba(255,255,255,.07);font-size:13px;line-height:1.35;color:#fff;word-break:break-word;align-self:flex-start}
+.cd-m.me{align-self:flex-end;background:rgba(255,197,51,.16)}
+.cd-m.sm{border-left:3px solid var(--call)}
+.cd-m.pend{opacity:.5}
+.cd-m small{display:block;font-size:10.5px;font-weight:700;color:rgba(255,255,255,.55);margin-bottom:2px}
+#cd-form{display:flex;gap:6px}
+#cd-text{flex:1;min-width:0;height:32px;padding:0 10px;border-radius:6px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:#fff;font:inherit;font-size:13px}

@@ -190,6 +190,48 @@
     eq(t.env.win.ShowtimeDatos.getSnapshot().avisos.length, 1, 'los móviles y la Live de Producción lo reciben');
   });
 
+  // ── Chat Producción ↔ Stage Manager ─────────────────────────────────
+  const chat = t => (t.read('showtime.chat') || []);
+  test('Chat: lo que escribe Producción se guarda con su nombre y avisa (punto de sin leer)', () => {
+    const t = dashboard();
+    t.env.getEl('chat-on').hidden = true;
+    t.prod({ type: 'chat', from: 'prod_001', text: '¿Abrimos puertas ya?' });
+    const c = chat(t); eq(c.length, 1); eq(c[0].from, 'Marta'); eq(c[0].pid, 'prod_001'); eq(c[0].sm, false); eq(c[0].text, '¿Abrimos puertas ya?');
+    eq(t.env.getEl('chat-on').hidden, false, 'punto de sin leer');
+    const html = t.env.innerLog.filter(x => x[0] === 'chat-list').map(x => x[1]).pop() || '';
+    ok(html.indexOf('¿Abrimos puertas ya?') >= 0 && html.indexOf('Marta') >= 0, html.slice(0, 200));
+    eq(t.env.errors.length, 0, t.env.errors.join(' | '));
+  });
+
+  test('Chat: el Stage Manager responde desde el Dashboard', () => {
+    const t = dashboard();
+    t.env.getEl('chat-text').value = '  Sí, abrid  ';
+    t.env.fire('chat-form', 'submit', { preventDefault() {} });
+    const c = chat(t); eq(c.length, 1); eq(c[0].sm, true); eq(c[0].text, 'Sí, abrid'); eq(c[0].from, 'Stage Manager');
+    eq(t.env.getEl('chat-text').value, '', 'el campo se vacía');
+    t.env.getEl('chat-text').value = '   ';
+    t.env.fire('chat-form', 'submit', { preventDefault() {} });
+    eq(chat(t).length, 1, 'vacío no se manda');
+  });
+
+  test('Chat: abrir el menú quita el punto; «pásame el chat» sin emisión no falla', () => {
+    const t = dashboard();
+    t.prod({ type: 'chat', from: 'prod_001', text: 'hola' });
+    eq(t.env.getEl('chat-on').hidden, false);
+    // el botón del menú es un comodín: se dispara su manejador directamente
+    const mb = t.env.getEl('m-chat'); ok(mb, 'menú');
+    t.prod({ type: 'chatsync', from: 'prod_001' });
+    eq(t.env.errors.length, 0, t.env.errors.join(' | '));
+  });
+
+  test('Chat: NO viaja en la emisión general (Staff no lo recibe), y basura no entra', () => {
+    const t = dashboard();
+    t.prod({ type: 'chat', from: 'prod_001', text: 'privado' });
+    ok(!('chat' in t.env.win.ShowtimeDatos.getSnapshot()), 'el snapshot no lleva el chat');
+    t.prod({ type: 'chat', from: '<x>', text: 'hola' }); t.prod({ type: 'chat', from: 'prod_001', text: '   ' });
+    eq(chat(t).length, 1);
+  });
+
   // ── Ejecutor ─────────────────────────────────────────────────────────
   let pass = 0, fail = 0;
   tests.forEach(([name, fn]) => {

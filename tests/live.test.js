@@ -20,11 +20,13 @@
   function arrancar(opts) {
     const env = D.makeEnv(Object.assign({ cripto: true }, opts));
     const sent = [];
-    env.getEl('msgdock').hidden = true; env.getEl('pmodal').hidden = true;   // como en live.html
+    env.getEl('msgdock').hidden = true; env.getEl('pmodal').hidden = true; env.getEl('chatdock').hidden = true;   // como en live.html
     D.cargar(env, MODULOS.slice(0, 4));
-    env.win.ShowtimeEmision.Receptor.prototype.sendProdMessage = async function (m) { sent.push(m); return { ok: true, msg: 'Enviado' }; };
+    const ctl = { fail: false };
+    env.win.ShowtimeEmision.Receptor.prototype.sendProdMessage = async function (m) { if (ctl.fail) return { ok: false, msg: 'Sin conexión' }; sent.push(m); return { ok: true, msg: 'Enviado' }; };
+    env.win.ShowtimeEmision.Receptor.prototype.start = async function () { env.win._R = this; };
     D.cargar(env, MODULOS.slice(4));
-    return { env, sent, body: env.getEl('body'), dock: env.getEl('msgdock'), title: () => env.win.document.title };
+    return { env, sent, ctl, R: () => env.win._R, body: env.getEl('body'), dock: env.getEl('msgdock'), title: () => env.win.document.title };
   }
   const clickOk = (t, key) => t.env.fire('document', 'click', { target: { closest: sel => sel === '.callok' ? { dataset: { ck: key } } : null } });
 
@@ -121,6 +123,65 @@
   test('Staff y Producción no pueden crear ni quitar avisos por su cuenta (solo lectura)', async () => {
     const t = await prod();
     eq(t.env.win.ShowtimeDatos.addAviso('hola', true, 'x'), null);
+  });
+
+  // ── Chat ─────────────────────────────────────────────────────────────
+  const log = (...m) => ({ type: 'chatlog', list: m.map((x, i) => Object.assign({ id: 'm' + i, at: 1000 + i, from: '', pid: '', sm: false }, x)) });
+  const chatHtml = t => t.env.getEl('cd-list').innerHTML;
+
+  test('Chat: solo en Producción; al conectar pide el chat al Dashboard', async () => {
+    ROOM = ROOM || await E.newRoom();
+    const s = arrancar({ hash: hashOf(E.staffUrl(ROOM, 'http://x/')) }); eq(s.env.getEl('chatdock').hidden, true, 'Staff no tiene chat');
+    const t = await prod();
+    eq(t.env.getEl('chatdock').hidden, false, 'Producción tiene chat');
+    t.R().o.onStatus({ state: 'live', links: [] });
+    t.R().o.onStatus({ state: 'live', links: [] });
+    await new Promise(r => setImmediate(r));
+    eq(t.sent.filter(m => m.type === 'chatsync').length, 1, 'lo pide una vez al conectar');
+  });
+
+  test('Chat: muestra los mensajes (los míos como «Tú») y avisa de los nuevos con un punto', async () => {
+    const t = await prod();
+    t.env.getEl('cd-dot').hidden = true;
+    t.R().o.onProdMessage(log({ text: 'Hola equipo', sm: true }, { text: 'Yo aquí', pid: 'prod_001', from: 'Marta' }, { text: 'Y yo', pid: 'prod_002', from: 'Luis' }));
+    const h = chatHtml(t);
+    ok(h.indexOf('Stage Manager') >= 0 && h.indexOf('Hola equipo') >= 0, 'mensaje del SM');
+    ok(/cd-m me[^>]*><small>Tú/.test(h), 'el mío como «Tú»: ' + h.slice(0, 300));
+    ok(h.indexOf('Luis') >= 0, 'otra persona de Producción con su nombre');
+    eq(t.env.getEl('cd-dot').hidden, false, 'punto de sin leer');
+    t.env.fire('cdbtn', 'click', {});
+    eq(t.env.getEl('cd-dot').hidden, true, 'al abrir se quita');
+    t.R().o.onProdMessage(log({ text: 'Hola equipo', sm: true }, { text: 'Yo aquí', pid: 'prod_001' }, { text: 'Y yo', pid: 'prod_002' }));
+    eq(t.env.getEl('cd-dot').hidden, true, 'con el chat abierto no hay punto');
+  });
+
+  test('Chat: enviar sale con «enviando…» hasta que vuelve del Dashboard', async () => {
+    const t = await prod();
+    t.env.getEl('cd-text').value = '  ¿Abrimos   puertas? ';
+    t.env.fire('cd-form', 'submit', { preventDefault() {} });
+    await new Promise(r => setImmediate(r));
+    const m = t.sent.filter(x => x.type === 'chat');
+    eq(m.length, 1); eq(m[0].text, '¿Abrimos puertas?'); eq(m[0].from, 'prod_001');
+    ok(chatHtml(t).indexOf('enviando…') >= 0, 'pendiente');
+    eq(t.env.getEl('cd-text').value, '');
+    t.R().o.onProdMessage({ type: 'chatlog', list: [{ id: 'x', at: Date.now(), from: 'Marta', pid: 'prod_001', text: '¿Abrimos puertas?', sm: false }] });
+    ok(chatHtml(t).indexOf('enviando…') < 0, 'confirmado');
+  });
+
+  test('Chat: si no se puede enviar, el texto vuelve al campo', async () => {
+    const t = await prod(); t.ctl.fail = true;
+    t.env.getEl('cd-text').value = 'Sin red';
+    t.env.fire('cd-form', 'submit', { preventDefault() {} });
+    await new Promise(r => setImmediate(r));
+    eq(t.env.getEl('cd-text').value, 'Sin red'); ok(chatHtml(t).indexOf('enviando…') < 0);
+  });
+
+  test('Chat: un chat manipulado no rompe nada', async () => {
+    const t = await prod();
+    t.R().o.onProdMessage({ type: 'chatlog', list: 'nada' }); t.R().o.onProdMessage(null);
+    t.R().o.onProdMessage(log({ text: '<img src=x onerror=alert(1)>' }));
+    ok(chatHtml(t).indexOf('<img') < 0, 'escapado');
+    eq(t.env.errors.length, 0, t.env.errors.join(' | '));
   });
 
   test('Menú de mensajes de Producción: no ofrece Confidence', () => {
