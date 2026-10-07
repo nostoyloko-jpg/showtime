@@ -780,3 +780,6 @@ td.est small{white-space:normal;max-width:96px;line-height:1.2}
 .chat-form{display:flex;gap:6px}
 .chat-form input{flex:1;min-width:0;height:32px;padding:0 10px;border-radius:8px;border:1px solid var(--line2);background:rgba(255,255,255,.05);color:var(--text);font:inherit;font-size:13px}
 #chat-on[hidden]{display:none}   /* el punto de «sin leer» solo cuando hay algo nuevo */
+/* Almacenamiento lleno: aviso fijo arriba */
+.savewarn{position:fixed;top:0;left:0;right:0;z-index:400;padding:10px 16px calc(10px);padding-top:calc(10px + env(safe-area-inset-top,0px));background:#b91c1c;color:#fff;font-size:13px;font-weight:600;text-align:center;box-shadow:0 4px 18px rgba(0,0,0,.4)}
+.savewarn[hidden]{display:none}

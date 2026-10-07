@@ -63,7 +63,7 @@
     $('clk').textContent = pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds());
     renderRx();
     if (!FEST) { $('evn').textContent = ST && ST.state === 'end' ? 'La emisión está parada en el Dashboard' : 'Esperando los datos del Mac…'; setActs(null); return; }
-    const jor = C.jornadaOfAbs(FEST, Math.floor(n));
+    const jor = C.activeJornada(FEST, Math.floor(n));
     $('evn').textContent = ((FEST.event && FEST.event.nombre) || 'Evento') + ' · ' + fmtDay(jor);
 
     // CALL activos
@@ -166,7 +166,15 @@
     });
   });
   document.addEventListener('click', e => {
-    const sg = e.target.closest('#b-stretch'); if (sg && !sg.disabled) { const b = selBand(); if (b) send('stretch', { key: b.key, on: sg.dataset.on === '1' }); return; }
+    const sg = e.target.closest('#b-stretch');
+    if (sg && !sg.disabled) {
+      const b = selBand(); if (!b) return;
+      const on = sg.dataset.on === '1', p = on && FEST ? M.stretchPlan(FEST, b.key, true, Math.floor(now())) : null;
+      if (p && p.ok && p.late !== null && p.late !== undefined) {   // bis: pasada su hora, se confirma antes
+        openSheet({ title: 'Bis · ' + b.name, body: () => '<p class="big">' + esc(p.msg) + '</p>', yes: 'Rescatar', run: () => send('stretch', { key: b.key, on: true }) });
+      } else send('stretch', { key: b.key, on });
+      return;
+    }
     const ck = e.target.closest('.callok'); if (ck && !ck.disabled) { send('callOk', { key: ck.dataset.ck }); return; }
     if (e.target.closest('#flash-off')) { send('flashOff', {}); return; }
     const z = e.target.closest('.zchip'); if (z) { ZONE = z.dataset.z; SEL = null; try { localStorage.setItem(ZKEY, JSON.stringify(ZONE)); } catch (er) {} render(); return; }
@@ -271,6 +279,9 @@
   Dt.onChange(() => { load(); render(); });
   R = new Em.Receptor({ params, onSnapshot: s => Dt.loadSnapshot(s), onStatus: st => { ST = st; renderRx(); setActs(FEST ? current().band : null, now()); } });
   R.start().catch(e => { console.error(e); toast('No se pudo conectar: ' + (e && e.message || e), true); });
+  // Pantalla que se enciende o red que vuelve: reconectar a fondo y pedir el estado
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') R.wake(); });
+  window.addEventListener('online', () => R.wake());
   render();
   setInterval(render, 1000);
   // Pantalla encendida mientras el mando está abierto (si el navegador lo permite)

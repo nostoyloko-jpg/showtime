@@ -32,12 +32,13 @@
   const PUBLIC_BASE = 'https://nostoyloko-jpg.github.io/showtime/';
   // Versión publicada: va en los enlaces de los QR para que el móvil no abra una copia vieja guardada en su caché
   // (súbela junto con los ?v= de index.html / live.html / remote.html).
-  const BUILD = '20261030';
+  const BUILD = '20261031';
   const CHUNK = 24000;           // bytes por trozo (los repetidores públicos limitan el tamaño de mensaje)
   const BEAT_MS = 10000;         // latido del Mac
   const PRESENCE_MS = 30000;     // presencia de cada móvil
   const VIEWER_TTL = 75000;      // un móvil cuenta como conectado si se ha presentado en este tiempo
-  const STALE_MS = 25000;        // sin noticias del Mac en este tiempo → «sin conexión con la sala»
+  const STALE_MS = 40000;        // sin noticias del Mac en este tiempo → «sin conexión con la sala» (margen por si el navegador frena los latidos)
+  const DEAD_MS = 75000;         // un repetidor que no manda nada en este tiempo (ni la respuesta al ping) está muerto: se reconecta
   const RETRY = [1000, 2000, 5000, 10000, 15000];
   const K_STATE = 1, K_BEAT = 2, K_END = 3, K_ACK = 4, K_HELLO = 16, K_CMD = 32, K_PROD_MSG = 33;
   const CMD_WINDOW = 120000;     // una orden con más de 2 min de diferencia con el reloj del Mac se rechaza
@@ -300,7 +301,7 @@
   // ── Conexión con un repetidor ────────────────────────────────────────
   function Link(broker, opts) {
     this.b = broker; this.o = opts; this.ws = null; this.state = 'off'; this.stopped = true;
-    this.buf = new Uint8Array(0); this.tries = 0; this.timer = null; this.pinger = null; this.err = '';
+    this.buf = new Uint8Array(0); this.tries = 0; this.timer = null; this.pinger = null; this.err = ''; this.lastRx = 0;
   }
   Link.prototype.start = function () { this.stopped = false; this.open(); };
   Link.prototype.open = function () {
@@ -311,6 +312,7 @@
     this.ws = ws; ws.binaryType = 'arraybuffer';
     ws.onopen = () => { this.send(MQ.connect('st' + b64u(rand(9)), 45)); };
     ws.onmessage = ev => {
+      this.lastRx = Date.now();
       const d = ev.data instanceof ArrayBuffer ? new Uint8Array(ev.data) : new Uint8Array(ev.data.buffer || ev.data);
       const r = MQ.parse(concat(this.buf, d)); this.buf = Uint8Array.from(r.rest);
       r.packets.forEach(p => {
@@ -318,12 +320,20 @@
           if (p.body[1] !== 0) { this.err = 'rechazado (' + p.body[1] + ')'; try { ws.close(); } catch (e) {} return; }
           this.send(MQ.subscribe(1, this.o.topics));
           this.tries = 0; this.err = ''; this.set('on');
-          clearInterval(this.pinger); this.pinger = setInterval(() => this.send(MQ.ping()), 30000);
+          clearInterval(this.pinger); this.lastRx = Date.now();
+          this.pinger = setInterval(() => { if (Date.now() - this.lastRx > DEAD_MS) { this.err = 'sin respuesta'; this.kick(); } else this.send(MQ.ping()); }, 30000);
         } else if (p.type === 3) { const m = MQ.readPublish(p); this.o.onMessage(m.topic, Uint8Array.from(m.payload), this); }
       });
     };
     ws.onerror = () => { this.err = this.err || 'no conecta'; };
-    ws.onclose = () => { clearInterval(this.pinger); if (this.ws === ws) { this.ws = null; this.buf = new Uint8Array(0); } if (!this.stopped) this.retry(); else this.set('off'); };
+    ws.onclose = () => { if (this.ws !== ws) return; clearInterval(this.pinger); this.ws = null; this.buf = new Uint8Array(0); if (!this.stopped) this.retry(); else this.set('off'); };
+  };
+  /** Cierra la conexión (si la hay) para que se reconecte sola: conexión «zombi», o el móvil vuelve de tener la pantalla apagada. */
+  Link.prototype.kick = function () {
+    if (this.stopped) return;
+    const ws = this.ws;
+    if (ws) { try { ws.close(); } catch (e) {} if (this.ws === ws) { this.ws = null; clearInterval(this.pinger); this.retry(); } }
+    else if (this.state !== 'connecting') { clearTimeout(this.timer); this.open(); }
   };
   Link.prototype.retry = function () {
     this.set('retry');
@@ -341,13 +351,26 @@
 
   function linkStatus(links) { return links.map(l => ({ id: l.b.id, name: l.b.name, state: l.state, err: l.err })); }
 
+  /** Temporizador que el navegador no frena con la pestaña en segundo plano (un Worker); si no se puede, setInterval. */
+  function ticker(ms, fn) {
+    let t = null, w = null, u = null;
+    const fallback = () => { if (w) { try { w.terminate(); } catch (e) {} w = null; } if (!t) t = setInterval(fn, ms); };
+    try {
+      if (typeof Worker !== 'undefined' && typeof Blob !== 'undefined' && typeof URL !== 'undefined' && URL.createObjectURL) {
+        u = URL.createObjectURL(new Blob(['setInterval(function(){postMessage(0)},' + ms + ')'], { type: 'text/javascript' }));
+        w = new Worker(u); w.onmessage = () => fn(); w.onerror = fallback;
+      } else fallback();
+    } catch (e) { fallback(); }
+    return { stop() { if (t) clearInterval(t); t = null; if (w) { try { w.terminate(); } catch (e) {} w = null; } if (u) { try { URL.revokeObjectURL(u); } catch (e) {} } } };
+  }
+
   // ── Emisor (Mac) ─────────────────────────────────────────────────────
   /**
    * opts: { room, getSnapshot(): obj, onStatus(st), brokers?, WebSocket? }
    * st: { on, links:[{id,name,state}], viewers, lastTs }
    */
   function Emisor(opts) {
-    this.o = opts; this.K = null; this.links = []; this.viewers = new Map(); this.remotes = new Map(); this.on = false; this.guard = new CmdGuard();
+    this.o = opts; this.K = null; this.links = []; this.viewers = new Map(); this.remotes = new Map(); this.on = false; this.guard = new CmdGuard(); this.prodGuard = new CmdGuard();
     this.lastTs = 0; this.pushT = null; this.lastPush = 0; this.beatT = null; this.busy = Promise.resolve();
   }
   Emisor.prototype.start = async function () {
@@ -360,7 +383,7 @@
       onState: l => { if (l.state === 'on') this.push(0); this.status(); }
     }));
     this.links.forEach(l => l.start());
-    this.beatT = setInterval(() => this.beat(), BEAT_MS);
+    this.beatT = ticker(BEAT_MS, () => this.beat());
     this.status();
   };
   Emisor.prototype.status = function () {
@@ -406,6 +429,8 @@
       if (!this.K.prod) return;
       const raw = await subtle.decrypt({ name: 'AES-GCM', iv: payload.subarray(0, 12), additionalData: aad(this.K.sala, K_PROD_MSG) }, this.K.prod, payload.subarray(12));
       const msg = JSON.parse(dec.decode(raw));
+      // Llega una copia por cada repetidor, y alguien podría reenviar uno viejo: cada mensaje lleva id y hora y solo cuenta una vez
+      if (!msg || this.prodGuard.check({ id: msg.mid, t: msg.t }) !== 'ok') return;
       if (this.o.onProdMessage) this.o.onProdMessage(msg);
     } catch (e) { }   // cifrado con otra clave (Staff, QR de Producción antiguo) o alterado: se ignora
   };
@@ -450,7 +475,7 @@
   /** Para la emisión: avisa a los móviles («emisión detenida») y cierra. */
   Emisor.prototype.stop = async function () {
     if (!this.on) return;
-    clearTimeout(this.pushT); clearInterval(this.beatT);
+    clearTimeout(this.pushT); if (this.beatT) this.beatT.stop();
     try { const f = await seal(this.K, K_END, enc.encode('{}')); this.links.forEach(l => l.publish(topic(this.K.sala, 's'), f)); } catch (e) {}
     this.on = false;
     await new Promise(r => setTimeout(r, 150));
@@ -481,7 +506,7 @@
     }));
     this.links.forEach(l => l.start());
     this.timers.push(setInterval(() => this.hello(false), PRESENCE_MS));
-    this.timers.push(setInterval(() => this.status(), 2000));
+    this.timers.push(setInterval(() => { this.status(); if (this.state() === 'stale' && Date.now() - (this.lastKick || 0) > 30000) this.wake(); }, 2000));
     this.status();
   };
   Receptor.prototype.hello = async function (want, only) {
@@ -490,11 +515,8 @@
     (only ? [only] : this.links).forEach(l => l.publish(topic(this.V.sala, 'h'), f));
   };
   Receptor.prototype.onMessage = async function (t, payload) {
-    if (t === topic(this.V.sala, 'prodx')) {
-      this.onProdMessage(payload);
-    } else {
-      this.onFrame(payload);
-    }
+    if (t === topic(this.V.sala, 'prodx')) return this.onProdMessage(payload);
+    return this.onFrame(payload);
   };
   Receptor.prototype.onFrame = async function (payload) {
     const m = await openFrame(this.V, payload);
@@ -525,6 +547,13 @@
       if (this.o.onProdMessage) this.o.onProdMessage(msg);
     } catch (e) { }
   };
+  /** Volver a conectar a fondo (pantalla que se enciende, red que cambia, sala sin noticias): reconecta los repetidores y pide el estado. */
+  Receptor.prototype.wake = function () {
+    if (!this.V) return;
+    this.lastKick = Date.now();
+    this.links.forEach(l => { if (l.state !== 'on' || Date.now() - l.lastRx > STALE_MS) l.kick(); });
+    this.hello(true).catch(() => {});
+  };
   Receptor.prototype.state = function () {
     if (this.ended) return 'end';
     if (!this.applied) return 'connecting';
@@ -549,7 +578,7 @@
   Receptor.prototype.sendProdMessage = async function (msg) {
     if (!this.o.params.id || !this.V || !this.V.prod) return { ok: false, msg: 'Este enlace no es de Producción' };
     const iv = rand(12);
-    const payload = enc.encode(JSON.stringify(msg));
+    const payload = enc.encode(JSON.stringify(Object.assign({}, msg, { mid: b64u(rand(12)), t: Date.now() })));
     const ct = new Uint8Array(await subtle.encrypt({ name: 'AES-GCM', iv, additionalData: aad(this.V.sala, K_PROD_MSG) }, this.V.prod, payload));
     const frame = concat(iv, ct);
     const live = this.links.filter(l => l.publish(topic(this.V.sala, 'prod'), frame)).length;
@@ -558,7 +587,7 @@
   Receptor.prototype.stop = function () { this.timers.forEach(t => clearInterval(t)); this.links.forEach(l => l.stop()); };
 
   const API = {
-    BROKERS, PUBLIC_BASE, BUILD, PROTO, STALE_MS, VIEWER_TTL, CMD_WINDOW, K_STATE, K_BEAT, K_END, K_ACK, K_HELLO, K_CMD, K_PROD_MSG,
+    BROKERS, PUBLIC_BASE, BUILD, PROTO, STALE_MS, DEAD_MS, VIEWER_TTL, CMD_WINDOW, K_STATE, K_BEAT, K_END, K_ACK, K_HELLO, K_CMD, K_PROD_MSG,
     newRoom, validRoom, withCmdKey, newCmdKey, withProdKey, newProdKey, staffUrl, remoteUrl, productionUrl, parseHash, cleanProdMsg, cleanChatLog, CHAT_SEND, publicBase, Emisor, Receptor, CmdGuard,
     // internos (para los tests)
     _: { b64u, unb64u, concat, MQ, varLen, pack, unpack, splitChunks, Assembler, macKeys, viewerKeys, seal, openFrame, sealHello, openHello, sealCmd, openCmd, fingerprint, topic, Link }

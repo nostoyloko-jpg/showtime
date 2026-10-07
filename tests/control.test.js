@@ -28,7 +28,7 @@
   /** Dashboard arrancado con festival y una persona de Producción (Marta = prod_001). */
   function dashboard(extra) {
     const F = fest();
-    const storage = Object.assign({ 'showtime.festival': JSON.stringify(F.s), 'showtime.producers': JSON.stringify({ producers: [{ id: 'prod_001', name: 'Marta' }], counter: 1, defaultId: 'prod_001' }) }, extra || {});
+    const storage = Object.assign({ 'showtime.festival': JSON.stringify(F.s), 'showtime.producers': JSON.stringify({ producers: [{ id: 'prod_001', name: 'Marta' }, { id: 'prod_002', name: 'Luis' }], counter: 2, defaultId: 'prod_001' }) }, extra || {});
     const env = D.makeEnv({ cripto: true, storage });
     D.cargar(env, MODULOS);
     const read = k => { const v = env.storage.get(k); return v ? JSON.parse(v) : null; };
@@ -78,9 +78,14 @@
     eq(t.env.errors.length, 0, t.env.errors.join(' | '));
   });
 
-  test('OK de CALL desde Producción: persona desconocida → sale su id', () => {
-    const t = dashboard(); t.prod({ type: 'call', from: 'prod_099', key: t.F.key });
-    ok(t.callLog()[0].text.indexOf('Producción (prod_099)') >= 0);
+  test('Producción: alguien que no está en la lista (borrado o id inventado) no puede dar OK ni mandar nada', () => {
+    const t = dashboard();
+    t.prod({ type: 'call', from: 'prod_099', key: t.F.key });
+    t.prod({ type: 'aviso', from: 'prod_099', text: 'hola', perm: true });
+    t.prod({ type: 'chat', from: 'prod_099', text: 'hola' });
+    eq((t.read('showtime.callDone') || []).length, 0); eq(t.callLog().length, 0);
+    eq((t.read('showtime.avisos') || []).length, 0); eq((t.read('showtime.chat') || []).length, 0);
+    ok(/«prod_099» no está en la lista/.test(t.env.getEl('toast').textContent), 'avisa: ' + t.env.getEl('toast').textContent);
   });
 
   test('OK de CALL: un CALL que no existe, o un mensaje manipulado, no se marca ni se apunta', () => {
@@ -236,6 +241,40 @@
     ok(!('chat' in t.env.win.ShowtimeDatos.getSnapshot()), 'el snapshot no lleva el chat');
     t.prod({ type: 'chat', from: '<x>', text: 'hola' }); t.prod({ type: 'chat', from: 'prod_001', text: '   ' });
     eq(chat(t).length, 1);
+  });
+
+  // ── Tanda 1 ─────────────────────────────────────────────────────────
+  test('Almacenamiento lleno: aviso fijo de «NO SE ESTÁ GUARDANDO» y se quita al recuperarse', () => {
+    const t = dashboard();
+    t.env.getEl('savewarn').hidden = true;
+    const real = t.env.win.localStorage.setItem; let lleno = true;
+    t.env.win.localStorage.setItem = (k, v) => { if (lleno) { const e = new Error('QuotaExceededError'); e.name = 'QuotaExceededError'; throw e; } return real(k, v); };
+    t.prod({ type: 'aviso', from: 'prod_001', text: 'Prueba', perm: true });
+    eq(t.env.getEl('savewarn').hidden, false, 'aviso visible');
+    lleno = false;
+    t.prod({ type: 'aviso', from: 'prod_001', text: 'Otra', perm: true });
+    eq(t.env.getEl('savewarn').hidden, true, 'se quita al volver a guardar');
+  });
+  test('La URL privada del tiempo no sale en la emisión (ni dentro de meteo.key)', () => {
+    const t = dashboard({ 'showtime.meteo': JSON.stringify({ key: 'url|0|0|https://estacion.ejemplo/api?token=SECRETO', snap: { at: 1 } }) });
+    const snap = t.env.win.ShowtimeDatos.getSnapshot();
+    ok(JSON.stringify(snap).indexOf('SECRETO') < 0, 'sin la URL'); ok(snap.meteo && snap.meteo.snap, 'el dato del tiempo sí');
+  });
+  test('Doble clic en la hora de una banda que ya empezó: abre la corrección del inicio real', () => {
+    const t = dashboard(), b = t.F.s && C.buildBlocks(t.F.s, { mode: 'all', day: 'all' })[0];
+    const td = { closest: sel => sel === 'tr' ? { dataset: { key: b.key } } : null };
+    t.env.fire('document', 'dblclick', { target: { closest: sel => sel === 'td.est' ? td : null } });
+    // la banda de prueba es a las 23:30: si aún no ha empezado, lo dice; si ya empezó, abre el selector
+    const ttl = t.env.getEl('modal-title').textContent, tst = t.env.getEl('toast').textContent;
+    ok(ttl === 'Hora real de inicio · Banda A' || /Banda A aún no ha empezado/.test(tst), 'abre el selector o explica que aún no empezó: ' + ttl + ' / ' + tst);
+    eq(t.env.errors.length, 0, t.env.errors.join(' | '));
+  });
+  test('Quitar a una persona de Producción ofrece cortarle el acceso con una clave nueva', async () => {
+    const room = await E.newRoom();
+    const t = dashboard({ 'showtime.emision': JSON.stringify({ room, on: false }) });
+    t.env.fire('document', 'click', { target: { closest: sel => sel === '[data-prod-del]' ? { dataset: { prodDel: '0' } } : null } });
+    eq(t.env.getEl('modal-title').textContent, 'Quitar acceso a Marta');
+    eq(JSON.parse(t.env.storage.get('showtime.producers')).producers.map(p => p.id).join(), 'prod_002', 'quitada de la lista');
   });
 
   // ── Clave propia de Producción ─────────────────────────────────────────

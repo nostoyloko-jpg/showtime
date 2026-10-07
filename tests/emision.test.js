@@ -345,6 +345,46 @@
     old.stop(); nuevo.stop(); await tx.stop();
   });
 
+  // ── Tanda 1: duplicados, reenvíos y conexiones «zombi» ─────────────────
+  test('Producción: un mensaje cuenta UNA vez aunque llegue por los dos repetidores; los reenviados se ignoran', async () => {
+    const R = rig(), room = await E.newRoom(), got = [];
+    const tx = new E.Emisor({ room, brokers: R.brokers, WebSocket: R.WS, getSnapshot: () => ({ real: true }), onProdMessage: m => got.push(m) });
+    await tx.start();
+    const prod = new E.Receptor({ params: paramsOf(E.productionUrl(room, 'http://x/', 'prod_001')), brokers: R.brokers, WebSocket: R.WS, onSnapshot() {}, onStatus() {} });
+    await prod.start(); await sleep(150);
+    ok((await prod.sendProdMessage({ type: 'aviso', from: 'prod_001', text: 'Puertas', perm: true })).ok);
+    await until(() => got.length >= 1, 3000, 'llega');
+    await sleep(250);
+    eq(got.length, 1, 'una sola vez (dos repetidores)');
+    ok(typeof got[0].mid === 'string' && Number.isFinite(got[0].t), 'lleva id y hora');
+    // Reenvío de un mensaje viejo (mismo id) o con la hora fuera de la ventana: se ignora
+    const w = await intruso(R);
+    w.send(MQ.publish(_.topic(room.sala, 'prod'), await rawProd(room.q, room.sala, { type: 'aviso', from: 'prod_001', text: 'Puertas', perm: true, mid: got[0].mid, t: got[0].t })));
+    w.send(MQ.publish(_.topic(room.sala, 'prod'), await rawProd(room.q, room.sala, { type: 'aviso', from: 'prod_001', text: 'Viejo', mid: 'zzzzzzzzzzzz', t: Date.now() - 10 * 60000 })));
+    w.send(MQ.publish(_.topic(room.sala, 'prod'), await rawProd(room.q, room.sala, { type: 'aviso', from: 'prod_001', text: 'Sin id' })));
+    await sleep(300);
+    eq(got.length, 1, 'ni repetido, ni viejo, ni sin id');
+    prod.stop(); await tx.stop();
+  });
+
+  test('Conexión «zombi»: kick reconecta el repetidor y wake pide el estado de nuevo', async () => {
+    const R = rig(), room = await E.newRoom();
+    const tx = new E.Emisor({ room, brokers: R.brokers, WebSocket: R.WS, getSnapshot: () => ({ n: 1 }) });
+    await tx.start();
+    const v = viewer(room, R); await v.rx.start();
+    await until(() => v.snaps.length >= 1, 4000, 'estado');
+    const l = v.rx.links[0], ws0 = l.ws;
+    ok(l.lastRx > 0, 'apunta cuándo recibió algo');
+    l.kick();
+    await until(() => l.state === 'on' && l.ws && l.ws !== ws0, 4000, 'reconecta con otra conexión');
+    const before = v.snaps.length;
+    v.rx.links.forEach(x => { x.lastRx = 0; });   // como si llevara rato sin recibir nada (pantalla apagada)
+    v.rx.wake();
+    await until(() => v.snaps.length > before, 4000, 'al despertar pide el estado y lo recibe');
+    ok(E.DEAD_MS >= 60000 && E.STALE_MS >= 30000, 'márgenes para la pestaña en segundo plano');
+    v.rx.stop(); await tx.stop();
+  });
+
   // ── Ejecutor asíncrono ────────────────────────────────────────────────
   (async () => {
     let pass = 0; const fails = [];

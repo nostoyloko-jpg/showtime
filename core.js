@@ -210,12 +210,12 @@
         id: a.id, kind: kind, key: a.id + ':' + kind,
         si: psi, sf: psf, psi: psi, psf: psf, ri: ri, rf: rf, delta: delta, base: base,
         fija: isFija(a), libre: isLibre(a), alargar: band && !!a[F.alargar],
-        name: a.nombre || '',
+        name: a.nombre === null || a.nombre === undefined ? '' : String(a.nombre),   // un nombre numérico (p. ej. «1975») no puede tumbar la Live
         color: artistColor(state, a),
         notes: (sc ? a.soundcheckNotas : a.notas) || '',
         call: call,
         callAbs: call ? callAbsFor(psi, call, f) : null,
-        stage: esc ? (esc.nombre || '') : '',
+        stage: esc && esc.nombre !== null && esc.nombre !== undefined ? String(esc.nombre) : '',
         stageId: esc ? esc.id : '',
         stageColor: esc ? (esc.color || '') : '',
         standby: band && !!a[F.standby],   // hueco ANTES de este bloque marcado a mano como STANDBY
@@ -367,8 +367,16 @@
     };
   }
 
-  /** Clave del OK de CALL: con la hora PREVISTA (un retraso no lo borra; cambiar la hora en la tabla, sí). */
-  function callKey(b) { return b.name + '@' + (b.psi !== undefined && b.psi !== null ? b.psi : b.si); }
+  /** Clave del OK de CALL: zona + nombre + hora PREVISTA (un retraso no lo borra; cambiar la hora en la tabla, sí).
+   *  Lleva la zona para que dos bandas con el mismo nombre a la misma hora en zonas distintas no compartan OK.
+   *  Formato «idZona|nombre@minutos» (los minutos siempre al final: pruneCallDone los lee de ahí). */
+  function callKey(b) { return (b.stageId || '') + '|' + b.name + '@' + (b.psi !== undefined && b.psi !== null ? b.psi : b.si); }
+  /** Clave de antes (sin zona): los OK guardados con la versión anterior siguen valiendo. */
+  function legacyCallKey(b) { return b.name + '@' + (b.psi !== undefined && b.psi !== null ? b.psi : b.si); }
+  /** ¿Tiene ya OK de CALL? (clave nueva o la antigua). */
+  function callIsDone(done, b) { const d = done instanceof Set ? done : new Set(done || []); return d.has(callKey(b)) || d.has(legacyCallKey(b)); }
+  /** Nombre de la banda a partir de su clave de CALL (nueva o antigua). */
+  function callKeyName(key) { key = String(key); const at = key.lastIndexOf('@'), bar = key.indexOf('|'); return key.slice(bar >= 0 && bar < at ? bar + 1 : 0, at >= 0 ? at : key.length); }
 
   /** Momento en que salta el aviso (cascada):
    *  1) hora de CALL escrita en el artista (callAbs), si es válida y anterior al inicio;
@@ -389,7 +397,7 @@
       const at = callAt(b, callMins);
       if (at === null) return false;
       if (!(now >= at && now < b.si)) return false;
-      return !d.has(callKey(b));
+      return !callIsDone(d, b);
     }).sort((a, b) => a.si - b.si);
   }
 
@@ -805,6 +813,20 @@
     return { ok: true, state: next };
   }
 
+  /** Jornada ACTIVA en un instante: la del reloj (jornadaOfAbs) salvo que, pasada la hora de corte, una banda de la jornada
+   *  anterior siga sonando (empezó, no tiene ■ y no ha llegado a su fin estimado, o tiene Tiempo extra). Entonces manda la anterior:
+   *  Confidence, la cinta, los desfases y el mando siguen con lo que está en el escenario, no con el reloj. */
+  function activeJornada(state, now) {
+    const n = Math.floor(now), j = jornadaOfAbs(state, n);
+    if (!state) return j;
+    const tod = ((n % 1440) + 1440) % 1440, sinceCut = ((tod - cutoffMins(state)) % 1440 + 1440) % 1440;
+    if (sinceCut > 720) return j;                                   // lejos del corte: no hace falta mirar
+    const prev = isoOfDay(dayIndex(j) - 1);
+    const playing = buildBlocks(state, { mode: 'all', day: prev, now: n })
+      .some(b => isBand(b) && b.rf === null && b.si !== null && b.si <= n && (b.alargar || (b.nf !== null && b.nf !== undefined ? n < b.nf : blockEnd(b) > n)));   // misma regla que el ■: sin Tiempo extra, se para a su hora
+    return playing ? prev : j;
+  }
+
   /** Jornada (día del evento) en la que cae un instante absoluto, con la hora de corte. */
   function jornadaOfAbs(state, abs) {
     const d = Math.floor(abs / 1440), t = abs - d * 1440;
@@ -908,7 +930,7 @@
    *  Zonas en el orden de la Live; «sin zona» al final. */
   function delayByZone(state, now) {
     if (!state) return [];
-    const n = Math.floor(now), jor = jornadaOfAbs(state, n);
+    const n = Math.floor(now), jor = activeJornada(state, n);
     const blocks = buildBlocks(state, { mode: 'all', day: jor, now: n });
     const groups = {};
     blocks.filter(b => isBand(b) && b.psi !== null).forEach(b => { const k = b.stageId || ''; (groups[k] = groups[k] || []).push(b); });
@@ -945,7 +967,7 @@
   function addRetraso(state, opts) {
     const o = opts || {};
     const mins = Math.round(Number(o.minutes) || 0);
-    const day = o.day || jornadaOfAbs(state, o.fromAbs);
+    const day = o.day || activeJornada(state, o.fromAbs);
     const zones = Array.isArray(o.zone) ? o.zone.slice() : (o.zone === 'all' || !o.zone ? 'all' : [o.zone]);
     const at = Number.isFinite(o.at) ? Math.floor(o.at) : Math.floor(nowAbs());
     const now = Number.isFinite(o.now) ? o.now : at;
@@ -1113,7 +1135,7 @@
 
   const API = {
     DEFAULT_CUTOFF, DEFAULT_CALL_MINS, DEFAULT_DURATION, DEFAULT_CO_MIN, isFija, setFija, coMinFor,
-    MARGIN_WARN, isLibre, setDelayFlag, movesWithDelay, setReal, jornadaOfAbs, driftByZone, delayByZone, addRetraso, retrasosOf, blockedIn, movesBy, setAlargar, hitoMargins, projectBands, MAX_NEXT, ARTIST_COLORS,
+    MARGIN_WARN, isLibre, setDelayFlag, movesWithDelay, setReal, jornadaOfAbs, activeJornada, legacyCallKey, callIsDone, callKeyName, driftByZone, delayByZone, addRetraso, retrasosOf, blockedIn, movesBy, setAlargar, hitoMargins, projectBands, MAX_NEXT, ARTIST_COLORS,
     pad2, parseHM, fmtHM, dayIndex, isoOfDay, shiftDate, toAbs, adjustEnd, nowAbs,
     cutoffMins, festivalDateOf, entersMode, festivalDays, TIPOS, tipoOf, isBand, isAll, entriesOf, tasksNow, hitosOf,
     getEscenario, artistColor, callAbsFor, buildBlocks,

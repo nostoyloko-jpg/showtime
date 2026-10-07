@@ -912,6 +912,9 @@
     const R = new Em.Receptor({ params, onSnapshot: snap => Dt.loadSnapshot(snap), onStatus: st => { render(st); if (PRODID) chatOnStatus(st); }, onProdMessage: m => { if (PRODID) chatIn(m); } });
     if (PRODID) { PROD_R = R; document.body.classList.add('prod'); initProdDock(); initChat(); }
     R.start().catch(e => { console.error(e); render(null); });
+    // Al volver a encender la pantalla (o volver a la pestaña), se reconecta a fondo y se pide el estado: nada de conexiones «zombi»
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') R.wake(); });
+    window.addEventListener('online', () => R.wake());   // la red vuelve (cambio de Wi-Fi)
   }
 
   // ── Vistas (2e-A) ───────────────────────────────────────────────────

@@ -110,7 +110,7 @@
    */
   function confidence(state, zoneId, now, screens) {
     if (!state) return { mode: 'nofest' };
-    const S = normScreens(screens), n = now, jor = C.jornadaOfAbs(state, Math.floor(n));
+    const S = normScreens(screens), n = now, jor = C.activeJornada(state, Math.floor(n));
     const zs = zonesWithBands(state, jor);
     let z = zoneId;
     if (z === null || z === undefined) { if (zs.length === 1) z = zs[0]; else return { mode: 'pickzone', zones: zs.map(id => ({ id, name: zoneName(state, id) })) }; }
@@ -147,7 +147,7 @@
     // Avisos escritos a mano (Producción / Stage Manager): siempre delante, en ámbar
     (Array.isArray(avisos) ? avisos : []).forEach(a => { if (a && a.text) out.push({ kind: 'aviso', level: 'warn', text: String(a.text).toUpperCase() }); });
     if (!state) return out;
-    const n = Math.floor(now), jor = C.jornadaOfAbs(state, n);
+    const n = Math.floor(now), jor = C.activeJornada(state, n);
     if (t.delays && C.delayByZone) {
       const late = C.delayByZone(state, n).filter(z => z.acc > 0 || z.live > 0);
       late.forEach(z => out.push({ kind: 'delay', level: z.status === 'overflow' ? 'over' : 'warn',
@@ -172,7 +172,7 @@
   /** CALL en Backstage: visibles desde su hora hasta que arranca el show, aunque ya tengan OK (salen como «avisado»). */
   function backstageCalls(blocks, now, callMins, done) {
     const d = done instanceof Set ? done : new Set(done || []);
-    return C.callList(blocks, now, callMins, []).map(b => ({ block: b, done: d.has(C.callKey(b)) }));
+    return C.callList(blocks, now, callMins, []).map(b => ({ block: b, done: C.callIsDone(d, b) }));
   }
 
   // ── Enlaces y monitor externo ────────────────────────────────────────

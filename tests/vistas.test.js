@@ -114,7 +114,7 @@
 
   test('Confidence: con Alargar y sin ■, sobretiempo en negativo y parpadeo', () => {
     const F = fest();
-    const s = M.realPlan(M.stretchPlan(F.s, key(F.s, 'Banda A'), true).state, {}, key(F.s, 'Banda A'), 'i', at('20:30')).state;
+    const s = M.realPlan(M.stretchPlan(F.s, key(F.s, 'Banda A'), true, at('20:00')).state, {}, key(F.s, 'Banda A'), 'i', at('20:30')).state;
     const r = V.confidence(s, F.P, atS('21:32', 15));
     eq(r.mode, 'show'); eq(V.fmtClock(r.remSec), '-02:15'); eq(r.level, 'over'); eq(r.blink, true); eq(r.frac, 0);
     eq(V.confidence(s, F.P, atS('21:32', 15), { conf: { blink: false } }).blink, false, 'parpadeo apagado en Configuración');
@@ -224,6 +224,16 @@
   test('Producción: solo ve Manager y Backstage (sin Confidence)', () => {
     eq(V.normProdVista('confidence'), 'manager'); eq(V.normProdVista('backstage'), 'backstage'); eq(V.normProdVista('rara'), 'manager'); eq(V.normProdVista(null), 'manager');
     eq(V.nextProdVista('manager'), 'backstage'); eq(V.nextProdVista('backstage'), 'manager'); eq(V.nextProdVista('confidence'), 'backstage');
+  });
+
+  test('Pasada la hora de corte, Confidence y la cinta siguen con la banda que suena', () => {
+    const F = fest();
+    let r = C.addArtist(F.s, 'show', { jornada: JOR, nombre: 'Última', escenarioId: F.P, inicio: '04:30', fin: '05:30' });
+    const s = C.setReal(C.setAlargar(r.state, r.id, 'show', true).state, r.id, 'show', 'i', C.toAbs('2026-07-11', '05:15')).state;   // con Tiempo extra, sin ■
+    const now = C.toAbs('2026-07-11', '06:10');
+    const cf = V.confidence(s, F.P, now, null);
+    eq(cf.mode, 'show', 'no «EN ESPERA» para mañana: ' + cf.mode);
+    const sin = fest(); eq(V.confidence(sin.s, sin.P, now, null).mode === 'show', false, 'sin nada sonando, no');
   });
 
   // ── Ejecutar ──────────────────────────────────────────────────────────

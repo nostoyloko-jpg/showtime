@@ -33,7 +33,7 @@
   /** Bandas (shows y soundchecks con hora) de una zona ('' = sin zona) en la jornada de ese momento, en orden. */
   function targets(state, zoneId, nowAbs) {
     if (!state) return [];
-    const jor = C.jornadaOfAbs(state, Math.floor(nowAbs));
+    const jor = C.activeJornada(state, Math.floor(nowAbs));   // pasado el corte, si una banda sigue sonando, sigue su jornada
     return allBlocks(state, nowAbs).filter(b => C.isBand(b) && b.psi !== null && b.jornada === jor && (b.stageId || '') === (zoneId || ''))
       .sort((x, y) => x.pmi - y.pmi);
   }
@@ -94,6 +94,7 @@
     if (which === 'i' && b0.ri !== null) return { ok: false, error: b0.name + ' ya tiene inicio real (' + C.fmtHM(b0.ri) + ')' };
     if (which === 'f' && b0.rf !== null) return { ok: false, error: b0.name + ' ya tiene fin real (' + C.fmtHM(b0.rf) + ')' };
     if (!b0.alargar && b0.rf === null && b0.nf !== null && now >= b0.nf) return { ok: false, error: b0.name + ' ya acabó a su hora (' + C.fmtHM(b0.nf) + '). Para que pueda pasarse, activa Tiempo extra antes' };
+    if (which === 'f' && b0.ri !== null && now < b0.ri) return { ok: false, error: 'El fin (' + C.fmtHM(now) + ') no puede ser anterior al inicio real de ' + b0.name + ' (' + C.fmtHM(b0.ri) + '). ¿Cambio de hora? Corrige el inicio con doble clic en el Dashboard' };
     const passive = which === 'f' && b0.ri === null;
     if (passive && !startedBySchedule(b0, now)) return { ok: false, error: b0.name + ' aún no ha empezado' + (b0.si !== null ? ' (empieza a las ' + C.fmtHM(b0.si) + ')' : '') };
     const mode = b0.kind === 'sc' ? 'sc' : 'show';
@@ -131,7 +132,41 @@
     const r = C.setReal(state, b.id, mode, 'i', b.pmi); if (!r.ok) return { ok: false, error: r.error };
     const before = allBlocks(state, now), after = allBlocks(r.state, now);
     const nb = after.find(x => x.key === key);
-    return { ok: true, state: r.state, msg: b.name + ': en hora, empieza ' + C.fmtHM(b.pmi) + (b.si !== b.pmi ? ' (estaba estimada a las ' + C.fmtHM(b.si) + ')' : '') + effectTxt(zoneEffect(before, after, nb)) };
+    const was = (b.ri !== null ? b.ri : b.si) - b.pmi;   // lo que llevaba de retraso (o de adelanto) antes de reconciliar
+    const zona = b.stage || 'sin zona';
+    const logTxt = 'Reconciliación: Zona ' + zona + ' vuelve a EN HORA (' + (was >= 0 ? 'absorbidos +' + was + ' min en changeover' : 'anulado un adelanto de ' + (-was) + ' min') + ') · ' + b.name + ' ' + C.fmtHM(b.pmi);
+    return { ok: true, state: r.state, logTxt, absorbed: was, msg: b.name + ': en hora, empieza ' + C.fmtHM(b.pmi) + (b.si !== b.pmi ? ' (estaba estimada a las ' + C.fmtHM(b.si) + ')' : '') + effectTxt(zoneEffect(before, after, nb)) };
+  }
+
+  /** Ventana del bis: hasta que la siguiente banda de su zona dé ▶ y como mucho 15 min (o el colchón del cambio, si es mayor). */
+  const BIS_MIN = 15;
+  function bisWindow(state, b, now) {
+    const list = allBlocks(state, now).filter(x => C.isBand(x) && x.psi !== null && x.jornada === b.jornada && (x.stageId || '') === (b.stageId || '') && x.pmi > b.pmi).sort((x, y) => x.pmi - y.pmi);
+    const next = list[0] || null;
+    const gap = next && next.psi !== null && b.psf !== null ? next.psi - b.psf : 0;
+    return { next, max: Math.max(BIS_MIN, gap) };
+  }
+
+  /** Corregir la hora REAL de inicio (solo desde el Dashboard): p. ej. no se pudo pulsar ▶ a tiempo y se dio por empezada a su hora.
+   *  Valida: no después de ahora ni del fin real, dentro de su jornada y sin pisar el fin real de la anterior de su zona. */
+  function editStartPlan(state0, config, key, abs, nowAbs) {
+    const now = Number.isFinite(nowAbs) ? Math.floor(nowAbs) : Math.floor(C.nowAbs()), state = withBlk(state0, config);
+    const b = findBlock(state, key, now);
+    if (!b) return { ok: false, error: 'Esa entrada ya no está en el horario' };
+    if (!C.isBand(b)) return { ok: false, error: 'Solo los shows y soundchecks tienen hora real' };
+    if (!Number.isFinite(abs)) return { ok: false, error: 'Hora no válida' };
+    const t = Math.floor(abs);
+    if (t > now) return { ok: false, error: 'La hora real de inicio no puede ser posterior a ahora (' + C.fmtHM(now) + ')' };
+    if (b.rf !== null && t >= b.rf) return { ok: false, error: 'Tiene que ser anterior a su fin real (' + C.fmtHM(b.rf) + ')' };
+    if (C.jornadaOfAbs(state, t) !== b.jornada) return { ok: false, error: 'Esa hora cae fuera de su jornada' };
+    const prev = allBlocks(state, now).filter(x => C.isBand(x) && x.key !== b.key && x.jornada === b.jornada && (x.stageId || '') === (b.stageId || '') && x.pmi < b.pmi && x.rf !== null).sort((x, y) => y.pmi - x.pmi)[0];
+    if (prev && t < prev.rf) return { ok: false, error: 'Pisa el fin real de ' + prev.name + ' (' + C.fmtHM(prev.rf) + ')' };
+    const old = b.ri !== null ? b.ri : b.si, assumed = b.ri === null;
+    if (!assumed && t === b.ri) return { ok: false, error: b.name + ' ya tiene ese inicio real' };
+    const r = C.setReal(state, b.id, b.kind === 'sc' ? 'sc' : 'show', 'i', t); if (!r.ok) return { ok: false, error: r.error };
+    const before = allBlocks(state, now), after = allBlocks(r.state, now), nb = after.find(x => x.key === key);
+    const logTxt = 'Corrección de inicio real: «' + b.name + '» ' + C.fmtHM(t) + ' (antes ' + C.fmtHM(old) + (assumed ? ', asumido' : '') + ')';
+    return { ok: true, state: r.state, logTxt, msg: b.name + ': inicio real ' + C.fmtHM(t) + ' (antes ' + C.fmtHM(old) + (assumed ? ', asumido a su hora' : '') + ')' + effectTxt(zoneEffect(before, after, nb)) };
   }
 
   /** Alargar: la banda puede gastar el colchón del cambio; pasado, cada minuto suma al estimado de su zona hasta ■. */
@@ -141,8 +176,17 @@
     if (!b) return { ok: false, error: 'Esa entrada ya no está en el horario' };
     if (!C.isBand(b)) return { ok: false, error: 'Solo los shows y soundchecks tienen Tiempo extra' };
     if (on && b.rf !== null) return { ok: false, error: b.name + ' ya ha terminado' };
+    // Bis: pasada su hora (ya en cambio de escenario) se puede rescatar, pero solo dentro de la ventana y si la siguiente no ha dado ▶
+    let late = null;
+    if (on && !b.alargar && b.nf !== null && b.nf !== undefined && now >= b.nf) {
+      const w = bisWindow(state, b, now);
+      if (w.next && w.next.ri !== null) return { ok: false, error: w.next.name + ' ya ha empezado (▶ ' + C.fmtHM(w.next.ri) + '): el bis de ' + b.name + ' ya no se puede rescatar' };
+      late = Math.floor(now - b.nf);
+      if (late > w.max) return { ok: false, error: 'Han pasado ' + late + ' min desde el fin de ' + b.name + ' (' + C.fmtHM(b.nf) + '): el bis solo se puede rescatar en los primeros ' + w.max + ' min' };
+    }
     const r = C.setAlargar(state, b.id, b.kind === 'sc' ? 'sc' : 'show', !!on); if (!r.ok) return { ok: false, error: r.error };
     if (!r.changed) return { ok: false, error: b.name + (on ? ' ya tiene Tiempo extra' : ' no tenía Tiempo extra') };
+    if (late !== null) return { ok: true, state: r.state, late, msg: 'BIS · ' + b.name + ': Tiempo extra tardío a las ' + C.fmtHM(now) + ' (+' + late + ' min desde su fin, ' + C.fmtHM(b.nf) + '). Vuelve a estar en escena; gasta el colchón y, pasado, retrasa lo que viene de su zona hasta ■' };
     return { ok: true, state: r.state, msg: b.name + (on ? ': TIEMPO EXTRA · puede gastar el colchón del cambio; pasado, retrasa lo que viene de su zona hasta ■' : ': Tiempo extra desactivado') };
   }
 
@@ -159,7 +203,7 @@
     if (!(mins >= 1 && mins <= 600)) return { ok: false, error: 'Minutos de 1 a 600' };
     const from = Math.floor(Number(o.from));
     if (!Number.isFinite(from)) return { ok: false, error: 'Falta desde cuándo' };
-    const day = o.day || C.jornadaOfAbs(state, from);
+    const day = o.day || C.activeJornada(state, from);
     const sh = C.addRetraso(state, { minutes: mins, zone: o.zones === 'all' || !o.zones ? 'all' : o.zones, blocked: (config && config.delayBlock) || {}, fromAbs: from, day, at: Number.isFinite(o.at) ? o.at : from, src: o.src, now: Number.isFinite(o.at) ? o.at : from });
     const summary = 'mueve ' + sh.moved.length + ' · ' + sh.kept.length + (sh.kept.length === 1 ? ' fija' : ' fijas') + (sh.clashes.length ? ' · ' + sh.clashes.length + (sh.clashes.length === 1 ? ' choque' : ' choques') : '');
     return { ok: true, state: sh.state, moved: sh.moved, kept: sh.kept, clashes: sh.clashes, jornada: sh.jornada, summary, minutes: mins };
@@ -210,7 +254,7 @@
     return { cls: 'ok', text: nm + ' · En hora', title: 'Sin retraso acumulado ni desfase en vivo' };
   }
 
-  const API = { withBlk, OPS, delayPill, OP_TXT, isBlocked, catsFor, targets, suggest, actionsFor, startedBySchedule, findBlock, realPlan, onTimePlan, stretchPlan, delayPlan, delayStamp, checkCmd, };
+  const API = { withBlk, OPS, delayPill, OP_TXT, isBlocked, catsFor, targets, suggest, actionsFor, startedBySchedule, findBlock, realPlan, onTimePlan, stretchPlan, editStartPlan, bisWindow, BIS_MIN, delayPlan, delayStamp, checkCmd, };
   if (isNode) module.exports = API;
   else root.ShowtimeMando = API;
 })(typeof window !== 'undefined' ? window : globalThis);

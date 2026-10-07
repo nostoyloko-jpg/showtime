@@ -209,6 +209,17 @@
     eq(L.SRC_TXT.produccion, 'Producción'); eq(L.TYPE_TXT.call, 'CALL OK');
   });
 
+  test('noReal: la orden (En hora, corrección) pone su propio texto y no se duplica con el ▶ genérico', () => {
+    const R = rig(), k = key(R.s, 'Banda A');
+    const id = C.buildBlocks(R.s, { mode: 'all', day: 'all' }).find(b => b.name === 'Banda A').id;
+    const next = C.setReal(R.s, id, 'show', 'i', at('20:34')).state;
+    const a = L.commit(R.log, R.s, next, { t: at('20:50'), src: 'panel', noTimes: true });
+    ok(a.entries.some(e => e.type === 'real' && /empieza 20:34/.test(e.text)), 'sin noReal: el ▶ genérico');
+    const b = L.commit(R.log, R.s, next, { t: at('20:50'), src: 'panel', noTimes: true, noReal: true, ev: [{ type: 'real', text: 'Corrección de inicio real: «Banda A» 20:34 (antes 20:30, asumido) · Stage Manager' }] });
+    const reals = b.entries.filter(e => e.type === 'real');
+    eq(reals.length, 1); ok(/^Corrección de inicio real/.test(reals[0].text)); void k;
+  });
+
   // ── Ejecutor ──────────────────────────────────────────────────────────
   let pass = 0; const fails = [];
   for (const [n, f] of tests) { try { f(); pass++; } catch (e) { fails.push([n, e.message]); } }

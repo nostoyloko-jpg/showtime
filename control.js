@@ -276,7 +276,7 @@
     const tip = (b.ri !== null ? 'Inicio real ' + C.fmtHM(b.ri) + '. ' : '') + (b.rf !== null ? 'Fin real ' + C.fmtHM(b.rf) + '. ' : '') +
       (b.man ? 'Retraso manual +' + b.man + ' min. ' : '') + (b.push ? 'Desborde de la anterior: +' + b.push + ' min. ' : '') +
       (b.alargar ? 'TIEMPO EXTRA activado: puede gastar el colchón del cambio. ' : '') + (b.clash ? 'Está fija (DELAY rojo o bloqueada) y la anterior la pisa. ' : '') +
-      'Previsto ' + C.fmtHM(b.psi) + (b.psf !== null ? '–' + C.fmtHM(b.psf) : '') + '.';
+      'Previsto ' + C.fmtHM(b.psi) + (b.psf !== null ? '–' + C.fmtHM(b.psf) : '') + '.' + (!hito && C.isBand(b) ? ' Doble clic: corregir la hora real de inicio.' : '');
     return '<td class="est' + (same ? ' same' : '') + (b.live ? ' live' : '') + '" title="' + esc(tip) + '"><span class="estt">' + dig(b.si, b.psi) +
       (hito || b.sf === null ? '' : '–' + dig(b.sf, b.psf)) + '</span>' + sub + '</td>';
   }
@@ -302,6 +302,42 @@
     if (m.level === 'tight') return '<span class="mchip tight" title="' + esc(m.band.name) + ' acaba ' + C.fmtHM(m.projEnd) + '"><svg class="ic"><use href="#i-alert"/></svg>Margen ' + m.margin + '′</span>';
     return '<span class="mchip over" title="' + esc(m.band.name) + ' acaba ' + C.fmtHM(m.projEnd) + '"><svg class="ic"><use href="#i-alert"/></svg>Rebasado +' + (-m.margin) + '′</span>';
   }
+
+  /** Tiempo extra desde el Panel. Pasada su hora (bis), pide confirmación con lo que va a pasar y queda en el log como BIS. */
+  function applyStretch(key, on) {
+    const r = M.stretchPlan(FEST, key, on, logNow());
+    if (!r.ok) { toast(r.error, true); return; }
+    const go = p => commitFestival(p.state, p.msg, { noTimes: true, ev: [{ type: 'buffer', amber: p.late !== null && p.late !== undefined, text: p.msg }] });
+    if (r.late === null || r.late === undefined) { go(r); return; }
+    modal('Rescatar el bis', '<p>' + esc(r.msg) + '</p>', [
+      { label: 'Cancelar' },
+      { label: 'Rescatar', kind: 'primary', run: () => { const p = M.stretchPlan(FEST, key, on, logNow()); if (!p.ok) { toast(p.error, true); return; } go(p); } }
+    ]);
+  }
+
+  /** Corregir la hora REAL de inicio (doble clic en la columna de horas): si no se pudo pulsar ▶ a tiempo. */
+  document.addEventListener('dblclick', e => {
+    const td = e.target.closest && e.target.closest('td.est'); if (!td || !FEST) return;
+    const tr = td.closest('tr'); if (!tr || !tr.dataset.key) return;
+    const now = logNow(), b = C.buildBlocks(FEST, { mode: 'all', day: 'all', now }).find(x => x.key === tr.dataset.key);
+    if (!b || !C.isBand(b)) return;
+    if (b.ri === null && !(b.si !== null && b.si <= now)) { toast(b.name + ' aún no ha empezado: la hora real de inicio se corrige cuando ya ha empezado', true); return; }
+    const cur = b.ri !== null ? b.ri : b.si;
+    modal('Hora real de inicio · ' + b.name, '<p>' + (b.ri === null ? 'Sin ▶: se dio por empezada a su hora (' + C.fmtHM(b.si) + ').' : 'Inicio real registrado: ' + C.fmtHM(b.ri) + '.') +
+      ' Pon la hora a la que empezó de verdad: el retraso de la zona y el log se recalculan.</p>' +
+      '<div class="form"><label for="ri-t">Empezó a las</label><input id="ri-t" type="time" value="' + C.fmtHM(cur) + '"></div>', [
+      { label: 'Cancelar' },
+      { label: 'Corregir', kind: 'primary', run: () => {
+        const m = /^(\d{1,2}):(\d{2})$/.exec(($('ri-t').value || '').trim());
+        if (!m || +m[1] > 23 || +m[2] > 59) { toast('Hora no válida', true); return false; }
+        const hm = +m[1] * 60 + +m[2], base = Math.floor(cur / 1440) * 1440;
+        const abs = [base - 1440, base, base + 1440].map(d => d + hm).sort((x, y) => Math.abs(x - cur) - Math.abs(y - cur))[0];   // la más cercana (cruza medianoche)
+        const r = M.editStartPlan(FEST, CONFIG, b.key, abs, logNow());
+        if (!r.ok) { toast(r.error, true); return false; }
+        commitFestival(r.state, r.msg, { noTimes: true, noReal: true, ev: [{ type: 'real', amber: true, text: r.logTxt + ' · Stage Manager' }] });
+      } }
+    ]);
+  });
 
   /** Registra la hora real y, si desborda el colchón, empuja SOLO el desborde en lo autorizado (Retrasos ▾) de su zona.
    *  La regla está en mando.js (la misma para la tabla y para el mando del móvil). */
@@ -684,12 +720,7 @@
       const mo = e.target.closest('[data-act="more"]');
       if (mo) { const m = mo.parentNode, on = !m.classList.contains('open'); document.querySelectorAll('.more.open').forEach(x => x.classList.remove('open')); m.classList.toggle('open', on); return; }
       const sg = e.target.closest('[data-act="stretch"]');
-      if (sg) {
-        const r = M.stretchPlan(FEST, sg.dataset.key || sg.closest('tr').dataset.key, sg.dataset.on === '1', logNow());
-        if (!r.ok) { toast(r.error, true); return; }
-        commitFestival(r.state, r.msg, { noTimes: true, ev: [{ type: 'buffer', text: r.msg }] });
-        return;
-      }
+      if (sg) { applyStretch(sg.dataset.key || sg.closest('tr').dataset.key, sg.dataset.on === '1'); return; }
       const led = e.target.closest('[data-act="fija"]');
       if (led) {
         // Clic = el contrario de lo que se ve. Si coincide con lo que dice su categoría, la entrada vuelve a seguir a la categoría.
@@ -771,9 +802,7 @@
   // TIEMPO EXTRA desde la tarjeta EN ESCENA
   ['v-now', 'v-next'].forEach(id => $(id).addEventListener('click', e => {
     const sg = e.target.closest('[data-act="stretch"]'); if (!sg) return;
-    const r = M.stretchPlan(FEST, sg.dataset.key, sg.dataset.on === '1', logNow());
-    if (!r.ok) { toast(r.error, true); return; }
-    commitFestival(r.state, r.msg, { noTimes: true, ev: [{ type: 'buffer', text: r.msg }] });
+    applyStretch(sg.dataset.key, sg.dataset.on === '1');
   }));
 
   // OK de CALL desde el Panel
@@ -1890,9 +1919,12 @@
   }
 
   /** Clave de Producción nueva: los QR de Producción anteriores dejan de valer (Staff y mando siguen; la emisión no se corta). */
-  function emRegenProd() {
-    modal('Nueva clave de Producción', '<p>Los QR de Producción anteriores <b>dejan de funcionar</b>: no podrán leer el chat ni mandar nada. Staff y el mando siguen igual y la emisión no se corta.</p>', [
-      { label: 'Cancelar' },
+  function emRegenProd(quitado) {
+    const intro = quitado
+      ? '<p><b>' + esc(quitado) + '</b> ya no está en la lista: el Dashboard ignora lo que mande con su nombre. Pero su QR sigue pudiendo <b>leer</b> la emisión y el chat de Producción. Para cortarle del todo, genera una clave nueva (el resto de Producción tendrá que volver a escanear su QR).</p>'
+      : '<p>Los QR de Producción anteriores <b>dejan de funcionar</b>: no podrán leer el chat ni mandar nada. Staff y el mando siguen igual y la emisión no se corta.</p>';
+    modal(quitado ? 'Quitar acceso a ' + quitado : 'Nueva clave de Producción', intro, [
+      { label: quitado ? 'Ahora no' : 'Cancelar' },
       { label: 'Nueva clave', kind: 'primary', run: () => { (async () => {
         emRoom = Em.newProdKey(emRoom); emSave(!!EM);
         if (EM) await EM.setProdKey(emRoom.q);
@@ -1921,13 +1953,13 @@
     if (cmd.op === 'onTime') {
       const r = M.onTimePlan(FEST, a.key, abs);
       if (!r.ok) return { ok: false, msg: r.error };
-      commitFestival(r.state, from + r.msg, { src: 'mando', t: abs, noTimes: true });
+      commitFestival(r.state, from + r.msg, { src: 'mando', t: abs, noTimes: true, noReal: true, ev: [{ type: 'real', text: r.logTxt + ' · Stage Manager (mando)' }] });
       return { ok: true, msg: r.msg };
     }
     if (cmd.op === 'stretch') {
       const r = M.stretchPlan(FEST, a.key, a.on, abs);
       if (!r.ok) return { ok: false, msg: r.error };
-      commitFestival(r.state, from + r.msg, { src: 'mando', t: abs, noTimes: true, ev: [{ type: 'buffer', text: r.msg }] });
+      commitFestival(r.state, from + r.msg, { src: 'mando', t: abs, noTimes: true, ev: [{ type: 'buffer', amber: r.late !== null && r.late !== undefined, text: r.msg }] });
       return { ok: true, msg: r.msg };
     }
     if (cmd.op === 'delay') {
@@ -1960,7 +1992,7 @@
 
   // ── CALL OK: quién lo ha dado queda en el log (Stage Manager desde el Panel, el mando o una pantalla Live; o la persona de Producción) ──
   let CALL_LOGGED = new Set(Dt.getCallDone());   // OK ya apuntados (los que había al abrir no se reescriben)
-  function bandOfKey(key) { key = String(key); return key.slice(0, key.lastIndexOf('@')); }
+  function bandOfKey(key) { return C.callKeyName(key); }
   function prodName(id) { const p = (typeof PRODUCERS !== 'undefined' ? PRODUCERS : []).find(x => x.id === id); return p ? p.name : id; }
   function logCallOk(key, who, src) {
     if (CALL_LOGGED.has(key)) return;   // el primero que lo da es el que queda apuntado
@@ -2011,6 +2043,7 @@
   function emProdMessage(raw) {
     const msg = Em && Em.cleanProdMsg ? Em.cleanProdMsg(raw) : null;
     if (!msg) return;
+    if (!PRODUCERS.some(p => p.id === msg.from)) { toast('Mensaje de Producción ignorado: «' + msg.from + '» no está en la lista de Producción', true); return; }   // persona borrada o id inventado
     const who = 'Producción (' + prodName(msg.from) + ')';
     if (msg.type === 'call') {
       if (!FEST || !C.buildBlocks(FEST, { mode: 'all', day: 'all' }).some(b => C.callKey(b) === msg.key)) return;   // solo CALL que existen
@@ -2133,6 +2166,7 @@
     saveProducers();
     renderProducerList();
     renderCast();
+    if (emRoom) emRegenProd(removed.name || removed.id);   // borrar de la lista no le quita el QR: se ofrece cortar el acceso
   }
   function closeProducerQR() {
     const side = $('prod-qr-side');
@@ -2255,21 +2289,10 @@
     else if (a === 'prod-add-person') { const inp = $('prod-input'); if (inp) addProducerFromInput(inp); }
   });
   document.addEventListener('click', e => {
-    console.log('click event on:', e.target, 'classList:', e.target.className);
     const btn = e.target.closest('[data-prod-del]');
-    if (btn) {
-      console.log('Found prod-del button');
-      const idx = parseInt(btn.dataset.prodDel, 10);
-      removeProducer(idx);
-      return;
-    }
+    if (btn) { removeProducer(parseInt(btn.dataset.prodDel, 10)); return; }
     const item = e.target.closest('[data-prod-idx]');
-    console.log('item:', item, 'has [data-prod-del]?', e.target.closest('[data-prod-del]'));
-    if (item && !e.target.closest('[data-prod-del]')) {
-      const idx = parseInt(item.dataset.prodIdx, 10);
-      console.log('Calling showProducerQR with idx:', idx);
-      showProducerQR(idx);
-    }
+    if (item) showProducerQR(parseInt(item.dataset.prodIdx, 10));
   });
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
@@ -2319,5 +2342,12 @@
   tick();
   setInterval(tick, 1000);
   requestWake();
+  // Almacenamiento lleno: aviso fijo (los cambios siguen en pantalla y en la emisión, pero no se guardan en este navegador)
+  Dt.onSaveState(ok => {
+    const w = $('savewarn'); if (!w) return;
+    w.hidden = ok;
+    if (ok) toast('Se vuelve a guardar con normalidad');
+  });
+
   window.ShowtimePanel = { reload: () => { loadState(); renderAll(); }, _test: { emProdMessage, emRegenProd, room: () => emRoom } };   // _test: solo para tests/control.test.js
 })();

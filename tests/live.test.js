@@ -25,6 +25,7 @@
     const ctl = { fail: false };
     env.win.ShowtimeEmision.Receptor.prototype.sendProdMessage = async function (m) { if (ctl.fail) return { ok: false, msg: 'Sin conexión' }; sent.push(m); return { ok: true, msg: 'Enviado' }; };
     env.win.ShowtimeEmision.Receptor.prototype.start = async function () { env.win._R = this; };
+    ctl.wakes = 0; env.win.ShowtimeEmision.Receptor.prototype.wake = function () { ctl.wakes++; };
     D.cargar(env, MODULOS.slice(4));
     return { env, sent, ctl, R: () => env.win._R, body: env.getEl('body'), dock: env.getEl('msgdock'), title: () => env.win.document.title };
   }
@@ -190,6 +191,19 @@
     t.R().o.onProdMessage(log({ text: '<img src=x onerror=alert(1)>' }));
     ok(chatHtml(t).indexOf('<img') < 0, 'escapado');
     eq(t.env.errors.length, 0, t.env.errors.join(' | '));
+  });
+
+  test('Pantalla que se vuelve a encender o red que vuelve: reconecta a fondo (Staff y Producción)', async () => {
+    ROOM = ROOM || await E.newRoom();
+    for (const h of [hashOf(E.staffUrl(ROOM, 'http://x/')), hashOf(E.productionUrl(ROOM, 'http://x/', 'prod_001'))]) {
+      const t = arrancar({ hash: h });
+      t.env.win.document.visibilityState = 'visible'; t.env.fire('document', 'visibilitychange', {});
+      eq(t.ctl.wakes, 1, 'al volver a la pantalla');
+      t.env.fire('window', 'online', {});
+      eq(t.ctl.wakes, 2, 'al volver la red');
+      t.env.win.document.visibilityState = 'hidden'; t.env.fire('document', 'visibilitychange', {});
+      eq(t.ctl.wakes, 2, 'al irse a segundo plano, no');
+    }
   });
 
   test('Menú de mensajes de Producción: no ofrece Confidence', () => {

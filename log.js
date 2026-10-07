@@ -127,7 +127,7 @@
       if ((a.call || '') !== (b.call || '')) ch.push('CALL ' + (a.call || '—') + ' → ' + (b.call || '—'));
       if (ch.length) out.push({ type: 'edit', key: k, jors: [a.jornada, b.jornada], amber: !o.noTimes && (a.psi !== b.psi || a.psf !== b.psf), text: label(a) + ': ' + ch.join(' · ') });
       // Horas reales (▶ / ■)
-      if (a.ri === b.ri && a.rf === b.rf) return;
+      if (o.noReal || (a.ri === b.ri && a.rf === b.rf)) return;   // noReal: la orden (En hora, corrección) ya trae su propio texto
       if (b.ri === null && b.rf === null) { out.push({ type: 'real', key: k, jors: [b.jornada], text: label(b) + ': registros ▶ / ■ borrados (vuelve a ir en hora)' }); return; }
       if (a.ri === null && a.rf === null && b.ri !== null && b.rf !== null) {      // ■ pasivo: inicio dado por en hora
         const d = b.rf - b.psf;
@@ -148,7 +148,7 @@
     const c = ctx || {};
     let lg = ensureFoto(log, prev || next, c.t);
     if (c.skip) return lg;
-    return record(lg, diff(prev, next, { noTimes: !!c.noTimes }).concat(c.ev || []), c, next || prev);
+    return record(lg, diff(prev, next, { noTimes: !!c.noTimes, noReal: !!c.noReal }).concat(c.ev || []), c, next || prev);
   }
 
   // ── Informe ───────────────────────────────────────────────────────────

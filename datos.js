@@ -32,6 +32,9 @@
   const READONLY = !!(root.location && /^#?(.*&)?sala=/.test(root.location.hash || ''));
   const mem = READONLY ? new Map() : null;
   const writeHooks = [];
+  const SAVE = { ok: true, key: '' }, saveHooks = [];
+  /** Avisa cuando el navegador deja de poder guardar (almacenamiento lleno) y cuando vuelve a poder: fn(ok, clave). */
+  function onSaveState(fn) { saveHooks.push(fn); }
 
   function read(key, fallback) {
     if (mem) { const v = mem.get(key); return v === undefined || v === null ? fallback : JSON.parse(v); }
@@ -42,6 +45,8 @@
     if (mem) { mem.set(key, JSON.stringify(value)); return true; }
     let okw = true;
     try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { okw = false; }
+    // ¿Se está guardando? Si el almacenamiento se llena, se avisa (y se vuelve a avisar cuando se recupera)
+    if (okw !== SAVE.ok) { SAVE.ok = okw; SAVE.key = key; saveHooks.forEach(fn => { try { fn(okw, key); } catch (e) { console.error(e); } }); }
     writeHooks.forEach(fn => { try { fn(key); } catch (e) { console.error(e); } });   // p. ej. la emisión a los móviles
     return okw;
   }
@@ -191,7 +196,9 @@
   function getSnapshot() {
     const c = getConfig();
     if (root.ShowtimeMeteo && c.meteo) c.meteo = root.ShowtimeMeteo.publicMeteo(c.meteo);   // sin la URL propia (puede llevar una clave)
-    return { festival: getFestival(), config: c, callDone: getCallDone(), flash: read(K.flash, null), avisos: getAvisos(), meteo: getMeteo() };
+    const m = getMeteo(), mp = m ? Object.assign({}, m) : null;
+    if (mp) delete mp.key;   // la «key» de la caché lleva la URL propia: no sale del Mac
+    return { festival: getFestival(), config: c, callDone: getCallDone(), flash: read(K.flash, null), avisos: getAvisos(), meteo: mp };
   }
   /** Modo Staff: aplica el estado recibido por la emisión y avisa a la Live. */
   function loadSnapshot(s) {
@@ -269,6 +276,6 @@
     getFestival, getConfig, getCallDone, getFlash, setFlash, getAvisos, addAviso, removeAviso, normAvisos, getChat, addChat, getMeteo, setMeteo, FLASH_MS, MSG_SECS, AVISO_SECS, flashMs, flashLeft, callMinsOf, getOriginal, setOriginal,
     setFestival, setConfig, markCallDone, pruneCallDone,
     onChange, onPeer, addPeer, send, hello, ping,
-    READONLY, onWrite, getSnapshot, loadSnapshot
+    READONLY, onWrite, onSaveState, getSnapshot, loadSnapshot
   };
 })(window);

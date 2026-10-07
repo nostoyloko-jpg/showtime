@@ -63,7 +63,7 @@
     const s1 = M.realPlan(F.s, CFG, k, 'i', at('20:35')).state;
     a = M.actionsFor(blk(s1, 'Banda A'), at('20:40')); ok(!a.start && a.stop && a.onTime && a.stretch);
     a = M.actionsFor(blk(F.s, 'Banda A'), at('21:31')); ok(!a.start && !a.stop && a.stretch, 'sin Alargar, pasada su hora ya acabó: sin ▶ ni ■');
-    a = M.actionsFor(blk(M.stretchPlan(F.s, k, true).state, 'Banda A'), at('21:31')); ok(a.stop, 'con Alargar, ■ hasta que acabe');
+    a = M.actionsFor(blk(M.stretchPlan(F.s, k, true, at('21:00')).state, 'Banda A'), at('21:31')); ok(a.stop, 'con Alargar, ■ hasta que acabe');
     const s2 = M.realPlan(s1, CFG, k, 'f', at('21:20')).state;
     a = M.actionsFor(blk(s2, 'Banda A'), at('21:40')); ok(!a.start && !a.stop && !a.onTime && !a.stretch, 'terminada: nada');
     a = M.actionsFor(null); ok(!a.start && !a.stop && !a.onTime && !a.stretch);
@@ -86,7 +86,7 @@
   test('■ tarde: sin Alargar no existe (acabó a su hora); con Alargar, lo que pasa del colchón va al estimado', async () => {
     const F = fest(), k = key(F.s, 'Banda A');
     ok(/ya acabó a su hora \(21:30\).*Tiempo extra/.test(M.realPlan(F.s, CFG, k, 'f', at('21:55')).error));
-    const r = M.realPlan(M.stretchPlan(F.s, k, true).state, CFG, k, 'f', at('21:55'));   // +25 al fin; colchón 15 → desborde 10
+    const r = M.realPlan(M.stretchPlan(F.s, k, true, at('21:00')).state, CFG, k, 'f', at('21:55'));   // +25 al fin; colchón 15 → desborde 10
     ok(r.ok, r.error); ok(/\+10 sobre lo previsto/.test(r.msg), r.msg);
     eq(C.fmtHM(blk(r.state, 'Banda B').si), '22:10'); eq(C.fmtHM(blk(r.state, 'Banda B').psi), '22:00');
     eq(r.pushed.minutes, 10); eq(r.pushed.who, 'Banda A');
@@ -104,7 +104,7 @@
     const F = fest(), k = key(F.s, 'Banda A');
     const r0 = M.realPlan(F.s, CFG, k, 'i', at('21:00'));
     ok(r0.ok); eq(C.fmtHM(blk(r0.state, 'Banda A').sf), '21:30'); eq(C.fmtHM(blk(r0.state, 'Banda B').si), '22:00'); eq(r0.pushed, null);
-    const r = M.realPlan(M.realPlan(M.stretchPlan(F.s, k, true).state, CFG, k, 'i', at('21:00')).state, CFG, k, 'f', at('22:00'));   // +30 → desborde 15
+    const r = M.realPlan(M.realPlan(M.stretchPlan(F.s, k, true, at('21:00')).state, CFG, k, 'i', at('21:00')).state, CFG, k, 'f', at('22:00'));   // +30 → desborde 15
     ok(r.ok, r.error); ok(/\+15 sobre lo previsto/.test(r.msg), r.msg);
     eq(C.fmtHM(blk(r.state, 'Banda B').si), '22:15', 'Banda B +15'); eq(C.fmtHM(blk(r.state, 'Banda B').psi), '22:00', 'previsto intacto');
     eq(C.fmtHM(blk(r.state, 'Cabeza').si), '23:30', 'Cabeza (DELAY rojo) no se mueve');
@@ -116,7 +116,7 @@
     const F = fest();
     const cfg = { delayBlock: { all: {}, [F.P]: { show: true } } };
     const kA = key(F.s, 'Banda A');
-    const r = M.realPlan(M.stretchPlan(F.s, kA, true).state, cfg, kA, 'f', at('22:00'));
+    const r = M.realPlan(M.stretchPlan(F.s, kA, true, at('21:00')).state, cfg, kA, 'f', at('22:00'));
     ok(r.ok, r.error); eq(C.fmtHM(blk(r.state, 'Banda B').si), '22:00');
     deq(r.state.showtimeBloqueos, cfg.delayBlock, 'los bloqueos viajan con el evento');
   });
@@ -157,7 +157,7 @@
   test('En hora: inicio real = su hora prevista y el retraso que arrastraba se cancela', async () => {
     const F = fest();
     const kA = key(F.s, 'Banda A');
-    const s1 = M.realPlan(M.stretchPlan(F.s, kA, true).state, CFG, kA, 'f', at('22:00')).state;   // Banda B estimada 22:15
+    const s1 = M.realPlan(M.stretchPlan(F.s, kA, true, at('21:00')).state, CFG, kA, 'f', at('22:00')).state;   // Banda B estimada 22:15
     const kB = key(F.s, 'Banda B');
     ok(/ya está en hora/.test(M.onTimePlan(F.s, kB, at('21:50')).error), 'sin retraso: nada que cancelar');
     const r = M.onTimePlan(s1, kB, at('21:45'));   // se puede pulsar siempre (también antes de su hora)
@@ -225,7 +225,7 @@
 
   test('acumulado + vivo: desborde y desfase de la banda en curso', async () => {
     const F = fest();
-    const kA = key(F.s, 'Banda A'), alg = M.stretchPlan(F.s, kA, true).state;
+    const kA = key(F.s, 'Banda A'), alg = M.stretchPlan(F.s, kA, true, at('21:00')).state;
     const r = M.realPlan(alg, CFG, kA, 'f', at('22:00'));   // alarga +30; desborde 15
     const z = C.delayByZone(r.state, at('22:05')).find(x => x.zoneId === F.P);
     eq(z.acc, 15, 'lo que viene va +15'); eq(z.live, 30, 'Banda A va +30'); eq(z.status, 'overflow'); eq(z.overflow, 15);
@@ -387,6 +387,76 @@
     const res = await p;
     eq(res.ok, false); ok(/caducada/.test(res.msg), res.msg); eq(ran, 0);
     await tx.stop(); rx.stop();
+  });
+
+  // ── Tanda 1: hora de corte, cambio de hora, bis, corrección de inicio, En hora ──
+  const at11 = hm => C.toAbs('2026-07-11', hm);
+  function festTarde() {   // la última banda empieza tarde y sigue sonando pasada la hora de corte (06:00)
+    const F = fest();
+    let r = C.addArtist(F.s, 'show', { jornada: JOR, nombre: 'Última', escenarioId: F.P, inicio: '04:30', fin: '05:30' }); F.s = r.state;
+    F.s = C.setReal(C.setAlargar(F.s, r.id, 'show', true).state, r.id, 'show', 'i', at('05:15')).state;   // ▶ a las 05:15, con Tiempo extra y sin ■
+    return F;
+  }
+  test('Hora de corte: la jornada activa sigue a la banda que suena, no al reloj', async () => {
+    const F = festTarde();
+    eq(C.jornadaOfAbs(F.s, at11('06:10')), '2026-07-11', 'el reloj ya está en la jornada siguiente');
+    eq(C.activeJornada(F.s, at11('06:10')), JOR, 'pero la Última sigue sonando');
+    ok(M.targets(F.s, F.P, at11('06:10')).some(b => b.name === 'Última'), 'el mando puede darle ■');
+    const z = C.delayByZone(F.s, at11('06:10')).find(x => x.zoneId === F.P); ok(z && z.liveBlock && z.liveBlock.name === 'Última', 'los desfases siguen con ella');
+    const F2 = fest(); eq(C.activeJornada(F2.s, at11('06:10')), '2026-07-11', 'si no suena nada, manda el reloj');
+    eq(C.activeJornada(F.s, at11('20:00')), '2026-07-11', 'lejos del corte, el reloj');
+    const fin = M.realPlan(F.s, CFG, key(F.s, 'Última'), 'f', at11('06:20')); ok(fin.ok, fin.error);
+    eq(C.activeJornada(fin.state, at11('06:21')), '2026-07-11', 'con ■, se pasa a la jornada nueva');
+  });
+
+  test('Cambio de hora: un ■ anterior al inicio real no se guarda al revés', async () => {
+    const F = fest(), k = key(F.s, 'Banda A');
+    const s1 = M.realPlan(F.s, CFG, k, 'i', at('20:45')).state;
+    const r = M.realPlan(M.stretchPlan(s1, k, true, at('20:50')).state, CFG, k, 'f', at('20:15'));   // el reloj ha retrocedido
+    ok(!r.ok && /anterior al inicio real.*cambio de hora/i.test(r.error), r.error);
+  });
+
+  test('Bis: Tiempo extra pasada su hora, dentro de la ventana (máx(15, colchón)), si la siguiente no dio ▶', async () => {
+    const F = fest(), k = key(F.s, 'Banda A');
+    eq(M.bisWindow(F.s, blk(F.s, 'Banda A'), at('21:40')).max, 30, 'colchón de 30 (21:30 → 22:00) > 15');
+    const r = M.stretchPlan(F.s, k, true, at('21:40'));
+    ok(r.ok, r.error); eq(r.late, 10); ok(/^BIS · Banda A: Tiempo extra tardío a las 21:40 \(\+10 min desde su fin, 21:30\)/.test(r.msg), r.msg);
+    ok(blk(r.state, 'Banda A').alargar, 'vuelve a estar en escena');
+    ok(M.actionsFor(blk(r.state, 'Banda A'), at('21:41')).stop, 'y se le puede dar ■');
+    const tarde = M.stretchPlan(F.s, k, true, at('22:01'));
+    ok(!tarde.ok && /primeros 30 min/.test(tarde.error), tarde.error);
+    const bEmpezada = M.realPlan(F.s, CFG, key(F.s, 'Banda B'), 'i', at('21:45')).state;
+    const tarde2 = M.stretchPlan(bEmpezada, k, true, at('21:46'));
+    ok(!tarde2.ok && /Banda B ya ha empezado/.test(tarde2.error), tarde2.error);
+    const kA = key(F.s, 'Acústico');   // sin siguiente en su zona: ventana de 15
+    ok(M.stretchPlan(F.s, kA, true, at('22:15')).ok, 'a los 15 min, sí');
+    ok(!M.stretchPlan(F.s, kA, true, at('22:16')).ok, 'a los 16, no');
+    ok(M.stretchPlan(F.s, k, true, at('21:00')).late === undefined, 'antes de su hora no es bis');
+  });
+
+  test('Corregir el inicio real: recalcula y deja texto para el log; valida la hora', async () => {
+    const F = fest(), k = key(F.s, 'Banda A');
+    const r = M.editStartPlan(F.s, CFG, k, at('20:34'), at('20:50'));
+    ok(r.ok, r.error); eq(blk(r.state, 'Banda A').ri, at('20:34'));
+    eq(r.logTxt, 'Corrección de inicio real: «Banda A» 20:34 (antes 20:30, asumido)');
+    const r2 = M.editStartPlan(r.state, CFG, k, at('20:36'), at('20:50'));
+    eq(r2.logTxt, 'Corrección de inicio real: «Banda A» 20:36 (antes 20:34)');
+    ok(/posterior a ahora/.test(M.editStartPlan(F.s, CFG, k, at('20:55'), at('20:50')).error));
+    const conFin = M.realPlan(M.realPlan(F.s, CFG, k, 'i', at('20:30')).state, CFG, k, 'f', at('21:00')).state;
+    ok(/anterior a su fin real/.test(M.editStartPlan(conFin, CFG, k, at('21:05'), at('21:10')).error));
+    ok(/fuera de su jornada/.test(M.editStartPlan(F.s, CFG, k, C.toAbs('2026-07-09', '20:30'), at('20:50')).error));
+    const aFin = M.realPlan(M.realPlan(M.stretchPlan(F.s, k, true, at('21:00')).state, CFG, k, 'i', at('20:30')).state, CFG, k, 'f', at('21:40')).state;
+    ok(/Pisa el fin real de Banda A \(21:40\)/.test(M.editStartPlan(aFin, CFG, key(F.s, 'Banda B'), at('21:35'), at('22:10')).error));
+  });
+
+  test('En hora: el log dice qué zona vuelve a EN HORA y cuánto se absorbió', async () => {
+    const F = fest(), k = key(F.s, 'Banda A');
+    const tarde = M.realPlan(F.s, CFG, k, 'i', at('20:40')).state;
+    const r = M.onTimePlan(tarde, k, at('20:50'));
+    ok(r.ok, r.error); eq(r.absorbed, 10);
+    eq(r.logTxt, 'Reconciliación: Zona Principal vuelve a EN HORA (absorbidos +10 min en changeover) · Banda A 20:30');
+    const pronto = M.realPlan(F.s, CFG, k, 'i', at('20:25')).state;
+    ok(/anulado un adelanto de 5 min/.test(M.onTimePlan(pronto, k, at('20:40')).logTxt));
   });
 
   // ── Ejecutor asíncrono ────────────────────────────────────────────────

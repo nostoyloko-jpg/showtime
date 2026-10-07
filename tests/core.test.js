@@ -257,7 +257,9 @@
   });
   test('CALL: OK lo quita (Set o array de claves)', () => {
     const k = C.callKey(byName('Los Ejemplos'));
-    eq(k, 'Los Ejemplos@' + at(D10, '21:00'));
+    eq(k, byName('Los Ejemplos').stageId + '|Los Ejemplos@' + at(D10, '21:00'), 'zona|nombre@minutos');
+    eq(C.callKeyName(k), 'Los Ejemplos'); eq(C.callKeyName('Los Ejemplos@123'), 'Los Ejemplos', 'clave antigua');
+    deq(C.callList(SHOW, at(D10, '20:50'), 15, ['Los Ejemplos@' + at(D10, '21:00')]), [], 'los OK guardados con la clave antigua siguen valiendo');
     deq(C.callList(SHOW, at(D10, '20:50'), 15, new Set([k])), []);
     deq(C.callList(SHOW, at(D10, '20:50'), 15, [k]), []);
   });
@@ -745,6 +747,24 @@
   });
 
   // ── Ejecutar ──────────────────────────────────────────────────────────
+  test('CALL: dos bandas con el mismo nombre a la misma hora en zonas distintas no comparten OK', () => {
+    let s = C.newFestival({ nombre: 'x', fechaInicio: '2026-07-10', fechaFin: '2026-07-10', dayCutoff: '06:00' }).state;
+    s = C.addStage(s, 'A').state; s = C.addStage(s, 'B').state;
+    const add = (st, n, z) => { const r = C.addArtist(st, 'show', { jornada: '2026-07-10', nombre: n, escenarioId: z, inicio: '22:00', fin: '23:00' }); if (!r.ok) throw new Error(r.error); return r.state; };
+    s = add(s, 'DJ SET', s.escenarios[0].id); s = add(s, 'DJ SET', s.escenarios[1].id);
+    const bl = C.buildBlocks(s, { mode: 'all', day: 'all' });
+    ok(C.callKey(bl[0]) !== C.callKey(bl[1]), 'claves distintas');
+    eq(C.callList(bl, C.toAbs('2026-07-10', '21:50'), 15, [C.callKey(bl[0])]).length, 1, 'un OK no quita el CALL de la otra zona');
+  });
+  test('Nombres numéricos en el JSON (p. ej. «1975») no rompen nada', () => {
+    let s = C.newFestival({ nombre: 'x', fechaInicio: '2026-07-10', fechaFin: '2026-07-10', dayCutoff: '06:00' }).state;
+    s = C.addStage(s, 'A').state;
+    s = C.addArtist(s, 'show', { jornada: '2026-07-10', nombre: 'tmp', escenarioId: s.escenarios[0].id, inicio: '22:00', fin: '23:00' }).state;
+    s.artists[0].nombre = 1975; s.escenarios[0].nombre = 2;
+    const b = C.buildBlocks(s, { mode: 'all', day: 'all' })[0];
+    eq(b.name, '1975'); eq(b.stage, '2'); eq(b.name.toUpperCase(), '1975');
+  });
+
   let pass = 0; const fails = [];
   tests.forEach(([name, fn]) => {
     try { fn(); pass++; } catch (e) { fails.push([name, e.message]); }
