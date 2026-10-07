@@ -284,9 +284,9 @@
     deq(rd2.records.map(r => r.banda + '/' + r.escenario), ['A/GIGANTE', 'B/VIBRAMAHOU'], 'una fila con solo un nombre en la primera columna cambia la zona');
   });
   test('Cabeceras: turnos de personal y regiduría NO son zonas; «Entrada»/«Salida» sueltas con horas de prueba = turno', () => {
-    ['HORARIO STAGE MANAGER', 'STAGE MANAGER SHIFT', 'TURNO', 'Turnos', 'CREW HOURS', 'REGIDURIA', 'Regiduría', 'HORAS TOTALES TURNO', 'PERSONAL'].forEach(h => eq(I.headerKey(h), 'ignorar', h));
+    ['HORARIO STAGE MANAGER', 'STAGE MANAGER SHIFT', 'TURNO', 'Turnos', 'CREW HOURS', 'REGIDURIA', 'Regiduría', 'HORAS TOTALES TURNO'].forEach(h => eq(I.headerKey(h), 'ignorar', h));
     [['CITACION TECNICOS CAMBIO ESCENARIO', 'call'], ['Crew call', 'call'], ['BAND CALL', 'call'], ['ENTRADA ESCENARIO ARTISTAS', 'pinicio'], ['SALIDA ESCENARIO ARTISTA', 'pfin'],
-      ['Stage in', 'pinicio'], ['STAGE OUT', 'pfin'], ['Soundcheck', 'pinicio'], ['CONCIERTO', 'concierto'], ['Performance', 'concierto'], ['Set time', 'concierto'], ['Escenario', 'escenario'], ['Stage', 'escenario'], ['GIGANTE', null]]
+      ['Stage in', 'pinicio'], ['STAGE OUT', 'pfin'], ['Soundcheck', 'pinicio'], ['CONCIERTO', 'concierto'], ['Performance', 'concierto'], ['Set time', 'concierto'], ['Escenario', 'escenario'], ['Stage', 'escenario'], ['GIGANTE', null], ['PERSONAL', 'notas'], ['ACCIÓN', 'banda'], ['NOTA', 'notas'], ['HORA', 'inicio']]
       .forEach(([h, k]) => eq(I.headerKey(h), k, h));
     const t = 'Banda\tEntrada escenario\tSalida escenario\tEntrada\tSalida\nUno\t15:00\t16:00\t09:00\t18:00';
     deq(I.read(t, CTX).map, ['banda', 'pinicio', 'pfin', 'ignorar', 'ignorar']);
@@ -315,6 +315,60 @@
     const ctx = { year: 2026, days: ['2026-08-27'] }, m = I.mergeSheets(sheets, ctx);
     deq(m.used, ['GIGANTE', 'VIBRAMAHOU']); deq(m.skipped, ['PERSONAL', 'Otra']);
     deq(I.read(m.text, ctx).records.map(r => r.banda + '/' + r.escenario + '/' + r.tipoCol), ['Uno/GIGANTE/sc', 'Uno/GIGANTE/show', 'Dos/VIBRAMAHOU/sc']);
+  });
+
+  // ── Hoja de ruta de gira (Roadbook) — Viva Suecia en Ponferrada, 05.09.2026 ─────────────────────────
+  // Copiada del PDF pasado a Word: bloques de 2-3 líneas (hora · actividad · quién va), con «*» sueltos y líneas en blanco.
+  const PONFERRADA = "08:45H\nSalida furgoneta MÚSICOS MADRID desde Plaza del Encuentro\nMÚSICOS MADRID + ¿NIC?\n09:00H\nTransfer Hotel - Recinto Crew 1 en furgo\nANA + ¿ABELLÁN? + BEA + GUIO + LIDIA + SARA\n09:15H\nParada para recogida furgoneta MÚSICOS MADRID en Chamartín\nMÚSICOS MADRID + JESS + NIC\n09:15H\nCitación en recinto para acceso trailers\nANA + ¿ABELLÁN? + BEA + GUIO + LIDIA + SARA\n09:30H\nDescarga equipos + montaje TARIMAS Y EQUIPOS PROVEEDORES\nGUIO + SARA + PROVEEDORES\n10:30H\nTransfer Hotel - Recinto Crew 2\nCREW\n10:45H\nMontaje equipos VS\n CREW\n14:00H a 15:30H\nCOMIDA CREW en recinto\n CREW\n13:45H\nCOMIDA BANDA + MÚSICOS\nJAIME + BANDA + MÚSICOS + NIC\n15:30H\n Linecheck\n CREW\n16:15H\nTransfer Hotel - Recinto Banda y músicos\nJAIME + BANDA + MÚSICOS + FURGO MADRID + NIC\n16:30H\nPRUEBA VIVA SUECIA\nALL\n17:30H\nFin de pruebas + Cambio escenario\nCREW\n17:30H\nTransfer Recinto - Hotel Banda y músicos\n JAIME + BANDA + MÚSICOS + FURGO MADRID + NIC\n18:00H (a valorar si está antes)\nTransfer Recinto - Hotel Crew\nANA + CREW\n20:00H\nApertura de puertas\n\n* \n\n20:20H\nTransfer Hotel - Recinto Avanzada\nANA + BEA + LIDIA + SARA\n20:50H\nTransfer Hotel - Recinto Crew\nANA + CREW\n20:50H\nTransfer Hotel - Recinto Banda y músicos\nJAIME + BANDA + MÚSICOS + FURGO MADRID + NIC\n21:00H\nCitación en recinto para show\nALL\n21:15H\nShow Paula Mattheus (45')\n\n* \n\n22:00H\nCambio escenario\nCREW\n22:30H\nSHOW VIVA SUECIA (90')\nALL\n";
+  function eventoPonferrada() { return C.newFestival({ nombre: 'Viva Suecia · Ponferrada', fechaInicio: '2026-09-04', fechaFin: '2026-09-05', dayCutoff: '06:00' }).state; }
+  test('Hoja de ruta en bloques (Ponferrada): 23 entradas limpias con tipo, horas y notas; 0 errores', () => {
+    const s = eventoPonferrada(), ctx = I.contextOf(s), rd = I.read(PONFERRADA, ctx);
+    const pv = I.preview(s, rd.records, { ctx, defaultJornada: '2026-09-05' });
+    eq(rd.kind, 'texto'); eq(pv.counts.err, 0, pv.rows.filter(r => r.errs.length).map(r => r.banda + ': ' + r.errs).join(' | '));
+    eq(pv.rows.length, 23, 'cada hora del sábado es una entrada (09:15, 17:30 y 20:50 traen dos)'); eq(rd.ignored.length, 0);
+    const T = pv.rows.map(r => r.tipo), cuenta = t => T.filter(x => x === t).length;
+    deq([cuenta('tarea'), cuenta('hito'), cuenta('sc'), cuenta('show')], [16, 4, 1, 2], 'tareas · hitos · prueba · shows');
+    const fila = n => pv.rows.find(r => r.banda === n);
+    deq(['tipo', 'inicio', 'notas'].map(k => fila('Salida furgoneta MÚSICOS MADRID desde Plaza del Encuentro')[k]), ['tarea', '08:45', 'MÚSICOS MADRID + ¿NIC?'], 'hora · actividad · quién va');
+    deq(['tipo', 'inicio', 'fin'].map(k => fila('COMIDA CREW en recinto')[k]), ['tarea', '14:00', '15:30'], '«14:00H a 15:30H»');
+    deq(['tipo', 'banda', 'notas'].map(k => pv.rows.find(r => r.tipo === 'sc')[k]), ['sc', 'VIVA SUECIA', 'ALL'], '«PRUEBA VIVA SUECIA» = soundcheck de Viva Suecia');
+    eq(fila('Fin de pruebas + Cambio escenario').tipo, 'hito'); eq(fila('Citación en recinto para acceso trailers').tipo, 'hito');
+    eq(fila('Apertura de puertas').tipo, 'hito'); eq(fila('Apertura de puertas').notas, '', 'el «*» suelto no es una nota');
+    eq(fila('Cambio escenario').tipo, 'tarea'); eq(fila('Linecheck').tipo, 'tarea');
+    deq(['tipo', 'inicio', 'fin'].map(k => fila('Paula Mattheus')[k]), ['show', '21:15', '22:00'], '«Show Paula Mattheus (45\')» → fin por la duración');
+    deq(['tipo', 'inicio', 'fin'].map(k => fila('VIVA SUECIA') && pv.rows.find(r => r.tipo === 'show' && r.banda === 'VIVA SUECIA')[k]), ['show', '22:30', '00:00'], '«SHOW VIVA SUECIA (90\')»');
+    eq(fila('Transfer Recinto - Hotel Crew').notas, 'a valorar si está antes · ANA + CREW', 'el paréntesis de la hora también a notas');
+    ok(pv.rows.every(r => r.jornada === '2026-09-05'));
+    const a = I.apply(s, pv, {}); eq(a.added, 23); eq(a.errors.length, 0, a.errors.join(' | '));
+  });
+  test('Hoja de ruta en bloques con la hora en negrita («**08:45H**») y fechas «05.09.2026»', () => {
+    const t = 'HORARIOS SÁBADO 05.09.2026\n**08:45H**\n**Salida furgoneta**\nMÚSICOS\n**21:15H a 22:00H**\nShow Paula (45\')\n*** Aviso: sin pirotecnia ***';
+    const rd = I.read(t, I.contextOf(eventoPonferrada()));
+    deq(rd.records.map(r => [r.banda, r.jornada, r.inicio, r.fin, r.notas].join('/')), ['Salida furgoneta/2026-09-05/08:45//MÚSICOS', 'Show Paula/2026-09-05/21:15/22:00/']);
+    ok(rd.ignored.some(x => /pirotecnia/.test(x.line)), 'un aviso entre *** sigue siendo un comentario');
+  });
+  test('La misma hoja de ruta copiada como tabla (HORA · ACCIÓN · NOTA, dos jornadas): notas no son zonas, TBC fuera', () => {
+    const t = "HORARIOS VIERNES 04.09.2026\nHORA\tACCIÓN\tNOTA\n10:30H\tSalida furgoneta CREW desde Local (ojo recogidas en ruta)\tCREW\n12:00H\tSalida furgoneta BANDA desde Local\tBANDA (EXCEPTO JESS) + JAIME + ANTONIO ILLÁN\nEn ruta\tCOMIDA\tALL\n20:15H\tLlegada estimada a hotel\tALL\n21:30H\tCENA\tALL\nHORARIOS SÁBADO 05.09.2026\nHORA\tACCIÓN\tNOTA\n08:45H\tSalida furgoneta MÚSICOS MADRID desde Plaza del Encuentro\tMÚSICOS MADRID + ¿NIC?\n09:00H\tTransfer Hotel - Recinto Crew 1 en furgo\tANA + ¿ABELLÁN? + BEA + GUIO + LIDIA + SARA\n09:15H\tParada para recogida furgoneta MÚSICOS MADRID en Chamartín\tMÚSICOS MADRID + JESS + NIC\n09:15H\tCitación en recinto para acceso trailers\tANA + ¿ABELLÁN? + BEA + GUIO + LIDIA + SARA\n09:30H\tDescarga equipos + montaje TARIMAS Y EQUIPOS PROVEEDORES\tGUIO + SARA + PROVEEDORES\n10:30H\tTransfer Hotel - Recinto Crew 2\tCREW\n10:45H\tMontaje equipos VS\tCREW\n14:00H a 15:30H\tCOMIDA CREW en recinto\tCREW\n13:45H\tCOMIDA BANDA + MÚSICOS\tJAIME + BANDA + MÚSICOS + NIC\n15:30H\tLinecheck\tCREW\n16:15H\tTransfer Hotel - Recinto Banda y músicos\tJAIME + BANDA + MÚSICOS + FURGO MADRID + NIC\n16:30H\tPRUEBA VIVA SUECIA\tALL\n17:30H\tFin de pruebas + Cambio escenario\tCREW\n17:30H\tTransfer Recinto - Hotel Banda y músicos\tJAIME + BANDA + MÚSICOS + FURGO MADRID + NIC\n18:00H (a valorar si está antes)\tTransfer Recinto - Hotel Crew\tANA + CREW\n20:00H\tApertura de puertas\t-\n20:20H\tTransfer Hotel - Recinto Avanzada\tANA + BEA + LIDIA + SARA\n20:50H\tTransfer Hotel - Recinto Crew\tANA + CREW\n20:50H\tTransfer Hotel - Recinto Banda y músicos\tJAIME + BANDA + MÚSICOS + FURGO MADRID + NIC\n21:00H\tCitación en recinto para show\tALL\n21:15H\tShow Paula Mattheus (45')\t-\n22:00H\tCambio escenario\tCREW\n22:30H\tSHOW VIVA SUECIA (90')\tALL\n00:00H\tFin show + Inicio desmontaje\tCREW\nTBC, uno temprano\tTransfer Recinto - Hotel Banda y músicos\tANA + JAIME + BANDA + MÚSICOS\nTBC\tTransfer Recinto - Hotel Crew\tANA + JAIME + CREW\n";
+    const s = eventoPonferrada(), ctx = I.contextOf(s), rd = I.read(t, ctx), pv = I.preview(s, rd.records, { ctx });
+    deq(rd.map, ['inicio', 'banda', 'notas'], 'la columna de quién va son notas (antes salían 10 «zonas»)');
+    eq(pv.newStages.length, 0); eq(pv.counts.err, 0, pv.rows.filter(r => r.errs.length).map(r => r.banda + ': ' + r.errs).join(' | '));
+    deq([pv.rows.filter(r => r.jornada === '2026-09-04').length, pv.rows.filter(r => r.jornada === '2026-09-05').length], [4, 24], 'viernes 4 · sábado 5 (por las filas de título)');
+    ok(rd.ignored.some(x => /En ruta/.test(x.why)) && rd.ignored.filter(x => /^sin hora/.test(x.why)).length === 3, 'En ruta y TBC: ignoradas (listadas)');
+    eq(pv.rows.find(r => r.banda === 'Apertura de puertas').notas, '', 'el «-» de la nota no cuenta');
+  });
+  test('Hoja de ruta copiada como tabla SIN cabecera (lo de la captura): 23 entradas, la tercera columna son notas y no 10 zonas', () => {
+    const t = "08:45H\tSalida furgoneta MÚSICOS MADRID desde Plaza del Encuentro\tMÚSICOS MADRID + ¿NIC?\n09:00H\tTransfer Hotel - Recinto Crew 1 en furgo\tANA + ¿ABELLÁN? + BEA + GUIO + LIDIA + SARA\n09:15H\tParada para recogida furgoneta MÚSICOS MADRID en Chamartín\tMÚSICOS MADRID + JESS + NIC\n09:15H\tCitación en recinto para acceso trailers\tANA + ¿ABELLÁN? + BEA + GUIO + LIDIA + SARA\n09:30H\tDescarga equipos + montaje TARIMAS Y EQUIPOS PROVEEDORES\tGUIO + SARA + PROVEEDORES\n10:30H\tTransfer Hotel - Recinto Crew 2\tCREW\n10:45H\tMontaje equipos VS\tCREW\n14:00H a 15:30H\tCOMIDA CREW en recinto\tCREW\n13:45H\tCOMIDA BANDA + MÚSICOS\tJAIME + BANDA + MÚSICOS + NIC\n15:30H\tLinecheck\tCREW\n16:15H\tTransfer Hotel - Recinto Banda y músicos\tJAIME + BANDA + MÚSICOS + FURGO MADRID + NIC\n16:30H\tPRUEBA VIVA SUECIA\tALL\n17:30H\tFin de pruebas + Cambio escenario\tCREW\n17:30H\tTransfer Recinto - Hotel Banda y músicos\tJAIME + BANDA + MÚSICOS + FURGO MADRID + NIC\n18:00H (a valorar si está antes)\tTransfer Recinto - Hotel Crew\tANA + CREW\n20:00H\tApertura de puertas\t-\n20:20H\tTransfer Hotel - Recinto Avanzada\tANA + BEA + LIDIA + SARA\n20:50H\tTransfer Hotel - Recinto Crew\tANA + CREW\n20:50H\tTransfer Hotel - Recinto Banda y músicos\tJAIME + BANDA + MÚSICOS + FURGO MADRID + NIC\n21:00H\tCitación en recinto para show\tALL\n21:15H\tShow Paula Mattheus (45')\t-\n22:00H\tCambio escenario\tCREW\n22:30H\tSHOW VIVA SUECIA (90')\tALL\n";
+    const s = eventoPonferrada(), ctx = I.contextOf(s), rd = I.read(t, ctx), pv = I.preview(s, rd.records, { ctx, defaultJornada: '2026-09-05' });
+    eq(rd.hasHeader, false); deq(rd.map, ['inicio', 'banda', 'notas']);
+    eq(pv.newStages.length, 0, 'ninguna zona inventada'); eq(pv.counts.err, 0, pv.rows.filter(r => r.errs.length).map(r => r.banda + ': ' + r.errs).join(' | ')); eq(pv.rows.length, 23);
+    eq(pv.rows.find(r => /Citación en recinto para show/.test(r.banda)).tipo, 'hito', 'antes salía como show');
+  });
+  test('Tipos de hoja de ruta: tarea frente a hito', () => {
+    const tipo = n => I.proposeTipo({ banda: n }, 'show').tipo;
+    [['Salida furgoneta CREW', 'tarea'], ['Transfer Hotel - Recinto', 'tarea'], ['Parada para recogida furgoneta', 'tarea'], ['Cambio escenario', 'tarea'], ['Linecheck', 'tarea'],
+      ['Llegada y descarga Omega', 'tarea'], ['Fin de pruebas + Cambio escenario', 'hito'], ['Citación en recinto para show', 'hito'], ['Apertura de puertas', 'hito'],
+      ['Fin show + Inicio desmontaje', 'hito'], ['PRUEBA VIVA SUECIA', 'sc'], ['Show Paula Mattheus', 'show'], ['Doors', 'hito'], ['Crew lunch', 'tarea']].forEach(([n, t]) => eq(tipo(n), t, n));
+    eq(I.parseDate('05.09.2026').iso, '2026-09-05'); eq(I.parseDate('04.09.26').iso, '2026-09-04');
   });
 
   let pass = 0; const fails = [];

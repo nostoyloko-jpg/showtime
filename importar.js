@@ -14,7 +14,10 @@
     return String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
   }
   function cleanName(s) {
-    return String(s == null ? '' : s).replace(/^[\s\-–—|·•:,;*>]+|[\s\-–—|·•:,;*<]+$/g, '').replace(/\s+/g, ' ').trim();
+    return String(s == null ? '' : s)
+      .replace(/[\p{So}\p{Sk}\uFE0F\u200D\u20E3\u2190-\u21FF\u25A0-\u25FF]+/gu, ' ')     // emojis, flechas, ▶ ■ ●
+      .replace(/(?:\s*[._…]){3,}\s*/g, ' ')                                         // puntos o guiones bajos de relleno
+      .replace(/^[\s\-–—|·•:,;*>]+|[\s\-–—|·•:,;*<]+$/g, '').replace(/\s+/g, ' ').trim();
   }
 
   /** Palabras pegadas al copiar de un PDF: «LlegaOmega» → «Llega Omega» (minúscula seguida de mayúscula).
@@ -38,8 +41,11 @@
   // show | sc (soundcheck) | tarea | hito
   const TIPO_KEYS = ['show', 'sc', 'tarea', 'hito'];
   const TIPO_LABEL = { show: 'Show', sc: 'Soundcheck', tarea: 'Tarea', hito: 'Hito' };
-  const TAREA_RE = /\b(comida|comidas|almuerzo|cena|cenas|desayuno|catering|montaje|desmontaje|carga|descarga|get ?in|get ?out|load ?in|load ?out|pruebas? de (?:luces|luz|video|iluminacion|led)|ensayo|ensayos|reunion|briefing|acreditacion|acreditaciones|transfer|traslado|traslados|hotel|check ?in|check ?out|limpieza|comer|parada|pausa|descanso|break|line ?check|linecheck|lunch|dinner|breakfast|meal|meals|crew meal|crew lunch|crew dinner|changeover meal)\b/;
-  const HITO_RE = /\b(puertas|apertura|cierre de puertas|curfew|toque de queda|fin de (?:sonido|evento|jornada|actividad|pruebas|prueba|soundcheck)|llegada|llega|llegan|salida|desalojo|hora limite|limite de sonido)\b/;
+  // Tareas: palabras FUERTES (inequívocas en cualquier documento) y DÉBILES (también pueden ser nombre de banda: «Hotel Costes»,
+  // «Ave Fénix», «The Press»…). Las débiles solo cuentan en documentos de producción (hojas de ruta, day sheets).
+  const TAREA_RE = /\b(comida|comidas|almuerzo|cena|cenas|desayuno|catering|montaje|desmontaje|carga y descarga|descarga|get ?in|get ?out|load ?in|load ?out|pruebas? de (?:luces|luz|video|iluminacion|led)|ensayo|ensayos|reunion|briefing|acreditacion|acreditaciones|transfer|traslado|traslados|check ?in|check ?out|checkout|limpieza|line ?check|linecheck|lunch|dinner|breakfast|meal|meals|crew meal|crew lunch|crew dinner|changeover meal|furgoneta|recogida|transporte|cambio (?:de )?escenario|changeover|salida (?:de(?:l)? )?(?:furgoneta|furgo|bus|autobus|van|coche|crew|banda)|rueda de prensa|entrevista|entrevistas|interview|interviews|meet (?:&|and|y) greet|m&g|photocall|firma de discos|signing)\b/;
+  const WEAK_TAREA_RE = /\b(hotel|bus|autobus|ave|tren|train|drive|driving|travel|viaje|vuelo|flight|avion|press|prensa|promo|lobby|backline|ducha|shower|vestuario|maquillaje|make ?up|calentamiento|warm ?up|parada|pausa|descanso|break|comer|pick ?up|furgo|carga)\b/;
+  const HITO_RE = /\b(puertas|apertura|cierre de puertas|curfew|toque de queda|fin de (?:sonido|evento|jornada|actividad|pruebas|prueba|soundcheck)|llegada|llega|llegan|salida|desalojo|hora limite|limite de sonido|citacion|citaciones|fin (?:del? )?(?:show|concierto)|doors|(?:lobby|bus|van|band|crew|artist|artista|banda) call|showtime|show time)\b/;
   const SC_HEAD = /^(pruebas? de sonido|soundcheck|sound check|pruebas?|sc)\b[\s:\-–—·.]*/i;
   const SC_TAIL = /[\s:\-–—·(\[]+(pruebas? de sonido|soundcheck|sound check|prueba)[)\]]?$/i;
   const SHOW_HEAD = /^(show|concierto|actuacion|actuación)\b[\s:\-–—·.]*/i;
@@ -65,10 +71,14 @@
     if (rec.tipoCol) return { tipo: rec.tipoCol, banda, why: rec.tipoWhy || '' };   // hora en la columna de prueba o de concierto
     const n = norm(banda);
     let m;
-    if ((m = TAREA_RE.exec(n))) return { tipo: 'tarea', banda, why: '«' + m[1] + '»' };
+    // Tarea o hito: si hay de las dos, manda la tarea («Llegada y descarga» = trabajo), salvo un hito «fuerte» al principio
+    // («Fin de pruebas + Cambio escenario», «Citación…», «Apertura de puertas» = hito). «Salida furgoneta» = tarea.
+    const mT = TAREA_RE.exec(n) || (rec.docProd ? WEAK_TAREA_RE.exec(n) : null), mH = HITO_RE.exec(n);
+    const hitoFirst = !!mH && (!mT || (mH.index === mT.index && mH[0].length > mT[0].length) || (mH.index === 0 && mT.index > 0 && /^(fin |apertura|puertas|cierre|citacion|curfew|doors|toque|desalojo|hora limite|limite)|\bcall$/.test(mH[1])));
+    if (mT && !hitoFirst) return { tipo: 'tarea', banda, why: '«' + mT[1] + '»' };
     if ((m = SC_HEAD.exec(banda)) && banda.slice(m[0].length).trim()) return { tipo: 'sc', banda: banda.slice(m[0].length), why: '«' + m[1] + '»' };
     if ((m = SC_TAIL.exec(banda)) && banda.slice(0, m.index).trim()) return { tipo: 'sc', banda: banda.slice(0, m.index), why: '«' + m[1] + '»' };
-    if ((m = HITO_RE.exec(n))) return { tipo: 'hito', banda, why: '«' + m[1] + '»' };
+    if (mH) return { tipo: 'hito', banda, why: '«' + mH[1] + '»' };
     if ((m = SHOW_HEAD.exec(banda)) && banda.slice(m[0].length).trim()) return { tipo: 'show', banda: banda.slice(m[0].length), why: '«' + m[1] + '»' };
     return { tipo: def, banda, why: '' };
   }
@@ -78,7 +88,9 @@
    *  Devuelve { hm:'HH:MM', warn?:'…' } o null. */
   function parseTime(raw) {
     let t = String(raw == null ? '' : raw).trim().toLowerCase().replace(/\s+/g, '').replace(/\./g, function (m, i, s) { return /\d/.test(s[i - 1] || '') && /\d/.test(s[i + 1] || '') ? ':' : ''; });
-    t = t.replace(/^(\d{1,2}[:h]\d{2}):?(?:h|hs|hrs|horas)?$/, '$1');   // «15:00 h.», «16:30: h.» (tras quitar espacios y puntos)
+    t = t.replace(/^(\d{1,2}[:h]\d{2}):?(?:h|hs|hrs|horas)?$/, '$1');
+    if (/^(noon|mediodia|mediodía|12noon)$/.test(t)) return { hm: '12:00' };
+    if (/^(midnight|medianoche)$/.test(t)) return { hm: '00:00' };   // «15:00 h.», «16:30: h.» (tras quitar espacios y puntos)
     if (!t) return null;
     let ap = null;
     const mAp = /(a|p)m$/.exec(t);
@@ -103,7 +115,7 @@
   /** "21:00-22:15", "21:00 – 22:15", "21h a 22h" → { ini, fin } o null */
   function parseRange(raw) {
     const s = String(raw == null ? '' : raw).trim();
-    const m = /^(.+?)\s*(?:-|–|—|a|hasta|to|>|\/)\s*(.+)$/i.exec(s);
+    const m = /^(.+?)\s*(?:-|–|—|→|~|>|\/|\b(?:a|al|hasta|to|till|until)\b)\s*(.+)$/i.exec(s);
     if (!m) return null;
     const a = parseTime(m[1]), b = parseTime(m[2]);
     return a && b ? { ini: a, fin: b } : null;
@@ -123,17 +135,26 @@
    *  ctx: { year, days:[iso...] } (jornadas del evento, para «vie 10» o «viernes»). */
   function parseDate(raw, ctx) {
     const c = ctx || {};
-    const s = norm(raw).replace(/[.,]/g, ' ').replace(/\s+/g, ' ').trim();
+    const s0 = norm(raw).trim(); let mDot;
+    if ((mDot = /^(?:[a-z]+\s+)?(\d{1,2})\.(\d{1,2})\.(\d{2,4})$/.exec(s0))) { let y = +mDot[3]; if (y < 100) y += 2000; const iso = isoOk(y, +mDot[2], +mDot[1]); return iso ? { iso } : null; }
+    const s = s0.replace(/[.,]/g, ' ').replace(/\s+/g, ' ').trim();
     if (!s) return null;
     const year = c.year || new Date().getFullYear();
     let m;
     if ((m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(s))) { const iso = isoOk(+m[1], +m[2], +m[3]); return iso ? { iso } : null; }
     if ((m = /^(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?$/.exec(s))) {
       let y = m[3] ? +m[3] : year; if (y < 100) y += 2000;
-      const iso = isoOk(y, +m[2], +m[1]); return iso ? { iso } : null;
+      let d = +m[1], mo = +m[2];
+      // Día/mes (Europa) salvo que no pueda serlo: «09/25/2026» es mes/día (EE. UU.); si las dos valen, manda la del evento
+      if (mo > 12 && d <= 12) { const x = d; d = mo; mo = x; }
+      else if (d <= 12 && mo <= 12 && d !== mo && (c.days || []).length) {
+        const eu = isoOk(y, mo, d), us = isoOk(y, d, mo);
+        if (us && c.days.indexOf(us) >= 0 && c.days.indexOf(eu) < 0) { const x = d; d = mo; mo = x; }
+      }
+      const iso = isoOk(y, mo, d); return iso ? { iso } : null;
     }
     // [día-semana] 10 [de] jul[io] [2026]
-    const tok = s.split(/[\s\-\/]+/).filter(x => x && x !== 'de' && x !== 'del');
+    const tok = s.split(/[\s\-\/]+/).filter(x => x && x !== 'de' && x !== 'del' && x !== 'the' && x !== 'of').map(x => x.replace(/^(\d{1,2})(?:st|nd|rd|th|º|ª|o|er)$/, '$1'));
     let wd = null, dd = null, mo = null, yy = null;
     for (const t of tok) {
       if (DIAS[t] !== undefined && wd === null && dd === null) wd = DIAS[t];
@@ -238,18 +259,18 @@
     pinicio: 'Prueba · entrada', pfin: 'Prueba · salida', concierto: 'Show · hora o rango', duracion: 'Duración', call: 'CALL', notas: 'Notas', ignorar: 'Ignorar columna' };
   const HEADERS = {
     tipo: ['tipo', 'type', 'categoria', 'category', 'clase', 'kind'],
-    banda: ['artista', 'artistas', 'artist', 'banda', 'band', 'grupo', 'nombre', 'name', 'act', 'line up', 'lineup'],
-    escenario: ['zona', 'escenario', 'stage', 'sala', 'room', 'lugar', 'espacio', 'area', 'zone'],
+    banda: ['artista', 'artistas', 'artist', 'banda', 'band', 'grupo', 'nombre', 'name', 'act', 'line up', 'lineup', 'accion', 'acciones', 'actividad', 'activity', 'evento', 'event', 'descripcion', 'description', 'concepto', 'what', 'item', 'artistas / actividad'],
+    escenario: ['zona', 'escenario', 'stage', 'sala', 'room', 'lugar', 'espacio', 'area', 'zone', 'location', 'venue', 'place', 'ubicacion', 'escenarios', 'stages'],
     jornada: ['dia', 'fecha', 'jornada', 'day', 'date'],
     inicio: ['inicio', 'hora', 'start', 'begin', 'desde', 'empieza', 'comienzo', 'hora inicio', 'horario', 'time', 'start time'],
     fin: ['fin', 'end', 'finish', 'hasta', 'termina', 'hora fin', 'final'],
     duracion: ['duracion', 'dur', 'min', 'mins', 'minutos', 'length', 'duration'],
     call: ['call', 'llamada', 'aviso', 'citacion', 'citaciones', 'convocatoria', 'crew call', 'band call', 'artist call'],
-    notas: ['notas', 'nota', 'notes', 'obs', 'observaciones', 'comentarios', 'comments', 'info']
+    notas: ['notas', 'nota', 'notes', 'obs', 'observaciones', 'comentarios', 'comments', 'info', 'personal', 'quien', 'quienes', 'who', 'equipo', 'asistentes']
   };
 
   // Turnos del personal (regiduría, técnicos…): NO son zonas ni horas de las bandas
-  const STAFF_RE = /\b(stage ?managers?|regidor|regidora|regiduria|turnos?|shifts?|crew hours|staff hours|horas totales|total hours|personal|staff|guardia|rota)\b/;
+  const STAFF_RE = /\b(stage ?managers?|regidor|regidora|regiduria|turnos?|shifts?|crew hours|staff hours|horas totales|total hours|staff|guardia|rota)\b/;
   const CALL_RE = /\b(citacion|citaciones|call|calls|llamada|convocatoria)\b/;
   const PIN_RE = /\b(entrada|subida|in|on)\b.*\b(escenario|stage|tarima)\b|\bstage ?in\b|^(soundcheck|sound check|prueba|pruebas|prueba de sonido|pruebas de sonido|line ?check|sc)(\s(inicio|start|desde|in))?$/;
   const POUT_RE = /\b(salida|bajada|out|off)\b.*\b(escenario|stage|tarima)\b|\bstage ?out\b|^(soundcheck|sound check|prueba|pruebas|prueba de sonido|sc)\s(fin|end|hasta|out)$/;
@@ -271,12 +292,28 @@
     const map = row.map(headerKey);
     const known = map.filter(k => k && k !== 'ignorar').length;
     const looksData = row.some(cell => parseTime(cell) || parseRange(cell));
+    if (row.filter(x => String(x || '').trim()).length < 2) return null;   // una sola celda: título o sección, no cabecera
     return known >= 2 || (known >= 1 && !looksData) ? map : null;
   }
   /** Si la fila parece cabecera, devuelve el mapeo propuesto; si no, null. */
   function guessHeader(row) {
     const map = headerKeys(row);
     return map ? map.map(k => k || 'ignorar') : null;
+  }
+
+  /** ¿Parrilla con una columna por escenario? Una columna de horas, ninguna de «Banda», y 2+ columnas de nombres (texto, no horas)
+   *  cuyo título es un escenario («ESCENARIO 1», «Main Stage», «Carpa») o desconocido. → { time, jor, stages:[col] } o null */
+  function matrixColumns(head, header, data, ctx) {
+    if (head.indexOf('banda') >= 0) return null;
+    const cells = c => data.map(r => String(r[c] || '').trim()).filter(Boolean);
+    const frac = (c, fn) => { const x = cells(c); return x.length ? x.filter(fn).length / x.length : 0; };
+    let time = head.indexOf('inicio');
+    if (time < 0) time = head.findIndex((k, c) => k === null && frac(c, x => parseTime(x) || parseRange(x)) >= 0.8);
+    if (time < 0) return null;
+    const jor = head.indexOf('jornada');
+    const stages = head.map((k, c) => c).filter(c => c !== time && c !== jor && (head[c] === 'escenario' || head[c] === null) && cleanName(header[c]) &&
+      cells(c).length && frac(c, x => /[a-zñáéíóú]/i.test(x) && !parseTime(x) && !parseRange(x) && !parseDate(x, Object.assign({}, ctx || {}))) >= 0.8);
+    return stages.length >= 2 ? { time, jor, stages } : null;
   }
 
   /** ¿La cabecera es un nombre de zona («MAIN STAGE», «GIGANTE») y no la etiqueta de la columna («Stage», «Zona»)? */
@@ -326,7 +363,10 @@
     take(x => x.stage >= 0.5, 'escenario');
     take(x => x.int >= 0.6, 'duracion');
     take(x => x.text >= 0.6, 'banda');
-    if (!map.includes('escenario')) take(x => x.text >= 0.6 && x.len <= 20, 'escenario');
+    // Zona por el contenido solo si se repite como una zona (pocos valores distintos) y no son listas de personas («ANA + BEA», «ALL», «CREW»)
+    const zoneLike = c => { const v = rows.map(r => norm(r[c] || '')).filter(Boolean); const d = new Set(v).size;
+      return v.length && d <= Math.max(2, Math.ceil(v.length * 0.5)) && v.filter(x => /\+|^(all|crew|todos|todo el equipo|everyone|banda|band)$/.test(x)).length < v.length * 0.2; };
+    if (!map.includes('escenario')) take(x => x.text >= 0.6 && x.len <= 20 && zoneLike(x.c), 'escenario');
     take(x => x.text >= 0.5, 'notas');
     return map;
   }
@@ -367,7 +407,7 @@
     const idx = k => map.reduce((a, x, i) => (x === k ? a.concat([i]) : a), []);
     const headNorm = o.header ? o.header.map(norm) : null;
     const isHeaderRepeat = r => headNorm && map.every((k, c) => k === 'ignorar' || c === o.zoneCol || norm(r[c]) === headNorm[c]) && r.some((x, c) => norm(x) && norm(x) === headNorm[c] && c !== o.zoneCol);
-    let lastJor = '', lastEsc = '', zone = o.zone || '';
+    let lastJor = '', lastEsc = '', zone = o.zone || '', secDay = o.day || '';
     const ctxD = Object.assign({}, ctx || {});            // la primera fecha deducida («Jueves 27») ancla las siguientes
     rows.forEach((r, i) => {
       if (isHeaderRepeat(r)) {
@@ -379,9 +419,20 @@
       if (o.zoneCol !== undefined && o.zoneCol !== null && cleanName(r[o.zoneCol]) && r.every((x, c) => c === o.zoneCol || !String(x || '').trim()) && !parseDate(r[o.zoneCol], ctxD)) {
         zone = cleanName(r[o.zoneCol]); lastEsc = ''; ignored.push({ n: i + 1, line: zone, why: 'zona' }); return;
       }
-      const vals = k => idx(k).map(c => String(r[c] || '').trim()).filter(Boolean);
+      const nonEmpty = r.map(x => String(x || '').trim()).filter(Boolean);
+      // Fila con solo una fecha («HORARIOS SÁBADO 05.09.2026»): jornada de lo que viene (si no hay columna de jornada)
+      if (nonEmpty.length === 1 && map.indexOf('jornada') < 0) {
+        const fd = findDate(nonEmpty[0], ctxD, true) || (parseDate(nonEmpty[0], ctxD) ? { d: parseDate(nonEmpty[0], ctxD) } : null);
+        if (fd && !parseTime(nonEmpty[0])) { secDay = fd.d.iso; ignored.push({ n: i + 1, line: nonEmpty[0], why: 'jornada' }); return; }
+      }
+      const vals = k => idx(k).map(c => String(r[c] || '').trim()).filter(x => x && !/^[-–—·*]+$/.test(x));
       const first = k => vals(k)[0] || '';
-      let jor = first('jornada'), esc = first('escenario');
+      // Sin hora todavía («TBC», «En ruta», «por confirmar»): no es importable; se lista entre las ignoradas
+      const st0 = first('inicio') || first('pinicio') || first('concierto');
+      if (st0 && !findTimes(st0).length && /^(tbc|tbd|tba|por confirmar|a confirmar|pendiente|en ruta|sin hora|a definir)\b/i.test(norm(st0))) {
+        ignored.push({ n: i + 1, line: nonEmpty.join(' | '), why: 'sin hora (' + st0 + ')' }); return;
+      }
+      let jor = first('jornada') || '', esc = first('escenario');
       const banda0 = vals('banda').join(' ');
       const starts = [first('inicio'), first('pinicio'), first('concierto')].filter(Boolean);
       const filled = map.filter((k, c) => k !== 'ignorar' && String(r[c] || '').trim()).length;
@@ -392,7 +443,7 @@
       const inName = !starts.length && banda0 ? nameWithTimes(banda0) : null;
       if (!banda0 && !starts.length) { if (r.some(x => String(x || '').trim())) ignored.push({ n: i + 1, line: r.filter(x => x).join(' | '), why: 'sin nombre ni hora' }); return; }
       if (!starts.length && !inName && !first('fin') && !first('pfin') && filled <= 1) { ignored.push({ n: i + 1, line: r.filter(x => x).join(' | '), why: 'sin hora' }); return; }
-      const base = { src: i, raw: r.filter(x => x !== '').join(' | '), banda: banda0, tipoTxt: first('tipo'), escenario: esc, jornadaTxt: jor,
+      const base = { src: i, raw: r.filter(x => x !== '').join(' | '), banda: banda0, tipoTxt: first('tipo'), escenario: esc, jornadaTxt: jor || secDay,
         inicioTxt: '', finTxt: '', duracion: '', callTxt: '', notas: vals('notas').join(' · ') };
       const head = c => o.header && o.header[c] ? '«' + cleanName(o.header[c]) + '»' : '';
       const out = [];
@@ -426,7 +477,7 @@
 
   // ── Texto libre ─────────────────────────────────────────────────────
   // Hora con separador (21:00, 21.00, 21h, 21h30, 9pm, 9:00 PM). Sin separador NO cuenta (no confundir «Blink 182»).
-  const TIME_RE = /(\d{1,2})(?:[:.h](\d{2}))(?::\d{2})?\s*(?:([ap])\.?\s?m\.?)?(?![\d])|(\d{1,2})\s*h(?![a-zñ\d])|(\d{1,2})\s*([ap])\.?\s?m\.?(?![a-z])/gi;
+  const TIME_RE = /(\d{1,2})(?:[:.h](\d{2}))(?::\d{2})?(?:h(?![a-zñ]))?\s*(?:([ap])\.?\s?m\.?)?(?![\d])|(\d{1,2})\s*h(?![a-zñ\d])|(\d{1,2})\s*([ap])\.?\s?m\.?(?![a-z])/gi;
 
   function findTimes(line) {
     const out = []; let m; TIME_RE.lastIndex = 0;
@@ -466,14 +517,43 @@
     return text;
   }
 
+  // Palabras de sitio de escenario: una línea corta con una de ellas es la cabecera de una zona
+  const STAGE_WORD_RE = /\b(escenario|escenarios|stage|sala|carpa|tarima|auditorio|plaza|club|room|zona|terraza|patio|arena|tent|hall|pabellon|anfiteatro|teatro|theatre|theater|main|carpa)\b/;
+  /** ¿Línea corta de título de sección? 'zona' (lleva palabra de escenario) · 'otra' (título en mayúsculas: «ACTIVIDADES») · null */
+  function sectionTitle(line) {
+    const t = cleanName(line);
+    if (!t || t.split(/\s+/).length > 5 || findTimes(t).length || /[.,;!?]$/.test(t)) return null;
+    if (STAGE_WORD_RE.test(norm(t))) return 'zona';
+    if (t === t.toUpperCase() && /[A-ZÁÉÍÓÚÑ]{3,}/.test(t)) return 'otra';
+    return null;
+  }
+
   /** Texto libre → registros. Líneas solo con fecha o con escenario hacen de CABECERA para las siguientes. */
   function textRecords(text, ctx) {
     const stageNames = (ctx && ctx.stageNames) || [];
     const recs = [], ignored = [];
     let curDay = '', curStage = '';
+    // Hoja de ruta en BLOQUES (copiada de Word/PDF): una línea con solo la hora, la siguiente es la actividad
+    // y las demás hasta la próxima hora son notas (quién va: «ANA + BEA», «CREW», «ALL»).
+    let pend = null;
+    function finish(p) {
+      const r = interpret(p.rec, ctx);
+      p.glued.changes.forEach(c => r.warns.push('Palabras separadas: «' + c[0] + '» → «' + c[1] + '»'));
+      if (p.ini.warn) r.warns.push(p.ini.warn);
+      if (p.fin && p.fin.warn) r.warns.push(p.fin.warn);
+      recs.push(r);
+    }
+    function flush() { if (pend) { finish(pend); pend = null; } }
+    /** Nombre de la actividad: duración «(45')» aparte y otros paréntesis a notas. */
+    function activity(txt) {
+      const td = takeDuration(txt); let name = td.text, notas = '';
+      name = name.replace(/\(([^)]*)\)|\[([^\]]*)\]/g, (m, a, b) => { const x = cleanName(a || b); if (x) notas = notas ? notas + ' · ' + x : x; return ' '; });
+      return { banda: cleanName(name), dur: td.dur, notas };
+    }
     String(text || '').split(/\r?\n/).forEach((line00, i) => {
-      // Comentarios entre *** … *** (avisos de la hoja de ruta): no son entradas
-      if (/^\s*\*{2,}.*\*{2,}\s*$/.test(line00)) { ignored.push({ n: i + 1, line: line00.trim() }); return; }
+      // Comentarios entre *** … *** (avisos de la hoja de ruta): no son entradas. Una hora en negrita («**08:45H**») sí cuenta.
+      // (con 3+ asteriscos; con 2 es negrita de Markdown/Word: «**08:45H**», «**Salida furgoneta**»)
+      if (/^\s*\*{3,}.*\*{3,}\s*$/.test(line00)) { ignored.push({ n: i + 1, line: line00.trim() }); return; }
       // PDF con columnas: lo que va tras un tabulador o 3+ espacios DESPUÉS del nombre son notas
       let line0 = line00.replace(/\u00a0/g, ' '), colNote = '';
       const cols = line0.trim().split(/\t+|\s{3,}/);
@@ -483,20 +563,43 @@
       const glued = splitGlued(line0);
       const line = glued.text.replace(/[*_~]/g, ' ').replace(/^\s*[•·\-–—>]+\s*/, '').replace(/\s+/g, ' ').trim();
       if (!line) return;
+      // Fecha con puntos («05.09.2026»): es fecha, no una hora «05.09»
+      const dot = /(^|[^\d.])(\d{1,2}\.\d{1,2}\.(?:\d{4}|\d{2}))(?![\d.])/.exec(line);
+      if (dot) {
+        const d = parseDate(dot[2], ctx);
+        if (d) {
+          const sinFecha = (line.slice(0, dot.index + dot[1].length) + ' ' + line.slice(dot.index + dot[0].length)).replace(/\s+/g, ' ').trim();
+          if (!findTimes(sinFecha).length) { flush(); curDay = d.iso; return; }   // cabecera de jornada («HORARIOS SÁBADO 05.09.2026»)
+        }
+      }
       const times = findTimes(line);
       if (!times.length) {
         const fd = findDate(line, ctx);
-        if (fd && !/[a-z]{3,}/i.test(norm(fd.rest).replace(/\b(de|del|jornada|dia|day)\b/g, ''))) { curDay = fd.d.iso; return; }
-        // Cabecera con fecha completa y más texto («HOJA DE RUTA · VIERNES 10 JULIO»)
+        if (fd && !/[a-z]{3,}/i.test(norm(fd.rest).replace(/\b(de|del|jornada|dia|day)\b/g, ''))) { flush(); curDay = fd.d.iso; return; }
+        // Cabecera con fecha completa y más texto («HOJA DE RUTA · VIERNES 10 JULIO», «HORARIOS SÁBADO 05.09.2026»)
         const fdn = findDate(line, ctx, true);
-        if (fdn) { curDay = fdn.d.iso; return; }
+        if (fdn) { flush(); curDay = fdn.d.iso; return; }
+        if (pend) {                                            // dentro de un bloque: actividad y luego notas
+          if (!pend.rec.banda) {
+            const a = activity(line);
+            pend.rec.banda = a.banda; pend.rec.raw += ' | ' + line;
+            if (a.dur) pend.rec.duracion = a.dur;
+            if (a.notas) pend.rec.notas = pend.rec.notas ? a.notas + ' · ' + pend.rec.notas : a.notas;
+          } else { pend.rec.notas = pend.rec.notas ? pend.rec.notas + ' · ' + line : line; pend.rec.raw += ' | ' + line; }
+          return;
+        }
         const st = findStage(line, stageNames);
         if (st) { curStage = st; return; }
-        const m = /^(?:escenario|stage|sala)\s*[:\-–]?\s*(.+)$/i.exec(norm(line)) ? /^(?:escenario|stage|sala)\s*[:\-–]?\s*(.+)$/i.exec(line) : null;
+        // «Escenario: Principal» → Principal · «ESCENARIO PRINCIPAL», «CARPA», «MAIN STAGE» → la línea entera es la zona
+        const m = /^(?:escenario|stage|sala|zona)\s*[:\-–]\s*(.+)$/i.exec(line);
         if (m) { curStage = cleanName(m[1]); return; }
+        const sec = sectionTitle(line);
+        if (sec === 'zona') { curStage = cleanName(line); return; }
+        if (sec === 'otra') { curStage = ''; ignored.push({ n: i + 1, line, why: 'sección' }); return; }
         ignored.push({ n: i + 1, line });
         return;
       }
+      flush();
       let rest = line;
       const t1 = times[0], t2 = times[1];
       let ini = t1.t, fin = null;
@@ -511,6 +614,7 @@
       const fd = findDate(rest, ctx, true);
       if (fd) { jornadaTxt = fd.d.iso; rest = fd.rest; }
       let escenario = '', notas = colNote;
+      const td = takeDuration(rest); rest = td.text;
       const paren = /\(([^)]+)\)|\[([^\]]+)\]/.exec(rest);
       const st = findStage(rest, stageNames);
       if (st) { escenario = st; rest = removeWord(rest.replace(/[()\[\]]/g, ' '), st); }
@@ -520,15 +624,23 @@
         if (paren) { notas = cleanName(paren[1] || paren[2]) + (notas ? ' · ' + notas : ''); rest = rest.replace(paren[0], ' '); }
         if (curStage) escenario = curStage;
       }
+      // Si hay más paréntesis (no de zona) también van a notas
+      rest = rest.replace(/\(([^)]*)\)|\[([^\]]*)\]/g, (m, a, b) => { const x = cleanName(a || b); if (x) notas = notas ? notas + ' · ' + x : x; return ' '; });
       const rec = { src: i, raw: line, banda: cleanName(rest), escenario,
-        jornadaTxt: jornadaTxt || curDay, inicioTxt: ini.hm, finTxt: fin ? fin.hm : '', duracion: '', callTxt: '', notas: notas };
-      const r = interpret(rec, ctx);
-      glued.changes.forEach(c => r.warns.push('Palabras separadas: «' + c[0] + '» → «' + c[1] + '»'));
-      if (ini.warn) r.warns.push(ini.warn);
-      if (fin && fin.warn) r.warns.push(fin.warn);
-      recs.push(r);
+        jornadaTxt: jornadaTxt || curDay, inicioTxt: ini.hm, finTxt: fin ? fin.hm : '', duracion: td.dur, callTxt: '', notas: notas };
+      const p = { rec, glued, ini, fin };
+      if (!rec.banda) { pend = p; return; }               // solo la hora: empieza un bloque
+      finish(p);
     });
+    flush();
     return { records: recs, ignored };
+  }
+
+  /** «Show Paula Mattheus (45')» → { text: 'Show Paula Mattheus', dur: '45' }. */
+  const DUR_PAREN = /\(\s*(\d{1,3})\s*(?:['’′´`]{1,2}|min|mins|minutos|minutes)\s*\)/i;
+  function takeDuration(text) {
+    const m = DUR_PAREN.exec(text || '');
+    return m ? { text: (text.slice(0, m.index) + ' ' + text.slice(m.index + m[0].length)).replace(/\s+/g, ' ').trim(), dur: m[1] } : { text: text || '', dur: '' };
   }
 
   /** Normaliza un registro (horas, fecha, rango en una celda). */
@@ -539,6 +651,15 @@
     if (!ini && r.inicioTxt) {
       const rg = parseRange(r.inicioTxt);
       if (rg) { ini = rg.ini; if (!r.finTxt) { r.finTxt = rg.fin.hm; r.warns.push('Inicio y fin venían en la misma celda'); } }
+    }
+    if (!ini && r.inicioTxt) {
+      const ft = findTimes(r.inicioTxt);
+      if (ft.length) {
+        ini = ft[0].t; let end = ft[0].j;
+        if (ft[1] && /^\s*(?:-|–|—|a|hasta|to|>|\/)?\s*$/i.test(r.inicioTxt.slice(ft[0].j, ft[1].i)) && !r.finTxt) { r.finTxt = ft[1].t.hm; end = ft[1].j; }
+        const extra = cleanName((r.inicioTxt.slice(0, ft[0].i) + ' ' + r.inicioTxt.slice(end)).replace(/[()\[\]]/g, ' '));
+        if (extra) r.notas = r.notas ? extra + ' · ' + r.notas : extra;
+      }
     }
     r.inicio = ini ? ini.hm : '';
     if (ini && ini.warn) r.warns.push(ini.warn);
@@ -555,6 +676,7 @@
       if (C.dayIndex(r.jornadaTxt) !== null) r.jornada = r.jornadaTxt;
       else { const d = parseDate(r.jornadaTxt, ctx); if (d) { r.jornada = d.iso; if (d.warn) r.warns.push(d.warn); } else r.errs.push('Jornada no reconocida: «' + r.jornadaTxt + '»'); }
     }
+    if (!String(r.duracion || '').trim()) { const td = takeDuration(r.banda); if (td.dur) { r.banda = td.text; r.duracion = td.dur; } }
     r.banda = cleanName(r.banda);
     r.escenario = cleanName(r.escenario);
     r.duracion = durMinutes(r.duracion);
@@ -638,6 +760,20 @@
         jornada, inicio: r.inicio, fin: fin || '', finTxt: r.fin, duracion: r.duracion, call: call, notas: r.notas,
         action, target, warns, errs, status, include };
     });
+    // Zonas NUEVAS solo de shows y soundchecks: el sitio de una tarea o un hito («Hotel», «Aeropuerto», «Recinto») no es un escenario.
+    // Si ninguna banda toca en ese sitio, va a notas y no se crea la zona.
+    const bandPlaces = new Set(rows.filter(r => (r.tipo === 'show' || r.tipo === 'sc') && r.stageNew).map(r => norm(r.stageNew)));
+    rows.forEach(r => {
+      if (!r.stageNew || r.tipo === 'show' || r.tipo === 'sc' || bandPlaces.has(norm(r.stageNew))) return;
+      const place = r.stageNew;
+      r.notas = r.notas ? place + ' · ' + r.notas : place;
+      r.warns = r.warns.filter(w => w !== 'Zona nueva: ' + place);
+      r.errs = r.errs.filter(w => w.indexOf('La zona «' + place + '» no existe') !== 0);
+      r.escenario = ''; r.stageNew = '';
+      r.status = r.errs.length ? 'err' : r.warns.length ? 'warn' : 'ok';
+      if (r.include === false && !r.errs.length && !(o.include && o.include[r.idx] === false)) r.include = true;
+    });
+    for (let k = newStages.length - 1; k >= 0; k--) if (!rows.some(r => r.stageNew && norm(r.stageNew) === norm(newStages[k]))) newStages.splice(k, 1);
     // Solapes: solo entre bandas del mismo tipo (show/sc), escenario y jornada (existentes + importadas).
     // Tareas e hitos conviven con todo: no solapan.
     const existingOf = { show: C.buildBlocks(state, { mode: 'show', day: 'all' }), sc: C.buildBlocks(state, { mode: 'sc', day: 'all' }) };
@@ -711,8 +847,19 @@
     return { year: y, days: days, stageNames: (state.escenarios || []).map(e => e.nombre) };
   }
 
+  /** ¿Hoja de producción (hoja de ruta, day sheet) y no un cartel? Si al menos 2 entradas y un 25 % llevan palabras inequívocas de
+   *  producción (comidas, montaje, transfer, puertas, citación, prueba…), las palabras «débiles» (hotel, bus, prensa…) también cuentan. */
+  function markProduction(rd) {
+    const recs = rd.records || [];
+    const hits = recs.filter(r => { const n = norm(r.banda); return TAREA_RE.test(n) || HITO_RE.test(n) || SC_HEAD.test(r.banda || '') || r.tipoCol === 'sc'; }).length;
+    rd.production = recs.length > 0 && hits >= 2 && hits >= recs.length * 0.25;
+    if (rd.production) recs.forEach(r => { r.docProd = true; });
+    return rd;
+  }
+
   /** Atajo: texto → { kind, sep?, rows?, map?, header?, records, ignored } */
-  function read(text, ctx, forced) {
+  function read(text, ctx, forced) { return markProduction(read0(text, ctx, forced)); }
+  function read0(text, ctx, forced) {
     text = joinQuotedLines(text);
     const d = detect(text);
     if (d.kind === 'vacio') return { kind: 'vacio', records: [], ignored: [] };
@@ -727,6 +874,18 @@
     const header = hasHeader ? rows[hi] : null;
     const data = hasHeader ? rows.slice(hi + 1) : rows;
     const pre = hasHeader ? rows.slice(0, hi).map((r, i) => ({ n: i + 1, line: r.filter(x => x).join(' | '), why: 'título' })) : [];
+    // Parrilla con UNA COLUMNA POR ESCENARIO (HORA · ESCENARIO 1 · ESCENARIO 2…): cada celda es una banda en esa zona y hora
+    if (hasHeader && head && !(forced && forced.map)) {
+      const mx = matrixColumns(head, header, data, ctx);
+      if (mx) {
+        const prow = [];
+        data.forEach(r => mx.stages.forEach(c => { if (String(r[c] || '').trim()) prow.push([r[mx.time], cleanName(header[c]), r[c], mx.jor >= 0 ? r[mx.jor] : '']); }));
+        const pmap = ['inicio', 'escenario', 'banda', mx.jor >= 0 ? 'jornada' : 'ignorar'];
+        const tr = tableRead(prow, pmap, ctx, {});
+        return { kind: 'tabla', sep: d.sep, rows, header, headerRow: hi, hasHeader, map: head.map((k, c) => c === mx.time ? 'inicio' : c === mx.jor ? 'jornada' : mx.stages.indexOf(c) >= 0 ? 'escenario' : 'ignorar'),
+          matrix: true, zone: '', records: tr.records, ignored: tr.ignored };
+      }
+    }
     let map, zoneCol = null, zone = '';
     if (forced && forced.map) map = forced.map;
     else if (hasHeader && head) map = resolveHeader(head, header, data, ctx);
@@ -736,7 +895,9 @@
       const c0 = map.findIndex((k, c) => (k === 'jornada' || k === 'ignorar') && cleanName(header[c]) && isZoneTitle(header[c]));
       if (c0 === 0) { zoneCol = 0; zone = cleanName(header[0]); }
     }
-    const tr = tableRead(data, map, ctx, { header, zoneCol, zone });
+    let day = '';
+    rows.slice(0, hasHeader ? hi : 0).forEach(r => { const t = r.filter(x => x).join(' '), fd = findDate(t, ctx, true); if (fd) day = fd.d.iso; });
+    const tr = tableRead(data, map, ctx, { header, zoneCol, zone, day });
     return { kind: 'tabla', sep: d.sep, rows, header, headerRow: hasHeader ? hi : -1, hasHeader, map, zone, records: tr.records, ignored: pre.concat(tr.ignored) };
   }
 
