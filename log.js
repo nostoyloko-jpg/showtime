@@ -18,9 +18,9 @@
 
   const VERSION = 1;
   const MAX = 20000;                 // tope de seguridad (un día normal son decenas o cientos)
-  const SRC_TXT = { panel: 'Panel', mando: 'Mando regidor' };
+  const SRC_TXT = { panel: 'Panel', mando: 'Mando regidor', produccion: 'Producción' };
   const KIND_TXT = { show: 'Show', sc: 'Soundcheck', tarea: 'Tarea', hito: 'Hito' };
-  const TYPE_TXT = { real: 'Hora real', delay: 'Retraso', buffer: 'Tiempo extra', msg: 'Mensaje', meteo: 'Meteo', add: 'Alta', del: 'Borrado', edit: 'Cambio', undo: 'Deshecho' };
+  const TYPE_TXT = { real: 'Hora real', delay: 'Retraso', buffer: 'Tiempo extra', msg: 'Mensaje', call: 'CALL OK', meteo: 'Meteo', add: 'Alta', del: 'Borrado', edit: 'Cambio', undo: 'Deshecho' };
   const CATS = ['show', 'sc', 'tarea', 'hito', 'inc'];
   const CAT_TXT = { show: 'Shows', sc: 'Soundchecks', tarea: 'Tareas', hito: 'Hitos / Eventos', inc: 'Incidencias' };
 

@@ -196,6 +196,19 @@
     ok(html.indexOf('<script>alert') < 0, 'HTML escapado'); ok(/BORRADA 16:05/.test(html)); ok(/@page/.test(html));
   });
 
+  test('CALL OK: queda apuntado quién lo dio (Stage Manager o Producción) y sobrevive a recargar', () => {
+    const R = rig();
+    R.log = L.record(R.log, [{ type: 'call', text: 'CALL OK · Banda A · Stage Manager' }], { t: at('15:00'), src: 'panel' }, R.s);
+    R.log = L.record(R.log, [{ type: 'call', text: 'CALL OK · Banda B · Producción (Marta)' }], { t: at('16:00'), src: 'produccion' }, R.s);
+    R.log = L.record(R.log, [{ type: 'call', text: 'CALL OK · Banda C · Stage Manager (mando)' }], { t: at('17:00'), src: 'mando' }, R.s);
+    const back = L.norm(JSON.parse(JSON.stringify(R.log)));   // como al recargar el Dashboard
+    const calls = back.entries.filter(e => e.type === 'call');
+    eq(calls.length, 3, 'las entradas de CALL no se pierden al recargar');
+    eq(calls[0].src, 'panel'); eq(calls[1].src, 'produccion'); eq(calls[2].src, 'mando');
+    ok(calls[1].text.indexOf('Producción (Marta)') > 0, 'el nombre de quien lo dio va en el texto');
+    eq(L.SRC_TXT.produccion, 'Producción'); eq(L.TYPE_TXT.call, 'CALL OK');
+  });
+
   // ── Ejecutor ──────────────────────────────────────────────────────────
   let pass = 0; const fails = [];
   for (const [n, f] of tests) { try { f(); pass++; } catch (e) { fails.push([n, e.message]); } }

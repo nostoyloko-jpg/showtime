@@ -32,7 +32,7 @@
   const PUBLIC_BASE = 'https://nostoyloko-jpg.github.io/showtime/';
   // Versión publicada: va en los enlaces de los QR para que el móvil no abra una copia vieja guardada en su caché
   // (súbela junto con los ?v= de index.html / live.html / remote.html).
-  const BUILD = '20261024';
+  const BUILD = '20261025';
   const CHUNK = 24000;           // bytes por trozo (los repetidores públicos limitan el tamaño de mensaje)
   const BEAT_MS = 10000;         // latido del Mac
   const PRESENCE_MS = 30000;     // presencia de cada móvil
@@ -244,7 +244,32 @@
   /** QR PRIVADO del Stage Manager: lo mismo que el de Staff + la clave del mando. */
   function remoteUrl(room, base) { return (base || publicBase()) + 'remote.html?b=' + BUILD + '#sala=' + room.sala + '&k=' + room.k + '&p=' + room.p + '&c=' + room.c; }
   /** QR para Producción: con ID único personalizado. */
-  function productionUrl(room, base, prodId) { return (base || publicBase()) + 'produccion.html?b=' + BUILD + '#sala=' + room.sala + '&k=' + room.k + '&p=' + room.p + '&id=' + encodeURIComponent(prodId); }
+  /** Enlace de Producción: la Live de Manager (solo lectura) + «id» del productor, que activa sus mandos (OK de CALL, mensajes). */
+  function productionUrl(room, base, prodId) { return (base || publicBase()) + 'live.html?vista=manager&b=' + BUILD + '#sala=' + room.sala + '&k=' + room.k + '&p=' + room.p + '&id=' + encodeURIComponent(prodId); }
+  /** Mensajes de Producción (productor → Dashboard). Entrada NO fiable: se valida todo y se devuelve un objeto limpio o null.
+   *  { type:'call', from, key } · { type:'flash', from, text, to } · { type:'chat', from, text } */
+  const PROD_VISTAS = ['manager', 'backstage'];   // Producción NUNCA manda a Confidence (monitor de los músicos)
+  function cleanProdMsg(m) {
+    if (!m || typeof m !== 'object') return null;
+    const from = typeof m.from === 'string' && /^[A-Za-z0-9_-]{1,40}$/.test(m.from) ? m.from : null;
+    if (!from) return null;
+    if (m.type === 'call') {
+      const key = typeof m.key === 'string' && m.key.length <= 200 && m.key.lastIndexOf('@') > 0 ? m.key : null;
+      return key ? { type: 'call', from, key } : null;
+    }
+    if (m.type === 'flash') {
+      const text = typeof m.text === 'string' ? m.text.trim().slice(0, 140) : '';
+      if (!text) return null;
+      const pedidos = Array.isArray(m.to) ? m.to : [], to = PROD_VISTAS.filter(v => pedidos.indexOf(v) >= 0);
+      if (pedidos.length && !to.length) return null;   // pedía solo Confidence (o algo raro): no se manda a ningún sitio
+      return { type: 'flash', from, text, to: to.length ? to : PROD_VISTAS.slice() };   // sin destino = Manager y Backstage
+    }
+    if (m.type === 'chat' || (m.type === undefined && typeof m.text === 'string')) {
+      const text = typeof m.text === 'string' ? m.text.trim().slice(0, 500) : '';
+      return text ? { type: 'chat', from, text } : null;
+    }
+    return null;
+  }
   /** Lee «#sala=…&k=…&p=…». null si falta algo o no tiene el formato esperado. */
   function parseHash(hash) {
     const h = String(hash || '').replace(/^#/, ''), o = {};
@@ -254,6 +279,7 @@
     if (!k || k.length !== 16 || !p || p.length !== 16) return null;
     const r = { sala: o.sala, k: o.k, p: o.p };
     if (o.c !== undefined) { const c = unb64u(o.c); if (!c || c.length !== 16) return null; r.c = o.c; }
+    if (o.id !== undefined) { if (!/^[A-Za-z0-9_-]{1,40}$/.test(o.id)) return null; r.id = o.id; }   // enlace de Producción
     return r;
   }
 
@@ -500,7 +526,7 @@
 
   const API = {
     BROKERS, PUBLIC_BASE, BUILD, PROTO, STALE_MS, VIEWER_TTL, CMD_WINDOW, K_STATE, K_BEAT, K_END, K_ACK, K_HELLO, K_CMD, K_PROD_MSG,
-    newRoom, validRoom, withCmdKey, newCmdKey, staffUrl, remoteUrl, productionUrl, parseHash, publicBase, Emisor, Receptor, CmdGuard,
+    newRoom, validRoom, withCmdKey, newCmdKey, staffUrl, remoteUrl, productionUrl, parseHash, cleanProdMsg, publicBase, Emisor, Receptor, CmdGuard,
     // internos (para los tests)
     _: { b64u, unb64u, concat, MQ, varLen, pack, unpack, splitChunks, Assembler, macKeys, viewerKeys, seal, openFrame, sealHello, openHello, sealCmd, openCmd, fingerprint, topic, Link }
   };

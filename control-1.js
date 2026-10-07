@@ -777,6 +777,7 @@
   $('v-call').addEventListener('click', e => {
     const b = e.target.closest('.okbtn'); if (!b) return;
     Dt.markCallDone(b.dataset.ck, Math.floor(C.nowAbs()));
+    logCallOk(b.dataset.ck, 'Stage Manager', 'panel');
     tick();
   });
 
@@ -1929,37 +1930,57 @@
       return { ok: true, msg: 'Mensaje retirado' };
     }
     if (cmd.op === 'callOk') {
-      Dt.markCallDone(a.key, Math.floor(C.nowAbs())); tick(); toast(from + 'CALL confirmado');
+      Dt.markCallDone(a.key, Math.floor(C.nowAbs())); logCallOk(a.key, 'Stage Manager (mando)', 'mando'); tick(); toast(from + 'CALL confirmado');
       return { ok: true, msg: 'CALL confirmado' };
     }
     return { ok: false, msg: 'Orden desconocida' };
   }
 
-  // Mensajes de Producción: CALL confirmado, chat, etc.
-  function emProdMessage(msg) {
+  // ── CALL OK: quién lo ha dado queda en el log (Stage Manager desde el Panel, el mando o una pantalla Live; o la persona de Producción) ──
+  let CALL_LOGGED = new Set(Dt.getCallDone());   // OK ya apuntados (los que había al abrir no se reescriben)
+  function bandOfKey(key) { key = String(key); return key.slice(0, key.lastIndexOf('@')); }
+  function prodName(id) { const p = (typeof PRODUCERS !== 'undefined' ? PRODUCERS : []).find(x => x.id === id); return p ? p.name : id; }
+  function logCallOk(key, who, src) {
+    if (CALL_LOGGED.has(key)) return;   // el primero que lo da es el que queda apuntado
+    CALL_LOGGED.add(key);
+    logEvent('call', 'CALL OK · ' + bandOfKey(key) + ' · ' + who, { src });
+  }
+  /** OK que llegan de otra ventana (la Live del Stage Manager): se apuntan como suyos. Y se olvidan los que caducan. */
+  function logLiveCallOks() {
+    const now = Dt.getCallDone();
+    now.forEach(k => logCallOk(k, 'Stage Manager (pantalla Live)', 'panel'));
+    CALL_LOGGED.forEach(k => { if (now.indexOf(k) < 0) CALL_LOGGED.delete(k); });
+  }
+
+  // Mensajes de Producción (llegan cifrados desde su Live): OK de CALL, mensajes a las pantallas y chat.
+  function emProdMessage(raw) {
+    const msg = Em && Em.cleanProdMsg ? Em.cleanProdMsg(raw) : null;
     if (!msg) return;
+    const who = 'Producción (' + prodName(msg.from) + ')';
     if (msg.type === 'call') {
-      // Producción ha confirmado un CALL
-      logEvent('call', 'CALL confirmado por Producción (' + esc(msg.from) + ') · ' + esc(msg.bandName), { src: 'produccion', prodId: msg.from });
-    } else if (msg.type === 'chat' || msg.text) {
-      // Agregar mensaje a la lista del chat
-      const chatList = $('chat-list');
-      const chatEmpty = $('chat-empty');
+      if (!FEST || !C.buildBlocks(FEST, { mode: 'all', day: 'all' }).some(b => C.callKey(b) === msg.key)) return;   // solo CALL que existen
+      if (CALL_LOGGED.has(msg.key)) return;
+      Dt.markCallDone(msg.key, Math.floor(C.nowAbs()));
+      logCallOk(msg.key, who, 'produccion');
+      tick(); toast('CALL OK · ' + bandOfKey(msg.key) + ' · ' + who);
+    } else if (msg.type === 'flash') {
+      const to = Vs.normTargets(msg.to);
+      Dt.setFlash(msg.text, to, null); renderFlash();
+      toast(who + ' → ' + Vs.targetsTxt(to, null, zoneLabel) + ': «' + msg.text + '»');
+      logEvent('msg', '«' + msg.text + '» → ' + Vs.targetsTxt(to, null, zoneLabel) + ' · ' + who, { src: 'produccion' });
+    } else if (msg.type === 'chat') {
+      const chatList = $('chat-list'), chatEmpty = $('chat-empty');
       if (chatList) {
         const item = document.createElement('div');
         item.className = 'chat-list-item';
-        item.innerHTML = '<div class="chat-list-item-from">' + esc(msg.from) + '</div><div class="chat-list-item-text">' + esc(msg.text) + '</div>';
+        item.innerHTML = '<div class="chat-list-item-from">' + esc(prodName(msg.from)) + '</div><div class="chat-list-item-text">' + esc(msg.text) + '</div>';
         chatList.appendChild(item);
         chatList.scrollTop = chatList.scrollHeight;
         if (chatEmpty) chatEmpty.hidden = true;
       }
-      // Mostrar indicador de mensaje nuevo
       const chatOn = $('chat-on');
       if (chatOn) chatOn.hidden = false;
-      // Pop-up por defecto
-      if (CONFIG && CONFIG.prodChatPopup !== false) {
-        toast('Mensaje de Producción (' + esc(msg.from) + '): ' + esc(msg.text.slice(0, 100)));
-      }
+      if (CONFIG && CONFIG.prodChatPopup !== false) toast('Mensaje de ' + who + ': ' + msg.text.slice(0, 100));
     }
   }
 
@@ -2214,7 +2235,7 @@
 
   // ── Sincronización con la Pantalla Live ──────────────────────────────
   Dt.onChange(type => {
-    if (type === 'callDone') { tick(); return; }
+    if (type === 'callDone') { logLiveCallOks(); tick(); return; }
     if (type === 'flash') { renderFlash(); return; }
     if (type === 'meteo') { renderMeteo(); return; }
     loadState(); renderAll();
@@ -2240,5 +2261,5 @@
   tick();
   setInterval(tick, 1000);
   requestWake();
-  window.ShowtimePanel = { reload: () => { loadState(); renderAll(); } };
+  window.ShowtimePanel = { reload: () => { loadState(); renderAll(); }, _test: { emProdMessage } };   // _test: solo para tests/control.test.js
 })();

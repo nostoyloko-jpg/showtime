@@ -215,6 +215,41 @@
     await tx.stop(); v.rx.stop();
   });
 
+  // ── Producción: enlace y mensajes ─────────────────────────────────────
+  test('Producción: el enlace es la Live de Manager con «id», y parseHash lo lee', async () => {
+    const room = await E.newRoom();
+    const url = E.productionUrl(room, E.PUBLIC_BASE, 'prod_001');
+    ok(url.indexOf('live.html?vista=manager&b=' + E.BUILD + '#sala=' + room.sala) > 0, 'abre la Live de Manager: ' + url);
+    ok(url.indexOf('produccion.html') < 0, 'ya no abre la página aparte');
+    const p = E.parseHash(url.slice(url.indexOf('#')));
+    eq(p.id, 'prod_001'); eq(p.sala, room.sala);
+    ok(Q.encode(url, { ecl: 'M' }).version <= 10, 'QR versión ' + Q.encode(url, { ecl: 'M' }).version);
+    eq(E.parseHash(url.slice(url.indexOf('#')).replace('id=prod_001', 'id=a%20b')), null, 'id con caracteres raros → enlace no válido');
+    eq(E.parseHash(E.staffUrl(room, E.PUBLIC_BASE).replace(/^[^#]*/, '')).id, undefined, 'el enlace de Staff no lleva id');
+  });
+
+  test('Producción: cleanProdMsg valida lo que llega (entrada no fiable)', async () => {
+    const C = E.cleanProdMsg;
+    eq(JSON.stringify(C({ type: 'call', from: 'prod_001', key: 'Banda X@1230' })), JSON.stringify({ type: 'call', from: 'prod_001', key: 'Banda X@1230' }));
+    eq(C({ type: 'call', from: 'prod_001', key: 'sinarroba' }), null, 'clave sin @');
+    eq(C({ type: 'call', from: 'prod_001', key: 'x'.repeat(300) + '@1' }), null, 'clave enorme');
+    eq(C({ type: 'call', key: 'A@1' }), null, 'sin quién lo manda');
+    eq(C({ type: 'call', from: '<img onerror=1>', key: 'A@1' }), null, 'from con HTML');
+    eq(C(null), null); eq(C('hola'), null); eq(C({ type: 'raro', from: 'p1' }), null);
+    const f = C({ type: 'flash', from: 'p1', text: '  Hola  ', to: ['backstage', 'raro'] });
+    eq(f.text, 'Hola'); eq(f.to.join(), 'backstage');
+    eq(C({ type: 'flash', from: 'p1', text: 'x'.repeat(400) }).text.length, 140, 'máximo 140 como los mensajes del Dashboard');
+    eq(C({ type: 'flash', from: 'p1', text: 'Hola', to: ['manager', 'confidence', 'backstage'] }).to.join(), 'manager,backstage', 'NUNCA a Confidence, aunque lo pidan');
+    eq(C({ type: 'flash', from: 'p1', text: 'Hola', to: ['confidence', 'backstage'] }).to.join(), 'backstage', 'se quita Confidence y queda el resto');
+    eq(C({ type: 'flash', from: 'p1', text: 'Hola', to: ['confidence'] }), null, 'pedir solo Confidence: no se manda a ningún sitio');
+    eq(C({ type: 'flash', from: 'p1', text: 'Hola', to: ['raro'] }), null, 'destino desconocido: no se manda');
+    eq(C({ type: 'flash', from: 'p1', text: 'Hola', to: [] }).to.join(), 'manager,backstage', 'sin destino = Manager y Backstage');
+    eq(C({ type: 'flash', from: 'p1', text: 'Hola' }).to.join(), 'manager,backstage', 'sin «to» = Manager y Backstage');
+    eq(C({ type: 'flash', from: 'p1', text: '   ' }), null, 'mensaje vacío');
+    eq(C({ type: 'chat', from: 'p1', text: 'ey' }).type, 'chat');
+    eq(C({ from: 'p1', text: 'antiguo sin type' }).type, 'chat', 'formato antiguo del chat');
+  });
+
   // ── Ejecutor asíncrono ────────────────────────────────────────────────
   (async () => {
     let pass = 0; const fails = [];

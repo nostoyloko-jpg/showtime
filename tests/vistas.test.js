@@ -214,6 +214,11 @@
     eq(V.pickScreen([lap], lap), null); eq(V.pickScreen([tv, lap], tv), lap, 'Dashboard en la tele: abre en el portátil');
   });
 
+  test('Producción: solo ve Manager y Backstage (sin Confidence)', () => {
+    eq(V.normProdVista('confidence'), 'manager'); eq(V.normProdVista('backstage'), 'backstage'); eq(V.normProdVista('rara'), 'manager'); eq(V.normProdVista(null), 'manager');
+    eq(V.nextProdVista('manager'), 'backstage'); eq(V.nextProdVista('backstage'), 'manager'); eq(V.nextProdVista('confidence'), 'backstage');
+  });
+
   // ── Ejecutar ──────────────────────────────────────────────────────────
   let pass = 0; const fails = [];
   tests.forEach(([n, f]) => { try { f(); pass++; } catch (e) { fails.push([n, e.message]); } });

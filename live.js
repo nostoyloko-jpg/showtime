@@ -10,7 +10,10 @@
   const URLP = new URLSearchParams(location.search);
   // ── Vista de esta ventana (2e-A): manager · confidence · backstage (?vista=…; tecla V para rotar) ──
   const Vs = window.ShowtimeVistas;
-  let VISTA = Vs.normVista(URLP.get('vista'));
+  // Producción: el enlace lleva «&id=…». Solo ve Manager y Backstage y tiene sus mandos (OK de CALL, mensajes).
+  const _EM = window.ShowtimeEmision, _HP = _EM && _EM.parseHash(location.hash), PRODID = _HP && _HP.id ? _HP.id : null;
+  const vistaOk = v => PRODID ? Vs.normProdVista(v) : Vs.normVista(v);
+  let VISTA = vistaOk(URLP.get('vista'));
   let ZONA = URLP.has('zona') ? URLP.get('zona') : null;   // zona de Confidence (null = sin elegir)
 
   // ── Preferencias de ESTA pantalla (otra luz, otro monitor: van aparte del Panel) ──
@@ -612,7 +615,8 @@
   // OK de CALL: se guarda (no vuelve al recargar) y se avisa a las demás ventanas.
   document.addEventListener('click', e => {
     const btn = e.target.closest && e.target.closest('.callok');
-    if (!btn || !btn.dataset.ck || Dt.READONLY) return;
+    if (!btn || !btn.dataset.ck) return;
+    if (Dt.READONLY) { if (PRODID) prodSend({ type: 'call', from: PRODID, key: btn.dataset.ck }, 'OK de CALL enviado'); return; }   // Producción: lo manda al Dashboard, que lo apunta en el log
     CALL_DONE = new Set(Dt.markCallDone(btn.dataset.ck, Math.floor(C.nowAbs())));
     tick();
   });
@@ -729,7 +733,7 @@
     const upd = () => b.querySelector('use').setAttribute('href', (d.fullscreenElement || d.webkitFullscreenElement) ? '#i-unfull' : '#i-full');
     d.addEventListener('fullscreenchange', upd); d.addEventListener('webkitfullscreenchange', upd);
   })();
-  document.addEventListener('keydown', e => { if ((e.key === 'f' || e.key === 'F') && !e.metaKey && !e.ctrlKey) toggleFull(); });
+  document.addEventListener('keydown', e => { if ((e.key === 'f' || e.key === 'F') && !e.metaKey && !e.ctrlKey && !(e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName))) toggleFull(); });
   document.addEventListener('fullscreenchange', () => {
     $('fullbtn').querySelector('use').setAttribute('href', document.fullscreenElement ? '#i-unfull' : '#i-full');
     requestAnimationFrame(tick);
@@ -781,6 +785,42 @@
   setInterval(() => { renderFlash(); if (VISTA === 'confidence') renderConf(); }, 250);
   window.ShowtimeLive = { applyStyle: v => { applyStyle(v); tick(); }, reload: () => { load(); tick(); } };
 
+  // ── Producción: envío al Dashboard y menú de mensajes (izquierda) ──
+  let PROD_R = null;
+  function prodNote(txt, bad) {
+    const el = $('pnote'); el.textContent = txt; el.classList.toggle('bad', !!bad); el.hidden = false;
+    clearTimeout(prodNote.t); prodNote.t = setTimeout(() => { el.hidden = true; }, 3500);
+  }
+  /** Manda un mensaje cifrado al Dashboard por el canal de Producción y avisa del resultado. */
+  async function prodSend(msg, okTxt) {
+    if (!PROD_R) { prodNote('Sin conexión con el Dashboard', true); return false; }
+    let r; try { r = await PROD_R.sendProdMessage(msg); } catch (e) { r = { ok: false, msg: 'No se pudo enviar' }; }
+    prodNote(r.ok ? okTxt : (r.msg || 'Sin conexión'), !r.ok);
+    return !!r.ok;
+  }
+  /** Menú plegado a la izquierda: se abre al pasar el cursor (o al tocar el icono) y se recoge solo. Mensajes igual que los «custom» del Dashboard. */
+  function initProdDock() {
+    const dock = $('msgdock'), input = $('md-text'); let tOpen = 0, tClose = 0, to = [];
+    dock.hidden = false;
+    const set = on => { dock.classList.toggle('open', on); $('mdbtn').setAttribute('aria-expanded', String(on)); };
+    dock.addEventListener('pointerenter', e => { if (e.pointerType !== 'mouse') return; clearTimeout(tClose); tOpen = setTimeout(() => set(true), 250); });
+    dock.addEventListener('pointerleave', e => { if (e.pointerType !== 'mouse') return; clearTimeout(tOpen); tClose = setTimeout(() => { if (document.activeElement !== input) set(false); }, 600); });
+    input.addEventListener('blur', () => { tClose = setTimeout(() => { if (!dock.matches(':hover')) set(false); }, 600); });
+    $('mdbtn').addEventListener('click', () => { clearTimeout(tOpen); set(!dock.classList.contains('open')); if (dock.classList.contains('open')) input.focus(); });
+    const paint = () => document.querySelectorAll('#md-to [data-to]').forEach(b => b.classList.toggle('on', b.dataset.to === 'all' ? !to.length : to.indexOf(b.dataset.to) >= 0));
+    $('md-to').addEventListener('click', e => {
+      const b = e.target.closest('[data-to]'); if (!b) return;
+      if (b.dataset.to === 'all') to = [];
+      else { const i = to.indexOf(b.dataset.to); if (i >= 0) to.splice(i, 1); else to.push(b.dataset.to); if (to.length === 2) to = []; }   // Manager + Backstage = «Todas» (Producción nunca manda a Confidence)
+      paint();
+    });
+    $('md-form').addEventListener('submit', async e => {
+      e.preventDefault();
+      const text = input.value.trim(); if (!text) return;
+      if (await prodSend({ type: 'flash', from: PRODID, text, to: to.slice() }, 'Mensaje enviado a las pantallas')) { input.value = ''; input.blur(); set(false); }
+    });
+  }
+
   // ── Modo Staff (2d-A): Pantalla Live de solo lectura abierta desde el QR ──
   // Los datos llegan cifrados por la emisión del Mac; aquí no se puede cambiar nada (sin OK de CALL ni cerrar mensajes).
   function startStaff() {
@@ -802,6 +842,7 @@
     }
     if (!params || !(window.crypto && crypto.subtle) || !('WebSocket' in window)) { render(null); return; }
     const R = new Em.Receptor({ params, onSnapshot: snap => Dt.loadSnapshot(snap), onStatus: render });
+    if (PRODID) { PROD_R = R; document.body.classList.add('prod'); initProdDock(); }
     R.start().catch(e => { console.error(e); render(null); });
   }
 
@@ -822,7 +863,7 @@
   }
   /** Cambia de vista sin recargar (tecla V): la URL se actualiza (el «#…» de la emisión se conserva). */
   function setVista(v) {
-    VISTA = Vs.normVista(v);
+    VISTA = vistaOk(v);
     const q = new URLSearchParams(location.search);
     q.set('vista', VISTA);
     if (VISTA === 'confidence' && ZONA !== null) q.set('zona', ZONA); else q.delete('zona');
@@ -832,7 +873,7 @@
   document.addEventListener('keydown', e => {
     if ((e.key === 'v' || e.key === 'V') && !e.metaKey && !e.ctrlKey && !e.altKey && !(e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName))) {
       if (VISTA === 'manager' && ZONA === null) { const z = pget(LIVE_ZONE, null); if (z !== null) ZONA = z; }   // última zona elegida en esta pantalla
-      setVista(Vs.nextVista(VISTA));
+      setVista(PRODID ? Vs.nextProdVista(VISTA) : Vs.nextVista(VISTA));
     }
   });
 

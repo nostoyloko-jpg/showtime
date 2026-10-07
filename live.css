@@ -251,7 +251,7 @@ body[data-lv="escenario"] .txtbtn{color:#fff}
 .rx.stale .rx-dot,.rx.end .rx-dot,.rx.bad .rx-dot{background:#ff3b30;box-shadow:0 0 7px #ff3b30;animation:rxp 1.1s ease-in-out infinite}
 @keyframes rxp{50%{opacity:.25}}
 /* Solo lectura: fuera todo lo que cambia datos */
-body.ro .callok,body.ro #flash-x,body.ro #close{display:none!important}
+body.ro:not(.prod) .callok,body.ro #flash-x,body.ro #close{display:none!important}   /* Producción (body.prod) sí puede dar OK de CALL */
 body.ro .vsplit,body.ro #hsplit{pointer-events:none}
 
 /* ── Móvil en vertical: todo en una columna con scroll ─────────────── */
@@ -361,3 +361,21 @@ body:not([data-vista="manager"]) .mtpill{display:none}
 .tk-it.meteo.warn{font-weight:900}
 .cf-kind{color:rgba(255,255,255,.6)}
 .cf-kind.sc{color:#c9b6ff}
+
+/* Producción: menú de mensajes a la izquierda (mismo comportamiento que el de la derecha) */
+.mdock{position:fixed;left:14px;bottom:14px;z-index:200;display:flex;flex-direction:column-reverse;align-items:flex-start;gap:6px;background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.15);border-radius:9px;padding:4px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);opacity:.55;transition:opacity .2s}
+.mdock[hidden]{display:none}
+.mdock:hover,.mdock.open{opacity:1}
+#mdbody{display:none;flex-direction:column;gap:8px;padding:4px 6px 6px;width:min(340px,80vw)}
+.mdock.open #mdbody{display:flex}
+#mdbtn{border-color:transparent;background:transparent}
+.mdock.open #mdbtn{border-color:var(--btn-line);background:var(--btn-bg)}
+.md-to{display:flex;flex-wrap:wrap;gap:4px}
+.md-to button{height:28px;padding:0 10px;border:1px solid rgba(255,255,255,.18);border-radius:6px;background:transparent;color:rgba(255,255,255,.75);font:inherit;font-size:11px;cursor:pointer}
+.md-to button.on{background:rgba(255,255,255,.16);color:#fff;border-color:rgba(255,255,255,.4)}
+#md-form{display:flex;gap:6px}
+#md-text{flex:1;min-width:0;height:32px;padding:0 10px;border-radius:6px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:#fff;font:inherit;font-size:13px}
+.md-send{background:var(--call);color:#111;font-weight:800}
+.pnote{position:fixed;left:50%;bottom:76px;transform:translateX(-50%);z-index:210;background:rgba(0,0,0,.88);border:1px solid rgba(255,255,255,.25);color:#fff;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:700}
+.pnote.bad{border-color:#ff6363;color:#ff8a8a}
+.pnote[hidden]{display:none}

@@ -16,6 +16,10 @@
 
   function normVista(v) { return VISTAS.indexOf(v) >= 0 ? v : 'manager'; }
   function nextVista(v) { return VISTAS[(VISTAS.indexOf(normVista(v)) + 1) % VISTAS.length]; }
+  // Producción: solo Manager y Backstage (sin Confidence, que es el monitor de los músicos)
+  const PROD_VISTAS = ['manager', 'backstage'];
+  function normProdVista(v) { return PROD_VISTAS.indexOf(v) >= 0 ? v : 'manager'; }
+  function nextProdVista(v) { return PROD_VISTAS[(PROD_VISTAS.indexOf(normProdVista(v)) + 1) % PROD_VISTAS.length]; }
 
   // ── Ajustes de pantallas (Configuración › Pantallas Live y vistas) ────
   const DEFAULT_SCREENS = {
@@ -188,7 +192,7 @@
     return list.find(s => !s.isInternal && !s.isPrimary) || list.find(s => !s.isInternal) || list.find(s => !s.isPrimary) || list[0];
   }
 
-  const API = { VISTAS, VISTA_TXT, VISTA_SUB, DEFAULT_SCREENS, normVista, nextVista, normScreens, normTargets, normZones, flashFor, targetsTxt,
+  const API = { VISTAS, VISTA_TXT, VISTA_SUB, DEFAULT_SCREENS, normVista, nextVista, normProdVista, nextProdVista, normScreens, normTargets, normZones, flashFor, targetsTxt,
     level, fmtClock, confidence, tickerItems, backstageCalls, liveUrl, parseLive, pickScreen };
   if (isNode) module.exports = API;
   else root.ShowtimeVistas = API;
