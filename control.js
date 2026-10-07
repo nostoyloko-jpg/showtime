@@ -1149,7 +1149,7 @@
   /** Zonas para Confidence: las del evento y «Sin zona» si hay bandas sin zona. */
   function renderLiveMenu() {
     const box = $('lv-zones'); if (!box) return;
-    if (!FEST) { box.innerHTML = '<div style="text-align:center;width:100%"><div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:24px">' + esc(p.name) + ' · ' + esc(p.id) + '</div>' + qr + '<div style="margin-top:24px;display:flex;flex-direction:column;gap:12px;width:100%;max-width:280px"><div style="font-size:12px;color:var(--accent);display:flex;align-items:center;gap:8px"><span style="width:8px;height:8px;background:var(--accent);border-radius:50%"></span>En directo</div><div style="font-size:11px;color:var(--muted)">0 dispositivos conectados</div><button style="padding:10px 16px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:var(--text);font-size:12px;cursor:pointer;margin-top:8px;width:100%">Ampliar</button><button style="padding:10px 16px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:var(--text);font-size:12px;cursor:pointer;width:100%">Copiar enlace</button><button style="padding:10px 16px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:var(--text);font-size:12px;cursor:pointer;width:100%">Parar emisión</button></div></div>'; return; }
+    if (!FEST) { box.innerHTML = '<p class="mnote">Sin evento cargado.</p>'; return; }
     const zs = (FEST.escenarios || []).map(z => ({ id: z.id, name: z.nombre, color: z.color }));
     if (C.buildBlocks(FEST, { mode: 'all', day: 'all' }).some(b => C.isBand(b) && !b.stageId)) zs.push({ id: '', name: 'Sin zona', color: '#888' });
     const h = zs.map(z => '<button class="mitem lvz" data-vista="confidence" data-zona="' + esc(z.id) + '"><i style="background:' + esc(safeColor(z.color, '#888')) + '"></i>' + esc(z.name) +
@@ -2021,7 +2021,7 @@
     const box = $('prod-list');
     if (!box) return;
     if (!PRODUCERS.length) {
-      box.innerHTML = '<div style="text-align:center;width:100%"><div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:24px">' + esc(p.name) + ' · ' + esc(p.id) + '</div>' + qr + '<div style="margin-top:24px;display:flex;flex-direction:column;gap:12px;width:100%;max-width:280px"><div style="font-size:12px;color:var(--accent);display:flex;align-items:center;gap:8px"><span style="width:8px;height:8px;background:var(--accent);border-radius:50%"></span>En directo</div><div style="font-size:11px;color:var(--muted)">0 dispositivos conectados</div><button style="padding:10px 16px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:var(--text);font-size:12px;cursor:pointer;margin-top:8px;width:100%">Ampliar</button><button style="padding:10px 16px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:var(--text);font-size:12px;cursor:pointer;width:100%">Copiar enlace</button><button style="padding:10px 16px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:var(--text);font-size:12px;cursor:pointer;width:100%">Parar emisión</button></div></div>';
+      box.innerHTML = '<p class="mnote">Sin productores. Añade uno arriba.</p>';
       return;
     }
     box.innerHTML = PRODUCERS.map((p, i) => {
@@ -2123,7 +2123,7 @@
     $('cast-on').classList.toggle('warn', on && !emLinksOn());
     ['staff', 'remote', 'produccion'].forEach(kind => {
       const box = $('cast-' + kind);
-      if (!emCan()) { box.innerHTML = '<div style="text-align:center;width:100%"><div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:24px">' + esc(p.name) + ' · ' + esc(p.id) + '</div>' + qr + '<div style="margin-top:24px;display:flex;flex-direction:column;gap:12px;width:100%;max-width:280px"><div style="font-size:12px;color:var(--accent);display:flex;align-items:center;gap:8px"><span style="width:8px;height:8px;background:var(--accent);border-radius:50%"></span>En directo</div><div style="font-size:11px;color:var(--muted)">0 dispositivos conectados</div><button style="padding:10px 16px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:var(--text);font-size:12px;cursor:pointer;margin-top:8px;width:100%">Ampliar</button><button style="padding:10px 16px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:var(--text);font-size:12px;cursor:pointer;width:100%">Copiar enlace</button><button style="padding:10px 16px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:var(--text);font-size:12px;cursor:pointer;width:100%">Parar emisión</button></div></div>'; return; }
+      if (!emCan()) { box.innerHTML = '<p class="cintro">Este navegador no permite la emisión cifrada.</p>'; return; }
       if (!on) {
         box.dataset.url = '';
         box.innerHTML = (kind === 'remote'
