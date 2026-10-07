@@ -563,8 +563,22 @@
     return { kind: 'tabla', sep: d.sep, rows, header: hasHeader ? rows[0] : null, hasHeader, map, records: tableRecords(data, map, ctx), ignored: [] };
   }
 
+  /** Sin evento abierto: evento PROVISIONAL para la vista previa, con las jornadas que trae el horario (de la primera a la
+   *  última, máx. 31) o, si no trae fechas, la jornada de hoy. Solo se guarda si el Stage Manager pulsa «Importar».
+   *  forced: las mismas opciones de lectura que la vista previa (cabecera, columnas). now: minutos absolutos (para los tests). */
+  function provisionalState(text, now, forced) {
+    const cut = { event: { dayCutoff: C.DEFAULT_CUTOFF } };
+    const today = C.jornadaOfAbs(cut, Number.isFinite(now) ? now : C.nowAbs());
+    const rd = read(text, { year: +today.slice(0, 4), days: [], stageNames: [] }, forced || {});
+    const days = Array.from(new Set(rd.records.map(r => r.jornada).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d || '')))).sort();
+    let fi = days.length ? days[0] : today, ff = days.length ? days[days.length - 1] : today;
+    const span = (Date.parse(ff) - Date.parse(fi)) / 86400000;
+    if (span > 30) ff = new Date(Date.parse(fi) + 30 * 86400000).toISOString().slice(0, 10);   // el resto saldrá como «fuera del evento»
+    return C.newFestival({ nombre: 'Evento sin nombre', fechaInicio: fi, fechaFin: ff, dayCutoff: C.DEFAULT_CUTOFF }).state;
+  }
+
   const API = { norm, parseTime, parseRange, parseDate, detect, splitRow, parseTable, guessHeader, guessColumns, tableRecords,
-    textRecords, findTimes, interpret, preview, apply, contextOf, read, KEYS, KEY_LABEL, splitGlued, proposeTipo, tipoFromText, TIPO_KEYS, TIPO_LABEL };
+    textRecords, findTimes, interpret, preview, apply, contextOf, read, KEYS, KEY_LABEL, splitGlued, proposeTipo, tipoFromText, TIPO_KEYS, TIPO_LABEL, provisionalState };
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
   else root.ShowtimeImport = API;
 })(typeof window !== 'undefined' ? window : globalThis);

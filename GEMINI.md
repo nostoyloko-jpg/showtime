@@ -31,7 +31,8 @@ Las reglas generales (idioma, tono, permisos, commits, varias IAs) están en el 
 | `meteo.js` | El tiempo (Open-Meteo, URL propia o manual) y avisos de previsión |
 | `importar.js` | «Pegar horario»: lee tablas (TSV/CSV) y texto libre, vista previa y alta |
 | `qr.js` | Generador de QR propio (sin dependencias) |
-| `tests/*.test.js` · `tests/_dom.js` · `tests/index.html` | Tests (node o navegador). `_dom.js` = navegador simulado con **reloj simulado** (`makeEnv({ now })`) |
+| `xlsx.js` | Lector de Excel (.xlsx) propio, sin librerías: abre el ZIP con `DecompressionStream` y saca la primera hoja con datos como texto tabulado para «Pegar horario» |
+| `tests/*.test.js` · `tests/_dom.js` · `tests/index.html` · `tests/fixtures/` | Tests (node o navegador). `_dom.js` = navegador simulado con **reloj simulado** (`makeEnv({ now })`) y archivos de verdad (File/FileReader). `fixtures/` = Excel reales para los tests del lector |
 | `parches/synapse-live-completo/` | Parche que pone en Synapse Live el mismo código que la Pantalla Live de Showtime |
 | `referencia/` | Material de partida (código extraído de Synapse, ejemplos). **No se publica ni se toca** |
 
@@ -44,6 +45,7 @@ Las reglas generales (idioma, tono, permisos, commits, varias IAs) están en el 
 - **CALL en cascada**: hora de CALL escrita (anterior al inicio) → avisa desde esa hora; vacía o «—» → inicio − minutos del evento. Por margen, no por instante.
 - **CHANGEOVER**: solo entre bandas de la **misma zona y la misma jornada**. STANDBY solo si el Stage Manager lo marca.
 - **Bis (Tiempo extra tardío)**: se puede rescatar la banda que acaba de terminar hasta que la siguiente de su zona dé ▶, y como mucho 15 min (o el colchón del cambio si es mayor). En EN ESCENA sale en la tarjeta de CHANGEOVER, en «Sin actividad» si la anterior era de la jornada de antes (pasada la hora de corte) o en una fila «ACABÓ» si no viene nadie detrás.
+- **Importar**: todo lo que se pega o se suelta (⌘V, arrastrar, «Subir archivo») pasa por la **vista previa**; nada se guarda hasta «Importar». Sin evento abierto, al importar se crea «Evento sin nombre» con las jornadas detectadas. PDF: no se lee (sin librerías); se abre la caja de pegar con el aviso de copiar el texto.
 - **Producción**: sus mensajes **nunca** van a Confidence (solo Manager / Backstage). Los avisos permanentes solo los quita el Stage Manager (✕ en el Dashboard). El chat Producción ↔ Stage Manager no entra en el Event Log y va con clave propia (privado frente a Staff).
 - Los manejadores van con `addEventListener` (no `onclick` en el HTML). `let`/`const` declarados antes de usarse. Sin `console.log` de depuración (solo `console.error` en errores reales).
 

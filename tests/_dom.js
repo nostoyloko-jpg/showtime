@@ -7,6 +7,13 @@ const fs = require('fs'), path = require('path'), vm = require('vm');
 const ROOT = path.join(__dirname, '..');
 const src = f => fs.readFileSync(path.join(ROOT, f), 'utf8');
 
+/** FileReader de mentira sobre File/Blob reales de node (asíncrono, como el del navegador). */
+class FakeFileReader {
+  readAsText(f) { this._go(f.text()); }
+  readAsArrayBuffer(f) { this._go(f.arrayBuffer()); }
+  _go(p) { p.then(r => { this.result = r; if (this.onload) this.onload(); }, e => { if (this.onerror) this.onerror(e); }); }
+}
+
 /** opts: { cripto, hash, search, storage:{clave:valor}, now: ms (reloj simulado: la hora no depende de cuándo se pasen los tests) } */
 function makeEnv(opts) {
   opts = opts || {};
@@ -42,7 +49,8 @@ function makeEnv(opts) {
   const getEl = id => { if (!els.has(id)) els.set(id, stub(id)); return els.get(id); };
   const addEL = (t, fn) => { (handlers[t] = handlers[t] || []).push(fn); };
   const document = {
-    getElementById: getEl, querySelector: () => stub('qs'), querySelectorAll: () => [], createElement: () => stub('new'),
+    getElementById: getEl, querySelector: sel => sel === '.menu.open' ? null : stub('qs'),   // ningún menú abierto al empezar
+    querySelectorAll: () => [], createElement: () => stub('new'),
     addEventListener: addEL, removeEventListener() {}, body: getEl('body'), documentElement: getEl('html'), head: getEl('head'),
     visibilityState: 'hidden', title: '', cookie: '', activeElement: null
   };
@@ -58,7 +66,7 @@ function makeEnv(opts) {
     history: { replaceState() {} }, innerHeight: 800, innerWidth: 1280, devicePixelRatio: 1,
     getComputedStyle: () => ({ getPropertyValue: () => '' }), URLSearchParams,
     open() { return null; }, close() {}, print() {}, focus() {}, alert() {}, confirm: () => true, prompt: () => null,
-    fetch: () => Promise.reject(new Error('sin red')), URL, Blob: function () {}, FileReader: function () {},
+    fetch: () => Promise.reject(new Error('sin red')), URL, Blob, File, Response, DecompressionStream, FileReader: FakeFileReader,
     Intl, Date: DateC, Math, JSON, Promise, Map, Set, Array, Object, String, Number, Boolean, RegExp, Error, TypeError, Uint8Array, TextEncoder, TextDecoder, encodeURIComponent, decodeURIComponent,
     parseInt, parseFloat, isNaN, Symbol, WeakMap, atob: s => Buffer.from(s, 'base64').toString('binary'), btoa: s => Buffer.from(s, 'binary').toString('base64')
   };

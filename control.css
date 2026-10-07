@@ -761,7 +761,7 @@ body[data-ps="escenario"] .bar .clock{color:#FFD600}
 .wake.on{color:var(--text)}
 .wake.on .led{background:var(--ok);box-shadow:0 0 6px var(--ok)}
 .wake[hidden]{display:none}
-@media (max-width:1500px){ .wake .wtxt{display:none} }
+@media (max-width:1700px){ .wake .wtxt{display:none} }
 
 /* ── Fila de estado: solo los chips (sin reloj, ya está arriba) ── */
 .tools{padding:8px 14px;border-bottom:1px solid var(--hair);min-height:0}
@@ -808,8 +808,9 @@ td.est{font-variant-numeric:tabular-nums}
 tr.k-hito td.ti::after{display:none}
 .bar .mbtn{padding:0 8px}
 .bar .brand{letter-spacing:.2em}
-@media (max-width:1560px){ .fest{max-width:120px} }
-@media (max-width:1480px){ .fest{display:none} .bar .mbtn{padding:0 6px} .bright{gap:8px;padding-left:10px} }
+@media (max-width:1560px){ .fest{display:none} }
+@media (max-width:1480px){ .bar .mbtn{padding:0 6px} .bright{gap:8px;padding-left:10px} }
+@media (max-width:1620px){ #btn-undo span{display:none} }
 
 /* ── Zona: el nombre entero (p. ej. «Secundario»), sin cortes feos ── */
 #tbl td.stage input[type=text]{width:var(--escw,140px);min-width:110px;max-width:220px;text-overflow:ellipsis}
@@ -875,3 +876,43 @@ body.focus #tbl .gapbtn{font-size:14px}
 .toast{transition:opacity .3s ease,transform .3s ease;animation:toastin .2s ease-out}
 .toast.out{opacity:0;transform:translateX(-50%) translateY(6px)}
 @keyframes toastin{from{opacity:0;transform:translateX(-50%) translateY(6px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+
+/* ── Importar en 1 segundo: tarjeta central, pestañas de «+ Añadir» y soltar archivos ── */
+.empty .onb,.list-empty .onb{margin:auto}
+.list-empty{flex:1;display:flex;align-items:center;justify-content:center;padding:28px 16px;min-height:360px}
+.list-empty[hidden]{display:none}
+.onb{width:min(560px,100%);display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center;padding:34px 34px 26px;border-radius:16px;
+  border:1px dashed var(--hair2,rgba(255,255,255,.16));background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.01));box-shadow:0 18px 50px rgba(0,0,0,.35)}
+.onb-ic{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--accent-fill,var(--accent)) 16%,transparent);color:var(--accent-fill,var(--accent))}
+.onb-ic .ic{width:24px;height:24px}
+.empty .onb-t,.onb-t{margin:0;font-size:15px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--text)}
+.empty .onb-s,.onb-s{margin:0;font-size:14px;color:var(--muted);max-width:420px;line-height:1.45}
+.onb-pill{font-size:12px;color:var(--dim,var(--muted));padding:5px 12px;border-radius:999px;border:1px solid var(--hair,rgba(255,255,255,.08));background:rgba(255,255,255,.03)}
+.onb-btns{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:6px}
+.onb-btns .btn{height:40px;padding:0 16px;font-size:14px;gap:8px}
+.onb-main kbd{margin-left:4px;background:rgba(0,0,0,.18);border-color:rgba(255,255,255,.25);color:inherit;font-size:11px}
+.onb-manual{font-size:12px;color:var(--muted);height:30px}
+.onb-alt{font-size:12px;color:var(--dim,var(--muted));margin-top:4px}
+.onb-alt .linkbtn{color:var(--muted);font-size:12px}
+.onb-alt .linkbtn:hover,.addtip .linkbtn:hover{color:var(--text)}
+/* Pestañas arriba de «Pegar horario» y de «Añadir 1 fila» */
+.addtabs{display:flex;gap:4px;padding:3px;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid var(--hair,rgba(255,255,255,.08));margin-bottom:12px;width:max-content;max-width:100%}
+.imp-head .addtabs{margin-bottom:0}
+.addtabs button{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 14px;border:0;border-radius:7px;background:transparent;color:var(--muted);font:inherit;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}
+.addtabs button small{font-weight:600;font-size:11px;color:var(--dim,var(--muted))}
+.addtabs button:hover{color:var(--text)}
+.addtabs button.on{background:rgba(255,255,255,.10);color:var(--text);box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+.addtabs button[data-addtab="paste"] .ic{color:var(--accent-fill,var(--accent))}
+.addtip{margin:12px 0 0;font-size:12px;color:var(--muted)}
+.addtip .linkbtn{color:var(--text);font-size:12px}
+.imp-notice{margin:0;padding:9px 12px;border-radius:8px;font-size:13px;font-weight:600;color:var(--text);background:color-mix(in srgb,var(--accent-fill,var(--accent)) 14%,transparent);border:1px solid color-mix(in srgb,var(--accent-fill,var(--accent)) 45%,transparent)}
+.imp-notice[hidden]{display:none}
+.imp-fresh{flex-basis:100%;color:var(--muted)}
+/* Soltar archivos: overlay sutil */
+.drop{background:rgba(6,7,10,.62);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.drop>.drop-box{display:flex;flex-direction:column;align-items:center;gap:8px;padding:36px 54px;border:2px dashed color-mix(in srgb,var(--accent-fill,var(--accent)) 70%,transparent);border-radius:18px;background:rgba(20,22,28,.7);font-size:15px;font-weight:600}
+.drop-box .ic{width:30px;height:30px;color:var(--accent-fill,var(--accent))}
+.drop-box b{font-size:20px;letter-spacing:.02em}
+.drop-box span{font-size:13px;color:var(--muted);font-weight:500}
+body[data-ps="escenario"] .onb{background:#000;border-color:rgba(255,214,0,.55)}
+body[data-ps="escenario"] .addtabs button.on{background:#FFD600;color:#000}

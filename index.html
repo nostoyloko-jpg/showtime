@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Showtime · Dashboard</title>
-<link rel="stylesheet" href="control.css?v=20261035">
+<link rel="stylesheet" href="control.css?v=20261036">
 </head>
 <body>
 <div id="savewarn" class="savewarn" role="alert" hidden><b>NO SE ESTÁ GUARDANDO</b> · el navegador no tiene espacio. Lo que cambies se ve y se emite, pero se pierde si recargas: guarda el evento en un archivo (.json), exporta el log y libera espacio.</div>
@@ -27,6 +27,8 @@
   <symbol id="i-down" viewBox="0 0 20 20"><path d="M10 4.5v11M5.5 11l4.5 4.5 4.5-4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-dot" viewBox="0 0 20 20"><circle cx="10" cy="10" r="4" fill="currentColor"/></symbol>
   <symbol id="i-play" viewBox="0 0 20 20"><path d="M7 5l8 5-8 5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 20 20"><path d="M11.5 2.5 4.5 11h5l-1 6.5 7-8.5h-5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 20 20"><path d="M2.5 5.5a1 1 0 0 1 1-1h4l1.7 2h7.3a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1h-13a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
   <symbol id="i-refresh" viewBox="0 0 20 20"><path d="M15.5 7.5A6 6 0 0 0 4.6 7M4.5 12.5A6 6 0 0 0 15.4 13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M15.8 3.8v3.9h-3.9M4.2 16.2v-3.9h3.9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-stop" viewBox="0 0 20 20"><rect x="5.5" y="5.5" width="9" height="9" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
   <symbol id="i-alert" viewBox="0 0 20 20"><path d="M10 3.5l7 12.5H3z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M10 8.5v3.5M10 14.2v.1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
@@ -186,6 +188,16 @@
       <button id="btn-help" class="btn ghost icon helpbtn" type="button" title="Atajos y ayuda (⌘/)" aria-label="Atajos y ayuda">?</button>
       <button id="btn-new-row" class="btn addnew" title="Añadir una entrada (show, soundcheck, tarea o hito): se coloca sola en su sitio por hora"><svg class="ic"><use href="#i-plus"/></svg>Añadir</button>
     </div>
+    <div id="list-empty" class="list-empty" hidden>
+  <div class="onb">
+    <div class="onb-ic" aria-hidden="true"><svg class="ic"><use href="#i-bolt"/></svg></div>
+    <h2 class="onb-t">Importar horario en 1 segundo</h2>
+    <p class="onb-s">Arrastra aquí tu archivo Excel / CSV / PDF o pega el texto del cartel</p>
+    <div class="onb-pill">Detecta automáticamente: bandas, zonas, horas y soundchecks · los changeovers se calculan solos</div>
+    <div class="onb-btns"><button type="button" class="btn primary onb-main" data-ob="paste"><svg class="ic"><use href="#i-bolt"/></svg>Pegar horario <kbd>⌘V</kbd></button><button type="button" class="btn onb-file" data-ob="file"><svg class="ic"><use href="#i-folder"/></svg>Subir archivo</button></div>
+    <button type="button" class="btn ghost onb-manual" data-ob="manual"><svg class="ic"><use href="#i-plus"/></svg>Añadir fila a mano</button>
+  </div>
+    </div>
     <div class="tblwrap">
       <table id="tbl">
         <thead><tr>
@@ -200,12 +212,14 @@
 </main>
 
 <section id="empty" class="empty" hidden>
-  <h2>Sin evento cargado</h2>
-  <p>Crea el evento aquí (zonas y bandas), o abre un JSON guardado de Showtime o de Synapse.</p>
-  <div class="row">
-    <button id="btn-new2" class="btn primary"><svg class="ic"><use href="#i-plus"/></svg>Nuevo evento</button>
-    <button id="btn-import2" class="btn"><svg class="ic"><use href="#i-in"/></svg>Abrir JSON</button>
-    <button id="btn-demo" class="btn">Evento de demostración</button>
+  <div class="onb">
+    <div class="onb-ic" aria-hidden="true"><svg class="ic"><use href="#i-bolt"/></svg></div>
+    <h2 class="onb-t">Importar horario en 1 segundo</h2>
+    <p class="onb-s">Arrastra aquí tu archivo Excel / CSV / PDF o pega el texto del cartel</p>
+    <div class="onb-pill">Detecta automáticamente: bandas, zonas, horas y soundchecks · los changeovers se calculan solos</div>
+    <div class="onb-btns"><button type="button" class="btn primary onb-main" data-ob="paste"><svg class="ic"><use href="#i-bolt"/></svg>Pegar horario <kbd>⌘V</kbd></button><button type="button" class="btn onb-file" data-ob="file"><svg class="ic"><use href="#i-folder"/></svg>Subir archivo</button></div>
+    <button type="button" class="btn ghost onb-manual" data-ob="manual"><svg class="ic"><use href="#i-plus"/></svg>Añadir fila a mano</button>
+    <div class="onb-alt">o empieza con <button id="btn-new2" type="button" class="linkbtn">Nuevo evento vacío</button> · <button id="btn-import2" type="button" class="linkbtn">Abrir un .json de Showtime o Synapse</button> · <button id="btn-demo" type="button" class="linkbtn">Evento de demostración</button></div>
   </div>
 </section>
 
@@ -321,12 +335,14 @@
 <!-- QR en grande (Emisión): se queda abierto hasta cerrarlo, para escanearlo con calma -->
 <div id="qr-big" class="qr-big" hidden><div class="qr-big-box"><div id="qr-big-svg"></div><div id="qr-big-t" class="qr-big-t">Staff · solo lectura</div><div id="qr-big-st" class="qr-big-st"></div><button id="qr-big-x" class="btn">Cerrar</button></div></div>
 
-<div id="drop" class="drop" hidden><div>Suelta aquí el archivo (.json del evento, o .csv / .tsv con un horario)</div></div>
+<div id="drop" class="drop" hidden><div class="drop-box"><svg class="ic"><use href="#i-bolt"/></svg><b>Suelta para importar</b><span>Excel (.xlsx) · CSV · TSV · texto · el .json del evento · PDF: te digo cómo</span></div></div>
+<input id="ob-file" type="file" accept=".xlsx,.csv,.tsv,.txt,.json,.pdf,text/csv,text/tab-separated-values,text/plain,application/json,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
 
 <!-- Añadir entrada: ventana en medio de la pantalla (la fila se coloca sola por su hora) -->
 <div id="addm" class="modal" hidden>
   <div class="modal-box addbox" role="dialog" aria-modal="true" aria-labelledby="addm-t">
-    <h2 id="addm-t">Añadir</h2>
+    <h2 id="addm-t" class="sr-only">Añadir 1 fila a mano</h2>
+    <div class="addtabs" role="tablist" aria-label="Añadir"><button type="button" role="tab" data-addtab="paste" aria-selected="false" class=""><svg class="ic"><use href="#i-bolt"/></svg>Pegar horario completo <small>Excel · CSV · PDF</small></button><button type="button" role="tab" data-addtab="row" aria-selected="true" class="on"><svg class="ic"><use href="#i-plus"/></svg>Añadir 1 fila a mano</button></div>
     <div id="addrow" class="form addform k-show">
       <label for="add-tipo">Tipo</label><select id="add-tipo" data-f="tipo" class="tipo" title="Qué vas a añadir"><option value="show">Show</option><option value="sc">Soundcheck</option><option value="tarea">Tarea</option><option value="hito">Hito</option></select>
       <label for="add-nombre">Nombre</label><input id="add-nombre" data-f="nombre" type="text" placeholder="Nombre de la banda" autocomplete="off" spellcheck="false">
@@ -338,6 +354,7 @@
       <label for="add-notas">Notas</label><input id="add-notas" data-f="notas" type="text" placeholder="Notas" autocomplete="off">
       <div class="addmsg"><span id="add-hint" class="hint"></span><span id="add-err" class="err"></span></div>
     </div>
+    <p class="addtip">💡 ¿Tienes varias bandas? Usa <button type="button" class="linkbtn" data-addtab="paste">Pegar horario completo</button></p>
     <div class="row end" style="margin-top:14px"><button id="addm-cancel" class="btn" type="button">Cancelar</button><button id="btn-add" class="btn primary" type="button"><svg class="ic"><use href="#i-plus"/></svg>Añadir</button></div>
   </div>
 </div>
@@ -353,13 +370,14 @@
 <!-- Pegar horario (ESPEC-2c A) -->
 <div id="imp" class="modal" hidden>
   <div class="modal-box imp-box" role="dialog" aria-modal="true" aria-labelledby="imp-title">
-    <div class="imp-head"><h2 id="imp-title">Pegar horario</h2><button id="imp-close" class="iconsq" title="Cerrar (Esc)"><svg class="ic"><use href="#i-x"/></svg></button></div>
+    <div class="imp-head"><h2 id="imp-title" class="sr-only">Pegar horario completo</h2><div class="addtabs" role="tablist" aria-label="Añadir"><button type="button" role="tab" data-addtab="paste" aria-selected="true" class="on"><svg class="ic"><use href="#i-bolt"/></svg>Pegar horario completo <small>Excel · CSV · PDF</small></button><button type="button" role="tab" data-addtab="row" aria-selected="false" class=""><svg class="ic"><use href="#i-plus"/></svg>Añadir 1 fila a mano</button></div><button id="imp-close" class="iconsq" title="Cerrar (Esc)"><svg class="ic"><use href="#i-x"/></svg></button></div>
+    <p id="imp-notice" class="imp-notice" role="status" hidden></p>
     <div class="imp-src">
       <textarea id="imp-text" spellcheck="false" placeholder="Pega aquí (⌘V) celdas copiadas de Excel, Numbers o Google Sheets, o texto de un PDF, WhatsApp o correo.&#10;&#10;Ejemplos:&#10;21:00-22:15 Los Ejemplos Principal&#10;VIERNES 10 JULIO · 23:30 Cabeza de Cartel (Carpa)"></textarea>
       <div class="imp-side">
-        <button id="imp-pick" class="btn"><svg class="ic"><use href="#i-in"/></svg>Elegir .csv / .tsv</button>
-        <input id="imp-file" type="file" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain" hidden>
-        <p class="hint">o arrastra el archivo a esta ventana</p>
+        <button id="imp-pick" class="btn"><svg class="ic"><use href="#i-folder"/></svg>Subir archivo</button>
+        <input id="imp-file" type="file" accept=".xlsx,.csv,.tsv,.txt,.pdf,text/csv,text/tab-separated-values,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
+        <p class="hint">Excel (.xlsx), CSV, TSV o texto. O arrastra el archivo a la ventana.</p>
         <p id="imp-kind" class="imp-kind"></p>
       </div>
     </div>
@@ -380,15 +398,16 @@
 <datalist id="zones-dl"></datalist>
 <div id="toast" class="toast" hidden></div>
 
-<script src="core.js?v=20261035"></script>
-<script src="meteo.js?v=20261035"></script>
-<script src="datos.js?v=20261035"></script>
-<script src="importar.js?v=20261035"></script>
-<script src="qr.js?v=20261035"></script>
-<script src="emision.js?v=20261035"></script>
-<script src="mando.js?v=20261035"></script>
-<script src="vistas.js?v=20261035"></script>
-<script src="log.js?v=20261035"></script>
-<script src="control.js?v=20261035"></script>
+<script src="core.js?v=20261036"></script>
+<script src="meteo.js?v=20261036"></script>
+<script src="datos.js?v=20261036"></script>
+<script src="importar.js?v=20261036"></script>
+<script src="xlsx.js?v=20261036"></script>
+<script src="qr.js?v=20261036"></script>
+<script src="emision.js?v=20261036"></script>
+<script src="mando.js?v=20261036"></script>
+<script src="vistas.js?v=20261036"></script>
+<script src="log.js?v=20261036"></script>
+<script src="control.js?v=20261036"></script>
 </body>
 </html>

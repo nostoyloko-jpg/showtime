@@ -201,6 +201,7 @@
     $('btn-export').disabled = !has;
     $('btn-undo').disabled = !UNDO.length;
     $('btn-undo').querySelector('span').textContent = UNDO.length ? 'Deshacer (' + UNDO.length + ')' : 'Deshacer';
+    $('btn-undo').title = UNDO.length ? 'Deshacer (' + UNDO.length + '): ' + UNDO[UNDO.length - 1].m + ' (⌘Z)' : 'Nada que deshacer';
     $('fest-name').textContent = has ? ((FEST.event && FEST.event.nombre) || 'Evento sin nombre') : 'Sin evento';
     const d = has && ORIG ? C.diffSummary(ORIG, FEST) : { total: 0 };
     $('mods').hidden = !d.total;
@@ -209,6 +210,10 @@
     renderTools();
     renderWarn();
     if (!$('cfg').hidden) renderConfig();
+    // Sin entradas: en vez de la tabla vacía, la tarjeta de «Importar horario en 1 segundo»
+    const empty = has && !(FEST.artists || []).length;
+    $('list-empty').hidden = !empty;
+    document.querySelector('.tblwrap').hidden = empty;
     if (has) { renderTable(); renderAddRow(); tick(); }
   }
 
@@ -567,15 +572,30 @@
   $('btn-add').addEventListener('click', addBand);
   /** Ventana «Añadir»: en medio de la pantalla; al aceptar, la entrada se coloca sola por su hora. */
   function openAdd() {
-    if (!FEST) { toast('Primero crea o abre un evento', true); return; }
+    if (!FEST) { toast('Primero crea el evento (o pega un horario: se crea solo)', true); askNew(); return; }
     closeMenus(); closeConfig();
+    if (IMP) closeImport();
+    setAddTabs('row');
     $('add-err').textContent = '';
     renderAddRow();
     $('addm').hidden = false;
     $('add-nombre').focus();
   }
   function closeAdd() { $('addm').hidden = true; }
-  $('btn-new-row').addEventListener('click', openAdd);
+  // «+ Añadir»: un solo modal con 2 pestañas (Pegar horario completo · Añadir 1 fila a mano). Abre en la última usada; la primera vez, Pegar.
+  const ADDTAB_KEY = 'showtime.addtab';
+  function setAddTabs(tab) {
+    document.querySelectorAll('.addtabs [data-addtab]').forEach(b => { const on = b.dataset.addtab === tab; b.classList.toggle('on', on); b.setAttribute('aria-selected', String(on)); });
+    try { localStorage.setItem(ADDTAB_KEY, tab); } catch (e) {}
+  }
+  function lastAddTab() { try { return localStorage.getItem(ADDTAB_KEY) === 'row' ? 'row' : 'paste'; } catch (e) { return 'paste'; } }
+  function openAddTab(tab) { if (tab === 'row') openAdd(); else openImport(''); }
+  $('btn-new-row').addEventListener('click', () => openAddTab(lastAddTab()));
+  document.addEventListener('click', e => {
+    const b = e.target.closest && e.target.closest('[data-addtab]'); if (!b) return;
+    if (b.dataset.addtab === 'row') { if (!FEST) { closeImport(); } openAdd(); }
+    else { const keep = IMP ? IMP.text : ''; openImport(keep); }
+  });
   $('addm-cancel').addEventListener('click', closeAdd);
   $('addm').addEventListener('click', e => { if (e.target.id === 'addm') closeAdd(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('addm').hidden) closeAdd(); });
@@ -1306,6 +1326,8 @@
       return;
     }
     const s = r.state, ev = s.event || {};
+    // Sin evento abierto y archivo limpio: se abre directamente (no hay nada que perder ni que avisar)
+    if (!FEST && !r.warnings.length) { loadNew(s, 'Evento abierto: ' + (ev.nombre || fname)); return; }
     const dShow = C.festivalDays(s, 'show'), dSc = C.festivalDays(s, 'sc');
     const nT = s.artists.filter(a => C.tipoOf(a) === 'tarea').length, nH = s.artists.filter(a => C.tipoOf(a) === 'hito').length;
     let html = '<p>Archivo: <b>' + esc(fname) + '</b></p><ul>' +
@@ -1448,6 +1470,15 @@
       [{ label: 'Cancelar' }, { label: 'Cargar demo', kind: 'primary', run: () => loadNew(C.demoFestival(Math.floor(C.nowAbs())), 'Demo cargada') }]);
   }
   $('btn-demo').addEventListener('click', askDemo);
+  // Tarjeta «Importar horario en 1 segundo» (sin evento o sin entradas)
+  document.addEventListener('click', e => {
+    const b = e.target.closest && e.target.closest('[data-ob]'); if (!b) return;
+    const a = b.dataset.ob;
+    if (a === 'paste') openImport('');
+    else if (a === 'file') $('ob-file').click();
+    else if (a === 'manual') openAdd();
+  });
+  $('ob-file').addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); e.target.value = ''; });
 
   // Arrastrar y soltar en cualquier parte del Panel: .json → abrir evento; .csv/.tsv → Pegar horario
   let dragN = 0;
@@ -1456,9 +1487,23 @@
   window.addEventListener('dragover', e => e.preventDefault());
   window.addEventListener('drop', e => {
     e.preventDefault(); dragN = 0; $('drop').hidden = true;
-    const f = e.dataTransfer && e.dataTransfer.files[0]; if (!f) return;
-    if (isTableFile(f)) { if (!IMP) openImport(''); if (IMP) loadImportFile(f); }
-    else readFile(f);
+    const f = e.dataTransfer && e.dataTransfer.files[0]; if (f) handleFile(f);
+  });
+
+  // ⌘V fuera de una casilla: abre «Pegar horario» con lo copiado (texto) o con el archivo copiado (p. ej. desde el Finder).
+  // Con un modal, el panel de Configuración o un menú abiertos no hace nada (cada uno pega donde toca).
+  function pasteShortcutOk(t) {
+    if (t && t.closest && t.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"]')) return false;
+    if (!$('modal').hidden || !$('addm').hidden || !$('imp').hidden || !$('cfg').hidden) return false;
+    if (document.querySelector('.menu.open')) return false;
+    return true;
+  }
+  document.addEventListener('paste', e => {
+    if (!pasteShortcutOk(e.target)) return;
+    const cd = e.clipboardData, f = cd && cd.files && cd.files[0];
+    e.preventDefault();
+    if (f) { handleFile(f); return; }
+    openImport(cd ? cd.getData('text/plain') : '');
   });
 
   // ── Pegar horario (ESPEC-2c A) ─────────────────────────────────────────
@@ -1467,17 +1512,17 @@
   let IMP = null;
   let impTimer = 0;
 
-  function openImport(text) {
-    if (!FEST) {
-      modal('Pegar horario', '<p>Primero crea o abre un evento: el horario se añade al evento activo.</p>', [{ label: 'Entendido', kind: 'primary' }]);
-      return;
-    }
+  /** notice: aviso arriba de la caja (p. ej. cómo pegar un PDF). Sin evento abierto se importa a un evento nuevo (IMP.fresh). */
+  function openImport(text, notice) {
     closeConfig();
+    if (!$('addm').hidden) closeAdd();
     // Por defecto, visibles y cambiables: la jornada que se está viendo (o la única del evento) y el único escenario si solo hay uno
-    const days = C.eventDays(FEST), stg = FEST.escenarios || [];
-    IMP = { text: text || '', mode: CONFIG.mode === 'sc' ? 'sc' : 'show',
-      defJor: CONFIG.day !== 'all' ? CONFIG.day : days.length === 1 ? days[0] : '', defEsc: stg.length === 1 ? stg[0].id : '',
+    const days = FEST ? C.eventDays(FEST) : [], stg = FEST ? FEST.escenarios || [] : [];
+    IMP = { text: text || '', mode: CONFIG.mode === 'sc' ? 'sc' : 'show', fresh: !FEST, base: FEST, jorTouched: false,
+      defJor: FEST && CONFIG.day !== 'all' ? CONFIG.day : days.length === 1 ? days[0] : '', defEsc: stg.length === 1 ? stg[0].id : '',
       header: undefined, map: null, create: {}, extend: true, include: {}, edits: {}, read: null, pv: null };
+    $('imp-notice').hidden = !notice; $('imp-notice').textContent = notice || '';
+    setAddTabs('paste');
     $('imp-text').value = IMP.text;
     $('imp').hidden = false;
     impRecompute();
@@ -1489,16 +1534,21 @@
 
   function impRecompute() {
     if (!IMP) return;
-    const ctx = I.contextOf(FEST);
     const forced = {};
     if (IMP.header !== undefined) forced.header = IMP.header;
     if (IMP.map) forced.map = IMP.map;
+    if (IMP.fresh) {     // sin evento: uno provisional con las jornadas del horario (no se guarda hasta «Importar»)
+      IMP.base = I.provisionalState(IMP.text, Math.floor(C.nowAbs()), forced);
+      const days = C.eventDays(IMP.base);
+      if (!IMP.jorTouched || days.indexOf(IMP.defJor) < 0) IMP.defJor = days.length === 1 ? days[0] : '';
+    }
+    const ctx = I.contextOf(IMP.base);
     let rd = I.read(IMP.text, ctx, forced);
     if (rd.kind === 'tabla' && IMP.map && rd.rows && IMP.map.length !== Math.max.apply(null, rd.rows.map(r => r.length))) {
       IMP.map = null; rd = I.read(IMP.text, ctx, IMP.header !== undefined ? { header: IMP.header } : {});
     }
     IMP.read = rd;
-    IMP.pv = I.preview(FEST, rd.records, { mode: IMP.mode, ctx: ctx, defaultJornada: IMP.defJor, defaultStageId: IMP.defEsc,
+    IMP.pv = I.preview(IMP.base, rd.records, { mode: IMP.mode, ctx: ctx, defaultJornada: IMP.defJor, defaultStageId: IMP.defEsc,
       createStages: IMP.create, include: IMP.include, edits: IMP.edits });
     impRender();
   }
@@ -1510,10 +1560,10 @@
       : rd.kind === 'texto' ? 'Texto libre · ' + rd.records.length + (rd.records.length === 1 ? ' línea con hora' : ' líneas con hora') : 'Esperando horario…';
     // Opciones
     document.querySelectorAll('#imp [data-imode]').forEach(b => b.classList.toggle('on', b.dataset.imode === IMP.mode));
-    const jor = jornadaOptions();
+    const jor = IMP.fresh ? C.eventDays(IMP.base) : jornadaOptions();
     $('imp-jor').innerHTML = '<option value="">— ninguna —</option>' + jor.map(d => '<option value="' + d + '">' + esc(fmtDay(d)) + '</option>').join('');
     $('imp-jor').value = IMP.defJor;
-    $('imp-esc').innerHTML = '<option value="">— ninguna —</option>' + (FEST.escenarios || []).map(e => '<option value="' + esc(e.id) + '">' + esc(e.nombre) + '</option>').join('');
+    $('imp-esc').innerHTML = '<option value="">— ninguna —</option>' + (IMP.base.escenarios || []).map(e => '<option value="' + esc(e.id) + '">' + esc(e.nombre) + '</option>').join('');
     $('imp-esc').value = IMP.defEsc;
     $('imp-head-l').hidden = rd.kind !== 'tabla';
     $('imp-head').checked = !!rd.hasHeader;
@@ -1534,6 +1584,10 @@
     } else $('imp-map').innerHTML = '';
     // Escenarios nuevos y jornadas fuera del evento
     let nh = '';
+    if (IMP.fresh) {
+      const ev = IMP.base.event, d1 = fmtDay(ev.fechaInicio), d2 = fmtDay(ev.fechaFin);
+      nh += '<span class="imp-fresh">Sin evento abierto: al importar se crea <b>«Evento sin nombre»</b> · ' + esc(d1 === d2 ? d1 : d1 + ' → ' + d2) + ' (nombre y fechas, luego en Configuración).</span>';
+    }
     if (pv.newStages.length) {
       nh += '<span><b>' + pv.newStages.length + (pv.newStages.length === 1 ? ' zona nueva' : ' zonas nuevas') + ':</b></span>' +
         pv.newStages.map(s => { const k = I.norm(s); return '<label><input type="checkbox" data-newstage="' + esc(k) + '"' + (IMP.create[k] === false ? '' : ' checked') + '> crear «' + esc(s) + '»</label>'; }).join('');
@@ -1579,13 +1633,18 @@
 
   function impDoImport() {
     if (!IMP || !IMP.pv || !IMP.pv.counts.importar) return;
-    const r = I.apply(FEST, IMP.pv, { mode: IMP.mode, createStages: IMP.create, extendEvent: IMP.extend });
+    const fresh = IMP.fresh, base = IMP.base;
+    const r = I.apply(base, IMP.pv, { mode: IMP.mode, createStages: IMP.create, extendEvent: IMP.extend });
     const used = new Set(IMP.pv.rows.filter(x => x.include && x.status !== 'err').map(x => x.tipo));
     const hidden = CONFIG.mode !== 'all' && Array.from(used).some(t => t !== CONFIG.mode);
     closeImport();
     let msg = 'Importado: ' + r.added + (r.added === 1 ? ' entrada nueva' : ' entradas nuevas');
     if (r.stagesCreated) msg += ', ' + r.stagesCreated + (r.stagesCreated === 1 ? ' zona nueva' : ' zonas nuevas');
     if (hidden) msg += ' · todo junto en Jornada completa';
+    if (fresh) {   // evento nuevo: la referencia es el evento vacío, así lo importado cuenta como «sin exportar» y se puede deshacer
+      loadNew(base, 'Evento creado');
+      msg = 'Evento creado · ' + msg.charAt(0).toLowerCase() + msg.slice(1) + '. Ponle nombre en Configuración';
+    }
     commitFestival(r.state, msg);
     if (r.errors.length) modal('Algunas filas no entraron', '<ul>' + r.errors.map(e => '<li>' + esc(e) + '</li>').join('') + '</ul>', [{ label: 'Entendido', kind: 'primary' }]);
   }
@@ -1605,28 +1664,63 @@
     fr.readAsText(file, 'utf-8');
   }
   function loadImportFile(file) {
-    readTextFile(file, t => {
-      if (!IMP) openImport('');
-      IMP.text = t.replace(/^﻿/, ''); IMP.map = null; IMP.header = undefined; impResetRows();
-      $('imp-text').value = IMP.text;
-      impRecompute();
-      toast('Archivo leído: ' + file.name);
-    });
+    readTextFile(file, t => setImportText(t.replace(/^﻿/, ''), 'Archivo leído: ' + file.name));
   }
   const isTableFile = f => /\.(csv|tsv|txt)$/i.test(f.name || '') || /text\/(csv|tab-separated-values|plain)/.test(f.type || '');
+  const PDF_NOTICE = 'Para PDFs: abre el PDF, selecciona y copia el texto (⌘A, ⌘C) y pégalo aquí.';
+  /** Qué es un archivo: 'xlsx' | 'xls' | 'pdf' | 'json' | 'tabla' | '' (no se sabe leer). */
+  function fileKind(f) {
+    const n = String(f.name || '').toLowerCase(), t = String(f.type || '');
+    if (/\.xlsx$/.test(n) || /spreadsheetml/.test(t)) return 'xlsx';
+    if (/\.xls$/.test(n) || t === 'application/vnd.ms-excel') return 'xls';
+    if (/\.pdf$/.test(n) || t === 'application/pdf') return 'pdf';
+    if (/\.json$/.test(n) || t === 'application/json') return 'json';
+    if (isTableFile(f)) return 'tabla';
+    return '';
+  }
+  /** Un archivo soltado, elegido o pegado: cada tipo a su sitio (todo pasa por la vista previa o por «Abrir evento»). */
+  function handleFile(f) {
+    const k = fileKind(f);
+    if (k === 'tabla') { loadImportFile(f); return; }
+    if (k === 'json') { readFile(f); return; }
+    if (k === 'pdf') { openImport(IMP ? IMP.text : '', PDF_NOTICE); return; }
+    if (k === 'xls') { toast('Es un Excel antiguo (.xls): ábrelo y guárdalo como .xlsx o CSV, o copia y pega las celdas', true); return; }
+    if (k === 'xlsx') { loadXlsx(f); return; }
+    toast('No sé leer «' + (f.name || 'ese archivo') + '»: usa Excel (.xlsx), CSV, TSV, texto o el .json del evento', true);
+  }
+  function setImportText(t, msg) {
+    if (!IMP) openImport('');
+    IMP.text = t; IMP.map = null; IMP.header = undefined; impResetRows();
+    $('imp-text').value = IMP.text;
+    $('imp-notice').hidden = true;
+    impRecompute();
+    if (msg) toast(msg);
+  }
+  function loadXlsx(file) {
+    const Xl = window.ShowtimeXlsx;
+    const fr = new FileReader();
+    fr.onload = () => {
+      Xl.toTSV(fr.result).then(r => {
+        if (!r.text) { toast('El Excel «' + file.name + '» no tiene datos', true); return; }
+        setImportText(r.text, 'Excel leído: ' + file.name + (r.sheets.length > 1 ? ' · hoja «' + r.sheet + '»' : ''));
+      }).catch(e => toast(e.message || 'No se pudo leer el Excel', true));
+    };
+    fr.onerror = () => toast('No se pudo leer el archivo', true);
+    fr.readAsArrayBuffer(file);
+  }
 
   $('btn-paste').addEventListener('click', () => openImport(''));
   $('imp-close').addEventListener('click', closeImport);
   $('imp-cancel').addEventListener('click', closeImport);
   $('imp-go').addEventListener('click', impDoImport);
   $('imp-pick').addEventListener('click', () => $('imp-file').click());
-  $('imp-file').addEventListener('change', e => { if (e.target.files[0]) loadImportFile(e.target.files[0]); e.target.value = ''; });
+  $('imp-file').addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); e.target.value = ''; });
   $('imp-text').addEventListener('input', () => {
     clearTimeout(impTimer);
     impTimer = setTimeout(() => { if (!IMP) return; IMP.text = $('imp-text').value; IMP.map = null; IMP.header = undefined; impResetRows(); impRecompute(); }, 250);
   });
   document.querySelectorAll('#imp [data-imode]').forEach(b => b.addEventListener('click', () => { IMP.mode = b.dataset.imode; impResetRows(); impRecompute(); }));
-  $('imp-jor').addEventListener('change', e => { IMP.defJor = e.target.value; impRecompute(); });
+  $('imp-jor').addEventListener('change', e => { IMP.defJor = e.target.value; IMP.jorTouched = true; impRecompute(); });
   $('imp-esc').addEventListener('change', e => { IMP.defEsc = e.target.value; impRecompute(); });
   $('imp-head').addEventListener('change', e => { IMP.header = e.target.checked; IMP.map = null; impResetRows(); impRecompute(); });
   $('imp-map').addEventListener('change', e => {
@@ -1655,7 +1749,7 @@
   impBox.addEventListener('drop', e => {
     e.preventDefault(); e.stopPropagation(); impBox.classList.remove('drag'); dragN = 0; $('drop').hidden = true;
     const f = e.dataTransfer && e.dataTransfer.files[0];
-    if (f) { if (isTableFile(f)) loadImportFile(f); else toast('Aquí solo .csv, .tsv o .txt (el .json del evento se abre con «Abrir»)', true); }
+    if (f) handleFile(f);
   });
 
 
@@ -2435,5 +2529,5 @@
     if (ok) toast('Se vuelve a guardar con normalidad');
   });
 
-  window.ShowtimePanel = { reload: () => { loadState(); renderAll(); }, _test: { emProdMessage, emRegenProd, hitoChips, emUrl, prodBigTitle, room: () => emRoom } };   // _test: solo para tests/control.test.js
+  window.ShowtimePanel = { reload: () => { loadState(); renderAll(); }, _test: { emProdMessage, emRegenProd, hitoChips, emUrl, prodBigTitle, fileKind, handleFile, emCommand, room: () => emRoom } };   // _test: solo para tests/control.test.js
 })();

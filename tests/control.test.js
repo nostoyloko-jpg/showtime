@@ -8,7 +8,7 @@
   if (typeof module === 'undefined' || !module.exports) { console.log('control.test.js: solo en Node (node tests/control.test.js)'); return; }
   const vm = require('vm');
   const D = require('./_dom.js'), C = require('../core.js'), E = require('../emision.js');
-  const MODULOS = ['core.js', 'meteo.js', 'datos.js', 'importar.js', 'qr.js', 'emision.js', 'mando.js', 'vistas.js', 'log.js', 'control.js'];
+  const MODULOS = ['core.js', 'meteo.js', 'datos.js', 'importar.js', 'xlsx.js', 'qr.js', 'emision.js', 'mando.js', 'vistas.js', 'log.js', 'control.js'];
 
   const tests = [];
   function test(name, fn) { tests.push([name, fn]); }
@@ -520,6 +520,230 @@
       const missing = Array.from(used).filter(u => defs.indexOf(u) < 0);
       eq(missing.join(), '', pg + ': iconos usados que no existen');
     });
+  });
+
+  // ── Importar en 1 segundo: tarjeta central, pestañas de «+ Añadir», soltar archivos y ⌘V ─────────────
+  const fsx = require('fs'), pathx = require('path');
+  const tick = () => new Promise(r => setImmediate(r));
+  const settle = async () => { for (let i = 0; i < 30; i++) await tick(); await new Promise(r => setTimeout(r, 150)); };   // lectura de archivos y descompresión: asíncronas
+  /** Dashboard con lo que se le pase en el almacenamiento (sin nada = app recién abierta) y modales cerrados. */
+  function panel(storage, now) {
+    const env = D.makeEnv({ cripto: true, storage: storage || {}, now });
+    D.cargar(env, MODULOS);
+    ['modal', 'addm', 'imp', 'cfg', 'drop'].forEach(id => { if (env.getEl(id).hidden !== true) env.getEl(id).hidden = true; });
+    const read = k => { const v = env.storage.get(k); return v ? JSON.parse(v) : null; };
+    return { env, read, T: env.win.ShowtimePanel._test };
+  }
+  const clickData = (t, sel, dataset) => t.env.fire('document', 'click', { target: { id: '', closest: q => q === sel ? { dataset, classList: { contains: () => false }, id: '' } : null } });
+  const pasteEv = (text, target, files) => ({ target: target || t0body, preventDefault() {}, clipboardData: { files: files || [], getData: k => k === 'text/plain' ? text : '' } });
+  const t0body = { closest: () => null };
+  const CARTEL = 'Día\tZona\tBanda\tInicio\tFin\n10/07/2026\tPrincipal\tLos Ácratas\t21:00\t22:15\n11/07/2026\tCarpa\tDJ Uno\t20:00\t21:00';
+  const HTMLx = D.src('index.html');
+  const sec = (a, b) => { const i = HTMLx.indexOf(a), j = HTMLx.indexOf(b, i); return i < 0 || j < 0 ? '' : HTMLx.slice(i, j); };
+
+  test('Tarjeta central «Importar horario en 1 segundo»: textos y botones (sin evento y con el evento vacío)', () => {
+    [sec('<section id="empty"', '</section>'), sec('<div id="list-empty"', '<div class="tblwrap">')].forEach((h, i) => {
+      const w = i ? 'evento vacío' : 'sin evento';
+      ok(/<h2 class="onb-t">Importar horario en 1 segundo<\/h2>/.test(h), w + ': título');
+      ok(/Arrastra aquí tu archivo Excel \/ CSV \/ PDF o pega el texto del cartel/.test(h), w + ': subtítulo');
+      ok(/class="onb-pill">Detecta automáticamente: bandas, zonas, horas y soundchecks/.test(h), w + ': píldora');
+      ok(/data-ob="paste"[\s\S]*Pegar horario[\s\S]*data-ob="file"[\s\S]*Subir archivo[\s\S]*data-ob="manual"[\s\S]*Añadir fila a mano/.test(h), w + ': botones en orden');
+      ok(/btn primary onb-main" data-ob="paste"/.test(h), w + ': «Pegar horario» es el principal');
+    });
+    ok(/id="btn-new2"[\s\S]*id="btn-import2"[\s\S]*id="btn-demo"/.test(sec('<section id="empty"', '</section>')), 'sin evento: Nuevo evento vacío · Abrir .json · Demo, discretos');
+    const lh = sec('<div class="list-h">', '<div id="list-empty"');
+    eq((lh.match(/<button /g) || []).length, 3, 'la cabecera sigue limpia: solo Foco · ? · Añadir');
+  });
+  test('Tarjeta central: sale sin evento y con el evento sin entradas; con entradas, la tabla', () => {
+    const a = panel();
+    eq(a.env.getEl('empty').hidden, false, 'sin evento'); eq(a.env.getEl('main').hidden, true);
+    const F = fest(), vacio = Object.assign({}, F.s, { artists: [] });
+    const b = panel({ 'showtime.festival': JSON.stringify(vacio) });
+    eq(b.env.getEl('list-empty').hidden, false, 'evento sin entradas'); eq(b.env.getEl('empty').hidden, true);
+    const c = panel({ 'showtime.festival': JSON.stringify(F.s) });
+    eq(c.env.getEl('list-empty').hidden, true, 'con entradas, la tabla');
+    [a, b, c].forEach(x => eq(x.env.errors.length, 0, x.env.errors.join(' | ')));
+  });
+  test('⌘V sin evento: abre «Pegar horario» con lo copiado y, al importar, crea «Evento sin nombre» con sus jornadas (y queda sin exportar)', () => {
+    const t = panel();
+    t.env.fire('document', 'paste', pasteEv(CARTEL));
+    eq(t.env.getEl('imp').hidden, false, 'se abre la vista previa'); eq(t.env.getEl('imp-text').value, CARTEL);
+    ok(/Sin evento abierto: al importar se crea <b>«Evento sin nombre»<\/b>/.test(ultimo(t, 'imp-new')), 'avisa de que se crea el evento');
+    eq(t.read('showtime.festival'), null, 'nada se guarda solo con pegar (vista previa)');
+    t.env.fire('imp-go', 'click', {});
+    const s = t.read('showtime.festival');
+    eq(s.event.nombre, 'Evento sin nombre'); eq(s.event.fechaInicio, '2026-07-10'); eq(s.event.fechaFin, '2026-07-11');
+    eq(s.artists.length, 2); eq(s.escenarios.map(e => e.nombre).join(), 'Principal,Carpa');
+    eq(t.read('showtime.original').artists.length, 0, 'la referencia es el evento vacío: lo importado cuenta como «sin exportar»');
+    ok(/Evento creado/.test(t.env.getEl('toast').textContent), t.env.getEl('toast').textContent);
+    eq(t.env.errors.length, 0, t.env.errors.join(' | '));
+  });
+  test('⌘V con el evento abierto: la vista previa va contra ese evento (no crea otro)', () => {
+    const F = fest(), t = panel({ 'showtime.festival': JSON.stringify(F.s) });
+    t.env.fire('document', 'paste', pasteEv('23:00-23:45 Banda Nueva Principal'));
+    eq(t.env.getEl('imp').hidden, false); ok(!/Sin evento abierto/.test(ultimo(t, 'imp-new')));
+    t.env.fire('imp-go', 'click', {});
+    const s = t.read('showtime.festival');
+    eq(s.event.nombre, 'Prueba control'); ok(s.artists.some(a => a.nombre === 'Banda Nueva'), 'añadida al evento abierto');
+  });
+  test('⌘V NO salta escribiendo en una casilla ni con un modal o Configuración abiertos', () => {
+    const t = panel();
+    t.env.fire('document', 'paste', pasteEv('x', { closest: q => /input/.test(q) ? {} : null }));
+    eq(t.env.getEl('imp').hidden, true, 'en una casilla, pega en la casilla');
+    t.env.getEl('cfg').hidden = false;
+    t.env.fire('document', 'paste', pasteEv('x'));
+    eq(t.env.getEl('imp').hidden, true, 'con Configuración abierta, nada');
+    t.env.getEl('cfg').hidden = true; t.env.getEl('modal').hidden = false;
+    t.env.fire('document', 'paste', pasteEv('x'));
+    eq(t.env.getEl('imp').hidden, true, 'con un modal abierto, nada');
+  });
+  test('«+ Añadir»: 2 pestañas — la primera vez «Pegar horario completo»; luego recuerda la última; el tip lleva a Pegar', () => {
+    ['<div id="addm"', '<div id="imp"'].forEach(m => {
+      const h = sec(m, '</div>\n</div>');
+      ok(/class="addtabs" role="tablist"[\s\S]*data-addtab="paste"[^>]*>[\s\S]*Pegar horario completo <small>Excel · CSV · PDF<\/small>[\s\S]*data-addtab="row"[\s\S]*Añadir 1 fila a mano/.test(h), m + ': pestañas en orden');
+    });
+    ok(/class="addtip">💡 ¿Tienes varias bandas\? Usa <button[^>]*data-addtab="paste">Pegar horario completo<\/button>/.test(sec('<div id="addm"', '<div id="modal"')), 'tip en la pestaña de 1 fila');
+    const F = fest(), t = panel({ 'showtime.festival': JSON.stringify(F.s) });
+    t.env.fire('btn-new-row', 'click', {});
+    eq(t.env.getEl('imp').hidden, false, 'primera vez: Pegar'); eq(t.env.getEl('addm').hidden, true);
+    clickData(t, '[data-addtab]', { addtab: 'row' });
+    eq(t.env.getEl('addm').hidden, false, 'pestaña de 1 fila'); eq(t.env.getEl('imp').hidden, true, 'cierra la de pegar');
+    eq(t.env.storage.get('showtime.addtab'), 'row');
+    t.env.getEl('addm').hidden = true;
+    t.env.fire('btn-new-row', 'click', {});
+    eq(t.env.getEl('addm').hidden, false, 'recuerda la última: 1 fila');
+    clickData(t, '[data-addtab]', { addtab: 'paste' });
+    eq(t.env.getEl('imp').hidden, false, 'el tip/pestaña lleva a Pegar'); eq(t.env.getEl('addm').hidden, true);
+    eq(t.env.errors.length, 0, t.env.errors.join(' | '));
+  });
+  test('Tarjeta central: «Pegar horario» abre la vista previa; «Añadir fila a mano» sin evento pide crearlo primero', () => {
+    const t = panel();
+    clickData(t, '[data-ob]', { ob: 'paste' });
+    eq(t.env.getEl('imp').hidden, false);
+    t.env.getEl('imp').hidden = true;
+    clickData(t, '[data-ob]', { ob: 'manual' });
+    eq(t.env.getEl('modal-title').textContent, 'Nuevo evento', 'sin evento: primero el evento');
+  });
+  test('Archivos: cada tipo a su sitio (Excel, CSV, PDF, .json, .xls antiguo y desconocidos)', async () => {
+    const t = panel(), T = t.T, F = (name, data, type) => new File([data], name, { type: type || '' });
+    eq(T.fileKind(F('a.xlsx', 'x')), 'xlsx'); eq(T.fileKind(F('a.XLS', 'x')), 'xls'); eq(T.fileKind(F('cartel.pdf', 'x')), 'pdf');
+    eq(T.fileKind(F('ev.json', 'x')), 'json'); eq(T.fileKind(F('h.csv', 'x')), 'tabla'); eq(T.fileKind(F('h.tsv', 'x')), 'tabla'); eq(T.fileKind(F('notas.txt', 'x')), 'tabla');
+    eq(T.fileKind(F('foto.png', 'x', 'image/png')), '');
+    // PDF: se abre la caja de pegar con el aviso
+    T.handleFile(F('cartel.pdf', '%PDF', 'application/pdf'));
+    eq(t.env.getEl('imp').hidden, false); eq(t.env.getEl('imp-notice').hidden, false);
+    eq(t.env.getEl('imp-notice').textContent, 'Para PDFs: abre el PDF, selecciona y copia el texto (⌘A, ⌘C) y pégalo aquí.');
+    // Excel real → texto en la caja y vista previa
+    T.handleFile(F('horario.xlsx', fsx.readFileSync(pathx.join(__dirname, 'fixtures', 'horario.xlsx'))));
+    await settle();
+    ok(/Los Ácratas\t21:00\t22:15/.test(t.env.getEl('imp-text').value), 'Excel leído: ' + t.env.getEl('imp-text').value.slice(0, 80));
+    eq(t.env.getEl('imp-notice').hidden, true, 'el aviso del PDF se quita al llegar datos');
+    ok(/Excel leído: horario\.xlsx · hoja «Horario»/.test(t.env.getEl('toast').textContent), t.env.getEl('toast').textContent);
+    // CSV
+    T.handleFile(F('h.csv', 'Banda;Inicio\nUno;21:00'));
+    await settle();
+    eq(t.env.getEl('imp-text').value, 'Banda;Inicio\nUno;21:00');
+    // .xls y desconocidos: mensaje claro
+    T.handleFile(F('viejo.xls', 'x')); ok(/Excel antiguo \(\.xls\)/.test(t.env.getEl('toast').textContent));
+    T.handleFile(F('foto.png', 'x', 'image/png')); ok(/No sé leer «foto\.png»/.test(t.env.getEl('toast').textContent));
+    eq(t.env.errors.length, 0, t.env.errors.join(' | '));
+  });
+  test('Soltar el .json de un evento sin nada abierto: se abre directamente; con un evento abierto, pregunta', async () => {
+    const F = fest(), json = JSON.stringify(F.s);
+    const t = panel();
+    t.env.fire('window', 'drop', { preventDefault() {}, dataTransfer: { files: [new File([json], 'prueba.json', { type: 'application/json' })] } });
+    await settle();
+    eq((t.read('showtime.festival') || {}).event.nombre, 'Prueba control', 'abierto sin preguntar');
+    const t2 = panel({ 'showtime.festival': json });
+    t2.env.fire('window', 'drop', { preventDefault() {}, dataTransfer: { files: [new File([json], 'prueba.json', { type: 'application/json' })] } });
+    await settle();
+    eq(t2.env.getEl('modal-title').textContent, 'Abrir evento', 'con evento abierto: confirma antes de sustituir');
+  });
+  test('Soltar un Excel sobre la ventana sin evento: vista previa e importación de una vez', async () => {
+    const t = panel(), buf = fsx.readFileSync(pathx.join(__dirname, 'fixtures', 'horario.xlsx'));
+    t.env.fire('window', 'dragenter', { dataTransfer: { types: ['Files'] } });
+    eq(t.env.getEl('drop').hidden, false, 'se enciende el dropzone');
+    t.env.fire('window', 'drop', { preventDefault() {}, dataTransfer: { files: [new File([buf], 'horario.xlsx')] } });
+    eq(t.env.getEl('drop').hidden, true, 'y se apaga al soltar');
+    await settle();
+    eq(t.env.getEl('imp').hidden, false);
+    t.env.fire('imp-go', 'click', {});
+    const s = t.read('showtime.festival');
+    eq(s.artists.length, 4, 'las 4 filas del Excel'); eq(s.event.fechaInicio, '2026-07-10');
+    ok(s.artists.some(a => a.nombre === 'Omega' && a.soundcheckInicio === '18:00' && !a.inicio), '«Prueba Omega» entra como soundcheck de Omega');
+  });
+
+  // ── Tanda 4: órdenes del mando (emCommand) — reloj simulado ────────────────────────
+  const NOWc = new Date(2026, 6, 10, 21, 10).getTime(), nAbs = Math.floor(C.nowAbs(new Date(NOWc)));
+  function festMando() {
+    return festEn(NOWc, add => { add('Suena', -30, 30); add('Viene', 20, 80); });
+  }
+  function conMando(F) {
+    const t = panel(F === null ? {} : { 'showtime.festival': JSON.stringify(F || festMando()) }, NOWc);
+    const cmd = (op, args, t0) => t.T.emCommand({ id: 'x', op, args: args || {}, t: t0 === undefined ? NOWc : t0 });
+    const blk = name => C.buildBlocks(t.read('showtime.festival'), { mode: 'all', day: 'all', now: nAbs }).find(b => b.name === name);
+    const log = () => ((t.read('showtime.log') || {}).entries || []);
+    return Object.assign(t, { cmd, blk, log });
+  }
+  test('Mando › órdenes mal formadas o desconocidas: se rechazan sin tocar nada', async () => {
+    const t = conMando(), antes = t.env.storage.get('showtime.festival');
+    for (const [op, args, re] of [['borrarTodo', {}, /desconocida/], ['start', {}, /Falta la banda/], ['stretch', { key: 'x' }, /Falta si se activa/],
+      ['flash', { text: 'x'.repeat(141) }, /140/], ['delay', { minutes: 5, zones: 'all', from: nAbs }, /resumen confirmado/], ['delay', { minutes: 0, zones: 'all', from: nAbs, stamp: '' }, /Minutos/]]) {
+      const r = await t.cmd(op, args);
+      ok(!r.ok && re.test(r.msg), op + ': ' + r.msg);
+    }
+    eq(t.env.storage.get('showtime.festival'), antes, 'el evento no cambia');
+  });
+  test('Mando › sin evento abierto: solo los mensajes funcionan', async () => {
+    const t = conMando(null);
+    const r = await t.cmd('start', { key: 'x' });
+    ok(!r.ok && /No hay evento abierto/.test(r.msg));
+    const f = await t.cmd('flash', { text: 'HOLA', to: null, zones: null });
+    ok(f.ok); eq(t.read('showtime.flash').text, 'HOLA');
+  });
+  test('Mando › ■ a la que suena: queda su fin real a la hora en que se pulsó y en el log como «mando»', async () => {
+    const t = conMando(), key = t.blk('Suena').key;
+    const r = await t.cmd('stop', { key }, NOWc - 30000);     // se pulsó hace 30 s (la orden tardó en llegar)
+    ok(r.ok, r.msg);
+    eq(t.blk('Suena').rf, nAbs - 1, 'fin real = cuando se pulsó en el móvil (21:09), no cuando llegó');
+    ok(t.log().some(e => e.src === 'mando'), 'el log dice que vino del mando');
+    ok(/Desde el mando del Stage Manager/.test(t.env.getEl('toast').textContent), t.env.getEl('toast').textContent);
+  });
+  test('Mando › una orden con hora rara (más de 2 min de diferencia) usa la hora del Mac', async () => {
+    const t = conMando(), key = t.blk('Suena').key;
+    await t.cmd('stop', { key }, NOWc - 10 * 60000);
+    eq(t.blk('Suena').rf, nAbs, 'fin real = ahora (no hace 10 min)');
+  });
+  test('Mando › ▶ dos veces: la segunda se rechaza con el motivo', async () => {
+    const t = conMando(), key = t.blk('Suena').key;
+    ok((await t.cmd('start', { key })).ok);
+    const r = await t.cmd('start', { key });
+    ok(!r.ok && /ya tiene inicio real/.test(r.msg), r.msg);
+  });
+  test('Mando › retraso: se aplica solo si el resumen del móvil coincide con el del Mac', async () => {
+    const t = conMando(), F = t.read('showtime.festival'), cfg = t.env.win.ShowtimeDatos.getConfig();
+    const M1 = t.env.win.ShowtimeMando, args = { minutes: 10, zones: 'all', from: nAbs };
+    const p = M1.delayPlan(F, cfg, args);
+    const mal = await t.cmd('delay', Object.assign({}, args, { stamp: 'otro resumen' }));
+    ok(!mal.ok && mal.data && mal.data.stale, 'resumen viejo: no se aplica y se pide revisar');
+    eq(t.blk('Viene').si, t.blk('Viene').psi, 'nada se ha movido');
+    const bien = await t.cmd('delay', Object.assign({}, args, { stamp: M1.delayStamp(p) }));
+    ok(bien.ok, bien.msg);
+    eq(t.blk('Viene').si - t.blk('Viene').psi, 10, '«Viene» +10 min');
+    ok(t.log().some(e => e.type === 'delay' && e.src === 'mando'));
+  });
+  test('Mando › OK de CALL: queda hecho y en el log como «Stage Manager (mando)»', async () => {
+    const t = conMando(), key = C.callKey(t.blk('Viene'));
+    ok((await t.cmd('callOk', { key })).ok);
+    ok(t.read('showtime.callDone').indexOf(key) >= 0);
+    ok(t.log().some(e => e.type === 'call' && /Stage Manager \(mando\)/.test(e.text)), JSON.stringify(t.log().map(e => e.text)));
+  });
+  test('Mando › mensaje y retirarlo', async () => {
+    const t = conMando();
+    const r = await t.cmd('flash', { text: '  ÚLTIMO   TEMA ', to: ['manager'], zones: null });
+    ok(r.ok); eq(t.read('showtime.flash').text, 'ÚLTIMO TEMA'); eq(t.read('showtime.flash').to.join(), 'manager');
+    ok(t.log().some(e => e.type === 'msg' && e.src === 'mando'));
+    ok((await t.cmd('flashOff', {})).ok); eq(t.read('showtime.flash'), null);
   });
 
   // ── Ejecutor ─────────────────────────────────────────────────────────
