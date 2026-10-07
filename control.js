@@ -1702,7 +1702,10 @@
     fr.onload = () => {
       Xl.toTSV(fr.result).then(r => {
         if (!r.text) { toast('El Excel «' + file.name + '» no tiene datos', true); return; }
-        setImportText(r.text, 'Excel leído: ' + file.name + (r.sheets.length > 1 ? ' · hoja «' + r.sheet + '»' : ''));
+        // Una hoja por zona: se juntan las que son horarios con las mismas columnas (las de personal o turnos, fuera)
+        const m = r.all && r.all.length > 1 ? I.mergeSheets(r.all, I.contextOf(FEST || { escenarios: [], artists: [] })) : null;
+        if (m && m.used.length) setImportText(m.text, 'Excel leído: ' + file.name + ' · ' + (m.used.length === 1 ? 'hoja «' + m.used[0] + '»' : m.used.length + ' hojas (' + m.used.join(', ') + ')') + (m.skipped.length ? ' · sin horarios: ' + m.skipped.join(', ') : ''));
+        else setImportText(r.text, 'Excel leído: ' + file.name + (r.sheets.length > 1 ? ' · hoja «' + r.sheet + '»' : ''));
       }).catch(e => toast(e.message || 'No se pudo leer el Excel', true));
     };
     fr.onerror = () => toast('No se pudo leer el archivo', true);

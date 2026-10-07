@@ -212,6 +212,111 @@
     ok(r.ignored.some(l => /Restricciones/.test(l.line)), 'el aviso *** se ignora (y se lista)');
   });
 
+  // ── Tablas reales de festival (ES / EN): celdas combinadas, turnos de regiduría, horas de prueba y de concierto ──
+  // Copiado tal cual de Excel (Ctrl+C) — hoja «GIGANTE» de un festival: una cabecera por jornada, celdas combinadas
+  // (la jornada y el turno solo en la primera fila), turnos del Stage Manager, pruebas por la mañana y conciertos por la noche.
+  const GIGANTE = "GIGANTE\tHORARIO STAGE MANAGER\tARTISTA\tCITACION \tENTRADA ESCENARIO ARTISTAS\tSALIDA ESCENARIO ARTISTA\tCITACION TECNICOS CAMBIO ESCENARIO\tCONCIERTO\tDuracion\nJueves 27\t\"14:45 - 01:00\n(10:45 h.)\"\tLA CABRA MECANICA \t15:00 h.\t15:15 h.\t17:00 h.\t\t\t1:45 h.\n\t\tANGELA GONZALEZ \t16:15 h.\t16:30: h.\t18:30 h.\t\t\t2:00 h.\n\t\t\t\t\t\t\t\t\n\t\tANGELA GONZALEZ \t\t\t\t20:35 h.\t21:05 - 22:15\t1:10 h.\n\t\tLA CABRA MECANICA \t\t\t\t21:45 h.\t23.45 - 00:45\t1:10 h.\n\t\t\t\t\t\t\t\t\nGIGANTE\tHORARIO STAGE MANAGER\tARTISTA\tCITACION \tENTRADA ESCENARIO ARTISTAS\tSALIDA ESCENARIO ARTISTA\tCITACION TECNICOS CAMBIO ESCENARIO\tCONCIERTO\tDuracion\nViernes 28\t\"MAÑANA: 09:45 - 18:52\n(09:07 h.)\"\tAIKO\t10:00 h.\t10:00 h.\t11:15 h.\t\t\t1:15 h.\n\t\tLA MODA\t10:45 h.\t11:00 h.\t14:15 h.\t\t\t3:15 h.\n\t\tCOMIDA 14:30 - 15:50 (REVISAR)                        \t\t\t\t\t\t1:20 h.\n\t\tORTIGA\t16:00 h\t16:00 h.\t17:15 h.\t\t\t1:15 h.\n\tSTAGE TARDE\t\t\t\t\t\t\t\n\t\"TARDE: 18:22 - 03:30\n(09:07 h.)\"\tAIKO\t\t\t\t17:15 h.\t20:20 - 21:35 \t1:15 h.\n\t\tLA MODA\t\t\t\t21:05 h.\t23:00 - 00:30 \t1:30 h.\n\t\tORTIGA\t\t\t\t00:00 h.\t01:50 - 03:00\t1:10 h.\n\t\t\t\t\t\t\t\t\nGIGANTE\tHORARIO STAGE MANAGER\tARTISTA\tCITACION \tENTRADA ESCENARIO ARTISTAS\tSALIDA ESCENARIO ARTISTA\tCITACION TECNICOS CAMBIO ESCENARIO\tCONCIERTO\tDuracion\nSabado 29\t\"MAÑANA: 10:45 - 19:22\n(08:37 h.)\"\tCHIMO BAYO\t11:00 h.\t11:00 h.\t11:45 h.\t\t\t0:45 h.\n\t\tGINEBRAS\t11:45 h.\t11:45 h.\t13:45 h.\t\t\t2:00 h.\n\t\tCOMIDA 14:00 - 14:50 (REVISAR)                        \t\t\t\t\t\t0:50 h.\n\t\tQUERALT LAHOZ\t15:00 h.\t15:00 h.\t17:30 h.\t\t\t2:30 h.\n\tSTAGE TARDE\t\t\t\t\t\t\t\n\t\"TARDE: 18:55 - 03:30\n(08:37 h.)\"\tQUERALT LAHOZ\t\t\t\t19:50 h.\t20:20 - 21:35\t1:15 h.\n\t\tGINEBRAS\t\t\t\t21:05 h.\t23:00 - 00:15\t1:15 h.\n\t\tCHIMO BAYO\t\t\t\t23:45 h.\t01:35 - 03:00\t1:25 h.\n\t\t\t\t\t\t\t\t";
+  const TARDE = r => r.inicio >= '19:00' || r.inicio < '06:00';
+  function eventoGigante(conZona) {
+    let s = C.newFestival({ nombre: 'Gigante', fechaInicio: '2026-08-27', fechaFin: '2026-08-29', dayCutoff: '06:00' }).state;
+    if (conZona) s = C.addStage(s, 'GIGANTE').state;
+    return s;
+  }
+  test('Festival real (hoja «GIGANTE» pegada de Excel): 3 jornadas, pruebas, comidas y conciertos con 0 errores', () => {
+    const s = eventoGigante(true), ctx = I.contextOf(s), rd = I.read(GIGANTE, ctx), pv = I.preview(s, rd.records, { ctx });
+    eq(rd.kind, 'tabla');
+    deq(rd.map, ['jornada', 'ignorar', 'banda', 'call', 'pinicio', 'pfin', 'call', 'concierto', 'duracion'], 'columnas: HORARIO STAGE MANAGER se ignora; CITACION = CALL; entrada/salida a escenario = prueba; CONCIERTO = show');
+    eq(rd.zone, 'GIGANTE', 'la zona es el título de la primera columna');
+    eq(pv.counts.err, 0, 'cero errores: ' + pv.rows.filter(r => r.errs.length).map(r => r.banda + ': ' + r.errs.join('; ')).join(' | '));
+    eq(pv.counts.importar, 18, '7 + 7 entradas de jueves… 4 + 7 + 7');
+    const dia = d => pv.rows.filter(r => r.jornada === d);
+    deq([dia('2026-08-27').length, dia('2026-08-28').length, dia('2026-08-29').length], [4, 7, 7], 'jueves 27 · viernes 28 · sábado 29 (relleno hacia abajo de la celda combinada)');
+    ok(pv.rows.every(r => r.escenario === 'GIGANTE' && r.stageId), 'todas en la zona GIGANTE (la existente)');
+    const sc = pv.rows.filter(r => r.tipo === 'sc'), show = pv.rows.filter(r => r.tipo === 'show'), tarea = pv.rows.filter(r => r.tipo === 'tarea');
+    deq([sc.length, show.length, tarea.length], [8, 8, 2], 'pruebas · conciertos · comidas');
+    ok(sc.every(r => !TARDE(r)) && show.every(TARDE), 'las pruebas por la mañana y los conciertos por la noche');
+    const fila = (n, t, d) => pv.rows.find(r => r.banda === n && r.tipo === t && (!d || r.jornada === d));
+    deq(['inicio', 'fin', 'call'].map(k => fila('LA CABRA MECANICA', 'sc')[k]), ['15:15', '17:00', '15:00'], 'prueba: entrada/salida a escenario y citación («15:15 h.»)');
+    eq(fila('ANGELA GONZALEZ', 'sc').inicio, '16:30', '«16:30: h.» con el «:» de más');
+    deq(['inicio', 'fin', 'call'].map(k => fila('ANGELA GONZALEZ', 'show')[k]), ['21:05', '22:15', '20:35'], 'concierto: rango entero en una celda y CALL de técnicos');
+    deq(['inicio', 'fin'].map(k => fila('LA CABRA MECANICA', 'show')[k]), ['23:45', '00:45'], '«23.45 - 00:45» con punto');
+    ok(fila('LA CABRA MECANICA', 'show').warns.some(w => /duración/.test(w)), 'la duración (1:10) no cuadra con el rango: aviso, mandan las horas');
+    const comida = fila('COMIDA', 'tarea', '2026-08-28');
+    deq([comida.inicio, comida.fin, comida.notas], ['14:30', '15:50', 'REVISAR'], '«COMIDA 14:30 - 15:50 (REVISAR)» = tarea con su horario');
+    eq(fila('ORTIGA', 'show').jornada, '2026-08-28', '01:50 del viernes sigue en la jornada del viernes');
+    ok(rd.ignored.some(x => /STAGE TARDE/.test(x.line)) && rd.ignored.filter(x => x.why === 'cabecera repetida').length === 2, 'subtítulos y cabeceras repetidas fuera, sin errores');
+    const a = I.apply(s, pv, {});
+    eq(a.added, 18); eq(a.errors.length, 0, a.errors.join(' | '));
+  });
+  test('Festival real sin evento abierto: el evento provisional sale del jueves 27 al sábado 29 y crea la zona GIGANTE', () => {
+    const now = C.nowAbs(new Date(2026, 9, 7, 12, 0));                    // 7 de octubre de 2026: el jueves 27 más cercano es el de agosto
+    const s = I.provisionalState(GIGANTE, now);
+    deq([s.event.fechaInicio, s.event.fechaFin], ['2026-08-27', '2026-08-29']);
+    const ctx = I.contextOf(s), rd = I.read(GIGANTE, ctx), pv = I.preview(s, rd.records, { ctx });
+    eq(pv.counts.err, 0); eq(pv.counts.importar, 18); deq(pv.newStages, ['GIGANTE']);
+    const a = I.apply(s, pv, {});
+    eq(a.added, 18); eq(a.stagesCreated, 1);
+  });
+  test('Cabeceras en inglés: MAIN STAGE · STAGE MANAGER SHIFT · STAGE IN/OUT · SHOW (PM) · CREW CALL · LUNCH', () => {
+    const t = 'MAIN STAGE\tSTAGE MANAGER SHIFT\tARTIST\tBAND CALL\tSTAGE IN\tSTAGE OUT\tCREW CALL\tSHOW\tDuration\n' +
+      'Friday 28\t09:00 - 18:00\tTHE EXAMPLES\t10:00\t10:15\t11:00\t\t\t0:45\n' +
+      '\t\tLUNCH / CATERING 14:00 - 15:00\t\t\t\t\t\t\n' +
+      '\t\tTHE EXAMPLES\t\t\t\t20:30\t9:00 PM - 10:30 PM\t1:30 h\n' +
+      '\tCREW HOURS\t\t\t\t\t\t\t\n';
+    const s = eventoGigante(false), ctx = I.contextOf(s), rd = I.read(t, ctx), pv = I.preview(s, rd.records, { ctx });
+    deq(rd.map, ['jornada', 'ignorar', 'banda', 'call', 'pinicio', 'pfin', 'call', 'concierto', 'duracion']);
+    eq(rd.zone, 'MAIN STAGE');
+    eq(pv.counts.err, 0, pv.rows.map(r => r.errs.join(';')).join(' | ')); eq(pv.rows.length, 3);
+    deq(pv.rows.map(r => [r.tipo, r.banda, r.jornada, r.inicio, r.fin, r.call].join('/')),
+      ['sc/THE EXAMPLES/2026-08-28/10:15/11:00/10:00', 'tarea/LUNCH / CATERING/2026-08-28/14:00/15:00/', 'show/THE EXAMPLES/2026-08-28/21:00/22:30/20:30']);
+  });
+  test('Prueba y concierto en la MISMA fila: dos entradas, cada CALL con la suya', () => {
+    const t = 'Día\tBanda\tCitación\tEntrada escenario\tSalida escenario\tCitación técnicos\tConcierto\n27/08/2026\tUno\t15:00\t15:15\t16:00\t20:30\t21:00-22:00';
+    const s = eventoGigante(true), ctx = I.contextOf(s), rd = I.read(t, ctx);
+    deq(rd.records.map(r => [r.tipoCol, r.inicio, r.fin, r.call].join('/')), ['sc/15:15/16:00/15:00', 'show/21:00/22:00/20:30']);
+  });
+  test('Relleno hacia abajo de Jornada y Zona (celdas combinadas) y cambio de zona por fila de título', () => {
+    const t = 'Zona\tDía\tBanda\tInicio\nPrincipal\t27/08/2026\tA\t20:00\n\t\tB\t21:00\n\t28/08/2026\tC\t20:00\nCarpa\t\tD\t22:00';
+    const rd = I.read(t, I.contextOf(eventoGigante(false)));
+    deq(rd.records.map(r => [r.banda, r.escenario, r.jornada].join('/')), ['A/Principal/2026-08-27', 'B/Principal/2026-08-27', 'C/Principal/2026-08-28', 'D/Carpa/2026-08-28']);
+    const t2 = 'GIGANTE\tBanda\tInicio\nJueves 27\tA\t20:00\nVIBRAMAHOU\t\t\nJueves 27\tB\t21:00';
+    const rd2 = I.read(t2, I.contextOf(eventoGigante(false)));
+    deq(rd2.records.map(r => r.banda + '/' + r.escenario), ['A/GIGANTE', 'B/VIBRAMAHOU'], 'una fila con solo un nombre en la primera columna cambia la zona');
+  });
+  test('Cabeceras: turnos de personal y regiduría NO son zonas; «Entrada»/«Salida» sueltas con horas de prueba = turno', () => {
+    ['HORARIO STAGE MANAGER', 'STAGE MANAGER SHIFT', 'TURNO', 'Turnos', 'CREW HOURS', 'REGIDURIA', 'Regiduría', 'HORAS TOTALES TURNO', 'PERSONAL'].forEach(h => eq(I.headerKey(h), 'ignorar', h));
+    [['CITACION TECNICOS CAMBIO ESCENARIO', 'call'], ['Crew call', 'call'], ['BAND CALL', 'call'], ['ENTRADA ESCENARIO ARTISTAS', 'pinicio'], ['SALIDA ESCENARIO ARTISTA', 'pfin'],
+      ['Stage in', 'pinicio'], ['STAGE OUT', 'pfin'], ['Soundcheck', 'pinicio'], ['CONCIERTO', 'concierto'], ['Performance', 'concierto'], ['Set time', 'concierto'], ['Escenario', 'escenario'], ['Stage', 'escenario'], ['GIGANTE', null]]
+      .forEach(([h, k]) => eq(I.headerKey(h), k, h));
+    const t = 'Banda\tEntrada escenario\tSalida escenario\tEntrada\tSalida\nUno\t15:00\t16:00\t09:00\t18:00';
+    deq(I.read(t, CTX).map, ['banda', 'pinicio', 'pfin', 'ignorar', 'ignorar']);
+    deq(I.read('Banda\tEntrada\tSalida\nUno\t21:00\t22:00', CTX).map, ['banda', 'inicio', 'fin'], 'sin horas de prueba ni concierto, «Entrada»/«Salida» son inicio y fin');
+  });
+  test('Horas con «h.», duración «1:45 h.» y celdas de Excel entre comillas con salto de línea', () => {
+    eq(hm('15:15 h.'), '15:15'); eq(hm('16:30: h.'), '16:30'); eq(hm('16:00 h'), '16:00'); eq(hm('9.45 h.'), '09:45'); eq(hm('21h'), '21:00');
+    deq(['1:45 h.', '0:45', '3:00 h', '2h', '1,5 h', '75', '75 min', 'raro'].map(I.durMinutes), ['105', '45', '180', '120', '90', '75', '75', 'raro']);
+    eq(I.joinQuotedLines('a\t"x\ny"\tb\nc\td'), 'a\t"x y"\tb\nc\td');
+    eq(I.joinQuotedLines('a\t"sin cerrar\nb'), 'a\t"sin cerrar\nb', 'comillas sin cerrar: no se toca');
+  });
+  test('«Jueves 27» sin mes: el más cercano a hoy, y los siguientes junto al primero (con aviso)', () => {
+    const ctx = { year: 2026, days: [], today: '2026-10-07' };
+    const a = I.parseDate('Jueves 27', ctx);
+    eq(a.iso, '2026-08-27'); ok(/sin mes/.test(a.warn));
+    eq(I.parseDate('Viernes 28', ctx).iso, '2026-08-28');
+    eq(I.parseDate('Thursday 27', { year: 2026, days: [], today: '2027-03-01' }).iso, '2027-05-27', 'en inglés y hacia delante si es lo más cercano');
+    eq(I.parseDate('Jueves 27', { year: 2026, days: ['2026-08-27', '2026-08-28'] }).iso, '2026-08-27', 'con el evento abierto, su día (sin aviso)');
+  });
+  test('Libro con una hoja por zona: junta las de horario con las mismas columnas; la de personal, fuera', () => {
+    const cab = z => z + '\tARTISTA\tENTRADA ESCENARIO\tSALIDA ESCENARIO\tCONCIERTO' + (z === 'VIBRAMAHOU' ? '\t\t' : '') + '\n';   // columnas vacías de más al final: da igual
+    const sheets = [{ name: 'GIGANTE', text: cab('GIGANTE') + 'Jueves 27\tUno\t15:00\t16:00\t\n\tUno\t\t\t21:00-22:00' },
+      { name: 'VIBRAMAHOU', text: cab('VIBRAMAHOU') + 'Jueves 27\tDos\t11:00\t12:00\t' },
+      { name: 'PERSONAL', text: 'GIGANTE\tHORARIO STAGE MANAGER\tPERSONAL\nJueves 27\t14:45 - 01:00\tLUIS' },
+      { name: 'Otra', text: 'Banda\tHora\nTres\t20:00' }];
+    const ctx = { year: 2026, days: ['2026-08-27'] }, m = I.mergeSheets(sheets, ctx);
+    deq(m.used, ['GIGANTE', 'VIBRAMAHOU']); deq(m.skipped, ['PERSONAL', 'Otra']);
+    deq(I.read(m.text, ctx).records.map(r => r.banda + '/' + r.escenario + '/' + r.tipoCol), ['Uno/GIGANTE/sc', 'Uno/GIGANTE/show', 'Dos/VIBRAMAHOU/sc']);
+  });
+
   let pass = 0; const fails = [];
   tests.forEach(([n, f]) => { try { f(); pass++; } catch (e) { fails.push([n, e.message]); } });
   const summary = 'Importar: ' + pass + '/' + tests.length + ' tests OK' + (fails.length ? ' — ' + fails.length + ' FALLAN' : '');

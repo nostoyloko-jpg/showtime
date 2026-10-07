@@ -1,7 +1,7 @@
 /* Showtime — xlsx.js
  * Lector de hojas de Excel (.xlsx) SIN librerías: abre el ZIP, descomprime con DecompressionStream del navegador
  * y convierte la primera hoja con datos en texto tabulado (TSV), que es lo que entiende «Pegar horario».
- *   ShowtimeXlsx.toTSV(arrayBuffer) → Promise<{ text, sheet, sheets: [nombres] }>
+ *   ShowtimeXlsx.toTSV(arrayBuffer) → Promise<{ text, sheet, sheets: [nombres], all: [{ name, text }] (todas las hojas con datos) }>
  * Horas y fechas de Excel (números con formato de hora/fecha) salen como «21:30» y «2026-07-10».
  */
 (function (root) {
@@ -145,7 +145,9 @@
       for (let i = 0; i < cells.length; i++) if (cells[i] === undefined) cells[i] = '';
       if (cells.some(x => x)) rows.push(cells);
     }
-    return rows;
+    // Sin las columnas vacías del final (hojas con formato hasta la columna AG, sin datos)
+    const used = rows.reduce((m, r) => { for (let i = r.length - 1; i >= 0; i--) if (r[i]) return Math.max(m, i + 1); return m; }, 0);
+    return rows.map(r => r.slice(0, used));
   }
 
   /** .xlsx (ArrayBuffer o Uint8Array) → { text (TSV), sheet, sheets } — la primera hoja (en orden del libro) que tenga datos. */
@@ -171,13 +173,15 @@
     while ((m = reS.exec(wb))) sheets.push({ name: attr(m[0], 'name') || '', path: relTarget[attr(m[0], 'r:id')] || '' });
     const ss = sharedStrings(await zipText(bytes, idx, 'xl/sharedStrings.xml'));
     const kinds = styleKinds(await zipText(bytes, idx, 'xl/styles.xml'));
+    const all = [];
     for (const sh of sheets) {
       const xml = sh.path && await zipText(bytes, idx, sh.path);
       if (!xml) continue;
       const rows = sheetRows(xml, ss, kinds, date1904);
-      if (rows.length) return { text: rows.map(r => r.join('\t')).join('\n'), sheet: sh.name, sheets: sheets.map(s => s.name) };
+      if (rows.length) all.push({ name: sh.name, text: rows.map(r => r.join('\t')).join('\n') });
     }
-    return { text: '', sheet: '', sheets: sheets.map(s => s.name) };
+    const f = all[0] || { name: '', text: '' };
+    return { text: f.text, sheet: f.name, sheets: sheets.map(s => s.name), all };
   }
 
   const API = { toTSV, _: { zipIndex, sharedStrings, styleKinds, fmtKind, serialText, colIndex, sheetRows, unxml } };
