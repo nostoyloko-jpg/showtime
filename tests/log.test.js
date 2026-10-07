@@ -186,7 +186,7 @@
     R.log = L.record(R.log, [{ type: 'msg', text: '<script>alert(1)</script>; "a"' }], { t: at('21:20'), src: 'panel' }, R.s);
     const rep = L.report(R.log, R.s, { day: JOR });
     const txt = L.toTxt(rep);
-    ok(/>> MENSAJE: «ÚLTIMO TEMA» → Confidence \(Mando regidor\)/.test(txt), 'incidencia en TXT');
+    ok(/>> MENSAJE: «ÚLTIMO TEMA» → Confidence \(Mando del Stage Manager\)/.test(txt), 'incidencia en TXT');
     ok(/21:10\*/.test(txt), 'fin cambiado marcado con *');
     ok(/BORRADA 16:05/.test(txt));
     const csv = L.toCsv(rep);

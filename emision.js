@@ -32,7 +32,7 @@
   const PUBLIC_BASE = 'https://nostoyloko-jpg.github.io/showtime/';
   // Versión publicada: va en los enlaces de los QR para que el móvil no abra una copia vieja guardada en su caché
   // (súbela junto con los ?v= de index.html / live.html / remote.html).
-  const BUILD = '20261034';
+  const BUILD = '20261035';
   const CHUNK = 24000;           // bytes por trozo (los repetidores públicos limitan el tamaño de mensaje)
   const BEAT_MS = 10000;         // latido del Mac
   const PRESENCE_MS = 30000;     // presencia de cada móvil
@@ -151,7 +151,7 @@
   }
   /** Salas de la 2d-A (sin clave de mando): se les añade una; el QR de Staff no cambia. */
   function withCmdKey(room) { return room && !room.c ? Object.assign({}, room, { c: b64u(rand(16)) }) : room; }
-  /** Clave de mando nueva (el QR del regidor anterior deja de valer; el de Staff sigue). */
+  /** Clave de mando nueva (el QR del mando anterior deja de valer; los de Staff y Producción siguen). */
   function newCmdKey(room) { return Object.assign({}, room, { c: b64u(rand(16)) }); }
   /** Clave PROPIA de Producción («q»): cifra su canal (OK de CALL, mensajes, avisos, chat). Staff no la tiene: no puede leer ni hacerse pasar por Producción.
    *  Salas anteriores (sin «q»): se les añade una; los QR de Staff y del mando no cambian. */

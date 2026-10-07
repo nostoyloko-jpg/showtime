@@ -380,10 +380,6 @@
   }
 
   // ── Paneles de arriba ────────────────────────────────────────────────
-  function stageHtml(name, col) {
-    return name ? '&nbsp;&nbsp;&middot;&nbsp;&nbsp;<span class="tstage" style="color:' + col + '">' + esc(name.toUpperCase()) + '</span>' : '';
-  }
-
   /** Cuenta atrás: mm:ss por debajo de una hora; si no, 1h 05m. */
   function fmtCountdown(mins) {
     const s = Math.max(0, Math.ceil(mins * 60));

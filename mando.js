@@ -16,14 +16,11 @@
   const C = isNode ? require('./core.js') : root.ShowtimeCore;
 
   const OPS = ['start', 'stop', 'onTime', 'stretch', 'delay', 'flash', 'flashOff', 'callOk'];
-  const OP_TXT = { start: '▶ Empezar', stop: '■ Terminar', onTime: 'En hora', stretch: 'Tiempo extra', delay: 'Retraso', flash: 'Mensaje', flashOff: 'Retirar mensaje', callOk: 'OK de CALL' };
   const CATS = ['show', 'sc', 'tarea', 'hito'];
 
   // ── Bloqueos del menú Retrasos (los mismos que usa el Panel) ──────────
   function blockOf(config, scope) { const b = ((config && config.delayBlock) || {})[scope] || {}; const o = {}; CATS.forEach(k => { o[k] = b[k] === true; }); return o; }
   function isBlocked(config, kind, zoneId) { return !!(blockOf(config, 'all')[kind] || blockOf(config, zoneId || '')[kind]); }
-  /** ¿Se mueve este bloque por su categoría y su zona? (el LED de cada entrada va por encima, en core.movesWithDelay) */
-  function catsFor(config, extra) { return b => !(extra && extra[b.kind]) && !isBlocked(config, b.kind, b.stageId || ''); }
 
   function allBlocks(state, now) { return state ? C.buildBlocks(state, Number.isFinite(now) ? { mode: 'all', day: 'all', now: now } : { mode: 'all', day: 'all' }) : []; }
   function nEnt(n, adj) { return n + (n === 1 ? ' entrada ' + adj : ' entradas ' + adj + 's'); }
@@ -254,7 +251,7 @@
     return { cls: 'ok', text: nm + ' · En hora', title: 'Sin retraso acumulado ni desfase en vivo' };
   }
 
-  const API = { withBlk, OPS, delayPill, OP_TXT, isBlocked, catsFor, targets, suggest, actionsFor, startedBySchedule, findBlock, realPlan, onTimePlan, stretchPlan, editStartPlan, bisWindow, BIS_MIN, delayPlan, delayStamp, checkCmd, };
+  const API = { withBlk, OPS, delayPill, isBlocked, targets, suggest, actionsFor, startedBySchedule, findBlock, realPlan, onTimePlan, stretchPlan, editStartPlan, bisWindow, BIS_MIN, delayPlan, delayStamp, checkCmd, };
   if (isNode) module.exports = API;
   else root.ShowtimeMando = API;
 })(typeof window !== 'undefined' ? window : globalThis);

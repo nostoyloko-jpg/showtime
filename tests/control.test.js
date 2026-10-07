@@ -407,16 +407,21 @@
     const t = dashboard(); t.env.fire('btn-focus', 'click', {});
     eq(t.env.getEl('toast').textContent, 'Modo foco activado'); eq(t.env.getEl('toast').hidden, false);
   });
-  test('Botón Foco visible junto a «?» y Añadir: un clic, «Foco» ↔ «Foco activo»', () => {
+  test('Botón Foco visible junto a «?» y Añadir: un clic, texto fijo «Foco» y micro-LED', () => {
+    const src = D.src('control.js'), css = D.src('control.css');
     const lh = seccion('<div class="list-h">', '<div class="tblwrap">');
     ok(/id="btn-focus"[\s\S]*id="btn-help"[\s\S]*id="btn-new-row"/.test(lh), 'orden: Foco · ? · Añadir');
     ok(seccion('<div class="menu" id="m-view">', '<div class="menu" id="m-days">').indexOf('btn-focus') < 0, 'ya no está dentro de «Ver»');
-    const t = dashboard(), b = t.env.getEl('btn-focus'), tx = { textContent: '' };
-    b.querySelector = () => tx;   // el comodín no tiene hijos: se le da el texto del botón
+    ok(/id="btn-focus"[^>]*><span class="fled"[^>]*><\/span><span class="ftxt">Foco<\/span><\/button>/.test(lh), 'LED + texto «Foco»');
+    ok(!/Foco activo/.test(src), 'el texto no cambia (el botón no baila de tamaño)');
+    ok(/\.btn\.focusbtn \.fled\{[^}]*background:#5b5f67/.test(css), 'LED apagado gris');
+    ok(/\.btn\.focusbtn\.on \.fled\{[^}]*background:var\(--ok\)/.test(css), 'LED encendido verde');
+    ok(!/\.btn\.focusbtn\.on\{[^}]*background/.test(css), 'el botón activo no se rellena de color');
+    const t = dashboard(), b = t.env.getEl('btn-focus');
     t.env.fire('btn-focus', 'click', {});
-    ok(b.classList.contains('on')); eq(tx.textContent, 'Foco activo');
+    ok(b.classList.contains('on'));
     t.env.fire('btn-focus', 'click', {});
-    ok(!b.classList.contains('on')); eq(tx.textContent, 'Foco');
+    ok(!b.classList.contains('on'));
   });
 
   // ── Clave propia de Producción ─────────────────────────────────────────
@@ -435,6 +440,87 @@
     eq(t.env.getEl('modal-title').textContent, 'Nueva clave de Producción');
     eq(t.env.errors.length, 0, t.env.errors.join(' | '));
   }]);
+
+  // ── Tanda 3: limpieza ────────────────────────────────────────────────
+  const at = (y, mo, d, h, mi) => new Date(y, mo, d, h, mi).getTime();
+  const cfgDia = dia => ({ 'showtime.config': JSON.stringify({ mode: 'show', day: dia }) });
+  test('Bis pasada la hora de corte (06:00): la banda de la jornada anterior se puede rescatar desde EN ESCENA', () => {
+    const now = at(2026, 6, 11, 6, 5);   // 06:05: «Noche» (05:00–05:55) es de la jornada del 10; «Mañana» (06:30) ya del 11
+    const F = festEn(now, add => { add('Noche', -65, -10); add('Mañana', 25, 85); });
+    [['todas las jornadas', {}], ['jornada nueva', cfgDia('2026-07-11')], ['jornada anterior', cfgDia('2026-07-10')]].forEach(([vista, extra]) => {
+      const t = dashboard(Object.assign({ 'showtime.festival': JSON.stringify(F) }, extra), now), v = ultimo(t, 'v-now');
+      ok(/xtrabtn bis[^>]*data-act="stretch"/.test(v) && /Bis · Noche/.test(v), vista + ': bis de «Noche»: ' + v.slice(0, 300));
+      eq((v.match(/xtrabtn bis/g) || []).length, 1, vista + ': un solo botón de bis');
+      eq(t.env.errors.length, 0, vista + ': ' + t.env.errors.join(' | '));
+    });
+  });
+  test('Bis de la última banda de la noche (sin nada después en su zona): fila «ACABÓ» con el bis durante la ventana', () => {
+    RELOJES.forEach(now => {
+      const h = hhmm(now);
+      const t = dashboard({ 'showtime.festival': JSON.stringify(festEn(now, add => { add('Cierre', -50, -6); })) }, now), v = ultimo(t, 'v-now');
+      ok(/ACABÓ · Cierre/.test(v) && /Bis · Cierre/.test(v), h + ': ' + v.slice(0, 300));
+      // fuera de la ventana (más de 15 min sin nada detrás) ya no se ofrece
+      const t2 = dashboard({ 'showtime.festival': JSON.stringify(festEn(now, add => { add('Cierre', -70, -30); })) }, now);
+      ok(!/xtrabtn bis/.test(ultimo(t2, 'v-now')) && !/ACABÓ/.test(ultimo(t2, 'v-now')), h + ': pasada la ventana, sin bis');
+    });
+  });
+  test('Bis: si la zona ya suena otra banda, no se ofrece (ni fila «ACABÓ»)', () => {
+    RELOJES.forEach(now => {
+      const t = dashboard({ 'showtime.festival': JSON.stringify(festEn(now, add => { add('Antes', -60, -8); add('Ahora', -5, 50); })) }, now), v = ultimo(t, 'v-now');
+      ok(/Ahora/.test(v) && !/xtrabtn bis/.test(v) && !/ACABÓ/.test(v), hhmm(now) + ': ' + v.slice(0, 300));
+    });
+  });
+  test('Producción: el panel lateral sin «Parar», con «Nueva clave…» (icono real) y el enlace de la persona elegida', async () => {
+    const room = await E.newRoom();
+    const t = dashboard({ 'showtime.emision': JSON.stringify({ room, on: false }) }), T = t.env.win.ShowtimePanel._test;
+    const clickItem = i => t.env.fire('document', 'click', { target: { closest: sel => sel === '[data-prod-idx]' ? { dataset: { prodIdx: String(i) } } : null } });
+    clickItem(1);
+    const side = t.env.getEl('prod-qr-side').innerHTML;
+    ok(/Luis/.test(side) && /prod_002/.test(side), 'muestra a Luis');
+    t.env.getEl('prod-input').value = 'Ana';   // dar de alta a otra persona repinta la lista
+    t.env.fire('document', 'click', { target: { id: '', closest: sel => sel.indexOf('[data-act^="prod-"]') >= 0 ? { dataset: { act: 'prod-add-person' }, classList: { contains: () => false }, id: '' } : null } });
+    ok(/class="prod-item active" data-prod-idx="1"/.test(ultimo(t, 'prod-list')), 'Luis sigue marcado aunque se repinte la lista');
+    ok(/Ana/.test(ultimo(t, 'prod-list')), 'Ana dada de alta');
+    ok(!/prod-stop|>Parar</.test(side), 'sin el botón «Parar» que no hacía nada');
+    ok(/data-act="prod-regen"[^>]*><svg class="ic"><use href="#i-refresh"\/><\/svg>Nueva clave…/.test(side), 'Nueva clave… con icono');
+    ok(!/0 dispositivos conectados/.test(side), 'sin el texto fijo «0 dispositivos»');
+    eq(T.emUrl('produccion'), E.productionUrl(room, undefined, 'prod_002'), 'Copiar/Ampliar llevan el enlace de Luis');
+    eq(T.prodBigTitle(), 'Producción · Luis', 'Ampliar dice de quién es el QR');
+    t.env.fire('document', 'click', { target: { closest: sel => sel === '[data-prod-del]' ? { dataset: { prodDel: '1' } } : null } });
+    eq(t.env.getEl('prod-qr-side').innerHTML, '', 'al quitar a Luis se cierra su QR');
+    eq(T.emUrl('produccion'), E.productionUrl(room, undefined, 'prod_001'), 'vuelve al enlace por defecto');
+    eq(T.prodBigTitle(), 'Producción · Marta');
+    eq(t.env.errors.length, 0, t.env.errors.join(' | '));
+  });
+  test('Código limpio: sin console.log de depuración ni funciones muertas', () => {
+    ['control.js', 'core.js', 'datos.js', 'emision.js', 'importar.js', 'live.js', 'log.js', 'mando.js', 'meteo.js', 'qr.js', 'remote.js', 'vistas.js'].forEach(f => {
+      ok(!/console\.(log|debug|info)\(/.test(D.src(f)), f + ': quedan console.log');
+    });
+    [['control.js', 'stageOptions'], ['control.js', 'catsFn'], ['control.js', 'prod-qr-display'], ['live.js', 'stageHtml'], ['mando.js', 'catsFor'], ['mando.js', 'OP_TXT'], ['core.js', 'projectBands']]
+      .forEach(([f, n]) => ok(D.src(f).indexOf(n) < 0, f + ': queda ' + n));
+  });
+  test('CSS consolidado: el cristal se define una vez y todo lo de ≤1600 px va en un solo bloque', () => {
+    const css = D.src('control.css').replace(/\/\*[\s\S]*?\*\//g, '');
+    eq((css.match(/:root\{--glass-bg:/g) || []).length, 1, 'una sola definición del cristal');
+    eq((css.match(/body\[data-ps="escenario"\]\{--glass-bg:/g) || []).length, 1, 'una sola versión de Escenario');
+    eq((css.match(/[;{]backdrop-filter:var\(--glass-blur\)/g) || []).length, 2, 'cristal en un solo sitio (más la cabecera del panel)');
+    eq((css.match(/@media \(max-width:1600px\)/g) || []).length, 1, 'un solo bloque de 1600 px');
+    eq((css.match(/\.mbtn \.mlbl\{display:/g) || []).length, 1, 'las etiquetas de los menús se ocultan en un solo sitio (sin reglas que se contradicen)');
+  });
+  test('Iconos: cada <use href="#i-…"> existe en su página y ningún icono está repetido', () => {
+    const scripts = html => (html.match(/<script src="([^"?]+)/g) || []).map(x => x.replace('<script src="', ''));
+    const METEO = ['sun', 'csun', 'cloud', 'rain', 'snow', 'storm', 'thermo', 'wind', 'alert'];   // los que se montan con '#i-' + nombre
+    ['index.html', 'live.html', 'remote.html'].forEach(pg => {
+      const html = D.src(pg), defs = (html.match(/<symbol id="([^"]+)"/g) || []).map(x => x.slice(12, -1));
+      const dup = defs.filter((x, i) => defs.indexOf(x) !== i);
+      eq(dup.join(), '', pg + ': iconos repetidos');
+      const code = [html].concat(scripts(html).map(f => D.src(f))).join('\n');
+      const used = new Set((code.match(/#i-[a-z0-9-]+(?=["'])/g) || []).map(x => x.slice(1)));
+      if (/'#i-' \+/.test(code) && pg !== 'remote.html') METEO.forEach(m => used.add('i-' + m));
+      const missing = Array.from(used).filter(u => defs.indexOf(u) < 0);
+      eq(missing.join(), '', pg + ': iconos usados que no existen');
+    });
+  });
 
   // ── Ejecutor ─────────────────────────────────────────────────────────
   (async () => {

@@ -1,7 +1,7 @@
 /* Showtime — log.js · Event Log (caja negra de producción)
  *
  * Registro que SOLO AÑADE: nunca borra ni reescribe nada. Deshacer no quita entradas: añade «Deshecho: …».
- * Graba lo que pasa, con su hora y quién dio la orden (Panel o Mando regidor):
+ * Graba lo que pasa, con su hora y quién dio la orden (Dashboard, Mando del Stage Manager o Producción):
  *   · horas reales ▶ / ■ (también el ■ pasivo, con el inicio dado por en hora)
  *   · retrasos (manuales y desbordes) · mensajes a las pantallas · avisos del tiempo y su «Visto»
  *   · altas, cambios (nombre, tipo, zona, jornada, horas, CALL) y borrados de entradas
@@ -18,7 +18,7 @@
 
   const VERSION = 1;
   const MAX = 20000;                 // tope de seguridad (un día normal son decenas o cientos)
-  const SRC_TXT = { panel: 'Panel', mando: 'Mando regidor', produccion: 'Producción' };
+  const SRC_TXT = { panel: 'Dashboard', mando: 'Mando del Stage Manager', produccion: 'Producción' };
   const KIND_TXT = { show: 'Show', sc: 'Soundcheck', tarea: 'Tarea', hito: 'Hito' };
   const TYPE_TXT = { real: 'Hora real', delay: 'Retraso', buffer: 'Tiempo extra', msg: 'Mensaje', call: 'CALL OK', meteo: 'Meteo', add: 'Alta', del: 'Borrado', edit: 'Cambio', undo: 'Deshecho' };
   const CATS = ['show', 'sc', 'tarea', 'hito', 'inc'];

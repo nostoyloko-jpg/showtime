@@ -1024,13 +1024,6 @@
     return out;
   }
 
-  /** Compatibilidad: { key: { ps, pe } } con el estimado. */
-  function projectBands(state, blocks) {
-    const res = {};
-    blocks.filter(b => isBand(b) && b.psi !== null).forEach(b => { res[b.key] = { ps: b.si, pe: blockEnd(b) }; });
-    return res;
-  }
-
   // ── Cambios respecto a la última importación / exportación ────────────
   /** Campos cambiados por artista en un modo (incluye los comunes): { id: ['inicio', ...] }. Artistas nuevos no aparecen. */
   function modifiedFields(original, current, mode) {
@@ -1138,7 +1131,7 @@
 
   const API = {
     DEFAULT_CUTOFF, DEFAULT_CALL_MINS, DEFAULT_DURATION, DEFAULT_CO_MIN, isFija, setFija, coMinFor,
-    MARGIN_WARN, isLibre, setDelayFlag, movesWithDelay, setReal, jornadaOfAbs, activeJornada, legacyCallKey, callIsDone, callKeyName, driftByZone, delayByZone, addRetraso, retrasosOf, blockedIn, movesBy, setAlargar, hitoMargins, projectBands, MAX_NEXT, ARTIST_COLORS,
+    MARGIN_WARN, isLibre, setDelayFlag, movesWithDelay, setReal, jornadaOfAbs, activeJornada, legacyCallKey, callIsDone, callKeyName, driftByZone, delayByZone, addRetraso, retrasosOf, blockedIn, movesBy, setAlargar, hitoMargins, MAX_NEXT, ARTIST_COLORS,
     pad2, parseHM, fmtHM, dayIndex, isoOfDay, shiftDate, toAbs, adjustEnd, nowAbs,
     cutoffMins, festivalDateOf, entersMode, festivalDays, TIPOS, tipoOf, isBand, isAll, entriesOf, tasksNow, hitosOf,
     getEscenario, artistColor, callAbsFor, buildBlocks,

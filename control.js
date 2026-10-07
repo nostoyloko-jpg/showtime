@@ -61,7 +61,7 @@
   function applyFocus() {
     const on = focusOn(), b = document.getElementById('btn-focus');
     document.body.classList.toggle('focus', on);
-    if (b) { b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); const tx = b.querySelector('.ftxt'); if (tx) tx.textContent = on ? 'Foco activo' : 'Foco'; }
+    if (b) { b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); b.title = (on ? 'Modo foco ACTIVO' : 'Modo foco') + ': solo lo de directo, filas y letra más grandes. Clic: activar / desactivar (⇧⌘F)'; }
     const l = document.getElementById('view-lbl'); if (l) l.textContent = viewLabel();
   }
   function setFocus(on) { try { if (on) localStorage.setItem(FOCUS_KEY, '1'); else localStorage.removeItem(FOCUS_KEY); } catch (e) {} applyFocus(); }
@@ -128,7 +128,7 @@
     if (msg) toast(msg);
   }
   /** Descripción del paso para «Deshecho: …» en el log. */
-  function undoTxt(msg) { return String(msg || '').replace(/^Desde el dispositivo del regidor · /, '').replace(/ \(Deshacer para recuperarla\)$/, ''); }
+  function undoTxt(msg) { return String(msg || '').replace(/^Desde el mando del Stage Manager · /, '').replace(/ \(Deshacer para recuperarla\)$/, ''); }
 
   function undo() {
     if (!UNDO.length) return;
@@ -235,13 +235,6 @@
     w.textContent = msg; w.hidden = !msg;
   }
 
-  // Opciones de escenario para un <select>
-  function stageOptions(selected, allowNone, noneLabel) {
-    const st = (FEST.escenarios || []);
-    let h = (allowNone || !st.length || !selected) ? '<option value=""' + (!selected ? ' selected' : '') + '>' + (noneLabel || (st.length ? '— elige —' : '— sin zona —')) + '</option>' : '';
-    h += st.map(e => '<option value="' + esc(e.id) + '"' + (e.id === selected ? ' selected' : '') + '>' + esc(e.nombre) + '</option>').join('');
-    return h;
-  }
   /** Zona tecleada → { state, id, created }. Vacío = sin zona. Si no existe, se crea (explícito: el regidor la ha escrito). */
   function resolveZone(state, name) {
     const n = String(name || '').replace(/\s+/g, ' ').trim();
@@ -601,13 +594,24 @@
     });
   }
 
-  /** En el CHANGEOVER: «Bis · Tiempo extra» si la banda que acaba de terminar en esa zona aún se puede rescatar (ventana del bis). */
-  function bisBtn(stageId, nowInt) {
-    const prev = BLOCKS.filter(b => C.isBand(b) && (b.stageId || '') === (stageId || '') && b.rf === null && !b.alargar && b.nf !== null && b.nf <= nowInt).sort((x, y) => y.nf - x.nf)[0];
-    if (!prev) return '';
-    const p = M.stretchPlan(FEST, prev.key, true, nowInt);
-    if (!p.ok || p.late === null || p.late === undefined) return '';
-    return '<button class="xtrabtn bis" data-act="stretch" data-key="' + esc(prev.key) + '" data-on="1" title="' + esc(prev.name) + ' acabó hace ' + p.late + ' min: rescátala si hay bis (Tiempo extra tardío)"><svg class="ic"><use href="#i-undo"/></svg>Bis · ' + esc(prev.name) + '</button>';
+  /** Bis rescatable por zona: la última banda que ya acabó (sin ■ ni Tiempo extra) y aún dentro de la ventana del bis.
+   *  Busca en TODAS las jornadas: la que acabó puede ser de la jornada anterior (pasada la hora de corte). { zoneId: { b, late } } */
+  function bisCands(nowInt) {
+    const last = {};
+    ALL_MODE.forEach(b => {
+      if (!C.isBand(b) || b.rf !== null || b.alargar || b.nf === null || b.nf > nowInt) return;
+      const z = b.stageId || '';
+      if (!last[z] || b.nf > last[z].nf) last[z] = b;
+    });
+    const out = {};
+    Object.keys(last).forEach(z => {
+      const p = M.stretchPlan(FEST, last[z].key, true, nowInt);
+      if (p.ok && p.late !== null && p.late !== undefined) out[z] = { b: last[z], late: p.late };
+    });
+    return out;
+  }
+  function bisBtnHtml(c) {
+    return '<button class="xtrabtn bis" data-act="stretch" data-key="' + esc(c.b.key) + '" data-on="1" title="' + esc(c.b.name) + ' acabó hace ' + c.late + ' min: rescátala si hay bis (Tiempo extra tardío)"><svg class="ic"><use href="#i-undo"/></svg>Bis · ' + esc(c.b.name) + '</button>';
   }
 
   // Vista en vivo (mismas reglas que la Pantalla Live)
@@ -621,17 +625,25 @@
         '<div class="v-meta">' + kindTag(b) + C.fmtHM(b.si) + '–' + C.fmtHM(b.sf) + (b.stage ? ' · ' + esc(b.stage) : '') + '</div>' +
         '<div class="v-rem" style="color:' + col + '">' + (xtraOver(b, nowInt) !== null ? 'TIEMPO EXTRA · +' + xtraOver(b, nowInt) + ' min' : p.remaining + ' min restantes' + (b.alargar && b.rf === null ? ' · tiempo extra' : '')) + '</div>' + (b.rf === null ? xtraBtn(b) : '') + '</div>' });
     });
+    const bis = bisCands(nowInt), bisShown = new Set(), bisFor = z => { z = z || ''; if (!bis[z]) return ''; bisShown.add(z); return bisBtnHtml(bis[z]); };
+    C.playingNow(BLOCKS, nowInt).forEach(b => bisShown.add(b.stageId || ''));   // la zona ya suena: ahí no se ofrece el bis
     C.changeoversNow(BLOCKS, nowMins, TAREAS).forEach(co => {
       const col = safeColor(co.stageColor || co.next.color, '#888');
       if (!co.standby && co.kind === 'idle') {      // hueco sin cambio real (decisión 76)
         rows.push({ o: order(co.stageId), h: '<div class="v-row co idle" style="--c:' + col + '"><div class="v-name" style="color:var(--muted)">— SIN ACTIVIDAD —' + (co.stage ? ' · ' + esc(co.stage) : '') + '</div>' +
-          '<div class="v-meta">después <b>' + esc(co.next.name) + '</b> · ' + C.fmtHM(co.next.si) + '</div></div>' });
+          '<div class="v-meta">después <b>' + esc(co.next.name) + '</b> · ' + C.fmtHM(co.next.si) + '</div>' + (co.prev ? '' : bisFor(co.stageId)) + '</div>' });
         return;
       }
       rows.push({ o: order(co.stageId), h: '<div class="v-row co' + (co.standby ? ' sb' : '') + '" style="--c:' + col + '"><div class="v-name" style="color:' + (co.standby ? 'var(--muted)' : col) + '">' +
         (co.standby ? 'STANDBY' : 'CHANGEOVER') + (co.stage ? ' · ' + esc(co.stage) : '') + '</div>' +
         '<div class="v-meta">' + (co.standby ? 'después' : 'entra') + ' <b>' + esc(co.next.name) + '</b> · ' + C.fmtHM(co.next.si) + '</div>' +
-        '<div class="v-rem">quedan ' + fmtCountdown(co.remaining) + '</div>' + bisBtn(co.stageId, nowInt) + '</div>' });
+        '<div class="v-rem">quedan ' + fmtCountdown(co.remaining) + '</div>' + bisFor(co.stageId) + '</div>' });
+    });
+    // Zonas cuya última banda acaba de terminar sin tarjeta de cambio (fin de la noche, o pasada la hora de corte): el bis sigue a mano
+    Object.keys(bis).filter(z => !bisShown.has(z)).forEach(z => {
+      const c = bis[z], col = safeColor(c.b.stageColor || c.b.color, '#888');
+      rows.push({ o: order(z), h: '<div class="v-row co ended" style="--c:' + col + '"><div class="v-name" style="color:var(--muted)">ACABÓ · ' + esc(c.b.name) + (c.b.stage ? ' · ' + esc(c.b.stage) : '') + '</div>' +
+        '<div class="v-meta">a las ' + C.fmtHM(c.b.nf) + ' · hace ' + c.late + ' min</div>' + bisBtnHtml(c) + '</div>' });
     });
     // Tareas en curso (operativa del día): debajo de los escenarios, sin cuenta de cambio
     C.tasksNow(BLOCKS, nowInt).forEach(b => {
@@ -1083,8 +1095,6 @@
   function blockOf(scope) { return Object.assign(EMPTY_BLOCK(), ((CONFIG.delayBlock || {})[scope]) || {}); }
   /** ¿Está bloqueada esta categoría en esta zona? (bloqueo global o de la zona) */
   function isBlocked(kind, zoneId) { return !!(blockOf('all')[kind] || blockOf(zoneId || '')[kind]); }
-  /** Para el motor: ¿se mueve este bloque por su categoría y su zona? (el LED individual va por encima) */
-  function catsFn() { return b => !isBlocked(b.kind, b.stageId || ''); }
   function curScope() {
     const zs = (FEST && FEST.escenarios) || [];
     return CONFIG.delayZone && (CONFIG.delayZone === 'all' || CONFIG.delayZone === '' || zs.some(z => z.id === CONFIG.delayZone)) ? CONFIG.delayZone : 'all';
@@ -1935,7 +1945,7 @@
     if (!quiet) toast('Emisión parada: los dispositivos muestran «Emisión detenida»');
   }
   function emRegen() {
-    modal('Regenerar claves', '<p>Se crea una sala nueva con claves nuevas. <b>Los dos QR anteriores (Staff y Regidor) dejan de funcionar</b>: habrá que escanear los nuevos.</p>', [
+    modal('Regenerar claves', '<p>Se crea una sala nueva con claves nuevas. <b>Todos los QR anteriores (Staff, Mando y Producción) dejan de funcionar</b>: habrá que escanear los nuevos.</p>', [
       { label: 'Cancelar' },
       { label: 'Regenerar', kind: 'primary', run: () => { (async () => {
         const was = !!EM; await emStop(true);
@@ -1946,12 +1956,12 @@
     ]);
   }
   function emRegenCmd() {
-    modal('Nueva clave del mando', '<p>El QR del regidor anterior <b>deja de poder mandar</b> al Mac. El QR de Staff sigue valiendo y la emisión no se corta.</p>', [
+    modal('Nueva clave del mando', '<p>El QR del mando anterior <b>deja de poder mandar</b> al Mac. Los QR de Staff y Producción siguen valiendo y la emisión no se corta.</p>', [
       { label: 'Cancelar' },
       { label: 'Nueva clave', kind: 'primary', run: () => { (async () => {
         emRoom = Em.newCmdKey(emRoom); emSave(!!EM);
         if (EM) await EM.setCmdKey(emRoom.c);
-        renderCast(); toast('Clave del mando nueva: escanea el QR del regidor otra vez');
+        renderCast(); toast('Clave del mando nueva: escanea otra vez el QR del mando');
       })(); } }
     ]);
   }
@@ -1966,7 +1976,7 @@
       { label: 'Nueva clave', kind: 'primary', run: () => { (async () => {
         emRoom = Em.newProdKey(emRoom); emSave(!!EM);
         if (EM) await EM.setProdKey(emRoom.q);
-        renderCast(); renderProducerList(); $('prod-qr-side') && ($('prod-qr-side').innerHTML = '');
+        renderCast(); renderProducerList(); closeProducerQR();
         toast('Clave de Producción nueva: cada persona tiene que escanear su QR otra vez');
       })(); } }
     ]);
@@ -1980,7 +1990,7 @@
     if (!FEST && ['flash', 'flashOff'].indexOf(cmd.op) < 0) return { ok: false, msg: 'No hay evento abierto en el Dashboard' };
     const at = Math.abs(Date.now() - cmd.t) < 120000 ? cmd.t : Date.now();     // la hora en que se pulsó en el móvil
     const abs = Math.floor(C.nowAbs(new Date(at)));
-    const from = 'Desde el dispositivo del regidor · ';
+    const from = 'Desde el mando del Stage Manager · ';
     if (cmd.op === 'start' || cmd.op === 'stop') {
       const r = M.realPlan(FEST, CONFIG, a.key, cmd.op === 'start' ? 'i' : 'f', abs);
       if (!r.ok) return { ok: false, msg: r.error };
@@ -2126,12 +2136,11 @@
   let PRODUCERS = [];  // Lista de personas de Producción: [{id, name}, ...]
   let PROD_DEFAULT_ID = null;  // ID para mostrar en la pestaña Producción
   let PROD_COUNTER = 0;  // Contador para generar IDs únicos
+  let PROD_SEL = null;  // Persona elegida en la lista: «Ampliar» y «Copiar enlace» van con SU enlace
   const PROD_STORAGE_KEY = 'showtime.producers';
   function saveProducers() {
-    console.log('saveProducers called, PRODUCERS:', PRODUCERS);
     try {
       localStorage.setItem(PROD_STORAGE_KEY, JSON.stringify({ producers: PRODUCERS, counter: PROD_COUNTER, defaultId: PROD_DEFAULT_ID }));
-      console.log('Guardado en localStorage');
     } catch (e) {
       console.error('Error guardando productores:', e);
     }
@@ -2159,7 +2168,8 @@
     if (kind === 'remote') return Em.remoteUrl(emRoom);
     if (kind === 'produccion') {
       if (!PROD_DEFAULT_ID && PRODUCERS.length) PROD_DEFAULT_ID = PRODUCERS[0].id;
-      return Em.productionUrl(emRoom, undefined, PROD_DEFAULT_ID || 'Producción');
+      const sel = PRODUCERS.some(p => p.id === PROD_SEL) ? PROD_SEL : PROD_DEFAULT_ID;
+      return Em.productionUrl(emRoom, undefined, sel || 'Producción');
     }
     if (CAST_VISTA === 'confidence') { const zs = castZones(); if (!zs.some(z => z.id === CAST_ZONA)) CAST_ZONA = zs.length ? zs[0].id : ''; }
     return Em.staffUrl(emRoom, undefined, { vista: CAST_VISTA, zona: CAST_ZONA });
@@ -2172,7 +2182,7 @@
       return;
     }
     box.innerHTML = PRODUCERS.map((p, i) => {
-      return '<div class="prod-item" data-prod-idx="' + i + '">'
+      return '<div class="prod-item' + (p.id === PROD_SEL ? ' active' : '') + '" data-prod-idx="' + i + '">'
         + '<div class="prod-info">'
         + '<div class="prod-name">' + esc(p.name) + '</div>'
         + '<div class="prod-id">' + esc(p.id) + '</div>'
@@ -2182,7 +2192,6 @@
     }).join('');
   }
   function addProducerFromInput(input) {
-    console.log('addProducerFromInput called', input);
     const name = input.value.trim();
     if (!name) { toast('Nombre requerido'); return; }
     PROD_COUNTER++;
@@ -2204,34 +2213,41 @@
     saveProducers();
     renderProducerList();
     renderCast();
+    // El panel lateral no se queda con el QR de alguien borrado (ni con el índice corrido)
+    const still = PRODUCERS.findIndex(x => x.id === PROD_SEL);
+    if (still >= 0) showProducerQR(still); else closeProducerQR();
     if (emRoom) emRegenProd(removed.name || removed.id);   // borrar de la lista no le quita el QR: se ofrece cortar el acceso
   }
   function closeProducerQR() {
     const side = $('prod-qr-side');
     if (side) {
-      side.innerHTML = '';
+      side.innerHTML = ''; PROD_SEL = null;
       document.querySelectorAll('.prod-item').forEach(item => item.classList.remove('active'));
     }
   }
+  /** Título del QR ampliado de Producción: dice de quién es (la persona elegida o, si no, la de por defecto). */
+  function prodBigTitle() {
+    const p = PRODUCERS.find(x => x.id === PROD_SEL) || PRODUCERS.find(x => x.id === PROD_DEFAULT_ID);
+    return 'Producción' + (p ? ' · ' + p.name : '');
+  }
   function showProducerQR(index) {
-    console.log('showProducerQR called, index:', index);
     if (index < 0 || index >= PRODUCERS.length) return;
     const p = PRODUCERS[index];
     const side = $('prod-qr-side');
-    console.log('side:', side, 'Em:', !!Em, 'emRoom:', !!emRoom, 'ShowtimeQR:', !!window.ShowtimeQR);
     if (!side) return;
     let qr = '';
     if (Em && emRoom && window.ShowtimeQR) {
       const url = Em.productionUrl(emRoom, undefined, p.id);
       qr = window.ShowtimeQR.svg(url, { ecl: 'M', margin: 3 });
-      console.log('QR generated, url:', url);
     }
-    side.innerHTML = '<div class="prod-qr-content"><div class="prod-qr-header">' + esc(p.name) + '<span class="prod-id">' + esc(p.id) + '</span></div><div class="prod-qr-svg">' + qr + '</div><div class="prod-state"><span class="prod-stat-dot"></span><span style="font-size:12px;color:var(--accent)">En directo</span></div><div style="font-size:11px;color:var(--muted);margin-top:4px">0 dispositivos conectados</div><div class="prod-buttons"><button class="btn" type="button" data-act="cast-big" data-k="produccion"><svg class="ic"><use href="#i-expand"/></svg>Ampliar</button><button class="btn" type="button" data-act="cast-copy" data-k="produccion"><svg class="ic"><use href="#i-copy"/></svg>Copiar enlace</button><button class="btn" type="button" data-act="prod-stop"><svg class="ic"><use href="#i-stop"/></svg>Parar</button><button class="btn ghost" type="button" data-act="prod-regen"><svg class="ic"><use href="#i-refresh"/></svg>Regen</button></div></div>';
+    PROD_SEL = p.id;
+    side.innerHTML = '<div class="prod-qr-content"><div class="prod-qr-header">' + esc(p.name) + '<span class="prod-id">' + esc(p.id) + '</span></div><div class="prod-qr-svg">' + qr + '</div>'
+      + '<div class="prod-state"><span class="prod-stat-dot' + (EM ? '' : ' off') + '"></span><span>' + (EM ? 'En directo' : 'Emisión parada') + '</span></div>'
+      + '<div class="prod-buttons"><button class="btn" type="button" data-act="cast-big" data-k="produccion"><svg class="ic"><use href="#i-expand"/></svg>Ampliar</button><button class="btn" type="button" data-act="cast-copy" data-k="produccion"><svg class="ic"><use href="#i-copy"/></svg>Copiar enlace</button><button class="btn ghost" type="button" data-act="prod-regen"><svg class="ic"><use href="#i-refresh"/></svg>Nueva clave…</button></div></div>';
     // Marca este productor como seleccionado
     document.querySelectorAll('.prod-item').forEach(item => item.classList.remove('active'));
     const selItem = document.querySelector('[data-prod-idx="' + index + '"]');
     if (selItem) selItem.classList.add('active');
-    console.log('QR display shown in side panel');
   }
   function castPickHtml() {
     const zs = castZones();
@@ -2245,21 +2261,15 @@
       ? '<button class="btn" type="button" data-act="cast-big" data-k="remote"><svg class="ic"><use href="#i-expand"/></svg>Ampliar</button>'
         + '<button class="btn" type="button" data-act="cast-copy" data-k="remote"><svg class="ic"><use href="#i-copy"/></svg>Copiar enlace</button>'
         + '<button class="btn ghost" type="button" data-act="cast-regencmd">Nueva clave del mando…</button>'
-      : kind === 'produccion'
-      ? '<button class="btn" type="button" data-act="cast-big" data-k="produccion"><svg class="ic"><use href="#i-expand"/></svg>Ampliar</button>'
-        + '<button class="btn" type="button" data-act="cast-copy" data-k="produccion"><svg class="ic"><use href="#i-copy"/></svg>Copiar enlace</button>'
-        + '<button class="btn ghost" type="button" data-act="prod-add-person">Agregar otra persona…</button>'
       : '<button class="btn" type="button" data-act="cast-big" data-k="staff"><svg class="ic"><use href="#i-expand"/></svg>Ampliar</button>'
         + '<button class="btn" type="button" data-act="cast-copy" data-k="staff"><svg class="ic"><use href="#i-copy"/></svg>Copiar enlace</button>'
         + '<button class="btn" type="button" data-act="cast-stop">Parar emisión</button>'
         + '<button class="btn ghost" type="button" data-act="cast-regen">Regenerar claves…</button>';
     const note = kind === 'remote'
       ? '<p class="cwarn"><svg class="ic"><use href="#i-alert"/></svg><span><b>Privado.</b> Quien tenga este QR puede mandar al Mac (▶ / ■, En hora, retrasos, mensajes, CALL). No lo compartas; si se escapa, «Nueva clave del mando».</span></p>'
-      : kind === 'produccion'
-      ? '<p class="mnote">Acceso a la tabla completa, confirmar CALL, enviar mensajes y chat interno. Cada persona de Producción recibe su QR único personalizado.</p>'
       : '<p class="mnote">Abre la Pantalla Live en el dispositivo (móvil, tablet…), en solo lectura. Si el Mac se duerme o se cierra el Dashboard, la emisión se corta y los dispositivos lo avisan.</p>';
     if (kind === 'produccion') {
-      return '<div class="cprod-split"><div class="cprod-left"><div class="cprod-add"><input type="text" id="prod-input" placeholder="Nombre productor…" /><button class="btn primary" type="button" data-act="prod-add-person"><svg class="ic"><use href="#i-plus"/></svg></button></div><div class="cprod-list" id="prod-list"></div><p class="mnote">Toca un productor para ver su QR.</p></div><div class="cprod-right"><div id="prod-qr-side" class="prod-qr-side"></div></div></div>';
+      return '<div class="cprod-split"><div class="cprod-left"><div class="cprod-add"><input type="text" id="prod-input" placeholder="Nombre productor…" /><button class="btn primary" type="button" data-act="prod-add-person"><svg class="ic"><use href="#i-plus"/></svg></button></div><div class="cprod-list" id="prod-list"></div><p class="mnote">Toca una persona para ver su QR. Ve la Live de Manager, confirma los CALL, manda mensajes y avisos y chatea contigo (sin tocar horarios).</p></div><div class="cprod-right"><div id="prod-qr-side" class="prod-qr-side"></div></div></div>';
     }
     return (kind === 'staff' ? castPickHtml() : '') + '<div class="cgrid"><div class="cqr" title="QR de ' + (kind === 'remote' ? 'Stage Manager' : 'Staff · ' + Vs.VISTA_TXT[CAST_VISTA]) + '">' + QR.svg(url, { ecl: 'M', margin: 3 }) + '</div>'
       + '<div class="cside"><div class="cst" data-k="' + kind + '"></div>' + side + '</div></div>' + note;
@@ -2277,15 +2287,16 @@
         box.innerHTML = (kind === 'remote'
           ? '<p class="cintro">Con el <b>mando del Stage Manager</b> manejas el Mac desde tu dispositivo: ▶ / ■, En hora, retrasos con resumen y Confirmar, mensajes y CALL. Necesita que la emisión esté activa.</p>'
           : kind === 'produccion'
-          ? '<p class="cintro">Acceso para <b>Producción</b>: ver la tabla completa, confirmar CALL, enviar mensajes y chat con Stage Manager. Necesita que la emisión esté activa.</p>'
+          ? '<p class="cintro">Acceso para <b>Producción</b>: ver la Live de Manager, confirmar CALL, enviar mensajes y avisos y chatear con el Stage Manager. Necesita que la emisión esté activa.</p>'
           : '<p class="cintro">Emite el horario en directo a los dispositivos del equipo (técnicos, producción, managers…). Lo ven <b>solo en lectura</b>: nadie puede cambiar nada desde ellos.</p>')
           + '<div class="cbtns"><button class="btn primary" type="button" data-act="cast-start"><svg class="ic"><use href="#i-cast"/></svg>Empezar a emitir</button>'
           + (emRoom && kind === 'staff' ? '<button class="btn" type="button" data-act="cast-regen">Regenerar claves…</button>' : '') + '</div>'
           + '<p class="mnote">Necesita internet en el Mac y en los dispositivos (4G o Wi-Fi con salida). Todo va cifrado: los repetidores públicos solo ven datos ilegibles y no guardan nada.</p>';
         return;
       }
-      const url = emUrl(kind);
-      if (box.dataset.url !== url) { box.dataset.url = url; box.innerHTML = paneHtml(kind); }
+      // Producción: el panel solo se rehace si cambia la sala o su clave (no al elegir persona, que borraría su QR)
+      const url = kind === 'produccion' ? Em.productionUrl(emRoom, undefined, '') : emUrl(kind);
+      if (box.dataset.url !== url) { box.dataset.url = url; box.innerHTML = paneHtml(kind); if (kind === 'produccion') PROD_SEL = null; }
       if (kind === 'produccion') renderProducerList();
       else { const cst = box.querySelector('.cst'); if (cst) cst.innerHTML = emStateHtml(kind); }
     });
@@ -2293,7 +2304,7 @@
     else {
       const url = emUrl(bigTab);
       if ($('qr-big-svg').dataset.url !== url) { $('qr-big-svg').dataset.url = url; $('qr-big-svg').innerHTML = QR.svg(url, { ecl: 'M', margin: 4 }); }
-      $('qr-big-t').textContent = bigTab === 'remote' ? 'Stage Manager · mando (privado)' : bigTab === 'produccion' ? 'Producción' : 'Staff · ' + Vs.VISTA_TXT[CAST_VISTA] + (CAST_VISTA === 'confidence' ? ' · ' + ((castZones().find(z => z.id === CAST_ZONA) || {}).name || '') : '') + ' · solo lectura';
+      $('qr-big-t').textContent = bigTab === 'remote' ? 'Stage Manager · mando (privado)' : bigTab === 'produccion' ? prodBigTitle() : 'Staff · ' + Vs.VISTA_TXT[CAST_VISTA] + (CAST_VISTA === 'confidence' ? ' · ' + ((castZones().find(z => z.id === CAST_ZONA) || {}).name || '') : '') + ' · solo lectura';
       $('qr-big').classList.toggle('remote', bigTab === 'remote');
       $('qr-big-st').innerHTML = emStateHtml(bigTab);
     }
@@ -2344,7 +2355,6 @@
   });
   document.addEventListener('click', e => { const b = e.target.closest('#cast-staff [data-cv]'); if (!b) return; CAST_VISTA = b.dataset.cv; renderCast(); });
   document.addEventListener('change', e => { if (e.target.matches('#cast-staff [data-cz]')) { CAST_ZONA = e.target.value; renderCast(); } });
-  document.addEventListener('click', e => { if (e.target.id === 'prod-qr-display') closeProducerQR(); });
   // Cada cambio guardado (en este Panel o llegado de la Live, p. ej. un OK de CALL) sale hacia los móviles
   const EM_KEYS = [Dt.KEYS.festival, Dt.KEYS.config, Dt.KEYS.callDone, Dt.KEYS.flash, Dt.KEYS.avisos, Dt.KEYS.meteo];
   Dt.onWrite(k => { if (EM && EM_KEYS.indexOf(k) >= 0) EM.push(); });
@@ -2425,5 +2435,5 @@
     if (ok) toast('Se vuelve a guardar con normalidad');
   });
 
-  window.ShowtimePanel = { reload: () => { loadState(); renderAll(); }, _test: { emProdMessage, emRegenProd, hitoChips, room: () => emRoom } };   // _test: solo para tests/control.test.js
+  window.ShowtimePanel = { reload: () => { loadState(); renderAll(); }, _test: { emProdMessage, emRegenProd, hitoChips, emUrl, prodBigTitle, room: () => emRoom } };   // _test: solo para tests/control.test.js
 })();
