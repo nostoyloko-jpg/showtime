@@ -723,8 +723,8 @@
           if (o.createStages && o.createStages[norm(r.escenario)] === false) errs.push('La zona «' + r.escenario + '» no existe (marca «crear» o cámbiala)');
           else warns.push('Zona nueva: ' + r.escenario);
         }
-      } else if (!band) { /* tareas e hitos: escenario opcional */ }
-      else if (o.defaultStageId) stage = C.getEscenario(state, o.defaultStageId);
+      } else if (o.defaultStageId && C.getEscenario(state, o.defaultStageId)) stage = C.getEscenario(state, o.defaultStageId);   // «Zona por defecto»: para todo lo que no trae zona
+      else if (!band) { /* tareas e hitos: escenario opcional */ }
       else if ((state.escenarios || []).length) errs.push('Falta la zona (elige una por defecto o una columna)');
       // Jornada
       const jornada = r.jornada || o.defaultJornada || '';
@@ -746,7 +746,7 @@
       if (tipo === 'hito') {
         if (fin) warns.push('Un hito no tiene fin: se ignora ' + fin);
         fin = '';
-      } else if (r.inicio && !fin) warns.push('Sin hora de fin (la Live supone 60 min)');
+      } else if (r.inicio && !fin) warns.push('Sin fin: se estiman ' + C.DEFAULT_DURATION + ' min');   // un hito es un instante: nunca lleva este aviso
       if (!band && call) { warns.push((tipo === 'hito' ? 'Los hitos' : 'Las tareas') + ' no tienen CALL: se ignora ' + call); call = ''; }
       if (r.inicio && fin && C.parseHM(fin) <= C.parseHM(r.inicio)) warns.push('Cruza medianoche: termina al día siguiente');
       if (r.inicio && jornada && C.fechaFor(state, jornada, r.inicio) !== jornada) warns.push('Antes de la hora de corte: fecha real ' + C.fechaFor(state, jornada, r.inicio));

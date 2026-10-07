@@ -916,3 +916,8 @@ body.focus #tbl .gapbtn{font-size:14px}
 .drop-box span{font-size:13px;color:var(--muted);font-weight:500}
 body[data-ps="escenario"] .onb{background:#000;border-color:rgba(255,214,0,.55)}
 body[data-ps="escenario"] .addtabs button.on{background:#FFD600;color:#000}
+
+/* Vista previa de «Pegar horario»: cabecera fija al hacer scroll (con su raya), y aviso de éxito en verde */
+.imp-prev thead th{position:sticky;top:0;z-index:10;background:#14151b;box-shadow:inset 0 -1px 0 var(--hair2,rgba(255,255,255,.14))}
+body[data-ps="escenario"] .imp-prev thead th{background:#000}
+.toast.good{border-color:color-mix(in srgb,var(--ok) 60%,transparent);color:var(--ok)}

@@ -575,7 +575,8 @@
     eq(s.event.nombre, 'Evento sin nombre'); eq(s.event.fechaInicio, '2026-07-10'); eq(s.event.fechaFin, '2026-07-11');
     eq(s.artists.length, 2); eq(s.escenarios.map(e => e.nombre).join(), 'Principal,Carpa');
     eq(t.read('showtime.original').artists.length, 0, 'la referencia es el evento vacío: lo importado cuenta como «sin exportar»');
-    ok(/Evento creado/.test(t.env.getEl('toast').textContent), t.env.getEl('toast').textContent);
+    eq(t.env.getEl('toast').textContent, '✓ 2 entradas importadas con éxito en 2 jornadas (2 shows) · ponle nombre en Configuración');
+    ok(t.env.getEl('toast').classList.contains('good'), 'toast en verde');
     eq(t.env.errors.length, 0, t.env.errors.join(' | '));
   });
   test('⌘V con el evento abierto: la vista previa va contra ese evento (no crea otro)', () => {
@@ -671,6 +672,20 @@
     const s = t.read('showtime.festival');
     eq(s.artists.length, 4, 'las 4 filas del Excel'); eq(s.event.fechaInicio, '2026-07-10');
     ok(s.artists.some(a => a.nombre === 'Omega' && a.soundcheckInicio === '18:00' && !a.inicio), '«Prueba Omega» entra como soundcheck de Omega');
+  });
+
+  test('Importar: resumen del toast con el desglose (solo lo que hay) y 2,5 s', () => {
+    const t = panel(), S = t.T.importSummary, R = (tipo, jornada) => ({ tipo, jornada });
+    eq(S([R('show', 'a'), R('show', 'a'), R('sc', 'b'), R('tarea', 'b'), R('hito', 'c')]), '✓ 5 entradas importadas con éxito en 3 jornadas (2 shows · 1 prueba · 2 tareas/hitos)');
+    eq(S([R('show', 'a')]), '✓ 1 entrada importada con éxito (1 show)');
+    eq(S([R('hito', 'a'), R('hito', 'a')], 2), '✓ 2 entradas importadas con éxito (2 tareas/hitos)');
+    const src = D.src('control.js');
+    ok(/toast\(importSummary\(IMP_LAST, r\.added\)[^;]*, false, 2500\)/.test(src), '2,5 s');
+    ok(/tw\.scrollTo\(\{ top: 0, behavior: 'smooth' \}\)/.test(src), 'la tabla vuelve arriba con scroll suave');
+  });
+  test('Vista previa: cabecera fija al hacer scroll (sticky, #14151b, por encima de las filas)', () => {
+    const css = D.src('control.css');
+    ok(/\.imp-prev thead th\{position:sticky;top:0;z-index:10;background:#14151b;box-shadow:inset 0 -1px 0/.test(css));
   });
 
   // ── Tanda 4: órdenes del mando (emCommand) — reloj simulado ────────────────────────

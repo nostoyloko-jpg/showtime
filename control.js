@@ -1631,10 +1631,19 @@
     $('imp-go').disabled = !c.importar;
   }
 
+  let IMP_LAST = [];
+  /** «✓ 39 entradas importadas en 3 jornadas (8 shows · 8 pruebas · 23 tareas/hitos)» — solo lo que hay. */
+  function importSummary(rows, added) {
+    const n = Number.isFinite(added) ? added : rows.length, c = t => rows.filter(x => x.tipo === t).length;
+    const jors = new Set(rows.map(x => x.jornada).filter(Boolean)).size;
+    const parts = [[c('show'), 'show', 'shows'], [c('sc'), 'prueba', 'pruebas'], [c('tarea') + c('hito'), 'tarea/hito', 'tareas/hitos']].filter(p => p[0]).map(p => p[0] + ' ' + (p[0] === 1 ? p[1] : p[2]));
+    return '✓ ' + n + (n === 1 ? ' entrada importada' : ' entradas importadas') + ' con éxito' + (jors > 1 ? ' en ' + jors + ' jornadas' : '') + (parts.length ? ' (' + parts.join(' · ') + ')' : '');
+  }
   function impDoImport() {
     if (!IMP || !IMP.pv || !IMP.pv.counts.importar) return;
     const fresh = IMP.fresh, base = IMP.base;
     const r = I.apply(base, IMP.pv, { mode: IMP.mode, createStages: IMP.create, extendEvent: IMP.extend });
+    IMP_LAST = IMP.pv.rows.filter(x => x.include && x.status !== 'err');
     const used = new Set(IMP.pv.rows.filter(x => x.include && x.status !== 'err').map(x => x.tipo));
     const hidden = CONFIG.mode !== 'all' && Array.from(used).some(t => t !== CONFIG.mode);
     closeImport();
@@ -1646,6 +1655,10 @@
       msg = 'Evento creado · ' + msg.charAt(0).toLowerCase() + msg.slice(1) + '. Ponle nombre en Configuración';
     }
     commitFestival(r.state, msg);
+    // Confirmación clara (2,5 s, en verde) y la tabla arriba para ver el evento recién importado
+    toast(importSummary(IMP_LAST, r.added) + (fresh ? ' · ponle nombre en Configuración' : ''), false, 2500);
+    $('toast').classList.add('good');
+    const tw = document.querySelector('.tblwrap'); if (tw && tw.scrollTo) tw.scrollTo({ top: 0, behavior: 'smooth' });
     if (r.errors.length) modal('Algunas filas no entraron', '<ul>' + r.errors.map(e => '<li>' + esc(e) + '</li>').join('') + '</ul>', [{ label: 'Entendido', kind: 'primary' }]);
   }
 
@@ -2532,5 +2545,5 @@
     if (ok) toast('Se vuelve a guardar con normalidad');
   });
 
-  window.ShowtimePanel = { reload: () => { loadState(); renderAll(); }, _test: { emProdMessage, emRegenProd, hitoChips, emUrl, prodBigTitle, fileKind, handleFile, emCommand, room: () => emRoom } };   // _test: solo para tests/control.test.js
+  window.ShowtimePanel = { reload: () => { loadState(); renderAll(); }, _test: { emProdMessage, emRegenProd, hitoChips, emUrl, prodBigTitle, fileKind, handleFile, emCommand, importSummary, room: () => emRoom } };   // _test: solo para tests/control.test.js
 })();

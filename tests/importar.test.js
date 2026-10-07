@@ -206,7 +206,7 @@
     const pv = I.preview(S, r.records, { mode: 'show', ctx: CTX, defaultStageId: S.escenarios[0].id });
     deq(pv.rows.map(x => x.tipo), ['tarea', 'tarea', 'tarea', 'sc', 'hito', 'show']);
     eq(pv.rows[0].banda, 'Llegada y descarga Omega'); eq(pv.rows[0].notas, 'Crew de artista + 4 hands');
-    eq(pv.rows[2].notas, 'por turnos'); eq(pv.rows[2].escenario, '', 'un paréntesis cualquiera no es un escenario');
+    eq(pv.rows[2].notas, 'por turnos'); eq(pv.rows[2].escenario, S.escenarios[0].nombre, 'un paréntesis cualquiera no es un escenario: va la «Zona por defecto»');
     eq(pv.rows[3].banda, 'Omega'); eq(pv.rows[3].notas, 'con Kiki y Antonio');
     eq(pv.rows[5].banda, 'OMEGA 30.º ANIVERSARIO'); eq(pv.rows[5].notas, '1 set * 105 min');
     ok(r.ignored.some(l => /Restricciones/.test(l.line)), 'el aviso *** se ignora (y se lista)');
@@ -371,6 +371,23 @@
     eq(I.parseDate('05.09.2026').iso, '2026-09-05'); eq(I.parseDate('04.09.26').iso, '2026-09-04');
   });
 
+  test('Vista previa: un hito nunca lleva el aviso de «sin fin»; shows, pruebas y tareas sin fin sí (se estiman 60 min)', () => {
+    const t = '19:00 Apertura de puertas\n19:30 Citación en recinto\n20:00 Banda Uno\n17:00 Prueba de sonido Banda Uno\n13:00 Comida';
+    const pv = I.preview(S, I.read(t, CTX).records, { ctx: CTX, defaultJornada: '2026-07-10', defaultStageId: S.escenarios[0].id });
+    deq(pv.rows.map(r => r.tipo), ['hito', 'hito', 'show', 'sc', 'tarea']);
+    const sinFin = r => r.warns.some(w => /Sin fin/.test(w));
+    deq(pv.rows.map(sinFin), [false, false, true, true, true]);
+    eq(pv.rows[2].warns.find(w => /Sin fin/.test(w)), 'Sin fin: se estiman 60 min');
+    ok(pv.rows.slice(0, 2).every(r => r.status === 'ok' && r.fin === ''), 'los hitos, limpios');
+  });
+  test('«Zona por defecto»: se aplica a TODAS las filas sin zona (también tareas e hitos); las que traen zona, la conservan', () => {
+    const t = '09:00 Transfer hotel - recinto\n19:00 Apertura de puertas\n20:00 Banda Uno\n21:00 Banda Dos (Carpa)';
+    const P = S.escenarios[0], K = S.escenarios[1];
+    const pv = I.preview(S, I.read(t, CTX).records, { ctx: CTX, defaultJornada: '2026-07-10', defaultStageId: P.id });
+    deq(pv.rows.map(r => r.escenario), [P.nombre, P.nombre, P.nombre, K.nombre]);
+    const sin = I.preview(S, I.read(t, CTX).records, { ctx: CTX, defaultJornada: '2026-07-10' });
+    deq(sin.rows.map(r => r.escenario), ['', '', '', K.nombre], 'sin zona por defecto: las tareas quedan sin zona');
+  });
   let pass = 0; const fails = [];
   tests.forEach(([n, f]) => { try { f(); pass++; } catch (e) { fails.push([n, e.message]); } });
   const summary = 'Importar: ' + pass + '/' + tests.length + ' tests OK' + (fails.length ? ' — ' + fails.length + ' FALLAN' : '');
