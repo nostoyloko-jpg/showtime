@@ -885,6 +885,7 @@
     $('cfg-msg-bg').value = CONFIG.msgBg;
     $('cfg-msg-fg').value = CONFIG.msgFg;
     $('cfg-msg-secs').value = String(CONFIG.msgSecs);
+    $('cfg-aviso-secs').value = String(CONFIG.avisoSecs);
     const pv = $('cfg-msg-prev');
     pv.style.setProperty('--mbg', CONFIG.msgBg); pv.style.setProperty('--mfg', CONFIG.msgFg);
   }
@@ -972,6 +973,10 @@
   $('cfg-msg-secs').addEventListener('change', e => {
     CONFIG = Dt.setConfig({ msgSecs: Number(e.target.value) }); fillMsgCfg();
     toast('Duración de los mensajes: ' + e.target.selectedOptions[0].textContent);
+  });
+  $('cfg-aviso-secs').addEventListener('change', e => {
+    CONFIG = Dt.setConfig({ avisoSecs: Number(e.target.value) }); fillMsgCfg();
+    toast('Duración de los avisos puntuales: ' + e.target.selectedOptions[0].textContent + ' (los que ya están no cambian)');
   });
   $('cfg-msg-reset').addEventListener('click', () => { CONFIG = Dt.setConfig({ msgBg: '#000000', msgFg: '#ffb347' }); fillMsgCfg(); toast('Colores de los mensajes por defecto'); });
 
@@ -1840,6 +1845,7 @@
       const v = JSON.parse(localStorage.getItem(EM_KEY) || 'null');
       if (!v || !Em || !Em.validRoom(v.room)) return null;
       if (!v.room.c) { v.room = Em.withCmdKey(v.room); localStorage.setItem(EM_KEY, JSON.stringify(v)); }   // sala de la 2d-A: se le añade la clave del mando
+      if (!v.room.q) { v.room = Em.withProdKey(v.room); localStorage.setItem(EM_KEY, JSON.stringify(v)); }   // sala anterior: se le añade la clave propia de Producción
       return v;
     } catch (e) { return null; }
   }
@@ -1879,6 +1885,19 @@
         emRoom = Em.newCmdKey(emRoom); emSave(!!EM);
         if (EM) await EM.setCmdKey(emRoom.c);
         renderCast(); toast('Clave del mando nueva: escanea el QR del regidor otra vez');
+      })(); } }
+    ]);
+  }
+
+  /** Clave de Producción nueva: los QR de Producción anteriores dejan de valer (Staff y mando siguen; la emisión no se corta). */
+  function emRegenProd() {
+    modal('Nueva clave de Producción', '<p>Los QR de Producción anteriores <b>dejan de funcionar</b>: no podrán leer el chat ni mandar nada. Staff y el mando siguen igual y la emisión no se corta.</p>', [
+      { label: 'Cancelar' },
+      { label: 'Nueva clave', kind: 'primary', run: () => { (async () => {
+        emRoom = Em.newProdKey(emRoom); emSave(!!EM);
+        if (EM) await EM.setProdKey(emRoom.q);
+        renderCast(); renderProducerList(); $('prod-qr-side') && ($('prod-qr-side').innerHTML = '');
+        toast('Clave de Producción nueva: cada persona tiene que escanear su QR otra vez');
       })(); } }
     ]);
   }
@@ -2232,6 +2251,7 @@
     else if (a === 'cast-regencmd') { closeMenus(); emRegenCmd(); }
     else if (a === 'cast-copy') emCopy(t.dataset.k || 'staff');
     else if (a === 'cast-big') { closeMenus(); bigTab = t.dataset.k || 'staff'; renderCast(); $('qr-big').hidden = false; }
+    else if (a === 'prod-regen') { closeMenus(); emRegenProd(); }
     else if (a === 'prod-add-person') { const inp = $('prod-input'); if (inp) addProducerFromInput(inp); }
   });
   document.addEventListener('click', e => {
@@ -2299,5 +2319,5 @@
   tick();
   setInterval(tick, 1000);
   requestWake();
-  window.ShowtimePanel = { reload: () => { loadState(); renderAll(); }, _test: { emProdMessage } };   // _test: solo para tests/control.test.js
+  window.ShowtimePanel = { reload: () => { loadState(); renderAll(); }, _test: { emProdMessage, emRegenProd, room: () => emRoom } };   // _test: solo para tests/control.test.js
 })();

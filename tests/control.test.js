@@ -7,7 +7,7 @@
   'use strict';
   if (typeof module === 'undefined' || !module.exports) { console.log('control.test.js: solo en Node (node tests/control.test.js)'); return; }
   const vm = require('vm');
-  const D = require('./_dom.js'), C = require('../core.js');
+  const D = require('./_dom.js'), C = require('../core.js'), E = require('../emision.js');
   const MODULOS = ['core.js', 'meteo.js', 'datos.js', 'importar.js', 'qr.js', 'emision.js', 'mando.js', 'vistas.js', 'log.js', 'control.js'];
 
   const tests = [];
@@ -153,9 +153,15 @@
   test('Aviso puntual de Producción: se guarda, dura lo de Configuración › Mensajes y queda en el log', () => {
     const t = dashboard();
     t.prod({ type: 'aviso', from: 'prod_001', text: 'Lluvia en 10 min', perm: false });
-    const a = avisos(t); eq(a.length, 1); eq(a[0].text, 'Lluvia en 10 min'); ok(a[0].ms > 0, 'puntual: con duración'); eq(a[0].from, 'Producción (Marta)');
+    const a = avisos(t); eq(a.length, 1); eq(a[0].text, 'Lluvia en 10 min'); eq(a[0].ms, 120000, 'puntual: 2 min por defecto'); eq(a[0].from, 'Producción (Marta)');
+    t.env.win.ShowtimeDatos.setConfig({ avisoSecs: 300 });
+    t.prod({ type: 'aviso', from: 'prod_001', text: 'Otro', perm: false });
+    eq(avisos(t)[1].ms, 300000, 'con la duración de Configuración');
+    eq(t.env.win.ShowtimeDatos.setConfig({ avisoSecs: 7 }).avisoSecs, 120, 'valor raro → 2 min');
+    t.env.getEl('cfg-aviso-secs').value = '600'; t.env.fire('cfg-aviso-secs', 'change', { target: { value: '600', selectedOptions: [{ textContent: '10 min' }] } });
+    eq(t.env.win.ShowtimeDatos.getConfig().avisoSecs, 600, 'el selector de Configuración la cambia');
     const m = ((t.read('showtime.log') || {}).entries || []).filter(e => e.type === 'msg');
-    eq(m.length, 1); eq(m[0].src, 'produccion'); ok(m[0].text.indexOf('Aviso puntual') === 0 && m[0].text.indexOf('Marta') > 0, m[0].text);
+    eq(m.length, 2, 'uno por aviso'); eq(m[0].src, 'produccion'); ok(m[0].text.indexOf('Aviso puntual') === 0 && m[0].text.indexOf('Marta') > 0, m[0].text);
   });
 
   test('Aviso permanente: sin caducidad y varios a la vez', () => {
@@ -232,11 +238,29 @@
     eq(chat(t).length, 1);
   });
 
+  // ── Clave propia de Producción ─────────────────────────────────────────
+  const tests2 = [];
+  tests2.push(['Clave de Producción: una sala anterior (sin clave) recibe la suya al abrir el Dashboard; Staff y mando no cambian', async () => {
+    const room = await E.newRoom(); delete room.q;
+    const t = dashboard({ 'showtime.emision': JSON.stringify({ room, on: false }) });
+    const saved = JSON.parse(t.env.storage.get('showtime.emision')).room;
+    ok(saved.q && E._.unb64u(saved.q).length === 16, 'clave nueva guardada');
+    eq(saved.k, room.k, 'la de Staff no cambia'); eq(saved.c, room.c, 'la del mando no cambia');
+    eq(t.env.errors.length, 0, t.env.errors.join(' | '));
+  }]);
+  tests2.push(['Clave de Producción: «Regen» del panel de Producción pide confirmación', async () => {
+    const t = dashboard();
+    t.env.fire('document', 'click', { target: { id: '', closest: sel => sel.indexOf('[data-act^="prod-"]') >= 0 ? { dataset: { act: 'prod-regen' }, classList: { contains: () => false }, id: '' } : null } });
+    eq(t.env.getEl('modal-title').textContent, 'Nueva clave de Producción');
+    eq(t.env.errors.length, 0, t.env.errors.join(' | '));
+  }]);
+
   // ── Ejecutor ─────────────────────────────────────────────────────────
-  let pass = 0, fail = 0;
-  tests.forEach(([name, fn]) => {
-    try { fn(); pass++; } catch (e) { fail++; console.log('  ✗ ' + name + '\n      ' + (e && e.message || e)); }
-  });
-  console.log('Control: ' + pass + '/' + tests.length + ' tests OK' + (fail ? ' — ' + fail + ' FALLAN' : ''));
-  if (fail) process.exitCode = 1;
+  (async () => {
+    let pass = 0, fail = 0;
+    const all = tests.concat(tests2);
+    for (const [name, fn] of all) { try { await fn(); pass++; } catch (e) { fail++; console.log('  ✗ ' + name + '\n      ' + (e && e.message || e)); } }
+    console.log('Control: ' + pass + '/' + all.length + ' tests OK' + (fail ? ' — ' + fail + ' FALLAN' : ''));
+    process.exitCode = fail ? 1 : 0;
+  })();
 })();

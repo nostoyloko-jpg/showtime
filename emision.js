@@ -32,7 +32,7 @@
   const PUBLIC_BASE = 'https://nostoyloko-jpg.github.io/showtime/';
   // Versión publicada: va en los enlaces de los QR para que el móvil no abra una copia vieja guardada en su caché
   // (súbela junto con los ?v= de index.html / live.html / remote.html).
-  const BUILD = '20261028';
+  const BUILD = '20261030';
   const CHUNK = 24000;           // bytes por trozo (los repetidores públicos limitan el tamaño de mensaje)
   const BEAT_MS = 10000;         // latido del Mac
   const PRESENCE_MS = 30000;     // presencia de cada móvil
@@ -146,18 +146,25 @@
   async function newRoom() {
     const kp = await subtle.generateKey(ECDSA, true, ['sign', 'verify']);
     const pub = new Uint8Array(await subtle.exportKey('raw', kp.publicKey));
-    return { v: 1, sala: b64u(rand(12)), k: b64u(rand(16)), c: b64u(rand(16)), pub: b64u(pub), p: b64u(await fingerprint(pub)), sk: await subtle.exportKey('jwk', kp.privateKey), at: Date.now() };
+    return { v: 1, sala: b64u(rand(12)), k: b64u(rand(16)), c: b64u(rand(16)), q: b64u(rand(16)), pub: b64u(pub), p: b64u(await fingerprint(pub)), sk: await subtle.exportKey('jwk', kp.privateKey), at: Date.now() };
   }
   /** Salas de la 2d-A (sin clave de mando): se les añade una; el QR de Staff no cambia. */
   function withCmdKey(room) { return room && !room.c ? Object.assign({}, room, { c: b64u(rand(16)) }) : room; }
   /** Clave de mando nueva (el QR del regidor anterior deja de valer; el de Staff sigue). */
   function newCmdKey(room) { return Object.assign({}, room, { c: b64u(rand(16)) }); }
+  /** Clave PROPIA de Producción («q»): cifra su canal (OK de CALL, mensajes, avisos, chat). Staff no la tiene: no puede leer ni hacerse pasar por Producción.
+   *  Salas anteriores (sin «q»): se les añade una; los QR de Staff y del mando no cambian. */
+  function withProdKey(room) { return room && !room.q ? Object.assign({}, room, { q: b64u(rand(16)) }) : room; }
+  /** Clave de Producción nueva: todos los QR de Producción anteriores dejan de valer (Staff y mando siguen). */
+  function newProdKey(room) { return Object.assign({}, room, { q: b64u(rand(16)) }); }
+  const key16 = x => typeof x === 'string' && !!unb64u(x) && unb64u(x).length === 16;
   function validRoom(r) { return !!(r && typeof r.sala === 'string' && r.sala.length === 16 && unb64u(r.k) && unb64u(r.k).length === 16 && unb64u(r.pub) && r.sk && r.p); }
   async function aesKey(k) { return subtle.importKey('raw', unb64u(k), 'AES-GCM', false, ['encrypt', 'decrypt']); }
   async function hmacKey(c) { return subtle.importKey('raw', unb64u(c), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']); }
   async function macKeys(room) {
     return { sala: room.sala, aes: await aesKey(room.k), pub: unb64u(room.pub), sk: await subtle.importKey('jwk', room.sk, ECDSA, false, ['sign']),
-      cmd: room.c && unb64u(room.c) && unb64u(room.c).length === 16 ? await hmacKey(room.c) : null };
+      cmd: room.c && unb64u(room.c) && unb64u(room.c).length === 16 ? await hmacKey(room.c) : null,
+      prod: key16(room.q) ? await aesKey(room.q) : null };
   }
   function aad(sala, kind) { return enc.encode(sala + '|' + kind); }
 
@@ -169,7 +176,8 @@
     return concat([VER, kind], K.pub, sig, iv, ct);
   }
   /** Móvil: claves de la sala a partir de lo que trae el QR. */
-  async function viewerKeys(params) { return { sala: params.sala, aes: await aesKey(params.k), p: unb64u(params.p), verify: null, pubRaw: null, cmd: params.c ? await hmacKey(params.c) : null }; }
+  async function viewerKeys(params) { return { sala: params.sala, aes: await aesKey(params.k), p: unb64u(params.p), verify: null, pubRaw: null, cmd: params.c ? await hmacKey(params.c) : null,
+    prod: params.q ? await aesKey(params.q) : null }; }
   /** Móvil: abre un mensaje del Mac. null si no es de esta sala, está alterado o no lo firma el Mac del QR. */
   async function openFrame(V, f) {
     try {
@@ -245,7 +253,7 @@
   function remoteUrl(room, base) { return (base || publicBase()) + 'remote.html?b=' + BUILD + '#sala=' + room.sala + '&k=' + room.k + '&p=' + room.p + '&c=' + room.c; }
   /** QR para Producción: con ID único personalizado. */
   /** Enlace de Producción: la Live de Manager (solo lectura) + «id» del productor, que activa sus mandos (OK de CALL, mensajes). */
-  function productionUrl(room, base, prodId) { return (base || publicBase()) + 'live.html?vista=manager&b=' + BUILD + '#sala=' + room.sala + '&k=' + room.k + '&p=' + room.p + '&id=' + encodeURIComponent(prodId); }
+  function productionUrl(room, base, prodId) { return (base || publicBase()) + 'live.html?vista=manager&b=' + BUILD + '#sala=' + room.sala + '&k=' + room.k + '&p=' + room.p + '&q=' + room.q + '&id=' + encodeURIComponent(prodId); }
   /** Mensajes de Producción (productor → Dashboard). Entrada NO fiable: se valida todo y se devuelve un objeto limpio o null.
    *  { type:'call', from, key } · { type:'flash', from, text, to } · { type:'aviso', from, text, perm } · { type:'chat', from, text } */
   const PROD_VISTAS = ['manager', 'backstage'];   // Producción NUNCA manda a Confidence (monitor de los músicos)
@@ -284,7 +292,8 @@
     if (!k || k.length !== 16 || !p || p.length !== 16) return null;
     const r = { sala: o.sala, k: o.k, p: o.p };
     if (o.c !== undefined) { const c = unb64u(o.c); if (!c || c.length !== 16) return null; r.c = o.c; }
-    if (o.id !== undefined) { if (!/^[A-Za-z0-9_-]{1,40}$/.test(o.id)) return null; r.id = o.id; }   // enlace de Producción
+    if (o.q !== undefined) { if (!key16(o.q)) return null; r.q = o.q; }
+    if (o.id !== undefined) { if (!/^[A-Za-z0-9_-]{1,40}$/.test(o.id) || !r.q) return null; r.id = o.id; }   // enlace de Producción: siempre con su clave propia
     return r;
   }
 
@@ -346,7 +355,7 @@
     this.on = true;
     const brokers = this.o.brokers || BROKERS;
     this.links = brokers.map(b => new Link(b, {
-      WebSocket: this.o.WebSocket, topics: [topic(this.K.sala, 'h'), topic(this.K.sala, 'c'), topic(this.K.sala, 'prod')],
+      WebSocket: this.o.WebSocket, topics: [topic(this.K.sala, 'h'), topic(this.K.sala, 'c')].concat(this.K.prod ? [topic(this.K.sala, 'prod')] : []),
       onMessage: (t, payload) => { if (t === topic(this.K.sala, 'c')) this.onCmd(payload); else if (t === topic(this.K.sala, 'prod')) this.onProdMessage(payload); else this.onHello(payload); },
       onState: l => { if (l.state === 'on') this.push(0); this.status(); }
     }));
@@ -394,18 +403,20 @@
   };
   Emisor.prototype.onProdMessage = async function (payload) {
     try {
-      const raw = await subtle.decrypt({ name: 'AES-GCM', iv: payload.subarray(0, 12), additionalData: aad(this.K.sala, K_PROD_MSG) }, this.K.aes, payload.subarray(12));
+      if (!this.K.prod) return;
+      const raw = await subtle.decrypt({ name: 'AES-GCM', iv: payload.subarray(0, 12), additionalData: aad(this.K.sala, K_PROD_MSG) }, this.K.prod, payload.subarray(12));
       const msg = JSON.parse(dec.decode(raw));
       if (this.o.onProdMessage) this.o.onProdMessage(msg);
-    } catch (e) { }
+    } catch (e) { }   // cifrado con otra clave (Staff, QR de Producción antiguo) o alterado: se ignora
   };
-  /** Dashboard → Producción: mensaje cifrado por el canal de Producción (p. ej. el chat entero). Solo lo escuchan los enlaces con «id». */
+  /** Clave de Producción nueva sin cortar la emisión: desde ya, solo valen los QR de Producción nuevos. */
+  Emisor.prototype.setProdKey = async function (q) { this.o.room = Object.assign({}, this.o.room, { q }); if (this.K) this.K.prod = await aesKey(q); };
+  /** Dashboard → Producción: mensaje cifrado con la clave de Producción y firmado (p. ej. el chat entero). Solo lo pueden abrir los QR de Producción. */
   Emisor.prototype.sendProd = async function (msg) {
-    if (!this.on || !this.K) return false;
-    const iv = rand(12);
-    const ct = new Uint8Array(await subtle.encrypt({ name: 'AES-GCM', iv, additionalData: aad(this.K.sala, K_PROD_MSG) }, this.K.aes, enc.encode(JSON.stringify(msg))));
-    const f = concat(iv, ct);
-    return this.links.filter(l => l.publish(topic(this.K.sala, 'prod'), f)).length > 0;
+    if (!this.on || !this.K || !this.K.prod) return false;
+    // Cifrado con la clave de Producción y FIRMADO por el Mac: otro productor no puede falsificar el chat
+    const f = await seal(Object.assign({}, this.K, { aes: this.K.prod }), K_PROD_MSG, enc.encode(JSON.stringify(msg)));
+    return this.links.filter(l => l.publish(topic(this.K.sala, 'prodx'), f)).length > 0;
   };
   /** Chat que llega al productor: se valida entero (entrada no fiable) → [{ id, at, from, pid, text, sm }] */
   function cleanChatLog(m) {
@@ -461,8 +472,8 @@
     this.V = await viewerKeys(this.o.params);
     const brokers = this.o.brokers || BROKERS;
     const topics = [topic(this.V.sala, 's')];
-    // Si es productor, suscribirse también al canal de chat
-    if (this.o.params.id) topics.push(topic(this.V.sala, 'prod'));
+    // Producción (con su clave propia): escucha lo que el Mac le manda por su canal
+    if (this.o.params.id && this.V.prod) { topics.push(topic(this.V.sala, 'prodx')); this.VP = Object.assign({}, this.V, { aes: this.V.prod, verify: null, pubRaw: null }); }
     this.links = brokers.map(b => new Link(b, {
       WebSocket: this.o.WebSocket, topics,
       onMessage: (t, payload) => { this.queue = (this.queue || Promise.resolve()).then(() => this.onMessage(t, payload)).catch(e => console.error(e)); },
@@ -479,7 +490,7 @@
     (only ? [only] : this.links).forEach(l => l.publish(topic(this.V.sala, 'h'), f));
   };
   Receptor.prototype.onMessage = async function (t, payload) {
-    if (t === topic(this.V.sala, 'prod')) {
+    if (t === topic(this.V.sala, 'prodx')) {
       this.onProdMessage(payload);
     } else {
       this.onFrame(payload);
@@ -507,8 +518,10 @@
   };
   Receptor.prototype.onProdMessage = async function (payload) {
     try {
-      const raw = await subtle.decrypt({ name: 'AES-GCM', iv: payload.subarray(0, 12), additionalData: aad(this.V.sala, K_PROD_MSG) }, this.V.aes, payload.subarray(12));
-      const msg = JSON.parse(dec.decode(raw));
+      if (!this.VP) return;
+      const r = await openFrame(this.VP, payload);   // tiene que venir firmado por el Mac del QR
+      if (!r || r.kind !== K_PROD_MSG) return;
+      const msg = JSON.parse(dec.decode(r.plain));
       if (this.o.onProdMessage) this.o.onProdMessage(msg);
     } catch (e) { }
   };
@@ -534,10 +547,10 @@
   };
   /** Productor: envía un mensaje de chat encriptado. */
   Receptor.prototype.sendProdMessage = async function (msg) {
-    if (!this.o.params.id) return { ok: false, msg: 'Este enlace no es de productor' };
+    if (!this.o.params.id || !this.V || !this.V.prod) return { ok: false, msg: 'Este enlace no es de Producción' };
     const iv = rand(12);
     const payload = enc.encode(JSON.stringify(msg));
-    const ct = new Uint8Array(await subtle.encrypt({ name: 'AES-GCM', iv, additionalData: aad(this.V.sala, K_PROD_MSG) }, this.V.aes, payload));
+    const ct = new Uint8Array(await subtle.encrypt({ name: 'AES-GCM', iv, additionalData: aad(this.V.sala, K_PROD_MSG) }, this.V.prod, payload));
     const frame = concat(iv, ct);
     const live = this.links.filter(l => l.publish(topic(this.V.sala, 'prod'), frame)).length;
     return { ok: live > 0, msg: live > 0 ? 'Enviado' : 'Sin conexión' };
@@ -546,7 +559,7 @@
 
   const API = {
     BROKERS, PUBLIC_BASE, BUILD, PROTO, STALE_MS, VIEWER_TTL, CMD_WINDOW, K_STATE, K_BEAT, K_END, K_ACK, K_HELLO, K_CMD, K_PROD_MSG,
-    newRoom, validRoom, withCmdKey, newCmdKey, staffUrl, remoteUrl, productionUrl, parseHash, cleanProdMsg, cleanChatLog, CHAT_SEND, publicBase, Emisor, Receptor, CmdGuard,
+    newRoom, validRoom, withCmdKey, newCmdKey, withProdKey, newProdKey, staffUrl, remoteUrl, productionUrl, parseHash, cleanProdMsg, cleanChatLog, CHAT_SEND, publicBase, Emisor, Receptor, CmdGuard,
     // internos (para los tests)
     _: { b64u, unb64u, concat, MQ, varLen, pack, unpack, splitChunks, Assembler, macKeys, viewerKeys, seal, openFrame, sealHello, openHello, sealCmd, openCmd, fingerprint, topic, Link }
   };

@@ -23,8 +23,9 @@
     meteo:    'showtime.meteo'         // el tiempo (2e-B): { snap, err, errAt } — lo pide el Dashboard; la Live y los dispositivos lo leen
   };
   const STYLES = ['clasico', 'escenario', 'neutro', 'raycast'];
-  const DEFAULT_CONFIG = { mode: 'show', day: 'all', style: 'clasico', callMins: null, msgBg: '#000000', msgFg: '#ffb347', msgSecs: 20 };
+  const DEFAULT_CONFIG = { mode: 'show', day: 'all', style: 'clasico', callMins: null, msgBg: '#000000', msgFg: '#ffb347', msgSecs: 20, avisoSecs: 120 };
   const MSG_SECS = [10, 20, 30, 60, 0];   // 0 = hasta retirarlo
+  const AVISO_SECS = [60, 120, 300, 600, 900];   // avisos puntuales en la cinta: la cinta tarda en dar la vuelta, necesitan más tiempo que un mensaje
 
   // Modo Staff (2d-A): la Live abierta desde el QR («live.html#sala=…») es SOLO LECTURA. Sus datos llegan por la
   // emisión y viven en memoria: no se mezclan con lo que este navegador tenga guardado ni se pueden cambiar.
@@ -68,6 +69,7 @@
     if (!hex(o.msgBg)) o.msgBg = DEFAULT_CONFIG.msgBg;
     if (!hex(o.msgFg)) o.msgFg = DEFAULT_CONFIG.msgFg;
     o.msgSecs = MSG_SECS.indexOf(Number(o.msgSecs)) >= 0 ? Number(o.msgSecs) : DEFAULT_CONFIG.msgSecs;
+    o.avisoSecs = AVISO_SECS.indexOf(Number(o.avisoSecs)) >= 0 ? Number(o.avisoSecs) : DEFAULT_CONFIG.avisoSecs;
     // Pantallas Live y vistas (2e-A): umbrales de Confidence, bloques de Backstage y cinta de avisos
     if (root.ShowtimeVistas) o.screens = root.ShowtimeVistas.normScreens(o.screens);
     if (root.ShowtimeMeteo) o.meteo = root.ShowtimeMeteo.normMeteo(o.meteo);   // el tiempo (2e-B): fuente, lugar y umbrales del regidor
@@ -228,13 +230,13 @@
   }
   /** El tiempo: guarda el dato (o el error) y lo manda a las Live abiertas. Solo el Dashboard lo pide. */
   function setMeteo(m) { if (READONLY) return; write(K.meteo, m || null); send({ type: 'meteo', meteo: m || null }); }
-  /** Aviso nuevo (puntual: dura lo de Configuración › Mensajes; permanente: hasta que lo quite el Stage Manager). Se suma a los que haya. */
+  /** Aviso nuevo (puntual: dura lo de Configuración › Mensajes › Avisos puntuales, 2 min por defecto; permanente: hasta que lo quite el Stage Manager). Se suma a los que haya. */
   function addAviso(text, perm, from) {
     if (READONLY) return null;
     const t = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 140);
     if (!t) return null;
     const c = getConfig(), now = Date.now();
-    const a = { id: now.toString(36) + Math.random().toString(36).slice(2, 6), text: t, at: now, ms: perm ? 0 : ((c.msgSecs || 0) * 1000 || FLASH_MS), from: String(from || '').slice(0, 80) };
+    const a = { id: now.toString(36) + Math.random().toString(36).slice(2, 6), text: t, at: now, ms: perm ? 0 : c.avisoSecs * 1000, from: String(from || '').slice(0, 80) };
     const list = getAvisos().concat([a]).slice(-AVISOS_MAX);
     write(K.avisos, list); send({ type: 'avisos', avisos: list });
     listeners.forEach(fn => { try { fn('avisos'); } catch (e) { console.error(e); } });
@@ -264,7 +266,7 @@
 
   root.ShowtimeDatos = {
     KEYS: K, STYLES, normStyle, normConfig,
-    getFestival, getConfig, getCallDone, getFlash, setFlash, getAvisos, addAviso, removeAviso, normAvisos, getChat, addChat, getMeteo, setMeteo, FLASH_MS, MSG_SECS, flashMs, flashLeft, callMinsOf, getOriginal, setOriginal,
+    getFestival, getConfig, getCallDone, getFlash, setFlash, getAvisos, addAviso, removeAviso, normAvisos, getChat, addChat, getMeteo, setMeteo, FLASH_MS, MSG_SECS, AVISO_SECS, flashMs, flashLeft, callMinsOf, getOriginal, setOriginal,
     setFestival, setConfig, markCallDone, pruneCallDone,
     onChange, onPeer, addPeer, send, hello, ping,
     READONLY, onWrite, getSnapshot, loadSnapshot

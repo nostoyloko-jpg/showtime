@@ -267,24 +267,82 @@
     eq(E.cleanChatLog({ type: 'chatlog', list: muchos }).length, E.CHAT_SEND, 'como mucho los últimos CHAT_SEND');
   });
 
-  test('Chat: va y vuelve cifrado; los enlaces de Staff (sin id) no lo reciben', async () => {
+  // ── Clave propia de Producción («q») ─────────────────────────────────
+  const subtleT = (globalThis.crypto && globalThis.crypto.subtle) || require('crypto').webcrypto.subtle;
+  /** Marco «a mano» como lo mandaría alguien que solo tiene una clave (sin la firma del Mac). */
+  async function rawProd(keyB64, sala, msg) {
+    const key = await subtleT.importKey('raw', _.unb64u(keyB64), 'AES-GCM', false, ['encrypt']);
+    const iv = globalThis.crypto.getRandomValues(new Uint8Array(12));
+    const ct = new Uint8Array(await subtleT.encrypt({ name: 'AES-GCM', iv, additionalData: enc.encode(sala + '|' + E.K_PROD_MSG) }, key, enc.encode(JSON.stringify(msg))));
+    return _.concat(iv, ct);
+  }
+  async function intruso(R) { const w = new R.brokers[0].fake.WS(R.brokers[0].url); await sleep(20); w.send(MQ.connect('intruso' + Math.random(), 30)); await sleep(20); return w; }
+  const paramsOf = url => E.parseHash(url.slice(url.indexOf('#')));
+
+  test('Clave de Producción: la sala la trae y solo va en los QR de Producción', async () => {
+    const room = await E.newRoom();
+    eq(_.unb64u(room.q).length, 16, 'clave de 16 bytes'); ok(room.q !== room.k && room.q !== room.c, 'distinta de la de Staff y del mando');
+    const pu = E.productionUrl(room, E.PUBLIC_BASE, 'prod_001');
+    ok(pu.indexOf('&q=' + room.q) > 0, 'el QR de Producción la lleva');
+    ok(E.staffUrl(room, E.PUBLIC_BASE).indexOf(room.q) < 0, 'el de Staff NO');
+    ok(E.remoteUrl(room, E.PUBLIC_BASE).indexOf(room.q) < 0, 'el del mando NO');
+    eq(paramsOf(pu).q, room.q);
+    eq(E.parseHash(pu.slice(pu.indexOf('#')).replace('&q=' + room.q, '')), null, 'QR de Producción antiguo (sin clave): no válido');
+    eq(E.parseHash(pu.slice(pu.indexOf('#')).replace('&q=' + room.q, '&q=abc')), null, 'clave mal formada');
+    ok(Q.encode(pu, { ecl: 'M' }).version <= 10, 'QR versión ' + Q.encode(pu, { ecl: 'M' }).version);
+    const vieja = Object.assign({}, room); delete vieja.q;
+    ok(E.withProdKey(vieja).q && E.withProdKey(room).q === room.q, 'salas antiguas reciben clave; las nuevas la conservan');
+    const n = E.newProdKey(room); ok(n.q !== room.q && n.k === room.k && n.c === room.c, 'regenerar solo cambia la de Producción');
+  });
+
+  test('Clave de Producción: el chat va y vuelve; Staff no lo lee ni puede hacerse pasar por Producción', async () => {
     const R = rig(), room = await E.newRoom();
     const aDash = [], aProd = [], aStaff = [];
     const tx = new E.Emisor({ room, brokers: R.brokers, WebSocket: R.WS, getSnapshot: () => ({ real: true }), onProdMessage: m => aDash.push(m) });
     await tx.start();
-    const prod = new E.Receptor({ params: { sala: room.sala, k: room.k, p: room.p, id: 'prod_001' }, brokers: R.brokers, WebSocket: R.WS, onSnapshot() {}, onStatus() {}, onProdMessage: m => aProd.push(m) });
-    const staff = new E.Receptor({ params: { sala: room.sala, k: room.k, p: room.p }, brokers: R.brokers, WebSocket: R.WS, onSnapshot() {}, onStatus() {}, onProdMessage: m => aStaff.push(m) });
-    await prod.start(); await staff.start();
+    const prod = new E.Receptor({ params: paramsOf(E.productionUrl(room, 'http://x/', 'prod_001')), brokers: R.brokers, WebSocket: R.WS, onSnapshot() {}, onStatus() {}, onProdMessage: m => aProd.push(m) });
+    const staffP = paramsOf(E.staffUrl(room, 'http://x/'));
+    const staff = new E.Receptor({ params: staffP, brokers: R.brokers, WebSocket: R.WS, onSnapshot() {}, onStatus() {}, onProdMessage: m => aStaff.push(m) });
+    // Staff «trucado»: se pone un id a mano, pero no tiene la clave de Producción
+    const spy = new E.Receptor({ params: Object.assign({}, staffP, { id: 'espia' }), brokers: R.brokers, WebSocket: R.WS, onSnapshot() {}, onStatus() {}, onProdMessage: m => aStaff.push(m) });
+    await prod.start(); await staff.start(); await spy.start();
     await sleep(150);
-    const r = await prod.sendProdMessage({ type: 'chat', from: 'prod_001', text: 'Hola SM' });
-    ok(r.ok, 'enviado');
-    await until(() => aDash.some(m => m.type === 'chat'), 3000, 'el Dashboard recibe el chat');
+    ok((await prod.sendProdMessage({ type: 'chat', from: 'prod_001', text: 'Hola SM' })).ok, 'Producción envía');
+    await until(() => aDash.some(m => m.text === 'Hola SM'), 3000, 'el Dashboard recibe el chat');
+    eq((await staff.sendProdMessage({ type: 'chat', from: 'x', text: 'falso' })).ok, false, 'Staff no puede enviar por el canal de Producción');
+    eq((await spy.sendProdMessage({ type: 'chat', from: 'x', text: 'falso' })).ok, false, 'ni poniéndose un id');
+    const w = await intruso(R);
+    w.send(MQ.publish(_.topic(room.sala, 'prod'), await rawProd(room.k, room.sala, { type: 'chat', from: 'intruso', text: 'con la clave de Staff' })));
     ok(await tx.sendProd({ type: 'chatlog', list: [{ id: 'a', at: 1, text: 'Recibido', sm: true }] }), 'el Dashboard lo manda');
     await until(() => aProd.some(m => m.type === 'chatlog'), 3000, 'Producción recibe el chat');
-    await sleep(200);
+    // Un productor (tiene la clave, no la firma del Mac) intenta colar un chat falso
+    w.send(MQ.publish(_.topic(room.sala, 'prodx'), await rawProd(room.q, room.sala, { type: 'chatlog', list: [{ id: 'f', at: 2, text: 'falso', sm: true }] })));
+    await sleep(300);
     eq(aStaff.length, 0, 'Staff no recibe nada del canal de Producción');
-    eq(R.brokers.length > 0, true);
-    prod.stop(); staff.stop(); await tx.stop();
+    ok(!aDash.some(m => m.from === 'intruso'), 'el Dashboard ignora lo cifrado con la clave de Staff');
+    ok(!aProd.some(m => m.type === 'chatlog' && m.list.some(x => x.text === 'falso')), 'un chat sin la firma del Mac se ignora');
+    ok(aProd.every(m => m.type === 'chatlog' && m.list[0].text === 'Recibido'), 'solo llega el del Mac (una vez por repetidor)');
+    prod.stop(); staff.stop(); spy.stop(); await tx.stop();
+  });
+
+  test('Clave de Producción nueva: los QR anteriores dejan de valer sin cortar la emisión', async () => {
+    const R = rig(), room = await E.newRoom();
+    const aDash = [], aOld = [];
+    const tx = new E.Emisor({ room, brokers: R.brokers, WebSocket: R.WS, getSnapshot: () => ({ real: true }), onProdMessage: m => aDash.push(m) });
+    await tx.start();
+    const old = new E.Receptor({ params: paramsOf(E.productionUrl(room, 'http://x/', 'prod_001')), brokers: R.brokers, WebSocket: R.WS, onSnapshot() {}, onStatus() {}, onProdMessage: m => aOld.push(m) });
+    await old.start(); await sleep(150);
+    const room2 = E.newProdKey(room); await tx.setProdKey(room2.q);
+    const nuevo = new E.Receptor({ params: paramsOf(E.productionUrl(room2, 'http://x/', 'prod_001')), brokers: R.brokers, WebSocket: R.WS, onSnapshot() {}, onStatus() {}, onProdMessage() {} });
+    await nuevo.start(); await sleep(150);
+    await old.sendProdMessage({ type: 'chat', from: 'prod_001', text: 'viejo' });
+    await nuevo.sendProdMessage({ type: 'chat', from: 'prod_001', text: 'nuevo' });
+    await until(() => aDash.some(m => m.text === 'nuevo'), 3000, 'el QR nuevo funciona');
+    await tx.sendProd({ type: 'chatlog', list: [] });
+    await sleep(300);
+    ok(!aDash.some(m => m.text === 'viejo'), 'el QR viejo ya no puede mandar');
+    eq(aOld.length, 0, 'ni leer');
+    old.stop(); nuevo.stop(); await tx.stop();
   });
 
   // ── Ejecutor asíncrono ────────────────────────────────────────────────

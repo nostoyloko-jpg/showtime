@@ -57,6 +57,14 @@
     eq(t.title(), 'Showtime · Manager');
   });
 
+  test('QR de Producción antiguo (sin clave propia): no activa nada y pide escanear de nuevo', async () => {
+    ROOM = ROOM || await E.newRoom();
+    const u = E.productionUrl(ROOM, 'http://x/', 'prod_001');
+    const t = arrancar({ hash: hashOf(u).replace('&q=' + ROOM.q, '') });
+    ok(!t.body.classList.contains('prod'), 'sin modo Producción'); eq(t.dock.hidden, true, 'sin menú');
+    eq(t.env.getEl('rx-t').textContent, 'ENLACE NO VÁLIDO · vuelve a escanear el QR');
+  });
+
   test('Producción: solo Manager y Backstage (Confidence se cambia por Manager)', async () => {
     ROOM = ROOM || await E.newRoom();
     const h = hashOf(E.productionUrl(ROOM, 'http://x/', 'prod_001'));
