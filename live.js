@@ -937,7 +937,8 @@
   function setVista(v) {
     VISTA = vistaOk(v);
     const q = new URLSearchParams(location.search);
-    q.set('vista', VISTA); q.delete('prev');
+    if (STANDBY) { q.set('vista', 'standby'); q.set('prev', VISTA); }   // en Standby, la V cambia la vista de debajo (y el Standby sigue puesto)
+    else { q.set('vista', VISTA); q.delete('prev'); }
     if (VISTA === 'confidence' && ZONA !== null) q.set('zona', ZONA); else q.delete('zona');
     try { history.replaceState(null, '', location.pathname + '?' + q.toString() + location.hash); } catch (e) {}
     applyVista();
@@ -947,7 +948,6 @@
   document.addEventListener('keydown', e => {
     if ((e.key === 'v' || e.key === 'V') && !e.metaKey && !e.ctrlKey && !e.altKey && !(e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName))) {
       if (VISTA === 'manager' && ZONA === null) { const z = pget(LIVE_ZONE, null); if (z !== null) ZONA = z; }   // última zona elegida en esta pantalla
-      if (STANDBY) return;   // en Standby, V no cambia nada por debajo
       setVista(PRODID ? Vs.nextProdVista(VISTA) : Vs.nextVista(VISTA));
     }
     if ((e.key === 's' || e.key === 'S') && !e.metaKey && !e.ctrlKey && !e.altKey && !(e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName))) setStandby(!STANDBY);

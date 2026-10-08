@@ -249,8 +249,9 @@
     const t = arrancar({ search: '?vista=manager' }), key = keyOf(t);
     eq(t.env.getEl('standby').hidden, true, 'normal: sin cartel');
     key('s'); eq(t.env.getEl('standby').hidden, false);
-    key('v'); eq(t.body.dataset.vista, 'manager', 'V no hace nada en Standby');
-    key('S'); eq(t.env.getEl('standby').hidden, true); eq(t.title(), 'Showtime · Manager');
+    key('v'); eq(t.body.dataset.vista, 'confidence', 'V sigue cambiando la vista de debajo');
+    eq(t.env.getEl('standby').hidden, false, 'y el cartel sigue puesto');
+    key('S'); eq(t.env.getEl('standby').hidden, true); eq(t.title(), 'Showtime · Confidence', 'al salir ya se ve la vista nueva');
     key('s'); key('Escape'); eq(t.env.getEl('standby').hidden, true, 'Esc también sale');
   });
   const stbMsg = (t, on, at) => t.env.fire('window', 'message', { data: { app: 'showtime', type: 'standbyAll', standby: { on, at } }, source: {} });
