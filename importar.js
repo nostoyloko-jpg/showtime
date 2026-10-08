@@ -40,7 +40,7 @@
   // ── Tipo de entrada propuesto (el regidor lo confirma o lo cambia en la vista previa) ──
   // show | sc (soundcheck) | tarea | hito
   const TIPO_KEYS = ['show', 'sc', 'tarea', 'hito'];
-  const TIPO_LABEL = { show: 'Show', sc: 'Soundcheck', tarea: 'Tarea', hito: 'Hito' };
+  const TIPO_LABEL = { show: 'Show', sc: 'Soundcheck', tarea: 'Tarea', hito: 'Marcador' };
   // Tareas: palabras FUERTES (inequívocas en cualquier documento) y DÉBILES (también pueden ser nombre de banda: «Hotel Costes»,
   // «Ave Fénix», «The Press»…). Las débiles solo cuentan en documentos de producción (hojas de ruta, day sheets).
   const TAREA_RE = /\b(comida|comidas|almuerzo|cena|cenas|desayuno|catering|montaje|desmontaje|carga y descarga|descarga|get ?in|get ?out|load ?in|load ?out|pruebas? de (?:luces|luz|video|iluminacion|led)|ensayo|ensayos|reunion|briefing|acreditacion|acreditaciones|transfer|traslado|traslados|check ?in|check ?out|checkout|limpieza|line ?check|linecheck|lunch|dinner|breakfast|meal|meals|crew meal|crew lunch|crew dinner|changeover meal|furgoneta|recogida|transporte|cambio (?:de )?escenario|changeover|salida (?:de(?:l)? )?(?:furgoneta|furgo|bus|autobus|van|coche|crew|banda)|rueda de prensa|entrevista|entrevistas|interview|interviews|meet (?:&|and|y) greet|m&g|photocall|firma de discos|signing|dejeuner|petit dejeuner|repas|diner|mittagessen|abendessen|fruhstuck|umbau|aufbau|abbau|rigging|stage setup|set ?up|montage|demontage|pranzo|cena crew|almoco|jantar)\b/;
@@ -59,7 +59,7 @@
   function tipoFromText(t) {
     const n = norm(t);
     if (!n) return null;
-    if (/^(hito|hitos|milestone|milestones|marca|momento|marker|cue)$/.test(n)) return 'hito';
+    if (/^(hito|hitos|marcador|marcadores|key ?times?|milestone|milestones|marca|momento|marker|cue)$/.test(n)) return 'hito';
     if (/^(tarea|tareas|task|tasks|produccion|production|operativa|logistica|logistics|crew)$/.test(n)) return 'tarea';
     if (/^(sc|soundcheck|sound check|prueba|pruebas|prueba de sonido|line check)$/.test(n)) return 'sc';
     if (/^(show|concierto|actuacion|banda|directo|live)$/.test(n)) return 'show';
@@ -808,10 +808,10 @@
       }
       let call = r.call;
       if (tipo === 'hito') {
-        if (fin && fin !== r.inicio) warns.push('Un hito no tiene fin: se ignora ' + fin);
+        if (fin && fin !== r.inicio) warns.push('Un marcador no tiene fin: se ignora ' + fin);
         fin = '';
       } else if (r.inicio && !fin) warns.push('Sin fin: se estiman ' + C.DEFAULT_DURATION + ' min');   // un hito es un instante: nunca lleva este aviso
-      if (!band && call) { warns.push((tipo === 'hito' ? 'Los hitos' : 'Las tareas') + ' no tienen CALL: se ignora ' + call); call = ''; }
+      if (!band && call) { warns.push((tipo === 'hito' ? 'Los marcadores' : 'Las tareas') + ' no tienen CALL: se ignora ' + call); call = ''; }
       if (r.inicio && fin && C.parseHM(fin) <= C.parseHM(r.inicio)) warns.push('Cruza medianoche: termina al día siguiente');
       if (r.inicio && jornada && C.fechaFor(state, jornada, r.inicio) !== jornada) warns.push('Antes de la hora de corte: fecha real ' + C.fechaFor(state, jornada, r.inicio));
       // ¿Ya hay una igual? Solo AVISO; la casilla no se toca: el regidor decide.

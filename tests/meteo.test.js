@@ -179,6 +179,23 @@
     ok(it.length >= 2); eq(V.tickerItems(st, { ticker: { delays: false, hitos: false, meteo: false } }, 0, W.tickerList(s, a)).length, 0);
   });
 
+  // ── Idioma (Fase 2): textos en el idioma del Panel; el log, siempre en español ──
+  test('idioma: cielo, avisos, píldora y cinta en inglés; textEs (log) sigue en español; vuelve al español', () => {
+    const I = isNode ? require('../i18n.js') : window.ShowtimeI18n; if (!I) return;
+    I.setLang('en');
+    try {
+      eq(W.sky(0).text, 'Clear'); eq(W.uvText(9), 'very high');
+      const a = W.alerts(SNAP, CFG({ gust: 50, storm: false, uvOn: false }), NOW);
+      eq(a[0].short, 'GUSTS 62 KM/H AROUND ' + W.hhmm((H0 + 4 * 3600) * 1000));
+      ok(/^Gusts 62 km\/h around .* · threshold 50$/.test(a[0].text), a[0].text);
+      ok(/^Ráfagas 62 km\/h hacia las .* · umbral 50$/.test(a[0].textEs), 'log en español: ' + a[0].textEs);
+      const s = W.summary(SNAP, CFG(), NOW);
+      ok(/WIND/.test(W.pillText(s)) && !/VIENTO/.test(W.pillText(s)), W.pillText(s));
+      ok(W.tickerList(s, a).some(x => /^FORECAST · GUSTS/.test(x.text)), 'cinta');
+    } finally { I.setLang('es'); }
+    eq(W.sky(0).text, 'Despejado', 'vuelve al español');
+  });
+
   // ── Ejecutar ──────────────────────────────────────────────────────────
   (async () => {
     let pass = 0; const fails = [];

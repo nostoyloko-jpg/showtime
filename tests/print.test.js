@@ -93,12 +93,12 @@
     ok(en.indexOf('Printed: 10/07/2026') >= 0 && en.indexOf('Page 1/1') >= 0, 'en: pie');
     ok(en.indexOf('Horario') < 0 && en.indexOf('Impreso') < 0, 'en: sin rastro en español');
   });
-  test('i18n: SOUNDCHECK en ambos idiomas; TASK/MILESTONE solo en inglés', () => {
+  test('i18n: SOUNDCHECK en ambos idiomas; TASK/KEY TIME solo en inglés', () => {
     const rows = [G('Prueba A', 600, 630, 'Principal', 'sc'), G('Tarea B', 640, 660, 'Principal', 'tarea'), G('Hito C', 700, null, 'Principal', 'hito')];
     const es = P.html({ rows, days: [J1], title: 'T', orient: 'portrait', now: new Date(2026, 6, 10) });
     const en = P.html({ rows, days: [J1], title: 'T', orient: 'portrait', now: new Date(2026, 6, 10), lang: 'en' });
-    ok(es.indexOf('>SOUNDCHECK<') >= 0 && es.indexOf('>TAREA<') >= 0 && es.indexOf('>HITO<') >= 0, 'es: píldoras');
-    ok(en.indexOf('>SOUNDCHECK<') >= 0 && en.indexOf('>TASK<') >= 0 && en.indexOf('>MILESTONE<') >= 0, 'en: píldoras');
+    ok(es.indexOf('>SOUNDCHECK<') >= 0 && es.indexOf('>TAREA<') >= 0 && es.indexOf('>MARCADOR<') >= 0, 'es: píldoras');
+    ok(en.indexOf('>SOUNDCHECK<') >= 0 && en.indexOf('>TASK<') >= 0 && en.indexOf('>KEY TIME<') >= 0, 'en: píldoras');
     ok(es.indexOf('PRUEBA') < 0, 'ya no aparece PRUEBA');
   });
   test('i18n: fecha en inglés, separador de noche bilingüe y cronograma traducido', () => {
@@ -182,7 +182,7 @@
     const { s } = fest();
     const doc = P.html({ rows: P.rowsOf(s, { day: 'all', content: 'all' }), days: [J1, J2], title: 'X', orient: 'portrait' });
     ok(doc.indexOf('>SHOW<') >= 0, 'SHOW');
-    ok(doc.indexOf('>HITO<') >= 0, 'HITO');
+    ok(doc.indexOf('>MARCADOR<') >= 0, 'MARCADOR');
   });
 
   test('html: escapa el texto del usuario (sin inyección)', () => {

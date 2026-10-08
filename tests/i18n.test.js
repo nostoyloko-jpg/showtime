@@ -36,7 +36,7 @@
     ok(I.setLang('en'), 'cambia');
     ok(!I.setLang('en'), 'mismo idioma: no hace nada');
     eq(I.t('lang.short'), 'EN');
-    eq(I.t('print.pills.hito'), 'MILESTONE');
+    eq(I.t('print.pills.hito'), 'KEY TIME');
     ok(I.setLang('es'));
     eq(seen.join(','), 'en,es');
   });
@@ -91,7 +91,7 @@
     } finally { reset(); }
   });
   test('tx: glosario oficial del Panel de Control', () => {
-    const G = { 'Configuración': 'Settings', 'Emisión': 'Broadcast', 'Siguiente': 'Next', 'En escena': 'On stage', 'Hitos': 'Milestones',
+    const G = { 'Configuración': 'Settings', 'Emisión': 'Broadcast', 'Siguiente': 'Next', 'En escena': 'On stage', 'Marcadores': 'Key Times', 'Marcador': 'Key Time', 'Solo los conciertos': 'Shows only',
       'Modo Foco': 'Focus Mode', 'Tiempo extra': 'Extra time', 'Pegar horario': 'Paste schedule', 'Jornada': 'Day', 'Zona': 'Stage',
       'Retrasos': 'Delays', 'Deshacer': 'Undo', 'Soundchecks': 'Soundchecks', 'Exportar log del evento…': 'Export event log…' };
     Object.keys(G).forEach(k => eq(I.tx(k, null, 'en'), G[k], k));
@@ -124,6 +124,28 @@
       I.setLang('es'); I.apply(rootEl);
       eq(n1.nodeValue, '  Pegar horario ', 'vuelve al español original'); eq(at.a.title, 'Deshacer');
     } finally { reset(); }
+  });
+
+  test('Vocabulario oficial: Marcador / Key Time · Shows only · Daily report · Extra time · Overrun', () => {
+    const E = k => I.tx(k, null, 'en');
+    eq(E('Marcador'), 'Key Time'); eq(E('Marcadores'), 'Key Times'); eq(E('MARCADOR'), 'KEY TIME');
+    eq(I.t('print.pills.hito', null, 'es'), 'MARCADOR'); eq(I.t('print.pills.hito', null, 'en'), 'KEY TIME');
+    eq(E('Solo los conciertos'), 'Shows only'); eq(E('Solo conciertos'), 'Shows only');
+    ok(/^Daily report/.test(E('Informe de la jornada: el horario previsto y, a su hora, lo que ha pasado (PDF, TXT o CSV)')));
+    eq(E('Tiempo extra'), 'Extra time'); eq(E('TIEMPO EXTRA'), 'EXTRA TIME'); eq(E('Desbordes'), 'Overruns');
+    Object.keys(UI).forEach(k => {
+      ok(!/\b(Hitos?|HITOS?|hitos?)\b/.test(k), 'queda «hito» en español: ' + k);
+      ok(!/milestone|concerts only|day report/i.test(UI[k]), 'vocabulario antiguo: ' + UI[k]);
+    });
+  });
+  if (isNode) test('Fase 2: la cinta de Backstage (vistas.js) sigue el idioma activo', () => {
+    const V = require('../vistas.js'), C = require('../core.js');
+    const F = C.demoFestival(Math.floor(C.nowAbs())), now = C.nowAbs();
+    const txt = () => V.tickerItems(F, null, now, null, []).map(x => x.text).join(' | ');
+    ok(/EN HORA · SIN INCIDENCIAS/.test(txt()), txt());
+    I.setLang('en');
+    try { ok(/ON TIME · NO INCIDENTS/.test(txt()), txt()); } finally { reset(); }
+    ok(/EN HORA · SIN INCIDENCIAS/.test(txt()), 'vuelve al español');
   });
 
   let fail = 0;

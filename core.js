@@ -809,7 +809,7 @@
   function setReal(state, id, mode, which, abs) {
     const i = findArtistIndex(state, id);
     if (i < 0) return { ok: false, error: 'Entrada no encontrada.' };
-    if (tipoOf(state.artists[i]) === 'hito') return { ok: false, error: 'Un hito no tiene hora real.' };
+    if (tipoOf(state.artists[i]) === 'hito') return { ok: false, error: 'Un marcador no tiene hora real.' };
     const next = clone(state), a = next.artists[i], k = FIELDS[modeKey(mode)].real;
     const r = Object.assign({}, a[k] || {});
     if (abs === null || abs === undefined) delete r[which]; else r[which] = Math.floor(abs);

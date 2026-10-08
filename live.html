@@ -11,8 +11,8 @@
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <title>Showtime · Pantalla Live</title>
-<link rel="stylesheet" href="live.css?v=20261109">
-<link rel="stylesheet" href="marca.css?v=20261109">
+<link rel="stylesheet" href="live.css?v=20261110">
+<link rel="stylesheet" href="marca.css?v=20261110">
 </head>
 <body>
 
@@ -52,7 +52,7 @@
 <!-- Modo Staff (QR, solo lectura): estado de la conexión con la sala -->
 <div id="rx" class="rx" role="status" hidden><span class="rx-dot"></span><span id="rx-t"></span></div>
 
-<button id="close" class="iconbtn" title="Cerrar la Pantalla Live" hidden><svg class="ic"><use href="#i-x"/></svg></button>
+<button id="close" class="iconbtn" title="Cerrar la Pantalla Live" hidden data-i18n-title><svg class="ic"><use href="#i-x"/></svg></button>
 
 <div id="top">
   <div id="clkbox">
@@ -62,23 +62,23 @@
     <div id="drift"></div>
     <div id="meteo" class="mtpill"></div>
   </div>
-  <div class="vsplit" data-vs="0" title="Arrastra para ajustar el ancho"></div>
+  <div class="vsplit" data-vs="0" title="Arrastra para ajustar el ancho" data-i18n-title></div>
   <div id="panel-now" class="tpanel">
-    <div class="tpanel-h">EN ESCENA</div>
+    <div class="tpanel-h" data-i18n>EN ESCENA</div>
     <div class="tpanel-b" id="now-list"><div class="tempty">—</div></div>
   </div>
-  <div class="vsplit" data-vs="1" title="Arrastra para ajustar el ancho"></div>
+  <div class="vsplit" data-vs="1" title="Arrastra para ajustar el ancho" data-i18n-title></div>
   <div id="panel-next" class="tpanel">
-    <div class="tpanel-h">SIGUIENTE</div>
+    <div class="tpanel-h" data-i18n>SIGUIENTE</div>
     <div class="tpanel-b" id="next-list"><div class="tempty">—</div></div>
   </div>
-  <div class="vsplit" data-vs="2" title="Arrastra para ajustar el ancho"></div>
+  <div class="vsplit" data-vs="2" title="Arrastra para ajustar el ancho" data-i18n-title></div>
   <div id="panel-call" class="tpanel">
-    <div class="tpanel-h">CALL</div>
+    <div class="tpanel-h" data-i18n>CALL</div>
     <div class="tpanel-b" id="call-list"></div>
   </div>
 </div>
-<div id="hsplit" title="Arrastra para ver más artistas"></div>
+<div id="hsplit" title="Arrastra para ver más artistas" data-i18n-title></div>
 <div id="bot"></div>
 
 <!-- Backstage: cinta de avisos (retrasos, hitos, tiempo) -->
@@ -86,76 +86,76 @@
 
 <!-- Confidence: monitor de escenario de UNA zona (cuenta atrás gigante con semáforo) -->
 <div id="conf" class="conf"></div>
-<button id="cf-full" class="iconbtn cf-full" title="Pantalla completa (F)" aria-label="Pantalla completa"><svg class="ic"><use href="#i-full"/></svg></button>
+<button id="cf-full" class="iconbtn cf-full" title="Pantalla completa (F)" aria-label="Pantalla completa" data-i18n-title data-i18n-aria><svg class="ic"><use href="#i-full"/></svg></button>
 
 <!-- Standby / Modo Cartel: el cartel de Showtime a pantalla completa y la hora (descansos, pausas técnicas, antes de puertas). Tecla S. -->
 <div id="standby" class="standby" hidden></div>
 
 <!-- Mensaje flash (2c-C): enorme, parpadea; se cierra solo (duración en Configuración → Mensajes) o con el botón -->
-<div id="flash" role="alert" hidden><div class="fl-box"><div id="flash-txt"></div><div class="fl-bar"><div id="flash-prog"></div></div></div><button id="flash-x" class="iconbtn" title="Cerrar mensaje"><svg class="ic"><use href="#i-x"/></svg></button></div>
+<div id="flash" role="alert" hidden><div class="fl-box"><div id="flash-txt"></div><div class="fl-bar"><div id="flash-prog"></div></div></div><button id="flash-x" class="iconbtn" title="Cerrar mensaje" data-i18n-title><svg class="ic"><use href="#i-x"/></svg></button></div>
 
 <!-- Controles plegados: un icono; al dejar el cursor encima (o al tocarlo) se despliegan -->
 <div id="zoomctl" class="dock">
   <div id="dockbody">
-  <span id="wake" title="Mientras esta ventana esté abierta, el equipo no apagará la pantalla ni entrará en reposo" hidden><svg class="ic"><use href="#i-screen"/></svg>Sin reposo</span>
-  <button id="syncbtn" class="iconbtn" title="Volver al momento actual"><svg class="ic"><use href="#i-now"/></svg></button>
+  <span id="wake" title="Mientras esta ventana esté abierta, el equipo no apagará la pantalla ni entrará en reposo" hidden data-i18n data-i18n-title><svg class="ic"><use href="#i-screen"/></svg>Sin reposo</span>
+  <button id="syncbtn" class="iconbtn" title="Volver al momento actual" data-i18n-title><svg class="ic"><use href="#i-now"/></svg></button>
   <span id="offlbl"></span>
-  <button id="rmin" class="iconbtn" title="Filas más bajas (todas por igual)"><svg class="ic"><use href="#i-minus"/></svg></button>
-  <button id="rlbl" class="txtbtn" title="Alto de las filas. Clic: automático">alto auto</button>
-  <button id="rmax" class="iconbtn" title="Filas más altas (todas por igual)"><svg class="ic"><use href="#i-plus"/></svg></button>
+  <button id="rmin" class="iconbtn" title="Filas más bajas (todas por igual)" data-i18n-title><svg class="ic"><use href="#i-minus"/></svg></button>
+  <button id="rlbl" class="txtbtn" title="Alto de las filas. Clic: automático" data-i18n-title>alto auto</button>
+  <button id="rmax" class="iconbtn" title="Filas más altas (todas por igual)" data-i18n-title><svg class="ic"><use href="#i-plus"/></svg></button>
   <span class="zsep"></span>
-  <button id="zmin" class="iconbtn" title="Más tiempo visible"><svg class="ic"><use href="#i-plus"/></svg></button>
+  <button id="zmin" class="iconbtn" title="Más tiempo visible" data-i18n-title><svg class="ic"><use href="#i-plus"/></svg></button>
   <span id="zlbl"></span>
-  <button id="zmax" class="iconbtn" title="Menos tiempo visible"><svg class="ic"><use href="#i-minus"/></svg></button>
-  <button id="stbbtn" class="iconbtn" title="Standby · Modo Cartel: el cartel de Showtime y la hora (S)" aria-pressed="false"><svg class="ic"><use href="#i-pause"/></svg></button>
-  <button id="fullbtn" class="iconbtn" title="Pantalla completa (F)"><svg class="ic"><use href="#i-full"/></svg></button>
+  <button id="zmax" class="iconbtn" title="Menos tiempo visible" data-i18n-title><svg class="ic"><use href="#i-minus"/></svg></button>
+  <button id="stbbtn" class="iconbtn" title="Standby · Modo Cartel: el cartel de Showtime y la hora (S)" aria-pressed="false" data-i18n-title><svg class="ic"><use href="#i-pause"/></svg></button>
+  <button id="fullbtn" class="iconbtn" title="Pantalla completa (F)" data-i18n-title><svg class="ic"><use href="#i-full"/></svg></button>
   </div>
-  <span id="docktag" title="La línea de tiempo está desplazada"></span>
-  <button id="dockbtn" class="iconbtn" title="Controles (zoom, volver a ahora, pantalla completa)" aria-expanded="false"><svg class="ic"><use href="#i-sliders"/></svg></button>
+  <span id="docktag" title="La línea de tiempo está desplazada" data-i18n-title></span>
+  <button id="dockbtn" class="iconbtn" title="Controles (zoom, volver a ahora, pantalla completa)" aria-expanded="false" data-i18n-title><svg class="ic"><use href="#i-sliders"/></svg></button>
 </div>
 
 <!-- Producción (enlace con «id»): menú de mensajes plegado a la izquierda; se despliega al pasar el cursor o al tocarlo -->
 <div id="pnote" class="pnote" role="status" hidden></div>
 <div id="msgdock" class="mdock" hidden>
   <div id="mdbody">
-    <div id="md-to" class="md-to" role="group" aria-label="Destino del mensaje"><button type="button" data-to="all" class="on">Todas</button><button type="button" data-to="manager">Manager</button><button type="button" data-to="backstage">Backstage</button></div>
-    <form id="md-form" autocomplete="off"><input id="md-text" type="text" maxlength="140" placeholder="Mensaje a las pantallas Live…" spellcheck="false" enterkeyhint="send"><button class="txtbtn md-send" type="submit">Enviar</button></form>
+    <div id="md-to" class="md-to" role="group" aria-label="Destino del mensaje" data-i18n-aria><button type="button" data-to="all" class="on" data-i18n>Todas</button><button type="button" data-to="manager" data-i18n>Manager</button><button type="button" data-to="backstage" data-i18n>Backstage</button></div>
+    <form id="md-form" autocomplete="off"><input id="md-text" type="text" maxlength="140" placeholder="Mensaje a las pantallas Live…" spellcheck="false" enterkeyhint="send" data-i18n-placeholder><button class="txtbtn md-send" type="submit" data-i18n>Enviar</button></form>
   </div>
-  <button id="mdbtn" class="iconbtn" type="button" title="Mensajes a las pantallas Live" aria-expanded="false"><svg class="ic"><use href="#i-msg"/></svg></button>
+  <button id="mdbtn" class="iconbtn" type="button" title="Mensajes a las pantallas Live" aria-expanded="false" data-i18n-title><svg class="ic"><use href="#i-msg"/></svg></button>
 </div>
 
 <!-- Producción: chat con el Stage Manager (se abre y se cierra con su icono; un punto avisa de mensajes sin leer) -->
 <div id="chatdock" class="cdock" hidden>
   <div id="cdbody">
-    <div class="cd-h">Chat con Stage Manager</div>
+    <div class="cd-h" data-i18n>Chat con Stage Manager</div>
     <div id="cd-list" class="cd-list"></div>
-    <form id="cd-form" autocomplete="off"><input id="cd-text" type="text" maxlength="300" placeholder="Escribe al Stage Manager…" spellcheck="false" enterkeyhint="send"><button class="txtbtn md-send" type="submit">Enviar</button></form>
+    <form id="cd-form" autocomplete="off"><input id="cd-text" type="text" maxlength="300" placeholder="Escribe al Stage Manager…" spellcheck="false" enterkeyhint="send" data-i18n-placeholder><button class="txtbtn md-send" type="submit" data-i18n>Enviar</button></form>
   </div>
-  <button id="cdbtn" class="iconbtn" type="button" title="Chat con el Stage Manager" aria-expanded="false"><svg class="ic"><use href="#i-chat"/></svg><span id="cd-dot" class="cd-dot" hidden></span></button>
+  <button id="cdbtn" class="iconbtn" type="button" title="Chat con el Stage Manager" aria-expanded="false" data-i18n-title><svg class="ic"><use href="#i-chat"/></svg><span id="cd-dot" class="cd-dot" hidden></span></button>
 </div>
 
 <!-- Producción: al enviar, se elige dónde va el mensaje -->
 <div id="pmodal" class="pmodal" hidden>
   <div class="pm-box" role="dialog" aria-modal="true" aria-labelledby="pm-t">
-    <div id="pm-t" class="pm-t">¿Dónde lo mandas?</div>
+    <div id="pm-t" class="pm-t" data-i18n>¿Dónde lo mandas?</div>
     <div id="pm-txt" class="pm-txt"></div>
     <div class="pm-opts">
-      <button type="button" data-pm="live"><b>Ventanas Live</b><small id="pm-live-sub">Mensaje grande en Manager y Backstage</small></button>
-      <button type="button" data-pm="aviso"><b>Aviso puntual</b><small>En amarillo en la cinta de Backstage y en el Dashboard · se quita solo (2 min por defecto)</small></button>
-      <button type="button" data-pm="perm"><b>Aviso permanente</b><small>Se queda en la cinta hasta que lo quite el Stage Manager</small></button>
+      <button type="button" data-pm="live"><b data-i18n>Ventanas Live</b><small id="pm-live-sub">Mensaje grande en Manager y Backstage</small></button>
+      <button type="button" data-pm="aviso"><b data-i18n>Aviso puntual</b><small data-i18n>En amarillo en la cinta de Backstage y en el Dashboard · se quita solo (2 min por defecto)</small></button>
+      <button type="button" data-pm="perm"><b data-i18n>Aviso permanente</b><small data-i18n>Se queda en la cinta hasta que lo quite el Stage Manager</small></button>
     </div>
-    <button type="button" class="txtbtn pm-no" data-pm="no">Cancelar</button>
+    <button type="button" class="txtbtn pm-no" data-pm="no" data-i18n>Cancelar</button>
   </div>
 </div>
 
-<script src="i18n.js?v=20261109"></script>
-<script src="core.js?v=20261109"></script>
-<script src="meteo.js?v=20261109"></script>
-<script src="datos.js?v=20261109"></script>
-<script src="emision.js?v=20261109"></script>
-<script src="vistas.js?v=20261109"></script>
-<script src="marca.js?v=20261109"></script>
-<script src="live.js?v=20261109"></script>
-<script src="pwa.js?v=20261109"></script>
+<script src="i18n.js?v=20261110"></script>
+<script src="core.js?v=20261110"></script>
+<script src="meteo.js?v=20261110"></script>
+<script src="datos.js?v=20261110"></script>
+<script src="emision.js?v=20261110"></script>
+<script src="vistas.js?v=20261110"></script>
+<script src="marca.js?v=20261110"></script>
+<script src="live.js?v=20261110"></script>
+<script src="pwa.js?v=20261110"></script>
 </body>
 </html>

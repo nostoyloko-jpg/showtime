@@ -721,9 +721,9 @@
 
   test('Importar: resumen del toast con el desglose (solo lo que hay) y 2,5 s', () => {
     const t = panel(), S = t.T.importSummary, R = (tipo, jornada) => ({ tipo, jornada });
-    eq(S([R('show', 'a'), R('show', 'a'), R('sc', 'b'), R('tarea', 'b'), R('hito', 'c')]), '✓ 5 entradas importadas con éxito en 3 jornadas (2 shows · 1 prueba · 2 tareas/hitos)');
+    eq(S([R('show', 'a'), R('show', 'a'), R('sc', 'b'), R('tarea', 'b'), R('hito', 'c')]), '✓ 5 entradas importadas con éxito en 3 jornadas (2 shows · 1 prueba · 2 tareas/marcadores)');
     eq(S([R('show', 'a')]), '✓ 1 entrada importada con éxito (1 show)');
-    eq(S([R('hito', 'a'), R('hito', 'a')], 2), '✓ 2 entradas importadas con éxito (2 tareas/hitos)');
+    eq(S([R('hito', 'a'), R('hito', 'a')], 2), '✓ 2 entradas importadas con éxito (2 tareas/marcadores)');
     const src = D.src('control.js');
     ok(/toast\(importSummary\(IMP_LAST, r\.added\)[^;]*, false, 2500\)/.test(src), '2,5 s');
     ok(/tw\.scrollTo\(\{ top: 0, behavior: 'smooth' \}\)/.test(src), 'la tabla vuelve arriba con scroll suave');
@@ -1023,7 +1023,7 @@
     const css = D.src('control.css'), js = D.src('control.js');
     ok(/\.spot-g\{[^}]*font-size:11px[^}]*letter-spacing:\.12em[^}]*color:var\(--dim,#8a8f98\)[^}]*padding:14px 10px 6px[^}]*border-top:1px solid var\(--hair\)/.test(css), 'encabezado: 11px, .12em, atenuado, 14px arriba, línea sutil');
     ok(/\.spot-list>\.spot-g:first-child\{border-top:0/.test(css), 'el primer encabezado no lleva línea');
-    ok(/spot-pill tp-' \+ b\.kind/.test(js) && /\.spot-pill\.tp-show\{--pc:#ff5d73\}/.test(css), 'bandas: píldora de tipo (SHOW, PRUEBA, TAREA, HITO)');
+    ok(/spot-pill tp-' \+ b\.kind/.test(js) && /\.spot-pill\.tp-show\{--pc:#ff5d73\}/.test(css), 'bandas: píldora de tipo (SHOW, PRUEBA, TAREA, MARCADOR)');
     ok(/ic: 'i-clock'/.test(js) && /ic: 'i-out'/.test(js), 'vistas y acciones: icono a la izquierda');
     const t = dashboard(); t.env.fire('document', 'keydown', { key: 'k', metaKey: true, preventDefault() {} });
     const html = t.env.getEl('spot-list').innerHTML;
@@ -1054,10 +1054,10 @@
     eq(t3.read('showtime.panel.style'), 'raycast', 'si ya estaba en Escenario sin historial, vuelve a Raycast');
     ok(/<dt><kbd>⇧<\/kbd> <kbd>⌘<\/kbd> <kbd>C<\/kbd><\/dt><dd>' \+ tx\('Alterna tema Alto Contraste \(Escenario \/ Sol\) al instante'\) \+ '<\/dd>/.test(D.src('control.js')), 'en la ayuda');
   });
-  test('Modo Foco: micro-píldora del tipo (SHOW · SOUNDCHECK · TAREA · HITO) con color fijo, en vez del cuadradito de color', () => {
+  test('Modo Foco: micro-píldora del tipo (SHOW · SOUNDCHECK · TAREA · MARCADOR) con color fijo, en vez del cuadradito de color', () => {
     const P = panel().T.tipoPill;
     eq(P('show'), '<span class="tpill tp-show" aria-hidden="true">SHOW</span>');
-    ok(/>SOUNDCHECK</.test(P('sc')) && />TAREA</.test(P('tarea')) && />HITO</.test(P('hito')));
+    ok(/>SOUNDCHECK</.test(P('sc')) && />TAREA</.test(P('tarea')) && />MARCADOR</.test(P('hito')));
     const F = fest(), t = panel({ 'showtime.festival': JSON.stringify(F.s) });
     ok(/<div class="nm"><span class="tpill tp-show"/.test(ultimo(t, 'tbody')), 'cada fila lleva su píldora');
     const css = D.src('control.css');

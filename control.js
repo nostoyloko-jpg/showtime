@@ -31,7 +31,7 @@
   const SPLASH_MS = 2500;   // pantalla de inicio (se va sola; clic o Esc la cierran antes)
   let pendingRender = false;       // si llegan datos mientras se edita una casilla, se pinta al salir
   const KEY_LABEL = { nombre: 'nombre', escenario: 'zona', color: 'color', tipo: 'tipo', jornada: 'jornada', fecha: 'fecha', inicio: 'inicio', fin: 'fin', call: 'CALL', notas: 'notas' };
-  const TIPO_TXT = { banda: 'banda', tarea: 'tarea', hito: 'hito' };
+  const TIPO_TXT = { banda: 'banda', tarea: 'tarea', hito: 'marcador' };
   // Vistas: Jornada completa (todo) · Shows · Soundchecks
   const VIEW = { all: { title: 'Jornada completa', short: 'Todo', what: 'entradas' }, show: { title: 'Shows', what: 'shows' }, sc: { title: 'Soundchecks', what: 'soundchecks' } };
 
@@ -295,7 +295,7 @@
   /** Selector de tipo de una fila: en una banda, la opción «banda» se llama Show o Soundcheck según la fila. */
   function tipoSelect(a, mode, attrs) {
     const t = C.tipoOf(a);
-    const lbl = { banda: tx(mode === 'sc' ? 'Soundcheck' : 'Show'), tarea: tx('Tarea'), hito: tx('Hito') };
+    const lbl = { banda: tx(mode === 'sc' ? 'Soundcheck' : 'Show'), tarea: tx('Tarea'), hito: tx('Marcador') };
     return '<select ' + attrs + ' class="tipo tipo-' + (t === 'banda' ? mode : t) + '">' + C.TIPOS.map(x => '<option value="' + x + '"' + (x === t ? ' selected' : '') + '>' + lbl[x] + '</option>').join('') + '</select>';
   }
 
@@ -342,7 +342,7 @@
   }
   function marginChip(m) {
     const ends = tx('{who} acaba {h}', { who: esc(m.band.name), h: C.fmtHM(m.projEnd) });
-    if (m.level === 'ok') return '<span class="mchip ok" title="' + tx('Margen hasta el hito con el retraso actual ({ends})', { ends }) + '">' + tx('Margen {n}′', { n: m.margin }) + '</span>';
+    if (m.level === 'ok') return '<span class="mchip ok" title="' + tx('Margen hasta el marcador con el retraso actual ({ends})', { ends }) + '">' + tx('Margen {n}′', { n: m.margin }) + '</span>';
     if (m.level === 'tight') return '<span class="mchip tight" title="' + ends + '"><svg class="ic"><use href="#i-alert"/></svg>' + tx('Margen {n}′', { n: m.margin }) + '</span>';
     return '<span class="mchip over" title="' + ends + '"><svg class="ic"><use href="#i-alert"/></svg>' + tx('Rebasado +{n}′', { n: -m.margin }) + '</span>';
   }
@@ -438,7 +438,7 @@
   }
 
   /** Modo Foco: micro-píldora del tipo, legible a distancia, con color fijo por tipo (show · prueba · tarea · hito). */
-  const PILL_TXT = { show: 'SHOW', sc: 'SOUNDCHECK', tarea: 'TAREA', hito: 'HITO' };   // SOUNDCHECK en toda la app (terminología internacional)
+  const PILL_TXT = { show: 'SHOW', sc: 'SOUNDCHECK', tarea: 'TAREA', hito: 'MARCADOR' };   // SOUNDCHECK en toda la app (terminología internacional)
   /** Texto de la píldora: SOUNDCHECK; en pantallas estrechas (CSS) se ve la forma corta SC. */
   function pillTxt(k) { return k === 'sc' ? '<span class="pl-l">SOUNDCHECK</span><span class="pl-s">SC</span>' : esc(tx(PILL_TXT[k] || '')); }
   function tipoPill(k) { return '<span class="tpill tp-' + k + '" aria-hidden="true">' + pillTxt(k) + '</span>'; }
@@ -457,7 +457,7 @@
     const jor = C.jornadaOf(FEST, a, mode);
     const fecha = v('fecha');
     const real = (jor && fecha && fecha !== jor) ? '<span class="real" title="' + tx('Empieza antes de la hora de corte: cuenta como la jornada anterior') + '">' + tx('fecha real {d}', { d: esc(fmtDay(fecha)) }) + '</span>' : '';
-    let gap = '<span class="dash"' + (band ? '' : ' title="' + tx('Las tareas y los hitos no tienen changeover ni solapes') + '"') + '>—</span>';
+    let gap = '<span class="dash"' + (band ? '' : ' title="' + tx('Las tareas y los marcadores no tienen changeover ni solapes') + '"') + '>—</span>';
     if (b && tipo === 'hito') { const hm = (MARGINS || []).find(x => x.hito.key === b.key); if (hm) gap = marginChip(hm); }
     if (b && band) {
       const co = C.changeoverBefore(ALL_MODE, ALL_MODE.find(x => x.key === b.key) || b, TAREAS);
@@ -469,7 +469,7 @@
         ? '<button class="gapbtn idle" data-act="standby" data-on="1" title="' + tx('Sin actividad · {n} min: no es un cambio (misma banda, o hay una tarea de la zona en medio). Pulsa para marcarlo como STANDBY', { n: co.mins }) + '">— ' + co.mins + '′</button>'
         : '<button class="gapbtn" data-act="standby" data-on="1" title="' + tx('CHANGEOVER · {n} min. Pulsa para marcarlo como STANDBY (zona cerrada o descanso)', { n: co.mins }) + '"><svg class="ic"><use href="#i-swap"/></svg>' + co.mins + '′</button>';
     }
-    const off = '<span class="dash" title="' + tx(tipo === 'hito' ? 'Un hito es un momento: no tiene fin ni CALL' : 'Las tareas no tienen CALL') + '">—</span>';
+    const off = '<span class="dash" title="' + tx(tipo === 'hito' ? 'Un marcador es un momento: no tiene fin ni CALL' : 'Las tareas no tienen CALL') + '">—</span>';
     const cls = [isNew ? 'nueva' : '', 'k-' + (band ? mode : tipo)].filter(Boolean).join(' ');
     return '<tr data-id="' + esc(a.id) + '" data-mode="' + mode + '"' + (b ? ' data-key="' + esc(b.key) + '"' : '') + ' class="' + cls + '">' +
       ledCell(a, b, band, mode) +
@@ -536,7 +536,7 @@
   }
 
   const ADD_LABEL = { show: 'show', sc: 'soundcheck', tarea: 'tarea', hito: 'hito' };
-  const ADD_PH = { show: 'Nombre de la banda', sc: 'Nombre de la banda', tarea: 'Tarea (p. ej. Comida técnicos)', hito: 'Hito (p. ej. Puertas, Curfew)' };
+  const ADD_PH = { show: 'Nombre de la banda', sc: 'Nombre de la banda', tarea: 'Tarea (p. ej. Comida técnicos)', hito: 'Marcador (p. ej. Puertas, Curfew)' };
   /** Hito: sin fin ni CALL. Tarea: sin CALL. Las casillas que no aplican se desactivan. */
   function syncAddTipo() {
     const t = $('add-tipo').value;
@@ -545,7 +545,7 @@
     $('add-nombre').placeholder = tx(ADD_PH[t]);
     $('add-fin').disabled = t === 'hito'; if (t === 'hito') $('add-fin').value = '';
     $('add-call').disabled = t === 'tarea' || t === 'hito'; if ($('add-call').disabled) $('add-call').value = '';
-    $('add-call-hint').textContent = $('add-call').disabled ? tx('las tareas y los hitos no llevan CALL')
+    $('add-call-hint').textContent = $('add-call').disabled ? tx('las tareas y los marcadores no llevan CALL')
       : tx('vacío = {n} min antes del inicio (el de Configuración › Evento)', { n: Dt.callMinsOf(FEST, CONFIG) });
     $('addrow').className = 'form addform k-' + t;
     updateAddHint();
@@ -1208,7 +1208,7 @@
 
   // ── Retrasos: categorías BLOQUEADAS («Bloquear retraso»). De entrada todo se mueve; lo marcado no. ──
   const CATS = ['show', 'sc', 'tarea', 'hito'];
-  const CAT_TXT = { show: 'Shows', sc: 'Soundchecks', tarea: 'Tareas', hito: 'Hitos' };
+  const CAT_TXT = { show: 'Shows', sc: 'Soundchecks', tarea: 'Tareas', hito: 'Marcadores' };
   const EMPTY_BLOCK = () => ({ show: false, sc: false, tarea: false, hito: false });
   /** Bloqueos de un ámbito: 'all' (todas las zonas), un id de zona o '' (sin zona). */
   function blockOf(scope) { return Object.assign(EMPTY_BLOCK(), ((CONFIG.delayBlock || {})[scope]) || {}); }
@@ -1274,7 +1274,7 @@
         '<label class="dw-n">+ <input id="dw-n" type="number" min="1" max="600" value="5"> min</label></div></div>' +
       '<div class="dw-row"><span class="dw-l">' + tx('Zonas') + '</span><div class="dtog" id="dw-zones"><button data-z="*">' + tx('Todas') + '</button>' + zones.map(z => '<button data-z="' + esc(z.id) + '">' + esc(z.nombre) + '</button>').join('') + (hasNoZone ? '<button data-z="">' + tx('Sin zona') + '</button>' : '') + '</div></div>' +
       '<div class="dw-row"><span class="dw-l">' + tx('Jornada') + '</span>' + jornadaSelect(W.day, 'id="dw-day"') + '<span class="dw-l" style="width:auto;margin-left:8px">' + tx('desde') + '</span><input id="dw-from" type="text" value="' + W.from + '" placeholder="' + tx('inicio') + '" style="width:80px"><span class="hint">' + tx('vacío = toda la jornada · solo lo que aún no ha empezado') + '</span></div>' +
-      '<div class="dw-row"><span class="dw-l">' + tx('Bloquear') + '</span><span class="hint dw-hint">' + tx('además de lo que ya está en rojo') + '</span></div><div class="dw-row"><span class="dw-l"></span><div class="dtog block" id="dw-cats">' + ['all', 'show', 'sc', 'tarea', 'hito'].map(k => '<button data-cat="' + k + '">' + tx(({ all: 'Todos', show: 'Shows', sc: 'Soundchecks', tarea: 'Tareas', hito: 'Hitos' })[k]) + '</button>').join('') + '</div></div>' +
+      '<div class="dw-row"><span class="dw-l">' + tx('Bloquear') + '</span><span class="hint dw-hint">' + tx('además de lo que ya está en rojo') + '</span></div><div class="dw-row"><span class="dw-l"></span><div class="dtog block" id="dw-cats">' + ['all', 'show', 'sc', 'tarea', 'hito'].map(k => '<button data-cat="' + k + '">' + tx(({ all: 'Todos', show: 'Shows', sc: 'Soundchecks', tarea: 'Tareas', hito: 'Marcadores' })[k]) + '</button>').join('') + '</div></div>' +
       dwOverHtml(W.day, ZK) +
       '<div id="dw-prev" class="dw-prev"></div></div>';
     modal('Aplicar retraso en cascada', html, [{ label: 'Cancelar' }, { label: 'Aplicar retraso en cascada', kind: 'primary', run: () => {
@@ -1298,8 +1298,8 @@
       const r = dwCompute(W);
       const prev = box.querySelector('#dw-prev');
       if (!r) { if (prev) prev.innerHTML = '<p class="err">' + tx('Elige la jornada y una hora «desde» válida (HH:MM) o déjala vacía.') + '</p>'; $('modal-actions').querySelector('.primary').disabled = true; return; }
-      const rows = r.moved.map(m => '<tr><td>' + esc(m.name) + '</td><td class="dim">' + esc(m.stage || '—') + '</td><td class="dim">' + tx(({ show: 'Show', sc: 'Soundcheck', tarea: 'Tarea', hito: 'Hito' })[m.kind]) + '</td><td class="t">' + C.fmtHM(m.from) + '</td><td class="t to">' + C.fmtHM(m.to) + '</td></tr>').join('') +
-        r.kept.map(k => '<tr class="kept"><td><span class="led red sm"></span>' + esc(k.name) + '</td><td class="dim">' + esc(k.stage || '—') + '</td><td class="dim">' + tx(({ show: 'Show', sc: 'Soundcheck', tarea: 'Tarea', hito: 'Hito' })[k.kind]) + '</td><td class="t">' + C.fmtHM(k.at) + '</td><td class="t">' + tx('no se mueve') + '</td></tr>').join('');
+      const rows = r.moved.map(m => '<tr><td>' + esc(m.name) + '</td><td class="dim">' + esc(m.stage || '—') + '</td><td class="dim">' + tx(({ show: 'Show', sc: 'Soundcheck', tarea: 'Tarea', hito: 'Marcador' })[m.kind]) + '</td><td class="t">' + C.fmtHM(m.from) + '</td><td class="t to">' + C.fmtHM(m.to) + '</td></tr>').join('') +
+        r.kept.map(k => '<tr class="kept"><td><span class="led red sm"></span>' + esc(k.name) + '</td><td class="dim">' + esc(k.stage || '—') + '</td><td class="dim">' + tx(({ show: 'Show', sc: 'Soundcheck', tarea: 'Tarea', hito: 'Marcador' })[k.kind]) + '</td><td class="t">' + C.fmtHM(k.at) + '</td><td class="t">' + tx('no se mueve') + '</td></tr>').join('');
       if (prev) prev.innerHTML = (r.clashes.length ? '<div class="errbox"><svg class="ic"><use href="#i-alert"/></svg>' + r.clashes.map(c => tx('{a} choca con «{b}» ({h}, DELAY rojo)', { a: esc(c.name), b: esc(c.with), h: C.fmtHM(c.at) })).join('<br>') + '</div>' : '') +
         (rows ? '<table class="dw-t"><thead><tr><th>' + tx('Entrada') + '</th><th>' + tx('Zona') + '</th><th>' + tx('Tipo') + '</th><th>' + tx('Antes') + '</th><th>' + tx('Después') + '</th></tr></thead><tbody>' + rows + '</tbody></table>'
               : '<p class="hint">' + tx(!W.zones.length ? 'Marca qué zonas se retrasan.' : CATS.every(k => W.block[k]) ? 'Todas las categorías están bloqueadas.' : 'No hay entradas pendientes con esa selección.') + '</p>');
@@ -1552,7 +1552,7 @@
     const nT = s.artists.filter(a => C.tipoOf(a) === 'tarea').length, nH = s.artists.filter(a => C.tipoOf(a) === 'hito').length;
     let html = '<p>' + tx('Archivo: <b>{f}</b>', { f: esc(fname) }) + '</p><ul>' +
       '<li>' + tx('Evento: <b>{name}</b>', { name: esc(ev.nombre || tx('sin nombre')) }) + '</li>' +
-      '<li>' + tx('{n} bandas', { n: s.artists.length - nT - nH }) + ' · ' + (nT ? tx('{n} tareas', { n: nT }) + ' · ' : '') + (nH ? tx('{n} hitos', { n: nH }) + ' · ' : '') + tx('{n} zonas', { n: s.escenarios.length }) + '</li>' +
+      '<li>' + tx('{n} bandas', { n: s.artists.length - nT - nH }) + ' · ' + (nT ? tx('{n} tareas', { n: nT }) + ' · ' : '') + (nH ? tx('{n} marcadores', { n: nH }) + ' · ' : '') + tx('{n} zonas', { n: s.escenarios.length }) + '</li>' +
       '<li>Shows: ' + (dShow.length ? dShow.map(fmtDay).map(esc).join(', ') : tx('ninguno')) + '</li>' +
       '<li>Soundchecks: ' + (dSc.length ? dSc.map(fmtDay).map(esc).join(', ') : tx('ninguno')) + '</li>' +
       '<li>' + tx('Hora de corte: {cut} · aviso CALL: {n} min', { cut: esc(ev.dayCutoff || C.DEFAULT_CUTOFF), n: esc(ev.callMins || C.DEFAULT_CALL_MINS) }) + '</li></ul>';
@@ -1636,7 +1636,7 @@
     logFoto();
     const days = Lg.reportDays(LOG, FEST), jNow = C.jornadaOfAbs(FEST, logNow());
     if (!LX.day || (LX.day !== 'all' && days.indexOf(LX.day) < 0)) LX.day = days.indexOf(jNow) >= 0 ? jNow : CONFIG.day !== 'all' && days.indexOf(CONFIG.day) >= 0 ? CONFIG.day : (days[0] || 'all');
-    const CK = [['show', 'Shows'], ['sc', 'Soundchecks'], ['tarea', 'Tareas'], ['hito', 'Hitos / Eventos'], ['inc', 'Incidencias']];
+    const CK = [['show', 'Shows'], ['sc', 'Soundchecks'], ['tarea', 'Tareas'], ['hito', 'Marcadores / Eventos'], ['inc', 'Incidencias']];
     const html = '<div class="dw lx">' +
       '<div class="dw-row"><span class="dw-l">' + tx('Jornada') + '</span><select id="lx-day">' + days.map(d => '<option value="' + d + '">' + esc(fmtDay(d)) + (d === jNow ? ' · ' + tx('hoy') : '') + '</option>').join('') + '<option value="all">' + tx('Todo el evento') + '</option></select></div>' +
       '<div class="dw-row top"><span class="dw-l">' + tx('Incluir') + '</span><div class="dtog" id="lx-cats"><button type="button" data-c="all">' + tx('Todos los tipos') + '</button>' + CK.map(([k, t]) => '<button type="button" data-c="' + k + '">' + tx(t) + '</button>').join('') + '</div></div>' +
@@ -1723,7 +1723,7 @@
       const sm = P.summary(rows, dl);
       if (!prKinds().length) { $('pr-sum').innerHTML = '<span class="hint">' + tx('Marca al menos un tipo de bloque.') + '</span>'; $('modal-actions').querySelector('.primary').disabled = true; return; }
       $('pr-sum').innerHTML = tx(sm.hojas === 1 ? (gantt ? '<b>{n}</b> bloques · <b>{h}</b> hoja horizontales' : '<b>{n}</b> bloques · <b>{h}</b> hoja · letra <b>{l}</b>') : (gantt ? '<b>{n}</b> bloques · <b>{h}</b> hojas A4 horizontales' : '<b>{n}</b> bloques · <b>{h}</b> hojas A4 · letra <b>{l}</b>'), { n: sm.bloques, h: sm.hojas, l: sm.letra }) +
-        '<div class="hint">' + tx(gantt ? 'Un carril por escenario, rango horario de cada jornada y hitos en rojo. Horarios previstos.' : 'Horarios previstos (la escaleta), no los reales. Una jornada por hoja: cada una cabe en una A4.') + '</div>';
+        '<div class="hint">' + tx(gantt ? 'Un carril por escenario, rango horario de cada jornada y marcadores en rojo. Horarios previstos.' : 'Horarios previstos (la escaleta), no los reales. Una jornada por hoja: cada una cabe en una A4.') + '</div>';
       $('modal-actions').querySelector('.primary').disabled = !rows.length;
     };
     $('pr-day').addEventListener('change', e => { PR.day = e.target.value; paint(); });
@@ -1932,7 +1932,7 @@
   function importSummary(rows, added) {
     const n = Number.isFinite(added) ? added : rows.length, c = t => rows.filter(x => x.tipo === t).length;
     const jors = new Set(rows.map(x => x.jornada).filter(Boolean)).size;
-    const parts = [[c('show'), 'show', 'shows'], [c('sc'), 'prueba', 'pruebas'], [c('tarea') + c('hito'), 'tarea/hito', 'tareas/hitos']].filter(p => p[0]).map(p => p[0] + ' ' + tx(p[0] === 1 ? p[1] : p[2]));
+    const parts = [[c('show'), 'show', 'shows'], [c('sc'), 'prueba', 'pruebas'], [c('tarea') + c('hito'), 'tarea/marcador', 'tareas/marcadores']].filter(p => p[0]).map(p => p[0] + ' ' + tx(p[0] === 1 ? p[1] : p[2]));
     return tx(n === 1 ? '✓ {n} entrada importada con éxito' : '✓ {n} entradas importadas con éxito', { n: n }) + (jors > 1 ? tx(' en {n} jornadas', { n: jors }) : '') + (parts.length ? ' (' + parts.join(' · ') + ')' : '');
   }
   function impDoImport() {
@@ -2168,7 +2168,7 @@
   function mtLog(list, pending) {
     if (!FEST) return;
     let next = W.pruneAcks(MT_LOGGED, list), ch = JSON.stringify(next) !== JSON.stringify(MT_LOGGED);
-    W.pendingAlerts(pending, next).forEach(a => { logEvent('meteo', 'Aviso (previsión): ' + a.text, { amber: true }); next = W.ack(next, a); ch = true; });
+    W.pendingAlerts(pending, next).forEach(a => { logEvent('meteo', 'Aviso (previsión): ' + (a.textEs || a.text), { amber: true }); next = W.ack(next, a); ch = true; });
     MT_LOGGED = next;
     if (ch) { try { localStorage.setItem(MT_LOG_KEY, JSON.stringify(MT_LOGGED)); } catch (e) {} }
   }
@@ -2218,7 +2218,7 @@
   function meteoChips(st) {
     if (!st.c.on) return '';
     let h = '';
-    if (st.sum && st.sum.stale) h += '<span class="dchip over" title="' + tx('El último dato del tiempo es de las {h}', { h: W.hhmm(st.sum.at) }) + (st.m && st.m.err ? ' · ' + esc(st.m.err) : '') + '"><svg class="ic"><use href="#i-alert"/></svg>' + tx('Meteo') + ': ' + esc(st.sum.staleTxt) + '</span>';
+    if (st.sum && st.sum.stale) h += '<span class="dchip over" title="' + tx('El último dato del tiempo es de las {h}', { h: W.hhmm(st.sum.at) }) + (st.m && st.m.err ? ' · ' + esc(tx(st.m.err)) : '') + '"><svg class="ic"><use href="#i-alert"/></svg>' + tx('Meteo') + ': ' + esc(st.sum.staleTxt) + '</span>';
     st.pending.forEach(a => {
       h += '<span class="dchip absorb mtchip" title="' + tx('Previsión del modelo, no es un aviso oficial') + '"><svg class="ic"><use href="#i-' + (a.kind === 'storm' ? 'storm' : a.kind === 'rain' ? 'rain' : a.kind === 'uv' ? 'sun' : a.kind === 'heat' ? 'thermo' : a.kind === 'aqi' ? 'cloud' : 'wind') + '"/></svg>' + tx('Previsión') + ' · ' + esc(a.text) +
         '<button class="chipx" data-act="mt-ack" data-k="' + a.kind + '" title="' + tx('Visto: no insiste salvo que empeore') + '">' + tx('Visto') + '</button></span>';
@@ -2235,7 +2235,7 @@
     const where = c.source === 'openmeteo' ? (c.place || (c.lat !== null ? c.lat + ', ' + c.lon : '')) : tx(MT_SRC[c.source]);
     if (!st.sum) {
       const need = c.source === 'openmeteo' && (c.lat === null || c.lon === null) ? 'Elige el lugar del evento' : c.source === 'url' && !c.url ? 'Falta la URL de la estación' : c.source === 'manual' ? 'Escribe los valores' : '';
-      h = '<div class="mt-none">' + (need ? esc(tx(need)) + ' ' + tx('en') + ' <button class="linkbtn" data-act="mt-cfg">' + tx('Configuración › Meteo') + '</button>' : (st.m && st.m.err ? tx('SIN DATOS') + ' · ' + esc(st.m.err) : tx('Cargando…'))) + '</div>';
+      h = '<div class="mt-none">' + (need ? esc(tx(need)) + ' ' + tx('en') + ' <button class="linkbtn" data-act="mt-cfg">' + tx('Configuración › Meteo') + '</button>' : (st.m && st.m.err ? tx('SIN DATOS') + ' · ' + esc(tx(st.m.err)) : tx('Cargando…'))) + '</div>';
     } else {
       const s = st.sum;
       h += '<div class="mt-now' + (s.stale ? ' stale' : '') + '"><svg class="ic mt-sky"><use href="#i-' + s.icon + '"/></svg><span class="mt-t">' + (s.temp === null ? '—' : Math.round(s.temp) + '°') + '</span><span class="mt-sk">' + esc(s.sky || '') + (where ? '<small>' + esc(where) + '</small>' : '') + '</span></div>';
@@ -2244,7 +2244,7 @@
         const fmt = t => { const tm = new Date(t), tomorrow = tm.toDateString() !== new Date().toDateString(); return '<b>' + W.hhmm(t) + '</b>' + (tomorrow ? ' <small>' + tx('mañana') + '</small>' : ''); };
         h += '<div class="mt-sun"><svg class="ic"><use href="#i-sun"/></svg>' + (sn.rise !== null ? tx('Amanece') + ' ' + fmt(sn.rise) : '') + (sn.rise !== null && sn.set !== null ? ' · ' : '') + (sn.set !== null ? tx('Se pone') + ' ' + fmt(sn.set) : '') + '</div>';
       }
-      if (s.stale) h += '<div class="mt-stale"><svg class="ic"><use href="#i-alert"/></svg>' + esc(s.staleTxt) + (st.m && st.m.err ? '<small>' + esc(st.m.err) + '</small>' : '') + '</div>';
+      if (s.stale) h += '<div class="mt-stale"><svg class="ic"><use href="#i-alert"/></svg>' + esc(s.staleTxt) + (st.m && st.m.err ? '<small>' + esc(tx(st.m.err)) + '</small>' : '') + '</div>';
       h += '<div class="mt-grid">' +
         '<span><svg class="ic"><use href="#i-drop"/></svg>' + tx('Lluvia') + ' <b>' + mtNum(s.rain, true) + '</b> mm/h</span>' +
         '<span><svg class="ic"><use href="#i-wind"/></svg>' + tx('Viento') + ' <b>' + mtNum(s.wind) + '</b> km/h</span>' +
@@ -2264,7 +2264,7 @@
     const b = e.target.closest('[data-act="mt-ack"]');
     if (b) {
       const st = meteoState(), a = st.list.find(x => x.kind === b.dataset.k);
-      if (a) { MT_ACKS = W.ack(MT_ACKS, a); mtSaveAcks(); logEvent('meteo', 'Visto: ' + a.text); }
+      if (a) { MT_ACKS = W.ack(MT_ACKS, a); mtSaveAcks(); logEvent('meteo', 'Visto: ' + (a.textEs || a.text)); }
       renderMeteo(); if (FEST) renderDrift(Math.floor(C.nowAbs()));
       return;
     }
@@ -2276,8 +2276,8 @@
     const st = meteoState(), m = st.m;
     let t = '';
     if (!st.c.on) t = tx('Apagado.');
-    else if (st.sum) t = tx('Último dato: {h}', { h: W.hhmm(st.sum.at) }) + (st.sum.stale ? ' · <b class="bad">' + esc(st.sum.staleTxt) + '</b>' : '') + (m && m.err ? tx(' · último intento: {e}', { e: esc(m.err) }) : '');
-    else if (m && m.err) t = '<b class="bad">' + tx('Sin datos') + '</b> · ' + esc(m.err);
+    else if (st.sum) t = tx('Último dato: {h}', { h: W.hhmm(st.sum.at) }) + (st.sum.stale ? ' · <b class="bad">' + esc(st.sum.staleTxt) + '</b>' : '') + (m && m.err ? tx(' · último intento: {e}', { e: esc(tx(m.err)) }) : '');
+    else if (m && m.err) t = '<b class="bad">' + tx('Sin datos') + '</b> · ' + esc(tx(m.err));
     else t = tx(MT_BUSY ? 'Pidiendo el dato…' : 'Sin datos todavía.');
     $('mt-st').innerHTML = t;
   }

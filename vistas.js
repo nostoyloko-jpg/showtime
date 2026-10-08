@@ -9,6 +9,9 @@
   'use strict';
   const isNode = typeof module !== 'undefined' && module.exports;
   const C = isNode ? require('./core.js') : root.ShowtimeCore;
+  // Idioma (Fase 2): textos de la cinta en el idioma activo (el que manda el Panel). Sin i18n.js, en español.
+  const I18 = () => root.ShowtimeI18n || (isNode ? (() => { try { return require('./i18n.js'); } catch (e) { return null; } })() : null);
+  const tx = (s, v) => { const I = I18(); return I ? I.tx(s, v) : (v ? String(s).replace(/\{(\w+)\}/g, (m, k) => (v[k] !== undefined && v[k] !== null ? String(v[k]) : m)) : s); };
 
   const VISTAS = ['manager', 'confidence', 'backstage'];
   const VISTA_TXT = { manager: 'Manager', confidence: 'Confidence', backstage: 'Backstage' };
@@ -102,7 +105,7 @@
     C.buildBlocks(state, { mode: 'all', day: jor }).forEach(b => { if (C.isBand(b) && b.psi !== null && ids.indexOf(b.stageId || '') < 0) ids.push(b.stageId || ''); });
     return ids;
   }
-  function zoneName(state, id) { const e = C.getEscenario(state, id); return e ? e.nombre : 'Sin zona'; }
+  function zoneName(state, id) { const e = C.getEscenario(state, id); return e ? e.nombre : tx('Sin zona'); }
 
   /**
    * Confidence de una zona en el instante `now` (minutos absolutos con decimales).
@@ -156,11 +159,11 @@
     if (t.delays && C.delayByZone) {
       const late = C.delayByZone(state, n).filter(z => z.acc > 0 || z.live > 0);
       late.forEach(z => out.push({ kind: 'delay', level: z.status === 'overflow' ? 'over' : 'warn',
-        text: (z.zone || 'Sin zona').toUpperCase() + ' · RETRASO +' + z.acc + ' MIN' + (z.live > 0 ? ' (+' + z.live + ' EN VIVO)' : '') }));
-      if (!late.length) out.push({ kind: 'delay', level: 'ok', text: 'EN HORA · SIN INCIDENCIAS' });
+        text: (z.zone || tx('Sin zona')).toUpperCase() + ' · ' + tx('RETRASO +{n} MIN', { n: z.acc }) + (z.live > 0 ? ' ' + tx('(+{n} EN VIVO)', { n: z.live }) : '') }));
+      if (!late.length) out.push({ kind: 'delay', level: 'ok', text: tx('EN HORA · SIN INCIDENCIAS') });
       // Tiempo extra en curso (activado y pasada su hora)
       C.buildBlocks(state, { mode: 'all', day: jor, now: n }).filter(b => C.isBand(b) && b.alargar && b.rf === null && b.nf !== null && n >= b.nf && b.si <= n).forEach(b =>
-        out.push({ kind: 'delay', level: 'warn', text: (b.stage || 'Sin zona').toUpperCase() + ' · ' + b.name.toUpperCase() + ' · TIEMPO EXTRA +' + Math.floor(n - b.nf) + ' MIN' }));
+        out.push({ kind: 'delay', level: 'warn', text: (b.stage || tx('Sin zona')).toUpperCase() + ' · ' + b.name.toUpperCase() + ' · ' + tx('TIEMPO EXTRA +{n} MIN', { n: Math.floor(n - b.nf) }) }));
     }
     if (t.hitos) {
       const all = C.buildBlocks(state, { mode: 'all', day: jor });

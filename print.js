@@ -22,7 +22,7 @@
     { k: 'show', label: 'Shows' },
     { k: 'sc', label: 'Pruebas (SC)' },
     { k: 'tarea', label: 'Tareas' },
-    { k: 'hito', label: 'Hitos' }
+    { k: 'hito', label: 'Marcadores' }
   ];
   /** Píldoras «ghost»: contorno y color por tipo (SHOW negro · SOUNDCHECK púrpura · TAREA azul · HITO rojo).
    *  El texto sale del diccionario de idioma (I18N). */

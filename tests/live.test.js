@@ -38,6 +38,99 @@
     eq(arrancar({ storage: { 'showtime.config': JSON.stringify({ lang: 'en' }) } }).env.win.ShowtimeI18n.getLang(), 'en');
     eq(arrancar({}).env.win.ShowtimeI18n.getLang(), 'es', 'sin nada: español');
   });
+  // ── Idioma, Fase 2: las 4 vistas Live cambian al instante con el idioma que manda el Panel (emisión) y vuelven ──
+  const snapL = (lang, fest, extra) => Object.assign({ festival: fest || null, config: { lang }, callDone: [], flash: null, avisos: [], meteo: null }, extra || {});
+  async function staffL(search) { ROOM = ROOM || await E.newRoom(); return arrancar({ search, hash: hashOf(E.staffUrl(ROOM, 'http://x/')) }); }
+  test('Idioma (Fase 2): Manager sin evento — cabecera, aviso y tarjetas pasan a inglés al llegar lang:en y vuelven con lang:es', async () => {
+    const t = await staffL('?vista=manager'), Dt = t.env.win.ShowtimeDatos, I = t.env.win.ShowtimeI18n, el = id => t.env.getEl(id);
+    Dt.loadSnapshot(snapL('es'));
+    eq(el('evn-name').textContent, 'SIN EVENTO'); eq(el('banner').textContent, 'ESPERANDO LOS DATOS DE LA SALA…');
+    ok(/SIN EVENTO CARGADO/.test(el('now-list').innerHTML));
+    Dt.loadSnapshot(snapL('en'));
+    eq(I.getLang(), 'en', 'el idioma llega con la emisión');
+    eq(el('evn-name').textContent, 'NO EVENT'); eq(el('banner').textContent, 'WAITING FOR THE ROOM DATA…');
+    ok(/NO EVENT LOADED/.test(el('now-list').innerHTML), 'EN ESCENA');
+    eq(el('rlbl').textContent, 'auto height');
+    Dt.loadSnapshot(snapL('es'));
+    eq(el('evn-name').textContent, 'SIN EVENTO', 'vuelve al español'); ok(/SIN EVENTO CARGADO/.test(el('now-list').innerHTML));
+    eq(t.env.errors.length, 0, t.env.errors.join(' | '));
+  });
+  test('Idioma (Fase 2): Manager con evento — tarjetas EN ESCENA / SIGUIENTE / CALL en inglés', async () => {
+    const t = await staffL('?vista=manager'), Dt = t.env.win.ShowtimeDatos, C = t.env.win.ShowtimeCore, el = id => t.env.getEl(id);
+    const F = C.demoFestival(Math.floor(C.nowAbs()));
+    Dt.loadSnapshot(snapL('en', F, { config: { lang: 'en', mode: 'all', day: 'all' } }));
+    const now = el('now-list').innerHTML + el('next-list').innerHTML + el('call-list').innerHTML;
+    ok(/min left|Finished|EXTRA TIME|CHANGEOVER|NO ACTIVITY/.test(now), 'textos de las tarjetas en inglés: ' + now.slice(0, 200));
+    ok(!/restantes|Finalizado|SIN ACTIVIDAD|quedan /.test(now), 'sin español');
+    Dt.loadSnapshot(snapL('es', F, { config: { lang: 'es', mode: 'all', day: 'all' } }));
+    const es = el('now-list').innerHTML + el('next-list').innerHTML;
+    ok(!/ min left|NO ACTIVITY/.test(es), 'vuelve al español');
+  });
+  test('Idioma (Fase 2): Backstage — la cinta en inglés (ON TIME · NO INCIDENTS) y de vuelta', async () => {
+    const t = await staffL('?vista=backstage'), Dt = t.env.win.ShowtimeDatos, C = t.env.win.ShowtimeCore, el = id => t.env.getEl(id);
+    const F = C.demoFestival(Math.floor(C.nowAbs()));
+    Dt.loadSnapshot(snapL('en', F));
+    ok(/ON TIME · NO INCIDENTS/.test(el('ticker').innerHTML), el('ticker').innerHTML.slice(0, 160));
+    Dt.loadSnapshot(snapL('es', F));
+    ok(/EN HORA · SIN INCIDENCIAS/.test(el('ticker').innerHTML), 'vuelve al español');
+  });
+  test('Idioma (Fase 2): Confidence — mensajes al músico en inglés y de vuelta', async () => {
+    const t = await staffL('?vista=confidence'), Dt = t.env.win.ShowtimeDatos, el = id => t.env.getEl(id);
+    Dt.loadSnapshot(snapL('en'));
+    ok(/WAITING FOR THE ROOM DATA…/.test(el('conf').innerHTML), el('conf').innerHTML);
+    Dt.loadSnapshot(snapL('es'));
+    ok(/ESPERANDO LOS DATOS DE LA SALA…/.test(el('conf').innerHTML), 'vuelve al español');
+  });
+  test('Idioma (Fase 2): Standby — botón de salir en inglés; el descriptor es «Real-Time Show Control»', async () => {
+    const t = await staffL('?vista=standby&prev=manager'), Dt = t.env.win.ShowtimeDatos, el = id => t.env.getEl(id);
+    Dt.loadSnapshot(snapL('en'));
+    ok(/Exit Standby \(S\)/.test(el('standby').innerHTML), 'en inglés');
+    ok(/Real-Time Show Control/.test(el('standby').innerHTML), 'descriptor oficial');
+    Dt.loadSnapshot(snapL('es'));
+    ok(/Salir del Standby \(S\)/.test(el('standby').innerHTML), 'vuelve al español');
+  });
+  test('Idioma (Fase 2): Live del Mac — al cambiar el idioma en el Panel se repinta sin recargar', () => {
+    const t = arrancar({ storage: { 'showtime.config': JSON.stringify({ lang: 'es' }) } }), I = t.env.win.ShowtimeI18n, el = id => t.env.getEl(id);
+    eq(el('evn-name').textContent, 'SIN EVENTO');
+    // el Panel guarda CONFIG.lang y avisa a sus ventanas (aquí, a mano: se escribe y se recarga como con el aviso del Panel)
+    const panel = lang => { t.env.storage.set('showtime.config', JSON.stringify({ lang })); t.env.win.ShowtimeLive.reload(); };
+    panel('en');
+    eq(I.getLang(), 'en');
+    eq(el('evn-name').textContent, 'NO EVENT'); ok(/NO EVENT LOADED/.test(el('now-list').innerHTML));
+    panel('es');
+    eq(el('evn-name').textContent, 'SIN EVENTO');
+    eq(t.env.errors.length, 0, t.env.errors.join(' | '));
+  });
+  test('Idioma (Fase 2): todo texto marcado en live.html y todo texto fijo de live.js, vistas.js y meteo.js tiene traducción', () => {
+    const I = require('../i18n.js'), h = D.src('live.html');
+    const ent = x => x.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
+    const list = []; let m;
+    const tagRe = /<([a-zA-Z][\w-]*)((?:[^>"']|"[^"]*")*)>([^<]*)/g;
+    while ((m = tagRe.exec(h))) {
+      [['title', 'title'], ['placeholder', 'placeholder'], ['aria', 'aria-label']].forEach(([d, a]) => {
+        if (new RegExp(' data-i18n-' + d + '(?=[\\s/>]|$)').test(m[2])) { const v = new RegExp(' ' + a + '="([^"]*)"').exec(m[2]); if (v) list.push(ent(v[1])); }
+      });
+      if (/ data-i18n(?=[\s/>]|$)/.test(m[2]) && m[3].trim()) list.push(ent(m[3]).replace(/\s+/g, ' ').trim());
+    }
+    ok(list.length > 30, list.length + ' textos marcados');
+    eq(list.filter(x => !I.txHas(x) && !/^(CALL|Manager|Backstage)$/.test(x)).join(' | '), '', 'live.html sin traducción');
+    ['EN ESCENA', 'SIGUIENTE'].forEach(x => ok(new RegExp('data-i18n>' + x + '<').test(h), x + ' marcado'));
+    // literales de tx('…') (también los dos lados de un ?:)
+    ['live.js', 'vistas.js', 'meteo.js'].forEach(f => {
+      const js = D.src(f).replace(/^\s*\/\/.*$/gm, '');
+      const miss = []; const re = /\btx\((?:[^'()]*\?\s*)?'((?:[^'\\]|\\.)*)'(?:\s*:\s*'((?:[^'\\]|\\.)*)')?/g;
+      while ((m = re.exec(js))) [m[1], m[2]].forEach(k => { if (k && /[A-Za-zÁÉÍÓÚáéíóúÑñ]{2}/.test(k) && !I.txHas(k) && !/^(SHOW|SOUNDCHECK|CALL)$/.test(k)) miss.push(k); });
+      eq(miss.join(' | '), '', f + ': sin traducción');
+    });
+  });
+  test('Idioma (Fase 2): vocabulario — tiempo extra «EXTRA TIME», desborde «OVERRUN», «+N MIN DELAY», marcadores «KEY TIME»', () => {
+    const I = require('../i18n.js');
+    eq(I.tx('TIEMPO EXTRA', null, 'en'), 'EXTRA TIME');
+    ok(/OVERRUN/.test(I.tx('+{n} MIN · BUFFER AGOTADO (+{o})', { n: 5, o: 2 }, 'en')));
+    eq(I.tx('RETRASO +{n} MIN', { n: 10 }, 'en'), '+10 MIN DELAY');
+    eq(I.tx('EN HORA · SIN INCIDENCIAS', null, 'en'), 'ON TIME · NO INCIDENTS');
+    eq(I.t('print.pills.hito', null, 'en'), 'KEY TIME'); eq(I.t('print.pills.hito', null, 'es'), 'MARCADOR');
+  });
   const clickOk = (t, key) => t.env.fire('document', 'click', { target: { closest: sel => sel === '.callok' ? { dataset: { ck: key } } : null } });
 
   test('Ancho del panel de info: automático y estable (medida a tamaño de referencia), mínimo 280 px y máximo 45 vw', () => {

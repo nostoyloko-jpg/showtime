@@ -49,6 +49,14 @@
   function safeColor(c, d) { return /^(#[0-9a-f]{3,8}|rgba?\([\d\s.,%]+\)|[a-z]{3,20})$/i.test(String(c || '').trim()) ? String(c).trim() : d; }
   function cssVar(n) { return getComputedStyle(document.body).getPropertyValue(n).trim(); }
   const pad2 = C.pad2;
+  // Idioma (Fase 2): el que manda el Panel (CONFIG.lang, también por la emisión). tx('Texto en español') → su traducción.
+  const I18 = window.ShowtimeI18n;
+  const tx = (s, v) => I18 ? I18.tx(s, v) : (v ? String(s).replace(/\{(\w+)\}/g, (m, k) => (v[k] !== undefined && v[k] !== null ? String(v[k]) : m)) : s);
+  const isEn = () => !!(I18 && I18.getLang() === 'en');
+  const LOCALE = () => (isEn() ? 'en-GB' : 'es-ES');
+  const ordEn = n => n + ((n % 100 >= 11 && n % 100 <= 13) ? 'TH' : ({ 1: 'ST', 2: 'ND', 3: 'RD' })[n % 10] || 'TH');
+  /** Etiquetas de las barras (core.js las da en español): AHORA · SIGUIENTE · EN 2º LUGAR… */
+  function lblUi(l) { const m = /^EN (\d+)º LUGAR$/.exec(l || ''); return m ? tx('EN {n}º LUGAR', { n: isEn() ? ordEn(+m[1]) : m[1] }) : l ? tx(l) : ''; }
 
   // ── Carga de datos ───────────────────────────────────────────────────
   function load() {
@@ -75,10 +83,10 @@
     CALL_DONE = new Set(Dt.getCallDone());
     applyInfoWidth();   // ancho del panel de info: manual si lo arrastraste; si no, según el nombre más largo del día
 
-    $('evn-name').textContent = NOFEST ? 'SIN EVENTO' : (DEMO ? 'DEMO · ' : '') + ((FEST.event && FEST.event.nombre) || '');
-    $('evn-mode').textContent = vt[0] + ' · ';
-    const msg = NOFEST ? (Dt.READONLY ? 'ESPERANDO LOS DATOS DE LA SALA…' : 'SIN EVENTO CARGADO · ábrelo en el Dashboard')
-      : DAY_MISSING ? 'EL ' + fmtDay(DAY_MISSING) + ' NO TIENE ' + vt[1] + ' · elige otro día'
+    $('evn-name').textContent = NOFEST ? tx('SIN EVENTO') : (DEMO ? 'DEMO · ' : '') + ((FEST.event && FEST.event.nombre) || '');
+    $('evn-mode').textContent = tx(vt[0]) + ' · ';
+    const msg = NOFEST ? tx(Dt.READONLY ? 'ESPERANDO LOS DATOS DE LA SALA…' : 'SIN EVENTO CARGADO · ábrelo en el Dashboard')
+      : DAY_MISSING ? tx('EL {d} NO TIENE {w} · elige otro día', { d: fmtDay(DAY_MISSING), w: tx(vt[1]) })
       : '';
     $('banner').textContent = msg;
     $('banner').hidden = !msg;
@@ -88,7 +96,7 @@
   function fmtDay(iso) {
     const i = C.dayIndex(iso);
     if (i === null) return iso;
-    return new Date(Date.UTC(2000, 0, 1) + i * 864e5).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }).toUpperCase();
+    return new Date(Date.UTC(2000, 0, 1) + i * 864e5).toLocaleDateString(LOCALE(), { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }).toUpperCase();
   }
 
   function applyStyle(v) {
@@ -121,7 +129,7 @@
   // ── Dibujo de una barra ──────────────────────────────────────────────
   /** Color de un hito según su margen con el retraso actual (sin palabras mágicas: solo cuenta la hora). */
   function hitoColor(h) { const m = MARG[h.key]; return !m ? 'rgba(255,255,255,.85)' : m.level === 'over' ? '#ff3b30' : m.level === 'tight' ? CALLC : 'rgba(255,255,255,.85)'; }
-  function hitoTag(h) { const m = MARG[h.key]; return !m || m.level === 'ok' ? '' : m.level === 'over' ? '  ·  REBASADO +' + (-m.margin) + ' MIN' : '  ·  MARGEN ' + m.margin + ' MIN'; }
+  function hitoTag(h) { const m = MARG[h.key]; return !m || m.level === 'ok' ? '' : m.level === 'over' ? '  ·  ' + tx('REBASADO +{n} MIN', { n: -m.margin }) : '  ·  ' + tx('MARGEN {n} MIN', { n: m.margin }); }
 
   /** Hitos: línea vertical en todas las barras; en la primera, la píldora «19:30 PUERTAS». */
   function drawHitos(ctx, W, H, xOf, withPill, FONT) {
@@ -224,7 +232,7 @@
         ctx.font = 'bold ' + (compact ? 12 : task ? 14 : 16) + 'px ' + FONT;
         ctx.textBaseline = 'middle';
         ctx.beginPath(); ctx.rect(Math.max(0, x1) + 8, by, Math.min(W, x2) - Math.max(0, x1) - 16, bh); ctx.clip();
-        ctx.fillText((task ? 'TAREA · ' : block.kind === 'sc' && CONFIG.mode === 'all' ? 'SOUNDCHECK · ' : '') + block.name.toUpperCase(), Math.max(x1, 0) + 12, by + bh / 2);
+        ctx.fillText((task ? tx('TAREA') + ' · ' : block.kind === 'sc' && CONFIG.mode === 'all' ? 'SOUNDCHECK · ' : '') + block.name.toUpperCase(), Math.max(x1, 0) + 12, by + bh / 2);
       }
       ctx.restore();
       const dur = Math.max(0, Math.round(end - block.si));
@@ -239,7 +247,7 @@
       ctx.fillStyle = 'rgba(255,255,255,.12)';
       ctx.font = '14px ' + FONT;
       ctx.textBaseline = 'middle';
-      if (!compact) ctx.fillText('Sin evento', NX + 16, H / 2);
+      if (!compact) ctx.fillText(tx('Sin evento'), NX + 16, H / 2);
     }
 
     drawHitos(ctx, W, H, xOf, idx === 0, FONT);
@@ -282,11 +290,11 @@
     nt.textContent = block.notes || '';
     if (block.alargar && block.rf === null) {
       const xo = xtraOver(block, Math.floor(C.nowAbs()));
-      nt.textContent = (xo !== null ? 'TIEMPO EXTRA · +' + xo + ' MIN' : 'TIEMPO EXTRA') + (block.notes ? '  ·  ' + block.notes : '');
+      nt.textContent = (xo !== null ? tx('TIEMPO EXTRA · +{n} MIN', { n: xo }) : tx('TIEMPO EXTRA')) + (block.notes ? '  ·  ' + block.notes : '');
     }
     if (block.kind === 'tarea' && C.isPlaying(block, Math.floor(C.nowAbs()))) {
       const p = C.progress(block, Math.floor(C.nowAbs()));
-      nt.textContent = 'quedan ' + p.remaining + ' min' + (block.notes ? '  ·  ' + block.notes : '');
+      nt.textContent = tx('quedan {n} min', { n: p.remaining }) + (block.notes ? '  ·  ' + block.notes : '');
     }
     if (block.call && block.callAbs !== null) {
       cl.hidden = false;
@@ -309,7 +317,7 @@
     ROW_H = ROW_STEPS.indexOf(v) >= 0 ? v : 0;
     pset(P.rowH, ROW_H);
     STRIP_H = {}; pset(P.stripH, STRIP_H);          // fuera los altos a mano: todas iguales
-    $('rlbl').textContent = ROW_H ? 'alto ' + ROW_H : 'alto auto';
+    $('rlbl').textContent = ROW_H ? tx('alto {n}', { n: ROW_H }) : tx('alto auto');
     $('rmin').disabled = curRowH() <= ROW_STEPS[0];
     $('rmax').disabled = curRowH() >= ROW_STEPS[ROW_STEPS.length - 1];
     buildStrips(visibleCount()); tick();
@@ -336,9 +344,9 @@
           '<div class="ihead"><span class="lbl"></span><span class="acall" hidden><svg class="ic"><use href="#i-bell"/></svg><span></span></span></div>' +
           '<div class="aname">—</div><div class="atime"></div><div class="anotes"></div>' +
         '</div>' +
-        '<div class="drag-handle" title="Arrastra para cambiar el ancho"></div>' +
+        '<div class="drag-handle" title="' + tx('Arrastra para cambiar el ancho') + '"></div>' +
         '<div class="cvsw"><canvas></canvas></div>' +
-        '<div class="striph" title="Arrastra para ajustar el alto; doble clic: automático"></div>';
+        '<div class="striph" title="' + tx('Arrastra para ajustar el alto; doble clic: automático') + '"></div>';
       // Alto FIJO: agrandar una barra empuja a las demás y aparece scroll.
       s.style.flex = '0 0 ' + (STRIP_H[i] || baseH) + 'px';
       bot.appendChild(s);
@@ -404,7 +412,7 @@
   const KIND_CARD = { show: 'SHOW', sc: 'SOUNDCHECK', tarea: 'TAREA' };
   function metaHtml(b, col) {
     const k = b.kind || 'show';
-    return '<div class="tmeta tkline"><span class="tkind ' + k + '">' + (KIND_CARD[k] || 'SHOW') + '</span>&nbsp;&nbsp;&middot;&nbsp;&nbsp;' +
+    return '<div class="tmeta tkline"><span class="tkind ' + k + '">' + tx(KIND_CARD[k] || 'SHOW') + '</span>&nbsp;&nbsp;&middot;&nbsp;&nbsp;' +
       C.fmtHM(b.si) + '–' + C.fmtHM(C.blockEnd(b)) + '</div>' +
       (b.stage ? '<div class="tmeta"><span class="tstage" style="color:' + col + '">' + esc(b.stage.toUpperCase()) + '</span></div>' : '');
   }
@@ -417,17 +425,17 @@
     const p = C.progress(b, nowInt), xo = xtraOver(b, nowInt), xt = b.alargar && b.rf === null;
     if (xo !== null) return '<div class="trow xtra" style="--c:' + col + '"><div class="tname fit">' + esc(b.name.toUpperCase()) + '</div>' +
       metaHtml(b, col) +
-      '<div class="trem xtra">TIEMPO EXTRA · +' + xo + ' MIN</div>' +
+      '<div class="trem xtra">' + tx('TIEMPO EXTRA · +{n} MIN', { n: xo }) + '</div>' +
       '<div class="tbar"><div style="width:100%;background:#ffb347"></div></div></div>';
     return '<div class="trow" style="--c:' + col + '"><div class="tname fit">' + esc(b.name.toUpperCase()) + '</div>' +
       metaHtml(b, col) +
-      '<div class="trem" style="color:' + col + '">' + (p.remaining > 0 ? p.remaining + ' min restantes' : 'Finalizado') + (xt ? '<span class="xtag">TIEMPO EXTRA</span>' : '') + '</div>' +
+      '<div class="trem" style="color:' + col + '">' + (p.remaining > 0 ? tx('{n} min restantes', { n: p.remaining }) : tx('Finalizado')) + (xt ? '<span class="xtag">' + tx('TIEMPO EXTRA') + '</span>' : '') + '</div>' +
       '<div class="tbar"><div style="width:' + p.pct + '%;background:' + col + '"></div></div></div>';
   }
 
   // «después: BANDA · hh:mm» (la próxima banda de la zona)
   function despuesHtml(nb) {
-    return nb ? '<div class="tmeta entra">después <b>' + esc(nb.name.toUpperCase()) + '</b>&nbsp;&nbsp;&middot;&nbsp;&nbsp;' + C.fmtHM(nb.si) + '</div>' : '';
+    return nb ? '<div class="tmeta entra">' + tx('después') + ' <b>' + esc(nb.name.toUpperCase()) + '</b>&nbsp;&nbsp;&middot;&nbsp;&nbsp;' + C.fmtHM(nb.si) + '</div>' : '';
   }
 
   // EN ESCENA: tarea en curso (operativa del día, solo en Jornada completa). Manda sobre el hueco de su zona (decisión 76)
@@ -435,7 +443,7 @@
     const p = C.progress(b, nowInt);
     return '<div class="trow tarea"><div class="tname fit">' + esc(b.name.toUpperCase()) + '</div>' + metaHtml(b, '#7dd3fc') +
       despuesHtml(C.nextBandIn(BLOCKS, b.stageId, nowInt)) +
-      '<div class="trem" style="color:#7dd3fc">quedan ' + p.remaining + ' min</div></div>';
+      '<div class="trem" style="color:#7dd3fc">' + tx('quedan {n} min', { n: p.remaining }) + '</div></div>';
   }
 
   // EN ESCENA: hueco de una zona. CHANGEOVER solo entre dos bandas distintas seguidas; STANDBY si el regidor lo marca;
@@ -444,12 +452,12 @@
     const col = safeColor(co.stageColor || co.next.color, '#888');
     const sb = co.standby, idle = !sb && co.kind === 'idle';
     const stage = co.stage ? '<div class="tmeta"><span class="tstage" style="color:' + col + '">' + esc(co.stage.toUpperCase()) + '</span></div>' : '';
-    if (idle) return '<div class="trow co idle" style="--c:' + col + '"><div class="tname">— SIN ACTIVIDAD —</div>' + stage +
+    if (idle) return '<div class="trow co idle" style="--c:' + col + '"><div class="tname">' + tx('— SIN ACTIVIDAD —') + '</div>' + stage +
       despuesHtml(co.next) + '</div>';
     return '<div class="trow co' + (sb ? ' sb' : '') + '" style="--c:' + col + '">' +
       '<div class="tname"><svg class="ic"><use href="' + (sb ? '#i-pause' : '#i-swap') + '"/></svg>' + (sb ? 'STANDBY' : 'CHANGEOVER') + '</div>' + stage +
-      '<div class="tmeta entra">' + (sb ? 'después' : 'entra') + ' <b>' + esc(co.next.name.toUpperCase()) + '</b>&nbsp;&nbsp;&middot;&nbsp;&nbsp;' + C.fmtHM(co.next.si) + '</div>' +
-      '<div class="trem">quedan ' + fmtCountdown(co.remaining) + '</div>' +
+      '<div class="tmeta entra">' + tx(sb ? 'después' : 'entra') + ' <b>' + esc(co.next.name.toUpperCase()) + '</b>&nbsp;&nbsp;&middot;&nbsp;&nbsp;' + C.fmtHM(co.next.si) + '</div>' +
+      '<div class="trem">' + tx('quedan {n}', { n: fmtCountdown(co.remaining) }) + '</div>' +
       '<div class="tbar"><div style="width:' + co.pct + '%;background:' + col + '"></div></div></div>';
   }
 
@@ -459,11 +467,11 @@
     const co = C.changeoverBefore(BLOCKS, b, ALLB);
     let badge = '';
     if (co) badge = co.mins < 0
-      ? '<div class="tbadge warn"><svg class="ic"><use href="#i-swap"/></svg>Solapa: ' + (-co.mins) + ' min</div>'
+      ? '<div class="tbadge warn"><svg class="ic"><use href="#i-swap"/></svg>' + tx('Solapa: {n} min', { n: -co.mins }) + '</div>'
       : b.standby
-        ? '<div class="tbadge sb"><svg class="ic"><use href="#i-pause"/></svg>Standby: ' + co.mins + ' min</div>'
+        ? '<div class="tbadge sb"><svg class="ic"><use href="#i-pause"/></svg>' + tx('Standby: {n} min', { n: co.mins }) + '</div>'
         : co.idle ? ''
-        : '<div class="tbadge"><svg class="ic"><use href="#i-swap"/></svg>Cambio: ' + co.mins + ' min</div>';
+        : '<div class="tbadge"><svg class="ic"><use href="#i-swap"/></svg>' + tx('Cambio: {n} min', { n: co.mins }) + '</div>';
     return '<div class="trow" style="--c:' + col + '"><div class="tname fit">' + esc(b.name.toUpperCase()) + '</div>' +
       metaHtml(b, col) + badge + '</div>';
   }
@@ -482,9 +490,9 @@
     const next = C.nextPerStage(BLOCKS, nowInt);
     // Backstage: el CALL sigue a la vista hasta que arranca el show (con OK sale como «avisado»)
     const calls = VISTA === 'backstage' ? Vs.backstageCalls(BLOCKS, nowInt, CALL_MINS, CALL_DONE) : C.callList(BLOCKS, nowInt, CALL_MINS, CALL_DONE).map(b => ({ block: b, done: false }));
-    const fin = '<div class="tempty fin">FIN DE JORNADA</div>', none = '<div class="tempty">—</div>';
-    const empty = NOFEST ? '<div class="tempty fin">SIN EVENTO CARGADO</div>' : DAY_MISSING ? '<div class="tempty fin">DÍA SIN DATOS</div>' : (ended ? fin : none);
-    const idle = (NOFEST || DAY_MISSING || ended) ? empty : '<div class="tempty idle">— SIN ACTIVIDAD —</div>';
+    const fin = '<div class="tempty fin">' + tx('FIN DE JORNADA') + '</div>', none = '<div class="tempty">—</div>';
+    const empty = NOFEST ? '<div class="tempty fin">' + tx('SIN EVENTO CARGADO') + '</div>' : DAY_MISSING ? '<div class="tempty fin">' + tx('DÍA SIN DATOS') + '</div>' : (ended ? fin : none);
+    const idle = (NOFEST || DAY_MISSING || ended) ? empty : '<div class="tempty idle">' + tx('— SIN ACTIVIDAD —') + '</div>';
     $('now-list').innerHTML = scene.length ? scene.map(x => x.h).join('') : idle;
     $('next-list').innerHTML = next.length ? next.map(nextHtml).join('') : none;
     $('call-list').innerHTML = calls.map(cb => {
@@ -494,9 +502,9 @@
       return '<div class="trow callrow" style="--c:' + col + '"><div class="callmain">' +
         '<div class="tname fit" style="color:' + col + '">' + esc(b.name.toUpperCase()) + '</div>' +
         (b.stage ? '<div class="tmeta"><span class="tstage" style="color:' + col + '">' + esc(b.stage.toUpperCase()) + '</span></div>' : '') +
-        '<div class="trem" style="color:' + col + '">en ' + falta + ' min &middot; ' + C.fmtHM(b.si) + '</div>' +
-        '</div>' + (VISTA === 'backstage' ? (cb.done ? '<span class="calldone"><svg class="ic"><use href="#i-check"/></svg>AVISADO</span>' : '')
-          : '<button class="callok" data-ck="' + esc(C.callKey(b)) + '" title="Marcar como avisado">OK</button>') + '</div>';
+        '<div class="trem" style="color:' + col + '">' + tx('en {n} min', { n: falta }) + ' &middot; ' + C.fmtHM(b.si) + '</div>' +
+        '</div>' + (VISTA === 'backstage' ? (cb.done ? '<span class="calldone"><svg class="ic"><use href="#i-check"/></svg>' + tx('AVISADO') + '</span>' : '')
+          : '<button class="callok" data-ck="' + esc(C.callKey(b)) + '" title="' + tx('Marcar como avisado') + '">OK</button>') + '</div>';
     }).join('');
     $('panel-call').classList.toggle('hot', calls.length > 0);
     fitNames();
@@ -541,7 +549,7 @@
     }
     const at = nowInt + off;
     const r = C.pickBlocks(BLOCKS, at, n);
-    r.labels = r.list.map(b => b ? (KIND_TXT[b.kind] || 'SHOW') + ' · ' + C.fmtHM(b.si) : '');
+    r.labels = r.list.map(b => b ? tx(KIND_TXT[b.kind] || 'SHOW') + ' · ' + C.fmtHM(b.si) : '');
     return r;
   }
 
@@ -552,9 +560,9 @@
     C.hitoMargins(FEST, ALLB, nowInt).forEach(m => { MARG[m.hito.key] = m; });
     const zs = C.driftByZone(FEST, ALLB, nowInt).filter(z => z.status !== 'ontime');
     const h = zs.map(z => {
-      const nm = esc((z.zone || 'SIN ZONA').toUpperCase());
-      if (z.status === 'overflow') return '<div class="dz over">' + nm + ' · +' + z.delta + ' MIN · BUFFER AGOTADO (+' + z.overflow + ')</div>';
-      if (z.status === 'absorb') return '<div class="dz absorb">' + nm + ' · +' + z.delta + ' MIN · ABSORBIENDO</div>';
+      const nm = esc((z.zone || tx('SIN ZONA')).toUpperCase());
+      if (z.status === 'overflow') return '<div class="dz over">' + nm + ' · ' + tx('+{n} MIN · BUFFER AGOTADO (+{o})', { n: z.delta, o: z.overflow }) + '</div>';
+      if (z.status === 'absorb') return '<div class="dz absorb">' + nm + ' · ' + tx('+{n} MIN · ABSORBIENDO', { n: z.delta }) + '</div>';
       return '<div class="dz early">' + nm + ' · −' + (-z.delta) + ' MIN</div>';
     }).join('');
     if ($('drift').innerHTML !== h) $('drift').innerHTML = h;
@@ -572,7 +580,7 @@
     const mt = meteoNow();
     if (VISTA === 'backstage') renderTicker(nowMins, mt);
     renderMeteoPill(mt);
-    $('dat').textContent = d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }).toUpperCase();
+    $('dat').textContent = d.toLocaleDateString(LOCALE(), { weekday: 'long', day: 'numeric', month: 'long' }).toUpperCase();
 
     renderDrift(nowInt);
     const n = visibleCount();
@@ -580,7 +588,7 @@
     const r = pickView(nowInt, n);
     const labels = r.labels;
     r.list.forEach((b, i) => {
-      setInfo(i, b, r.ended ? (i === 0 ? 'FIN DE JORNADA' : '') : labels[i]);
+      setInfo(i, b, r.ended ? (i === 0 ? tx('FIN DE JORNADA') : '') : lblUi(labels[i]));
       const cv = document.querySelector('.strip[data-i="' + i + '"] canvas');
       drawStrip(cv, b, nowMins, r.ended, i);
     });
@@ -607,8 +615,8 @@
         cls += mt.sum.stale ? ' stale' : mt.list.length ? ' warn' : '';
         h = '<div class="mt-l1"><svg class="ic"><use href="#i-' + (mt.sum.stale ? 'alert' : mt.sum.icon) + '"/></svg>' +
           Wm.pillText(mt.sum).split(' · ').map(x => '<span>' + esc(x) + '</span>').join('<i>·</i>') + '</div>';
-        if (!mt.sum.stale && mt.list.length) h += '<div class="mt-l2">PREVISIÓN · ' + esc(mt.list[0].short) + (mt.list.length > 1 ? ' · +' + (mt.list.length - 1) : '') + '</div>';
-      } else if (mt.m && mt.m.err) { cls += ' stale'; h = '<div class="mt-l1"><svg class="ic"><use href="#i-alert"/></svg><span>EL TIEMPO: SIN DATOS</span></div>'; }
+        if (!mt.sum.stale && mt.list.length) h += '<div class="mt-l2">' + tx('PREVISIÓN') + ' · ' + esc(mt.list[0].short) + (mt.list.length > 1 ? ' · +' + (mt.list.length - 1) : '') + '</div>';
+      } else if (mt.m && mt.m.err) { cls += ' stale'; h = '<div class="mt-l1"><svg class="ic"><use href="#i-alert"/></svg><span>' + tx('EL TIEMPO: SIN DATOS') + '</span></div>'; }
     }
     const k = cls + h;
     if (k !== mtKeyL) { mtKeyL = k; el.className = cls; el.innerHTML = h; }
@@ -842,7 +850,7 @@
   // ── Producción: envío al Dashboard y menú de mensajes (izquierda) ──
   let PROD_R = null;
   function prodNote(txt, bad) {
-    const el = $('pnote'); el.textContent = txt; el.classList.toggle('bad', !!bad); el.hidden = false;
+    const el = $('pnote'); el.textContent = tx(txt); el.classList.toggle('bad', !!bad); el.hidden = false;
     clearTimeout(prodNote.t); prodNote.t = setTimeout(() => { el.hidden = true; }, 3500);
   }
   /** Manda un mensaje cifrado al Dashboard por el canal de Producción y avisa del resultado. */
@@ -886,13 +894,13 @@
     });
     // Al enviar se elige dónde va: Ventanas Live (mensaje grande), aviso puntual o aviso permanente (cinta de Backstage + Dashboard)
     const pm = $('pmodal');
-    const destTxt = () => !to.length ? 'Manager y Backstage' : to.map(v => Vs.VISTA_TXT[v]).join(' y ');
+    const destTxt = () => !to.length ? tx('Manager y Backstage') : to.map(v => Vs.VISTA_TXT[v]).join(' ' + tx('y') + ' ');
     const pmClose = () => { pm.hidden = true; };
     $('md-form').addEventListener('submit', e => {
       e.preventDefault();
       const text = input.value.trim(); if (!text) return;
       $('pm-txt').textContent = '«' + text + '»';
-      $('pm-live-sub').textContent = 'Mensaje grande en ' + destTxt();
+      $('pm-live-sub').textContent = tx('Mensaje grande en {d}', { d: destTxt() });
       pm.hidden = false;
     });
     pm.addEventListener('click', async e => {
@@ -915,8 +923,8 @@
   function renderChat() {
     const box = $('cd-list'); if (!box) return;
     const row = (m, pend) => '<div class="cd-m' + (m.pid === PRODID ? ' me' : '') + (m.sm ? ' sm' : '') + (pend ? ' pend' : '') + '"><small>' +
-      esc(m.pid === PRODID ? 'Tú' : m.sm ? 'Stage Manager' : m.from) + ' · ' + (pend ? 'enviando…' : hhmm(m.at)) + '</small>' + esc(m.text) + '</div>';
-    box.innerHTML = CHAT.length || CHAT_PEND.length ? CHAT.map(m => row(m)).join('') + CHAT_PEND.map(m => row(m, true)).join('') : '<div class="cd-empty">Sin mensajes todavía</div>';
+      esc(m.pid === PRODID ? tx('Tú') : m.sm ? 'Stage Manager' : m.from) + ' · ' + (pend ? tx('enviando…') : hhmm(m.at)) + '</small>' + esc(m.text) + '</div>';
+    box.innerHTML = CHAT.length || CHAT_PEND.length ? CHAT.map(m => row(m)).join('') + CHAT_PEND.map(m => row(m, true)).join('') : '<div class="cd-empty">' + tx('Sin mensajes todavía') + '</div>';
     box.scrollTop = box.scrollHeight;
   }
   /** Llega el chat entero desde el Dashboard. */
@@ -971,12 +979,12 @@
       rx.className = 'rx ' + s;
       const t = st && st.lastMsg ? Math.round((Date.now() - st.lastMsg) / 1000) : 0;
       const nLinks = st ? st.links.filter(l => l.state === 'on').length : 0;
-      $('rx-t').textContent = s === 'live' ? 'EN DIRECTO'
-        : s === 'connecting' ? (nLinks ? 'ESPERANDO A LA SALA…' : 'CONECTANDO…')
-        : s === 'stale' ? 'SIN CONEXIÓN CON LA SALA · último dato hace ' + ago(t)
-        : s === 'end' ? 'EMISIÓN DETENIDA EN EL DASHBOARD'
-        : 'ENLACE NO VÁLIDO · vuelve a escanear el QR';
-      rx.title = st ? st.links.map(l => l.name + ': ' + (l.state === 'on' ? 'conectado' : 'sin conexión')).join(' · ') : '';
+      $('rx-t').textContent = s === 'live' ? tx('EN DIRECTO')
+        : s === 'connecting' ? tx(nLinks ? 'ESPERANDO A LA SALA…' : 'CONECTANDO…')
+        : s === 'stale' ? tx('SIN CONEXIÓN CON LA SALA · último dato hace {t}', { t: ago(t) })
+        : s === 'end' ? tx('EMISIÓN DETENIDA EN EL DASHBOARD')
+        : tx('ENLACE NO VÁLIDO · vuelve a escanear el QR');
+      rx.title = st ? st.links.map(l => l.name + ': ' + tx(l.state === 'on' ? 'conectado' : 'sin conexión')).join(' · ') : '';
     }
     if (!params || !(window.crypto && crypto.subtle) || !('WebSocket' in window)) { render(null); return; }
     const R = new Em.Receptor({ params, onSnapshot: snap => Dt.loadSnapshot(snap), onStatus: st => { render(st); if (PRODID) chatOnStatus(st); }, onProdMessage: m => { if (PRODID) chatIn(m); } });
@@ -1055,7 +1063,7 @@
     document.body.classList.toggle('standby-on', STANDBY);
     if (!STANDBY) { el.hidden = true; el.innerHTML = ''; clearInterval(stbClk); stbClk = null; document.title = 'Showtime · ' + Vs.VISTA_TXT[VISTA]; return; }
     el.innerHTML = Mk.banner({ version: (window.ShowtimeEmision || {}).BUILD || '', footer: true }) +
-      '<div id="stb-clk" class="stb-clk"></div><div class="stb-bar"><button id="stb-x" class="stb-x" type="button">Salir del Standby (S)</button></div>';
+      '<div id="stb-clk" class="stb-clk"></div><div class="stb-bar"><button id="stb-x" class="stb-x" type="button">' + tx('Salir del Standby (S)') + '</button></div>';
     el.hidden = false;
     document.title = 'Showtime · Standby';
     const upd = () => { const c = $('stb-clk'); const t = Mk.hhmm(new Date()); if (c && c.textContent !== t) c.textContent = t; };
@@ -1085,8 +1093,8 @@
       if (confKey !== k) {
         confKey = k;
         box.className = 'conf pick';
-        box.innerHTML = r.mode === 'nofest' ? '<div class="cf-msg">' + (Dt.READONLY ? 'ESPERANDO LOS DATOS DE LA SALA…' : 'SIN EVENTO CARGADO') + '</div>'
-          : '<div class="cf-msg">CONFIDENCE · ELIGE LA ZONA DE ESTA PANTALLA</div><div class="cf-zones">' +
+        box.innerHTML = r.mode === 'nofest' ? '<div class="cf-msg">' + tx(Dt.READONLY ? 'ESPERANDO LOS DATOS DE LA SALA…' : 'SIN EVENTO CARGADO') + '</div>'
+          : '<div class="cf-msg">' + tx('CONFIDENCE · ELIGE LA ZONA DE ESTA PANTALLA') + '</div><div class="cf-zones">' +
             r.zones.map(z => '<button class="cf-zone" data-z="' + esc(z.id) + '">' + esc(z.name.toUpperCase()) + '</button>').join('') + '</div>';
       }
       return;
@@ -1094,7 +1102,7 @@
     let top = '', digits = '', foot = '', cls = 'conf ' + r.mode, frac = r.frac;
     const zn = esc((r.zone || '').toUpperCase());
     const kindTag = b => '<span class="cf-kind ' + (b.kind === 'sc' ? 'sc' : 'show') + '">' + (b.kind === 'sc' ? 'SOUNDCHECK' : 'SHOW') + '</span>';
-    const prox = b => 'PRÓXIMO ' + (b.kind === 'sc' ? 'SOUNDCHECK' : 'SHOW') + ': <b>' + esc(b.name.toUpperCase()) + '</b> · ' + C.fmtHM(b.si);
+    const prox = b => tx(b.kind === 'sc' ? 'PRÓXIMO SOUNDCHECK: <b>{n}</b> · {h}' : 'PRÓXIMO SHOW: <b>{n}</b> · {h}', { n: esc(b.name.toUpperCase()), h: C.fmtHM(b.si) });
     if (r.mode === 'show') {
       top = zn + ' · ' + kindTag(r.band) + ' · ' + esc(r.band.name.toUpperCase());
       digits = Vs.fmtClock(r.remSec); foot = hhmm;
@@ -1105,12 +1113,12 @@
       foot = hhmm + '<span class="cf-sep">·</span>' + prox(r.next);
       cls += ' lv-' + r.level;
     } else if (r.mode === 'wait') {
-      top = zn + ' · EN ESPERA';
+      top = zn + ' · ' + tx('EN ESPERA');
       digits = Vs.fmtClock(r.remSec);
       foot = hhmm + '<span class="cf-sep">·</span>' + prox(r.next);
       cls += ' lv-ok nobar';
     } else {
-      top = zn; digits = hhmm; foot = 'FIN DE JORNADA'; cls += ' nobar';
+      top = zn; digits = hhmm; foot = tx('FIN DE JORNADA'); cls += ' nobar';
     }
     const k = cls + '|' + top + '|' + foot;
     if (confKey !== k) {
@@ -1155,7 +1163,7 @@
     tk.className = 'ticker ' + t.mode;
     const ic = { aviso: '#i-msg', delay: '#i-clock', hito: '#i-flag', meteo: '#i-sun' };
     const html = items.length ? items.map(x => '<span class="tk-it ' + x.kind + ' ' + x.level + '"><svg class="ic"><use href="' + ic[x.kind] + '"/></svg>' + esc(x.text) + '</span>').join('<span class="tk-sep"></span>')
-      : '<span class="tk-it">SIN AVISOS</span>';
+      : '<span class="tk-it">' + tx('SIN AVISOS') + '</span>';
     if (t.mode === 'crawl') {
       tk.innerHTML = '<div class="tk-track"><div class="tk-run">' + html + '<span class="tk-sep"></span></div><div class="tk-run" aria-hidden="true">' + html + '<span class="tk-sep"></span></div></div>';
       // La duración de una vuelta la pone la velocidad de Configuración (--tk-speed, en el CSS), no el ancho del texto
@@ -1167,8 +1175,8 @@
     const a = URLP.get('aviso'); if (!a) return;
     const tip = document.createElement('div');
     tip.className = 'tip';
-    tip.innerHTML = a === 'arrastra' ? '<b>Arrastra esta ventana al monitor de escenario</b> y pulsa <kbd>F</kbd> para pantalla completa'
-      : 'Pulsa <kbd>F</kbd> (o haz clic y pulsa F) para pantalla completa';
+    tip.innerHTML = tx(a === 'arrastra' ? '<b>Arrastra esta ventana al monitor de escenario</b> y pulsa <kbd>F</kbd> para pantalla completa'
+      : 'Pulsa <kbd>F</kbd> (o haz clic y pulsa F) para pantalla completa');
     document.body.appendChild(tip);
     const off = () => { tip.remove(); document.removeEventListener('fullscreenchange', off); };
     setTimeout(off, 12000); document.addEventListener('fullscreenchange', off);
@@ -1181,6 +1189,16 @@
     const m = e.data; if (!m || m.app !== 'showtime' || Dt.READONLY || !window.opener || e.source !== window.opener) return;
     if (m.type === 'standby') setStandby(!!m.on);
     else if (m.type === 'setVista' && m.vista) setVista(m.vista, m.zona == null ? null : String(m.zona));
+  });
+
+  // Idioma: al cambiar (llega con la configuración del Panel, aquí o por la emisión) se repinta todo lo que escribe el JS, sin recargar
+  if (I18) I18.onChange(() => {
+    try {
+      confKey = ''; tickerKey = ''; mtKeyL = ''; stripCount = 0;
+      load(); applyVista(); renderStandby(); setZoom(0); setRowH(ROW_H);
+      if (PRODID) renderChat();
+      tick();
+    } catch (e) { console.error(e); }
   });
 
   // ── Arranque ─────────────────────────────────────────────────────────

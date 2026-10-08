@@ -50,7 +50,7 @@ function makeEnv(opts) {
   const addEL = (t, fn) => { (handlers[t] = handlers[t] || []).push(fn); };
   const document = {
     getElementById: getEl, querySelector: sel => sel === '.menu.open' ? null : stub('qs'),   // ningún menú abierto al empezar
-    querySelectorAll: () => [], createElement: () => stub('new'),
+    querySelectorAll: () => [], createElement: () => stub('new'), createTextNode: () => stub('text'),
     addEventListener: addEL, removeEventListener() {}, body: getEl('body'), documentElement: getEl('html'), head: getEl('head'),
     visibilityState: 'hidden', title: '', cookie: '', activeElement: null
   };

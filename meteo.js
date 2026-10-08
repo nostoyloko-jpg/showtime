@@ -11,6 +11,10 @@
 (function (root) {
   'use strict';
   const isNode = typeof module !== 'undefined' && module.exports;
+  // Idioma (Fase 2): textos en el idioma activo (lo manda el Panel). lang 'es' para lo que queda en el log.
+  const I18 = () => root.ShowtimeI18n || (isNode ? (() => { try { return require('./i18n.js'); } catch (e) { return null; } })() : null);
+  const tx = (s, v, l) => { const I = I18(); return I ? I.tx(s, v, l) : (v ? String(s).replace(/\{(\w+)\}/g, (m, k) => (v[k] !== undefined && v[k] !== null ? String(v[k]) : m)) : s); };
+  const enOn = l => { const I = I18(); return (l || (I ? I.getLang() : 'es')) === 'en'; };
 
   const OM_FC = 'https://api.open-meteo.com/v1/forecast';
   const OM_AQ = 'https://air-quality-api.open-meteo.com/v1/air-quality';
@@ -181,28 +185,29 @@
   function pad2(n) { return (n < 10 ? '0' : '') + n; }
   function hhmm(ms) { const d = new Date(ms); return pad2(d.getHours()) + ':' + pad2(d.getMinutes()); }
   function r0(v) { return Math.round(v); }
-  function r1(v) { return (Math.round(v * 10) / 10).toString().replace('.', ','); }
+  function r1(v, l) { const s = (Math.round(v * 10) / 10).toString(); return enOn(l) ? s : s.replace('.', ','); }
   /** Cielo según el código WMO → { icon, text }. */
-  function sky(code) {
+  function sky(code, lang) {
     const c = Number(code);
-    if (!Number.isFinite(c)) return { icon: 'thermo', text: '' };
-    if (c === 0) return { icon: 'sun', text: 'Despejado' };
-    if (c === 1) return { icon: 'sun', text: 'Casi despejado' };
-    if (c === 2) return { icon: 'csun', text: 'Parcialmente nuboso' };
-    if (c === 3) return { icon: 'cloud', text: 'Cubierto' };
-    if (c === 45 || c === 48) return { icon: 'cloud', text: 'Niebla' };
-    if (c >= 51 && c <= 57) return { icon: 'rain', text: 'Llovizna' };
-    if (c >= 61 && c <= 67) return { icon: 'rain', text: 'Lluvia' };
-    if (c >= 71 && c <= 77) return { icon: 'snow', text: 'Nieve' };
-    if (c >= 80 && c <= 82) return { icon: 'rain', text: 'Chubascos' };
-    if (c === 85 || c === 86) return { icon: 'snow', text: 'Chubascos de nieve' };
-    if (c === 95) return { icon: 'storm', text: 'Tormenta' };
-    if (c === 96 || c === 99) return { icon: 'storm', text: 'Tormenta con granizo' };
-    return { icon: 'cloud', text: '' };
+    const S = (icon, text) => ({ icon, text: text ? tx(text, null, lang) : '' });
+    if (!Number.isFinite(c)) return S('thermo', '');
+    if (c === 0) return S('sun', 'Despejado');
+    if (c === 1) return S('sun', 'Casi despejado');
+    if (c === 2) return S('csun', 'Parcialmente nuboso');
+    if (c === 3) return S('cloud', 'Cubierto');
+    if (c === 45 || c === 48) return S('cloud', 'Niebla');
+    if (c >= 51 && c <= 57) return S('rain', 'Llovizna');
+    if (c >= 61 && c <= 67) return S('rain', 'Lluvia');
+    if (c >= 71 && c <= 77) return S('snow', 'Nieve');
+    if (c >= 80 && c <= 82) return S('rain', 'Chubascos');
+    if (c === 85 || c === 86) return S('snow', 'Chubascos de nieve');
+    if (c === 95) return S('storm', 'Tormenta');
+    if (c === 96 || c === 99) return S('storm', 'Tormenta con granizo');
+    return S('cloud', '');
   }
   function isStorm(code) { return code === 95 || code === 96 || code === 99; }
-  function uvText(v) { return v >= 11 ? 'extremo' : v >= 8 ? 'muy alto' : v >= 6 ? 'alto' : v >= 3 ? 'moderado' : 'bajo'; }
-  function aqiText(v) { return v > 100 ? 'extremadamente mala' : v > 80 ? 'muy mala' : v > 60 ? 'mala' : v > 40 ? 'moderada' : v > 20 ? 'razonable' : 'buena'; }
+  function uvText(v, l) { return tx(v >= 11 ? 'extremo' : v >= 8 ? 'muy alto' : v >= 6 ? 'alto' : v >= 3 ? 'moderado' : 'bajo', null, l); }
+  function aqiText(v, l) { return tx(v > 100 ? 'extremadamente mala' : v > 80 ? 'muy mala' : v > 60 ? 'mala' : v > 40 ? 'moderada' : v > 20 ? 'razonable' : 'buena', null, l); }
 
   // ── Resumen y avisos ─────────────────────────────────────────────────
   /** Puntos que se miran: «ahora» + las horas de la previsión hasta `horizon` horas. */
@@ -233,14 +238,14 @@
     const sn = sunNext(snap, now), sameDay = sn && sn.set !== null && new Date(sn.set).toDateString() === new Date(now).toDateString();
     return {
       sunset: sameDay ? sn.set : null,
-      src: snap.src, at: snap.t, stale, staleTxt: stale ? 'SIN DATOS DESDE ' + hhmm(snap.t) : '',
+      src: snap.src, at: snap.t, stale, staleTxt: stale ? tx('SIN DATOS DESDE {h}', { h: hhmm(snap.t) }) : '',
       temp: snap.cur.temp, rain: snap.cur.rain, wind: snap.cur.wind, gust: snap.cur.gust,
       gustMax: g ? g.v : null, gustMaxAt: g ? g.t : null, uv: snap.cur.uv, uvMax: u ? u.v : null, aqi: snap.cur.aqi,
       code: snap.cur.code, icon: s.icon, sky: s.text, horizon: c.horizon
     };
   }
 
-  function whenTxt(t, nowMs) { return t === null || t === undefined || t - nowMs < 20 * 60000 ? 'AHORA' : 'HACIA LAS ' + hhmm(t); }
+  function whenTxt(t, nowMs, l) { return t === null || t === undefined || t - nowMs < 20 * 60000 ? tx('AHORA', null, l) : tx('HACIA LAS {h}', { h: hhmm(t) }, l); }
 
   /**
    * Avisos de PREVISIÓN según los umbrales del regidor. `prev` = tipos que ya estaban activos (histéresis).
@@ -252,21 +257,28 @@
     const c = normMeteo(m), now = nowMs || Date.now(), was = new Set(prev || []);
     const pts = windowPoints(snap, c.horizon, now), out = [];
     const lim = (k, th) => th === null ? null : (was.has(k) ? th - HYST[k] : th);
+    // short: píldora y cinta · text: Dashboard (con umbral) · textEs: el mismo en español, para el log del evento
     const check = (kind, key, th, fmt) => {
       const l = lim(kind, th); if (l === null) return;
       const mx = maxOf(pts, key);
-      if (mx && mx.v >= l) out.push(Object.assign({ kind, value: mx.v, at: mx.t, th }, fmt(mx.v, whenTxt(mx.t, now))));
+      if (mx && mx.v >= l) {
+        const ui = fmt(mx.v, whenTxt(mx.t, now), undefined), es = fmt(mx.v, whenTxt(mx.t, now, 'es'), 'es');
+        out.push(Object.assign({ kind, value: mx.v, at: mx.t, th }, ui, { textEs: es.text }));
+      }
     };
-    check('gust', 'gust', c.th.gust, (v, w) => ({ short: 'RÁFAGAS ' + r0(v) + ' KM/H ' + w, text: 'Ráfagas ' + r0(v) + ' km/h ' + w.toLowerCase() + ' · umbral ' + r0(c.th.gust) }));
-    check('wind', 'wind', c.th.wind, (v, w) => ({ short: 'VIENTO ' + r0(v) + ' KM/H ' + w, text: 'Viento medio ' + r0(v) + ' km/h ' + w.toLowerCase() + ' · umbral ' + r0(c.th.wind) }));
-    check('rain', 'rain', c.th.rain, (v, w) => ({ short: 'LLUVIA ' + r1(v) + ' MM/H ' + w, text: 'Lluvia ' + r1(v) + ' mm/h ' + w.toLowerCase() + ' · umbral ' + r1(c.th.rain) }));
-    check('heat', 'temp', c.th.heat, (v, w) => ({ short: 'CALOR ' + r0(v) + ' °C ' + w, text: 'Calor ' + r0(v) + ' °C ' + w.toLowerCase() + ' · umbral ' + r0(c.th.heat) }));
+    check('gust', 'gust', c.th.gust, (v, w, L) => ({ short: tx('RÁFAGAS {v} KM/H {w}', { v: r0(v), w }, L), text: tx('Ráfagas {v} km/h {w} · umbral {u}', { v: r0(v), w: w.toLowerCase(), u: r0(c.th.gust) }, L) }));
+    check('wind', 'wind', c.th.wind, (v, w, L) => ({ short: tx('VIENTO {v} KM/H {w}', { v: r0(v), w }, L), text: tx('Viento medio {v} km/h {w} · umbral {u}', { v: r0(v), w: w.toLowerCase(), u: r0(c.th.wind) }, L) }));
+    check('rain', 'rain', c.th.rain, (v, w, L) => ({ short: tx('LLUVIA {v} MM/H {w}', { v: r1(v, L), w }, L), text: tx('Lluvia {v} mm/h {w} · umbral {u}', { v: r1(v, L), w: w.toLowerCase(), u: r1(c.th.rain, L) }, L) }));
+    check('heat', 'temp', c.th.heat, (v, w, L) => ({ short: tx('CALOR {v} °C {w}', { v: r0(v), w }, L), text: tx('Calor {v} °C {w} · umbral {u}', { v: r0(v), w: w.toLowerCase(), u: r0(c.th.heat) }, L) }));
     if (c.th.storm) {
       const st = pts.find(p => isStorm(p.code));
-      if (st) { const w = whenTxt(st.now ? null : st.t, now); out.push({ kind: 'storm', value: st.code, at: st.now ? null : st.t, th: null, short: 'TORMENTA ' + w, text: sky(st.code).text + ' ' + w.toLowerCase() }); }
+      if (st) {
+        const at = st.now ? null : st.t, w = whenTxt(at, now), wEs = whenTxt(at, now, 'es');
+        out.push({ kind: 'storm', value: st.code, at, th: null, short: tx('TORMENTA {w}', { w }), text: sky(st.code).text + ' ' + w.toLowerCase(), textEs: sky(st.code, 'es').text + ' ' + wEs.toLowerCase() });
+      }
     }
-    if (c.th.uvOn) check('uv', 'uv', c.th.uv, (v, w) => ({ short: 'ÍNDICE UV ' + r0(v) + ' (' + uvText(v).toUpperCase() + ') ' + w, text: 'Índice UV ' + r0(v) + ' (' + uvText(v) + ') ' + w.toLowerCase() + ' · umbral ' + r0(c.th.uv) }));
-    if (c.th.aqiOn) check('aqi', 'aqi', c.th.aqi, (v, w) => ({ short: 'CALIDAD DEL AIRE ' + aqiText(v).toUpperCase() + ' ' + w, text: 'Calidad del aire ' + aqiText(v) + ' (' + r0(v) + ') ' + w.toLowerCase() }));
+    if (c.th.uvOn) check('uv', 'uv', c.th.uv, (v, w, L) => ({ short: tx('ÍNDICE UV {v} ({t}) {w}', { v: r0(v), t: uvText(v, L).toUpperCase(), w }, L), text: tx('Índice UV {v} ({t}) {w} · umbral {u}', { v: r0(v), t: uvText(v, L), w: w.toLowerCase(), u: r0(c.th.uv) }, L) }));
+    if (c.th.aqiOn) check('aqi', 'aqi', c.th.aqi, (v, w, L) => ({ short: tx('CALIDAD DEL AIRE {t} {w}', { t: aqiText(v, L).toUpperCase(), w }, L), text: tx('Calidad del aire {t} ({v}) {w}', { t: aqiText(v, L), v: r0(v), w: w.toLowerCase() }, L) }));
     return out;
   }
 
@@ -287,27 +299,27 @@
     if (sum.stale) return sum.staleTxt;
     const p = [];
     if (sum.temp !== null) p.push(r0(sum.temp) + '°');
-    if (sum.wind !== null) p.push('VIENTO ' + r0(sum.wind));
-    if (sum.gustMax !== null) p.push('RÁF. MÁX ' + r0(sum.gustMax) + ' KM/H');
-    else if (sum.gust !== null) p.push('RÁF. ' + r0(sum.gust) + ' KM/H');
-    if (sum.rain !== null && sum.rain > 0) p.push('LLUVIA ' + r1(sum.rain));
-    if (sum.sunset) p.push('PUESTA ' + hhmm(sum.sunset));
+    if (sum.wind !== null) p.push(tx('VIENTO {v}', { v: r0(sum.wind) }));
+    if (sum.gustMax !== null) p.push(tx('RÁF. MÁX {v} KM/H', { v: r0(sum.gustMax) }));
+    else if (sum.gust !== null) p.push(tx('RÁF. {v} KM/H', { v: r0(sum.gust) }));
+    if (sum.rain !== null && sum.rain > 0) p.push(tx('LLUVIA {v}', { v: r1(sum.rain) }));
+    if (sum.sunset) p.push(tx('PUESTA {h}', { h: hhmm(sum.sunset) }));
     return p.join(' · ');
   }
 
   /** Avisos de la cinta (Backstage): el tiempo de ahora y los avisos (sin umbrales: es para camerinos). */
   function tickerList(sum, list) {
     if (!sum) return [];
-    if (sum.stale) return [{ kind: 'meteo', level: 'warn', text: 'EL TIEMPO: ' + sum.staleTxt }];
+    if (sum.stale) return [{ kind: 'meteo', level: 'warn', text: tx('EL TIEMPO: {s}', { s: sum.staleTxt }) }];
     const p = [];
     if (sum.temp !== null) p.push(r0(sum.temp) + ' °C');
     if (sum.sky) p.push(sum.sky.toUpperCase());
-    if (sum.rain !== null) p.push('LLUVIA ' + r1(sum.rain) + ' MM/H');
-    if (sum.wind !== null) p.push('VIENTO ' + r0(sum.wind) + ' KM/H');
-    if (sum.gustMax !== null) p.push('RÁFAGAS MÁX ' + r0(sum.gustMax) + ' KM/H');
+    if (sum.rain !== null) p.push(tx('LLUVIA {v} MM/H', { v: r1(sum.rain) }));
+    if (sum.wind !== null) p.push(tx('VIENTO {v} KM/H', { v: r0(sum.wind) }));
+    if (sum.gustMax !== null) p.push(tx('RÁFAGAS MÁX {v} KM/H', { v: r0(sum.gustMax) }));
     const out = p.length ? [{ kind: 'meteo', level: 'ok', text: p.join(' · ') }] : [];
-    if (sum.sunset) out.push({ kind: 'meteo', level: 'ok', text: 'PUESTA DE SOL ' + hhmm(sum.sunset) });
-    (list || []).forEach(a => out.push({ kind: 'meteo', level: 'warn', text: 'PREVISIÓN · ' + a.short }));
+    if (sum.sunset) out.push({ kind: 'meteo', level: 'ok', text: tx('PUESTA DE SOL {h}', { h: hhmm(sum.sunset) }) });
+    (list || []).forEach(a => out.push({ kind: 'meteo', level: 'warn', text: tx('PREVISIÓN') + ' · ' + a.short }));
     return out;
   }
 

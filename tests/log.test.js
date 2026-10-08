@@ -95,7 +95,7 @@
     R.go(C.addArtist(R.s, 'show', { jornada: JOR, nombre: 'Sorpresa', escenarioId: R.F.K, inicio: '21:10', fin: '21:40' }).state, '15:02');
     eq(R.log.entries[2].type, 'add'); ok(/^Show «Sorpresa» · 21:10–21:40 · Carpa$/.test(R.log.entries[2].text), R.log.entries[2].text);
     R.go(C.editArtist(R.s, R.F.ids['Comida'], 'show', 'tipo', 'hito').state, '15:03');
-    eq(R.log.entries[3].type, 'edit'); ok(/tipo tarea → hito/.test(R.log.entries[3].text), R.log.entries[3].text);
+    eq(R.log.entries[3].type, 'edit'); ok(/tipo tarea → marcador/.test(R.log.entries[3].text), R.log.entries[3].text);
     const n = R.log.entries.length;
     R.go(C.setFija(R.s, R.F.ids['Banda A'], true).state, '15:04');
     R.go(C.setStandby(R.s, R.F.ids['Banda A'], 'show', true).state, '15:05');
