@@ -20,6 +20,7 @@
   let MSG_TO = null;                  // destino de los mensajes flash: null = todas las pantallas; si no, lista de vistas
   let MSG_ZONES = null;               // zonas de las pantallas Confidence que lo reciben: null = todas
   function zoneLabel(id) { const z = FEST && C.getEscenario(FEST, id); return z ? z.nombre : 'Sin zona'; }
+  const SPLASH_MS = 1200;   // pantalla de inicio
   function liveOpen(name) { const w = name ? LIVES.get(name) : null; if (name) return !!(w && !w.closed); return Array.from(LIVES.values()).some(x => x && !x.closed); }
   let pendingRender = false;       // si llegan datos mientras se edita una casilla, se pinta al salir
   const KEY_LABEL = { nombre: 'nombre', escenario: 'zona', color: 'color', tipo: 'tipo', jornada: 'jornada', fecha: 'fecha', inicio: 'inicio', fin: 'fin', call: 'CALL', notas: 'notas' };
@@ -405,6 +406,9 @@
     return '<td class="dl"><button class="led' + (red ? ' red' : '') + (own ? ' own' : '') + '" data-act="fija" data-red="' + (red ? '1' : '') + '" data-cat="' + (catBlocked ? '1' : '') + '" title="' + title + '" aria-label="Delay"></button></td>';
   }
 
+  /** Modo Foco: micro-píldora del tipo, legible a distancia, con color fijo por tipo (show · prueba · tarea · hito). */
+  const PILL_TXT = { show: 'SHOW', sc: 'PRUEBA', tarea: 'TAREA', hito: 'HITO' };
+  function tipoPill(k) { return '<span class="tpill tp-' + k + '" aria-hidden="true">' + (PILL_TXT[k] || '') + '</span>'; }
   // Fila editable de una entrada (con o sin horario en la vista actual). b = su bloque (o null).
   function rowHtml(a, b, mods, isNew) {
     const mode = rowModeOf(b);
@@ -444,7 +448,7 @@
       estCell(b) +
       td('tipo', 'tp', tipoSelect(a, mode, 'data-k="tipo" data-orig="' + tipo + '"')) +
       td('escenario', 'stage', '<input type="text" list="zones-dl" data-k="zona" value="' + esc(esc0 ? esc0.nombre : '') + '" data-orig="' + esc(esc0 ? esc0.nombre : '') + '" placeholder="' + (band ? '— zona —' : '— ninguna —') + '" style="--sc:' + scol + '" title="Elige una zona o escribe una nueva para crearla" autocomplete="off" spellcheck="false">') +
-      '<td class="name' + (isMod('nombre') || isMod('color') ? ' mod' : '') + '"><div class="nm">' +
+      '<td class="name' + (isMod('nombre') || isMod('color') ? ' mod' : '') + '"><div class="nm">' + tipoPill(band ? mode : tipo) +
         '<input type="color" data-k="color" value="' + col + '" data-orig="' + col + '" title="Color de la banda">' +
         '<input type="text" data-k="nombre" value="' + esc(a.nombre || '') + '" data-orig="' + esc(a.nombre || '') + '" autocomplete="off" spellcheck="false">' +
         (isNew ? '<span class="tag" title="Creada desde la última importación/exportación">NUEVA</span>' : '') + '</div></td>' +
@@ -705,6 +709,11 @@
     document.querySelectorAll('#m-live [data-on]').forEach(el => el.classList.toggle('on', liveOpen(el.dataset.on)));
     document.querySelectorAll('#m-live [data-close]').forEach(el => { el.hidden = !liveOpen(el.dataset.close); });
     if ($('lv-closeall')) $('lv-closeall').hidden = nOpen < 2;
+    if ($('lv-standby')) {
+      const on = standbyOn();
+      $('lv-standby-on').classList.toggle('on', on);
+      $('lv-standby-t').textContent = on ? 'Quitar Standby · volver a la vista' : 'Standby · Modo Cartel';
+    }
     meteoTick();
     if (!FEST) return;
     logFoto();
@@ -1299,7 +1308,25 @@
     tick();
     toast(name ? 'Pantalla Live cerrada' : 'Pantallas Live cerradas');
   }
+  // ── Standby / Modo Cartel: las Live abiertas desde aquí enseñan el cartel de Showtime y la hora ──
+  const STB = new Map();   // nombre de la ventana → ¿en Standby? (lo confirma cada Live)
+  function openLives() { return Array.from(LIVES.entries()).filter(([, w]) => w && !w.closed); }
+  function standbyOn() { return openLives().some(([n]) => STB.get(n)); }
+  function setStandby(on) {
+    const open = openLives();
+    if (!open.length) { toast('No hay ninguna Pantalla Live abierta: ábrela primero (Live ▾)', true); return; }
+    open.forEach(([n, w]) => { try { w.postMessage({ app: 'showtime', type: 'standby', on: !!on }, '*'); } catch (e) {} STB.set(n, !!on); });
+    tick();
+    toast(on ? 'Standby: ' + (open.length === 1 ? 'la Pantalla Live muestra' : 'las ' + open.length + ' Pantallas Live muestran') + ' el cartel y la hora' : 'Standby quitado: las Pantallas Live vuelven a su vista');
+  }
+  // Cada Live avisa de su estado (también si el Standby se pone o se quita en ella, con la tecla S)
+  window.addEventListener('message', e => {
+    const m = e.data; if (!m || m.app !== 'showtime' || m.type !== 'standbyState') return;
+    for (const [n, w] of LIVES) if (w === e.source) STB.set(n, !!m.on);
+    tick();
+  });
   document.addEventListener('click', e => {
+    if (e.target.closest('#lv-standby')) { e.preventDefault(); e.stopPropagation(); closeMenus(); setStandby(!standbyOn()); return; }
     const x = e.target.closest('#m-live [data-close]');
     if (x) { e.preventDefault(); e.stopPropagation(); closeLive(x.dataset.close); return; }
     if (e.target.closest('#lv-closeall')) { closeLive(null); return; }
@@ -2556,7 +2583,30 @@
   document.addEventListener('visibilitychange', requestWake);
   document.addEventListener('pointerdown', requestWake);
 
+  // ── Marca: pantalla de inicio (1,2 s o clic) y «Archivo › Acerca de Showtime…» ──
+  let splashT = null;
+  /** about = false: inicio (se va sola a los 1,2 s); true: «Acerca de» (hasta clic o Esc). */
+  function showSplash(about) {
+    const el = $('splash'), Mk = window.ShowtimeMarca; if (!el || !Mk) return;
+    clearTimeout(splashT);
+    el.className = 'splash' + (about ? ' about' : '');
+    el.classList.remove('out');
+    el.innerHTML = Mk.banner({ version: (window.ShowtimeEmision || {}).BUILD || '', footer: true }) + (about ? '<div class="splash-hint">Clic o Esc para cerrar</div>' : '');
+    el.hidden = false;
+    if (!about) splashT = setTimeout(hideSplash, SPLASH_MS);
+  }
+  function hideSplash() {
+    const el = $('splash'); if (!el || el.hidden || el.classList.contains('out')) return;
+    clearTimeout(splashT);
+    el.classList.add('out');
+    splashT = setTimeout(() => { el.hidden = true; el.classList.remove('out'); el.innerHTML = ''; }, 450);
+  }
+  $('splash').addEventListener('click', hideSplash);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('splash').hidden) { e.stopImmediatePropagation(); hideSplash(); } }, true);
+  $('btn-about').addEventListener('click', () => { closeMenus(); showSplash(true); });
+
   // ── Arranque ─────────────────────────────────────────────────────────
+  showSplash(false);
   loadState();
   logLoad();
   renderAll();
@@ -2570,5 +2620,5 @@
     if (ok) toast('Se vuelve a guardar con normalidad');
   });
 
-  window.ShowtimePanel = { reload: () => { loadState(); renderAll(); }, _test: { emProdMessage, emRegenProd, hitoChips, emUrl, prodBigTitle, fileKind, handleFile, emCommand, importSummary, hidesSome, room: () => emRoom } };   // _test: solo para tests/control.test.js
+  window.ShowtimePanel = { reload: () => { loadState(); renderAll(); }, _test: { emProdMessage, emRegenProd, hitoChips, emUrl, prodBigTitle, fileKind, handleFile, emCommand, importSummary, hidesSome, tipoPill, showSplash, hideSplash, setStandby, standbyOn, room: () => emRoom } };   // _test: solo para tests/control.test.js
 })();

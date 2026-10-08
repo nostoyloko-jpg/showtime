@@ -765,6 +765,20 @@
     eq(b.name, '1975'); eq(b.stage, '2'); eq(b.name.toUpperCase(), '1975');
   });
 
+  test('Colores: el arcoíris es para las bandas; tareas e hitos en gris de trabajo técnico (salvo color elegido a mano)', () => {
+    const st = { artists: [
+      { id: 1, nombre: 'Banda' }, { id: 2, nombre: 'Comida', showtimeTipo: 'tarea' }, { id: 3, nombre: 'Puertas', showtimeTipo: 'hito' },
+      { id: 4, nombre: 'Montaje', showtimeTipo: 'tarea', color: '#123456' }, { id: 5, nombre: 'Otra banda' } ] };
+    const col = i => C.artistColor(st, st.artists[i]);
+    eq(col(0), C.ARTIST_COLORS[0]); eq(col(4), C.ARTIST_COLORS[4]);
+    eq(col(1), C.TIPO_COLORS.tarea); eq(col(1), '#6b7280');
+    eq(col(2), C.TIPO_COLORS.hito); eq(col(2), '#9ca3af');
+    eq(col(3), '#123456', 'el color elegido a mano se respeta');
+    ok(C.ARTIST_COLORS.indexOf(C.TIPO_COLORS.tarea) < 0 && C.ARTIST_COLORS.indexOf(C.TIPO_COLORS.hito) < 0, 'los grises no están en el arcoíris');
+    const b = C.buildBlocks(Object.assign({ event: { fechaInicio: '2026-07-10', fechaFin: '2026-07-10', dayCutoff: '06:00' }, escenarios: [] }, {
+      artists: [{ id: 7, nombre: 'Comida', showtimeTipo: 'tarea', fecha: '2026-07-10', inicio: '14:00', fin: '15:00' }] }), { mode: 'all', day: 'all' });
+    eq(b[0].color, '#6b7280', 'la Live también la pinta en gris');
+  });
   let pass = 0; const fails = [];
   tests.forEach(([name, fn]) => {
     try { fn(); pass++; } catch (e) { fails.push([name, e.message]); }

@@ -932,3 +932,13 @@ body[data-ps="raycast"] .modal-box,body[data-ps="raycast"] .imp-box{--modal-bg:#
 body[data-ps="neutro"] .modal-box,body[data-ps="neutro"] .imp-box{--modal-bg:#1a1a1c}
 body[data-ps="escenario"] .modal{background:rgba(0,0,0,.85)}
 body[data-ps="escenario"] .modal-box,body[data-ps="escenario"] .imp-box{--modal-bg:#000;border-color:rgba(255,214,0,.55)}
+
+/* ── Modo Foco: micro-píldora del tipo (en vez del cuadradito de color, ambiguo a distancia) ── */
+.tpill{display:none;flex:0 0 auto;align-items:center;justify-content:center;min-width:62px;height:22px;padding:0 7px;border-radius:6px;font:800 11px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;letter-spacing:.1em;color:var(--pc);background:rgba(255,255,255,.05);border:1px solid var(--pc);background:color-mix(in srgb,var(--pc) 16%,transparent);border:1px solid color-mix(in srgb,var(--pc) 55%,transparent)}
+.tpill.tp-show{--pc:#ff5d73}
+.tpill.tp-sc{--pc:#b79cff}
+.tpill.tp-tarea{--pc:#7dd3fc}
+.tpill.tp-hito{--pc:#ffc533}
+body.focus #tbl .tpill{display:inline-flex}
+body.focus #tbl td.name input[type=color]{display:none}
+body[data-ps="escenario"] .tpill{background:#000}

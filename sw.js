@@ -8,14 +8,14 @@
  * (sin recargar ninguna pantalla: lo nuevo se usa la próxima vez que se abra).
  */
 'use strict';
-const VERSION = '20261044';
+const VERSION = '20261045';
 const CACHE = 'showtime-' + VERSION;
 const NET_TIMEOUT = 3000;
 const PRECACHE = [
   './', 'index.html', 'live.html', 'remote.html', 'manifest.webmanifest',
   'control.css', 'live.css', 'remote.css',
   'core.js', 'meteo.js', 'datos.js', 'importar.js', 'xlsx.js', 'qr.js', 'emision.js', 'mando.js', 'vistas.js', 'log.js',
-  'control.js', 'live.js', 'remote.js', 'pwa.js',
+  'control.js', 'live.js', 'remote.js', 'pwa.js', 'marca.js', 'marca.css',
   'icons/icon.svg', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png'
 ];
 

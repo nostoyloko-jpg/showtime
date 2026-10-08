@@ -7,7 +7,7 @@
   if (typeof module === 'undefined' || !module.exports) { console.log('live.test.js: solo en Node (node tests/live.test.js)'); return; }
   const vm = require('vm');
   const D = require('./_dom.js'), E = require('../emision.js');
-  const MODULOS = ['core.js', 'meteo.js', 'datos.js', 'emision.js', 'vistas.js', 'live.js'];
+  const MODULOS = ['core.js', 'meteo.js', 'datos.js', 'emision.js', 'vistas.js', 'marca.js', 'live.js'];
 
   const tests = [];
   function test(name, fn) { tests.push([name, fn]); }
@@ -20,6 +20,7 @@
   function arrancar(opts) {
     const env = D.makeEnv(Object.assign({ cripto: true }, opts));
     const sent = [];
+    if (opts && opts.opener) env.win.opener = opts.opener;
     env.getEl('msgdock').hidden = true; env.getEl('pmodal').hidden = true; env.getEl('chatdock').hidden = true;   // como en live.html
     D.cargar(env, MODULOS.slice(0, 4));
     const ctl = { fail: false };
@@ -233,6 +234,48 @@
   });
 
   // ── Ejecutor asíncrono ──────────────────────────────────────────────
+  // ── Standby / Modo Cartel ──
+  const keyOf = t => k => t.env.fire('document', 'keydown', { key: k, target: { tagName: 'BODY' } });
+  test('Standby por la URL (vista=standby): el cartel a pantalla completa, reloj HH:MM y debajo la vista de antes', () => {
+    const t = arrancar({ search: '?vista=standby&prev=backstage' });
+    eq(t.env.errors.length, 0, t.env.errors.join(' | '));
+    const sb = t.env.getEl('standby'), h = t.env.innerLog.filter(x => x[0] === 'standby').map(x => x[1]).pop() || '';
+    eq(sb.hidden, false); ok(t.body.classList.contains('standby-on'));
+    ok(/class="stm-name">SHOWTIME</.test(h) && /by Synapse Live/.test(h) && /Real-Time Show Control/.test(h) && /BUILT FOR LIFE ON STAGE/.test(h), 'el mismo cartel que el inicio');
+    ok(/id="stb-clk" class="stb-clk"/.test(h)); ok(/^\d\d:\d\d$/.test(t.env.getEl('stb-clk').textContent), 'HH:MM sin segundos: ' + t.env.getEl('stb-clk').textContent);
+    eq(t.title(), 'Showtime · Standby'); eq(t.body.dataset.vista, 'backstage', 'debajo sigue Backstage');
+  });
+  test('Standby con la tecla S (y Esc o S para salir); V no cambia la vista mientras tanto', () => {
+    const t = arrancar({ search: '?vista=manager' }), key = keyOf(t);
+    eq(t.env.getEl('standby').hidden, true, 'normal: sin cartel');
+    key('s'); eq(t.env.getEl('standby').hidden, false);
+    key('v'); eq(t.body.dataset.vista, 'manager', 'V no hace nada en Standby');
+    key('S'); eq(t.env.getEl('standby').hidden, true); eq(t.title(), 'Showtime · Manager');
+    key('s'); key('Escape'); eq(t.env.getEl('standby').hidden, true, 'Esc también sale');
+  });
+  test('Standby desde el Dashboard (Live ▾): la Live obedece a quien la abrió y le confirma el estado', () => {
+    const got = [], opener = { closed: false, postMessage(m) { got.push(m); } };
+    const t = arrancar({ search: '?vista=manager', opener });
+    t.env.fire('window', 'message', { data: { app: 'showtime', type: 'standby', on: true }, source: {} });
+    eq(t.env.getEl('standby').hidden, true, 'otra ventana: no');
+    t.env.fire('window', 'message', { data: { app: 'showtime', type: 'standby', on: true }, source: opener });
+    eq(t.env.getEl('standby').hidden, false, 'el Dashboard que la abrió: sí');
+    ok(got.some(m => m.type === 'standbyState' && m.on === true), 'confirma al Dashboard');
+    t.env.fire('window', 'message', { data: { app: 'showtime', type: 'standby', on: false }, source: opener });
+    eq(t.env.getEl('standby').hidden, true);
+    ok(got.some(m => m.type === 'standbyState' && m.on === false));
+  });
+  test('Standby: los mensajes flash siguen saliendo por encima (z-index) y la Live de Staff no obedece al Dashboard', async () => {
+    const css = D.src('marca.css'), lcss = D.src('live.css');
+    const z = re => +re.exec(css + lcss)[1];
+    ok(z(/\.standby\{position:fixed;inset:0;z-index:(\d+)/) < z(/#flash\{position:fixed;inset:0;z-index:(\d+)/), 'flash encima');
+    ROOM = ROOM || await E.newRoom();
+    const t = arrancar({ hash: hashOf(E.staffUrl(ROOM, 'http://x/')) });
+    t.env.fire('window', 'message', { data: { app: 'showtime', type: 'standby', on: true } });
+    eq(t.env.getEl('standby').hidden, true, 'Staff (QR): no');
+    ok(/<button id="stbbtn"[^>]*title="Standby · Modo Cartel/.test(D.src('live.html')), 'botón en los controles de la Live');
+  });
+
   (async () => {
     let pass = 0, fail = 0;
     for (const [name, fn] of tests) { try { await fn(); pass++; } catch (e) { fail++; console.log('  ✗ ' + name + '\n      ' + (e && e.message || e)); } }

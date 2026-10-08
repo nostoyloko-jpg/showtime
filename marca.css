@@ -1,0 +1,63 @@
+/* Showtime — marca.css · Cartel de marca (inicio, «Acerca de Showtime…» y Modo Cartel / Standby de la Live).
+   Medidas en unidades del propio cartel (cqw): se ve igual en un portátil, en un monitor de escenario y en un móvil. */
+.stm{--stm-bg:#07080a;--stm-fg:#ebebeb;--stm-dim:rgba(235,235,235,.62);--stm-line:rgba(255,255,255,.2);
+  position:relative;container-type:inline-size;width:100%;aspect-ratio:2.6/1;overflow:hidden;border-radius:14px;
+  background:var(--stm-bg);border:1px solid rgba(255,255,255,.08);color:var(--stm-fg);
+  font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+  user-select:none;-webkit-user-select:none}
+.stm-glow{position:absolute;inset:0;background:radial-gradient(ellipse 34% 60% at 58% 50%,rgba(255,255,255,.05),rgba(255,255,255,0) 70%);pointer-events:none}
+/* Líneas de tiempo: a la derecha, difuminadas hacia la izquierda */
+.stm-flow{position:absolute;top:0;right:0;bottom:0;width:64%;
+  -webkit-mask-image:linear-gradient(to right,transparent 0,#000 42%);mask-image:linear-gradient(to right,transparent 0,#000 42%)}
+.stm-lines{width:100%;height:100%;display:block}
+.stm-lines path,.stm-lines circle{vector-effect:non-scaling-stroke}
+.stm-rails path{stroke:rgba(255,255,255,.34);stroke-width:1;fill:none}
+.stm-l path{stroke:var(--stm-line);stroke-width:1;fill:none}
+.stm-p path{stroke:rgba(255,255,255,.85);stroke-width:1.4;fill:none;stroke-linecap:round;stroke-dasharray:70 930;stroke-dashoffset:0;animation:stmflow 9s linear infinite}
+.stm-n circle{fill:#6b7078;stroke:none}
+.stm-n circle.on{fill:#d7dade}
+.stm-t text{fill:rgba(255,255,255,.38);font:500 15px ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.04em}
+/* El pulso recorre la línea de derecha a izquierda */
+@keyframes stmflow{from{stroke-dashoffset:-1000}to{stroke-dashoffset:0}}
+@media (prefers-reduced-motion:reduce){.stm-p path{animation:none;opacity:0}}
+/* Identidad */
+.stm-id{position:absolute;left:5.5cqw;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;align-items:center;text-align:center;width:27cqw}
+.stm-mono{width:16cqw;height:auto;fill:var(--stm-fg);display:block;margin-bottom:2.1cqw}
+.stm-name{font-size:max(15px,4.7cqw);font-weight:800;letter-spacing:.015em;line-height:1}
+.stm-by{font-size:max(10px,2.1cqw);color:var(--stm-dim);letter-spacing:.06em;margin-top:1.1cqw}
+.stm-desc{font-size:max(10px,1.95cqw);color:rgba(235,235,235,.82);letter-spacing:.05em;margin-top:2.2cqw}
+.stm-ver{position:absolute;top:2.2cqw;left:2.6cqw;font:600 max(9px,1.05cqw) ui-monospace,SFMono-Regular,Menlo,monospace;color:rgba(255,255,255,.42);letter-spacing:.06em}
+.stm-foot{position:absolute;left:2.6cqw;bottom:2.2cqw;font-size:max(8px,.95cqw);font-weight:600;letter-spacing:.2em;color:rgba(255,255,255,.36)}
+
+/* Pantalla estrecha (móvil en vertical): marca arriba, líneas debajo, pie al final */
+@media (max-width:600px){
+  .stm{aspect-ratio:auto;display:flex;flex-direction:column;align-items:center;padding:9cqw 0 6cqw}
+  .stm-id{position:relative;left:auto;top:auto;transform:none;width:auto;order:-1}
+  .stm-mono{width:38cqw}
+  .stm-name{font-size:10cqw}.stm-by{font-size:4.2cqw;margin-top:2cqw}.stm-desc{font-size:4cqw;margin-top:4cqw}
+  .stm-flow{position:relative;width:100%;height:46cqw;margin-top:6cqw}
+  .stm-ver{top:3cqw;left:4cqw;font-size:max(9px,2.6cqw)}
+  .stm-foot{position:relative;left:auto;bottom:auto;margin-top:5cqw;font-size:max(8px,2.2cqw);text-align:center}
+  .standby .stm{width:100vw}
+}
+
+/* ── Dashboard: pantalla de inicio y «Acerca de Showtime…» ── */
+.splash{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px;background:#07080a;opacity:1;transition:opacity .45s ease;cursor:pointer}
+.splash[hidden]{display:none}
+.splash.about{background:rgba(0,0,0,.75);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.splash.out{opacity:0;pointer-events:none}
+.splash .stm{width:min(1100px,94vw);box-shadow:0 24px 64px rgba(0,0,0,.8),0 2px 8px rgba(0,0,0,.5);animation:stmin .5s ease both}
+.splash-hint{position:absolute;left:0;right:0;bottom:18px;text-align:center;font-size:12px;color:rgba(255,255,255,.4);letter-spacing:.04em}
+@keyframes stmin{from{opacity:0;transform:scale(.985)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.splash .stm{animation:none}.splash{transition:none}}
+
+/* ── Pantalla Live: Modo Cartel (Standby) ── */
+.standby{position:fixed;inset:0;z-index:400;display:flex;align-items:center;justify-content:center;background:#07080a;cursor:none}
+.standby[hidden]{display:none}
+.standby.moving{cursor:default}
+.standby .stm{width:min(90vw,calc(90vh * 2.6));border-color:transparent;border-radius:0}
+.stb-clk{position:fixed;right:max(24px,2.4vw);bottom:max(18px,2vh);font:600 clamp(18px,2.6vw,56px)/1 -apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Roboto,sans-serif;
+  font-variant-numeric:tabular-nums;color:rgba(235,235,235,.55);letter-spacing:.02em}
+.stb-x{position:fixed;top:16px;right:16px;display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 16px;border-radius:10px;border:1px solid rgba(255,255,255,.2);
+  background:rgba(20,22,28,.9);color:#fff;font:600 14px -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;cursor:pointer;opacity:0;pointer-events:none;transition:opacity .2s}
+.standby.moving .stb-x{opacity:1;pointer-events:auto}

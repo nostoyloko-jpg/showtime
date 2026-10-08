@@ -31,6 +31,8 @@ Las reglas generales (idioma, tono, permisos, commits, varias IAs) están en el 
 | `meteo.js` | El tiempo (Open-Meteo, URL propia o manual) y avisos de previsión |
 | `importar.js` | «Pegar horario»: lee tablas (TSV/CSV) y texto libre, vista previa y alta |
 | `qr.js` | Generador de QR propio (sin dependencias) |
+| `marca.js` · `marca.css` | Marca: cartel ~3:1 vectorial (isotipo ST, SHOWTIME · by Synapse Live, Real-Time Show Control, líneas de tiempo). Pantalla de inicio (1,2 s o clic), «Archivo › Acerca de Showtime…» y Standby / Modo Cartel de la Live |
+| `icons/` · `marca/` | Iconos de la app (ST maciza: 180, 192, 512, maskable, SVG) y material de marca (isotipo 2048 px, `st.svg`, splash de referencia). `marca/` no se cachea |
 | `xlsx.js` | Lector de Excel (.xlsx) propio, sin librerías: abre el ZIP con `DecompressionStream` y saca la primera hoja con datos como texto tabulado para «Pegar horario» |
 | `tests/*.test.js` · `tests/_dom.js` · `tests/index.html` · `tests/fixtures/` | Tests (node o navegador). `_dom.js` = navegador simulado con **reloj simulado** (`makeEnv({ now })`) y archivos de verdad (File/FileReader). `fixtures/` = Excel reales para los tests del lector |
 | `parches/synapse-live-completo/` | Parche que pone en Synapse Live el mismo código que la Pantalla Live de Showtime |
@@ -61,7 +63,8 @@ Las reglas generales (idioma, tono, permisos, commits, varias IAs) están en el 
 - **Después de cualquier cambio**: todos los tests en verde —
   `for f in tests/*.test.js; do node "$f"; done`
   — y **abrir el Dashboard y la Pantalla Live**: que pinten y que la consola no tenga errores.
-- Fondo **siempre oscuro**. Modales: fondo de pantalla oscurecido con desenfoque y **caja opaca sin cristal** (en Safari el cristal dejaba ver la tabla de detrás). Estilos con los mismos nombres que Synapse: Clásico, Escenario (alto contraste), Neutro, Raycast.
+- Fondo **siempre oscuro**. Colores: el arcoíris es solo para **bandas** (shows y soundchecks); tareas e hitos en gris de trabajo técnico (salvo color elegido a mano). Modo Foco: píldora SHOW · PRUEBA · TAREA · HITO con color fijo.
+- **Standby / Modo Cartel** (Live): `vista=standby&prev=<vista>`; tecla S, botón en los controles de la Live o «Live ▾ › Standby» en el Dashboard (manda a las Live que abrió). Los mensajes flash salen por encima. Modales: fondo de pantalla oscurecido con desenfoque y **caja opaca sin cristal** (en Safari el cristal dejaba ver la tabla de detrás). Estilos con los mismos nombres que Synapse: Clásico, Escenario (alto contraste), Neutro, Raycast.
 - Vocabulario del oficio: CALL, soundcheck, changeover, standby, jornada, bis.
 
 ## Comprobación a mano

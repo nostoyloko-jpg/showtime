@@ -13,7 +13,10 @@
   // Producción: el enlace lleva «&id=…». Solo ve Manager y Backstage y tiene sus mandos (OK de CALL, mensajes).
   const _EM = window.ShowtimeEmision, _HP = _EM && _EM.parseHash(location.hash), PRODID = _HP && _HP.id ? _HP.id : null;
   const vistaOk = v => PRODID ? Vs.normProdVista(v) : Vs.normVista(v);
-  let VISTA = vistaOk(URLP.get('vista'));
+  const Mk = window.ShowtimeMarca;
+  // Standby (Modo Cartel): «vista=standby&prev=<vista>»; debajo sigue la vista de antes
+  let STANDBY = !!(Mk && Mk.isStandby(location.search));
+  let VISTA = vistaOk(STANDBY ? Mk.prevVista(location.search) : URLP.get('vista'));
   let ZONA = URLP.has('zona') ? URLP.get('zona') : null;   // zona de Confidence (null = sin elegir)
 
   // ── Preferencias de ESTA pantalla (otra luz, otro monitor: van aparte del Panel) ──
@@ -923,7 +926,7 @@
     document.body.classList.toggle('bs-nocards', VISTA === 'backstage' && !b.cards);
     document.body.classList.toggle('bs-nolines', VISTA === 'backstage' && !b.lines);
     document.body.classList.toggle('bs-noticker', VISTA !== 'backstage' || !b.ticker);
-    document.title = 'Showtime · ' + Vs.VISTA_TXT[VISTA];
+    document.title = STANDBY ? 'Showtime · Standby' : 'Showtime · ' + Vs.VISTA_TXT[VISTA];
     tickerKey = '';
     if (VISTA !== 'confidence') { buildStrips(visibleCount()); }
     requestAnimationFrame(tick);
@@ -932,7 +935,7 @@
   function setVista(v) {
     VISTA = vistaOk(v);
     const q = new URLSearchParams(location.search);
-    q.set('vista', VISTA);
+    q.set('vista', VISTA); q.delete('prev');
     if (VISTA === 'confidence' && ZONA !== null) q.set('zona', ZONA); else q.delete('zona');
     try { history.replaceState(null, '', location.pathname + '?' + q.toString() + location.hash); } catch (e) {}
     applyVista();
@@ -940,8 +943,47 @@
   document.addEventListener('keydown', e => {
     if ((e.key === 'v' || e.key === 'V') && !e.metaKey && !e.ctrlKey && !e.altKey && !(e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName))) {
       if (VISTA === 'manager' && ZONA === null) { const z = pget(LIVE_ZONE, null); if (z !== null) ZONA = z; }   // última zona elegida en esta pantalla
+      if (STANDBY) return;   // en Standby, V no cambia nada por debajo
       setVista(PRODID ? Vs.nextProdVista(VISTA) : Vs.nextVista(VISTA));
     }
+    if ((e.key === 's' || e.key === 'S') && !e.metaKey && !e.ctrlKey && !e.altKey && !(e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName))) setStandby(!STANDBY);
+    if (e.key === 'Escape' && STANDBY) setStandby(false);
+  });
+
+  // ── Standby / Modo Cartel ─────────────────────────────────────────────
+  let stbClk = null, stbMove = 0;
+  /** Pone o quita el Standby en ESTA ventana. La URL lo recuerda (al recargar sigue igual) y se avisa al Dashboard. */
+  function setStandby(on) {
+    if (!Mk) return;
+    STANDBY = !!on;
+    try { history.replaceState(null, '', location.pathname + Mk.standbySearch(location.search, STANDBY) + location.hash); } catch (e) {}
+    renderStandby();
+    reportStandby();
+  }
+  function reportStandby() { try { if (window.opener && !Dt.READONLY) window.opener.postMessage({ app: 'showtime', type: 'standbyState', on: STANDBY }, '*'); } catch (e) {} }
+  function renderStandby() {
+    const el = $('standby'); if (!el || !Mk) return;
+    if ($('stbbtn')) $('stbbtn').setAttribute('aria-pressed', String(STANDBY));
+    document.body.classList.toggle('standby-on', STANDBY);
+    if (!STANDBY) { el.hidden = true; el.innerHTML = ''; clearInterval(stbClk); stbClk = null; document.title = 'Showtime · ' + Vs.VISTA_TXT[VISTA]; return; }
+    el.innerHTML = Mk.banner({ version: (window.ShowtimeEmision || {}).BUILD || '', footer: true }) +
+      '<div id="stb-clk" class="stb-clk"></div><button id="stb-x" class="stb-x" type="button">Salir del Standby (S)</button>';
+    el.hidden = false;
+    document.title = 'Showtime · Standby';
+    const upd = () => { const c = $('stb-clk'); const t = Mk.hhmm(new Date()); if (c && c.textContent !== t) c.textContent = t; };
+    upd(); clearInterval(stbClk); stbClk = setInterval(upd, 1000);
+  }
+  if ($('standby')) {
+    $('standby').addEventListener('click', e => { if (e.target.closest && e.target.closest('#stb-x')) setStandby(false); });
+    // El botón de salir y el cursor solo aparecen al mover el ratón o tocar la pantalla (en escena no se ve nada más)
+    $('standby').addEventListener('pointermove', () => { $('standby').classList.add('moving'); clearTimeout(stbMove); stbMove = setTimeout(() => $('standby').classList.remove('moving'), 2500); });
+  }
+  if ($('stbbtn')) $('stbbtn').addEventListener('click', () => setStandby(!STANDBY));
+  // Desde el Dashboard (Live ▾ › Standby): solo la ventana que lo abrió puede mandarlo
+  window.addEventListener('message', e => {
+    const m = e.data; if (!m || m.app !== 'showtime' || m.type !== 'standby' || Dt.READONLY) return;
+    if (window.opener && e.source !== window.opener) return;
+    setStandby(!!m.on);
   });
 
   // Confidence: cuenta atrás gigante de UNA zona (la que lleva la URL o la que se elige aquí)
@@ -1053,6 +1095,7 @@
   // ── Arranque ─────────────────────────────────────────────────────────
   load();
   applyVista();
+  if (STANDBY) setStandby(true); else renderStandby();
   setZoom(0);
   setRowH(ROW_H);
   tick();
@@ -1061,5 +1104,6 @@
   if (Dt.READONLY) startStaff();
   if (window.opener || !Dt.getFestival()) Dt.hello();   // pide los datos al Panel que la abrió (o a uno abierto)
   // Si el Panel se recarga, pierde la referencia a esta ventana: el «ping» hace que la recupere y le reenvíe todo.
-  if (window.opener && Dt.ping) setInterval(Dt.ping, 2000);
+  // (también recuerda al Dashboard que esta ventana está en Standby, por si se recargó)
+  if (window.opener && Dt.ping) setInterval(() => { Dt.ping(); if (STANDBY) reportStandby(); }, 2000);
 })();

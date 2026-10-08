@@ -14,6 +14,7 @@
   const DEFAULT_DURATION = 60;          // si un bloque no tiene fin
   const MAX_NEXT = 4;                   // «Siguiente»: máximo de filas
   const ARTIST_COLORS = ['#e94560','#4fc3f7','#1de9b6','#ffb347','#c77dff','#ff9a3c','#84fab0','#f77f00','#a8edea','#fed6e3'];
+  const TIPO_COLORS = { tarea: '#6b7280', hito: '#9ca3af' };   // neutros: trabajo técnico (comidas, descargas, montajes) e hitos
   const EPOCH_UTC = Date.UTC(2000, 0, 1);
 
   // ── Utilidades de formato ─────────────────────────────────────────────
@@ -152,8 +153,12 @@
     return ((state && state.escenarios) || []).find(e => e.id === id) || null;
   }
 
+  /** Color de una entrada. Los colores (arcoíris) son para las BANDAS (shows y soundchecks);
+   *  tareas e hitos van en gris de trabajo técnico, salvo que se les elija un color a mano. */
   function artistColor(state, artist) {
     if (artist && artist.color) return artist.color;
+    const t = tipoOf(artist);
+    if (t !== 'banda') return TIPO_COLORS[t];
     const i = ((state && state.artists) || []).indexOf(artist);
     return ARTIST_COLORS[(i < 0 ? 0 : i) % ARTIST_COLORS.length];
   }
@@ -1131,7 +1136,7 @@
 
   const API = {
     DEFAULT_CUTOFF, DEFAULT_CALL_MINS, DEFAULT_DURATION, DEFAULT_CO_MIN, isFija, setFija, coMinFor,
-    MARGIN_WARN, isLibre, setDelayFlag, movesWithDelay, setReal, jornadaOfAbs, activeJornada, legacyCallKey, callIsDone, callKeyName, driftByZone, delayByZone, addRetraso, retrasosOf, blockedIn, movesBy, setAlargar, hitoMargins, MAX_NEXT, ARTIST_COLORS,
+    MARGIN_WARN, isLibre, setDelayFlag, movesWithDelay, setReal, jornadaOfAbs, activeJornada, legacyCallKey, callIsDone, callKeyName, driftByZone, delayByZone, addRetraso, retrasosOf, blockedIn, movesBy, setAlargar, hitoMargins, MAX_NEXT, ARTIST_COLORS, TIPO_COLORS,
     pad2, parseHM, fmtHM, dayIndex, isoOfDay, shiftDate, toAbs, adjustEnd, nowAbs,
     cutoffMins, festivalDateOf, entersMode, festivalDays, TIPOS, tipoOf, isBand, isAll, entriesOf, tasksNow, hitosOf,
     getEscenario, artistColor, callAbsFor, buildBlocks,

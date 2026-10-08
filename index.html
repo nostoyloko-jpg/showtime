@@ -13,9 +13,11 @@
 <meta name="apple-mobile-web-app-title" content="Showtime">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
-<link rel="stylesheet" href="control.css?v=20261044">
+<link rel="stylesheet" href="control.css?v=20261045">
+<link rel="stylesheet" href="marca.css?v=20261045">
 </head>
 <body>
+<div id="splash" class="splash" hidden></div>
 <div id="savewarn" class="savewarn" role="alert" hidden><b>NO SE ESTÁ GUARDANDO</b> · el navegador no tiene espacio. Lo que cambies se ve y se emite, pero se pierde si recargas: guarda el evento en un archivo (.json), exporta el log y libera espacio.</div>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -24,6 +26,7 @@
   <symbol id="i-undo" viewBox="0 0 20 20"><path d="M7 5 3.5 8.5 7 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 8.5h7.5a4.5 4.5 0 0 1 0 9H8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
   <symbol id="i-screen" viewBox="0 0 20 20"><rect x="2.5" y="3.5" width="15" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M7 17h6M10 13.5V17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
   <symbol id="i-swap" viewBox="0 0 20 20"><path d="M4 7.5h11.5M12.5 4.5l3 3-3 3M16 12.5H4.5M7.5 9.5l-3 3 3 3" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-st" viewBox="0 0 1545 1094"><path fill="currentColor" d="M234 0L0 215L0 337L535 784L401 898L195 724L0 724L0 866L219 1094L545 1094L784 864L784 702L265 276L393 168L596 342L784 342L784 225L535 0ZM624 0L1545 0L1545 186L1279 186L1279 861L1032 1094L1032 189L831 186Z"/></symbol>
   <symbol id="i-pause" viewBox="0 0 20 20"><path d="M7.5 5v10M12.5 5v10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></symbol>
   <symbol id="i-plus" viewBox="0 0 20 20"><path d="M10 4.5v11M4.5 10h11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
   <symbol id="i-trash" viewBox="0 0 20 20"><path d="M4 6h12M8 6V4.5h4V6M6 6l.8 10h6.4L14 6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
@@ -78,6 +81,8 @@
         <button id="btn-log" class="mitem" role="menuitem" title="Informe de la jornada: el horario previsto y, a su hora, lo que ha pasado (PDF, TXT o CSV)"><svg class="ic"><use href="#i-log"/></svg>Exportar log del evento…</button>
         <div class="msep"></div>
         <button id="btn-paste" class="mitem" role="menuitem" title="Pegar un horario de Excel, Numbers, Sheets, PDF o WhatsApp, o abrir un .csv / .tsv"><svg class="ic"><use href="#i-paste"/></svg>Pegar horario</button>
+        <div class="msep"></div>
+        <button id="btn-about" class="mitem" role="menuitem" title="Versión y créditos"><svg class="ic"><use href="#i-st"/></svg>Acerca de Showtime…</button>
       </div>
     </div>
   </nav>
@@ -164,6 +169,7 @@
         <div id="lv-zones" class="lvzones"></div>
       </div>
       <button class="mitem lv" data-vista="backstage"><svg class="ic"><use href="#i-msg"/></svg><span class="lvt"><b>Backstage</b><small>Camerinos y catering · tarjetas, 2 líneas y cinta de avisos</small></span><span class="lvon" data-on="showtime-live-backstage"></span><span class="lvx" role="button" data-close="showtime-live-backstage" title="Cerrar esta ventana Live" hidden><svg class="ic"><use href="#i-x"/></svg></span></button>
+      <button class="mitem lv lvstb" id="lv-standby" title="Descansos, pausas técnicas y antes de abrir puertas. En la Live: tecla S"><svg class="ic"><use href="#i-pause"/></svg><span class="lvt"><b id="lv-standby-t">Standby · Modo Cartel</b><small>Las Live abiertas muestran el cartel de Showtime y la hora</small></span><span class="lvon" id="lv-standby-on"></span></button>
       <button class="mitem lvcloseall" id="lv-closeall" hidden><svg class="ic"><use href="#i-x"/></svg><span class="lvt"><b>Cerrar todas las Live</b><small>También las que no estén en este escritorio</small></span></button>
       <div class="msep"></div>
       <p class="mnote" id="lv-note">Con un segundo monitor conectado, la ventana se abre en él (Chrome, Edge o Brave). En la ventana: <b>F</b> pantalla completa · <b>V</b> cambia de vista.</p>
@@ -407,17 +413,18 @@
 <datalist id="zones-dl"></datalist>
 <div id="toast" class="toast" hidden></div>
 
-<script src="core.js?v=20261044"></script>
-<script src="meteo.js?v=20261044"></script>
-<script src="datos.js?v=20261044"></script>
-<script src="importar.js?v=20261044"></script>
-<script src="xlsx.js?v=20261044"></script>
-<script src="qr.js?v=20261044"></script>
-<script src="emision.js?v=20261044"></script>
-<script src="mando.js?v=20261044"></script>
-<script src="vistas.js?v=20261044"></script>
-<script src="log.js?v=20261044"></script>
-<script src="control.js?v=20261044"></script>
-<script src="pwa.js?v=20261044"></script>
+<script src="core.js?v=20261045"></script>
+<script src="meteo.js?v=20261045"></script>
+<script src="datos.js?v=20261045"></script>
+<script src="importar.js?v=20261045"></script>
+<script src="xlsx.js?v=20261045"></script>
+<script src="qr.js?v=20261045"></script>
+<script src="emision.js?v=20261045"></script>
+<script src="mando.js?v=20261045"></script>
+<script src="vistas.js?v=20261045"></script>
+<script src="log.js?v=20261045"></script>
+<script src="marca.js?v=20261045"></script>
+<script src="control.js?v=20261045"></script>
+<script src="pwa.js?v=20261045"></script>
 </body>
 </html>

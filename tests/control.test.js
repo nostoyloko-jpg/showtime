@@ -8,7 +8,7 @@
   if (typeof module === 'undefined' || !module.exports) { console.log('control.test.js: solo en Node (node tests/control.test.js)'); return; }
   const vm = require('vm');
   const D = require('./_dom.js'), C = require('../core.js'), E = require('../emision.js');
-  const MODULOS = ['core.js', 'meteo.js', 'datos.js', 'importar.js', 'xlsx.js', 'qr.js', 'emision.js', 'mando.js', 'vistas.js', 'log.js', 'control.js'];
+  const MODULOS = ['core.js', 'meteo.js', 'datos.js', 'importar.js', 'xlsx.js', 'qr.js', 'emision.js', 'mando.js', 'vistas.js', 'log.js', 'marca.js', 'control.js'];
 
   const tests = [];
   function test(name, fn) { tests.push([name, fn]); }
@@ -535,6 +535,7 @@
     return { env, read, T: env.win.ShowtimePanel._test };
   }
   const clickData = (t, sel, dataset) => t.env.fire('document', 'click', { target: { id: '', closest: q => q === sel ? { dataset, classList: { contains: () => false }, id: '' } : null } });
+  const clickStb = t => t.env.fire('document', 'click', { target: { closest: q => q === '#lv-standby' ? {} : null }, preventDefault() {}, stopPropagation() {} });
   const pasteEv = (text, target, files) => ({ target: target || t0body, preventDefault() {}, clipboardData: { files: files || [], getData: k => k === 'text/plain' ? text : '' } });
   const t0body = { closest: () => null };
   const CARTEL = 'Día\tZona\tBanda\tInicio\tFin\n10/07/2026\tPrincipal\tLos Ácratas\t21:00\t22:15\n11/07/2026\tCarpa\tDJ Uno\t20:00\t21:00';
@@ -747,6 +748,58 @@
       ok(m, ps + ': color propio y opaco');
     });
     ok(css.indexOf('/* ── Modales sólidos') > css.indexOf('/* ── Cristal'), 'va después del cristal (gana)');
+  });
+
+  test('Pantalla de inicio: el cartel de marca con versión y pie; se va sola (1,2 s), con clic o con Esc', () => {
+    const t = panel(), sp = t.env.getEl('splash'), h = ultimo(t, 'splash');
+    eq(sp.hidden, false, 'se ve al arrancar'); eq(sp.className, 'splash', 'inicio (no «Acerca de»)');
+    ok(/class="stm-name">SHOWTIME</.test(h) && /by Synapse Live/.test(h) && /Real-Time Show Control/.test(h));
+    ok(h.indexOf('v' + t.env.win.ShowtimeEmision.BUILD) > 0, 'versión activa'); ok(h.indexOf('BUILT FOR LIFE ON STAGE · © 2026 Synapse Live') > 0);
+    ok(/const SPLASH_MS = 1200;/.test(D.src('control.js')) && /if \(!about\) splashT = setTimeout\(hideSplash, SPLASH_MS\)/.test(D.src('control.js')), '1,2 s');
+    t.env.fire('splash', 'click', {});
+    ok(sp.classList.contains('out'), 'clic: se desvanece');
+    const u = panel(); u.env.fire('document', 'keydown', { key: 'Escape', stopImmediatePropagation() {} });
+    ok(u.env.getEl('splash').classList.contains('out'), 'Esc');
+    eq(t.env.errors.length, 0, t.env.errors.join(' | '));
+  });
+  test('Archivo › Acerca de Showtime…: el mismo cartel, hasta clic o Esc', () => {
+    const t = panel();
+    t.T.hideSplash();
+    t.env.fire('btn-about', 'click', {});
+    const sp = t.env.getEl('splash');
+    eq(sp.className, 'splash about'); ok(!sp.classList.contains('out'));
+    ok(/Clic o Esc para cerrar/.test(ultimo(t, 'splash')) && /stm-ver/.test(ultimo(t, 'splash')));
+    ok(/<button id="btn-about" class="mitem"[^>]*>.*Acerca de Showtime…<\/button>/.test(D.src('index.html')), 'en el menú Archivo');
+  });
+  test('Live ▾ › Standby: pone en Modo Cartel las Live abiertas (y lo quita); sin Live abierta, avisa', async () => {
+    const t = panel(), msgs = [];
+    const w = { closed: false, focus() {}, postMessage(m) { msgs.push(m); } };
+    t.env.win.open = () => w;
+    clickStb(t);
+    ok(/No hay ninguna Pantalla Live abierta/.test(t.env.getEl('toast').textContent), 'sin Live: aviso');
+    t.env.fire('document', 'click', { target: { closest: q => q === '#m-live [data-vista]' ? { dataset: { vista: 'manager' } } : null } });
+    await new Promise(r => setImmediate(r));
+    clickStb(t);
+    ok(msgs.some(m => m.app === 'showtime' && m.type === 'standby' && m.on === true), 'la Live recibe la orden');
+    eq(t.T.standbyOn(), true); eq(t.env.getEl('lv-standby-t').textContent, 'Quitar Standby · volver a la vista');
+    ok(/Standby: la Pantalla Live muestra el cartel y la hora/.test(t.env.getEl('toast').textContent));
+    // La Live avisa de que ha salido (tecla S en ella): el menú lo refleja
+    t.env.fire('window', 'message', { data: { app: 'showtime', type: 'standbyState', on: false }, source: w });
+    eq(t.T.standbyOn(), false); eq(t.env.getEl('lv-standby-t').textContent, 'Standby · Modo Cartel');
+    clickStb(t); clickStb(t);
+    ok(msgs.filter(m => m.type === 'standby').map(m => m.on).join() === 'true,true,false', 'y se quita con el mismo botón');
+    ok(/id="lv-standby"/.test(D.src('index.html')));
+  });
+  test('Modo Foco: micro-píldora del tipo (SHOW · PRUEBA · TAREA · HITO) con color fijo, en vez del cuadradito de color', () => {
+    const P = panel().T.tipoPill;
+    eq(P('show'), '<span class="tpill tp-show" aria-hidden="true">SHOW</span>');
+    ok(/>PRUEBA</.test(P('sc')) && />TAREA</.test(P('tarea')) && />HITO</.test(P('hito')));
+    const F = fest(), t = panel({ 'showtime.festival': JSON.stringify(F.s) });
+    ok(/<div class="nm"><span class="tpill tp-show"/.test(ultimo(t, 'tbody')), 'cada fila lleva su píldora');
+    const css = D.src('control.css');
+    ok(/\.tpill\{display:none;/.test(css), 'fuera del Modo Foco no se ve');
+    ok(/body\.focus #tbl \.tpill\{display:inline-flex\}/.test(css) && /body\.focus #tbl td\.name input\[type=color\]\{display:none\}/.test(css));
+    ['show', 'sc', 'tarea', 'hito'].forEach(k => ok(new RegExp('\\.tpill\\.tp-' + k + '\\{--pc:#[0-9a-f]{6}\\}').test(css), k + ': color fijo'));
   });
 
   test('Imágenes (foto del cartel, captura): sin OCR — se abre «Pegar horario» con el truco de Texto en Vivo', () => {

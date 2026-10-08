@@ -11,7 +11,8 @@
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <title>Showtime · Pantalla Live</title>
-<link rel="stylesheet" href="live.css?v=20261044">
+<link rel="stylesheet" href="live.css?v=20261045">
+<link rel="stylesheet" href="marca.css?v=20261045">
 </head>
 <body>
 
@@ -87,6 +88,9 @@
 <div id="conf" class="conf"></div>
 <button id="cf-full" class="iconbtn cf-full" title="Pantalla completa (F)" aria-label="Pantalla completa"><svg class="ic"><use href="#i-full"/></svg></button>
 
+<!-- Standby / Modo Cartel: el cartel de Showtime a pantalla completa y la hora (descansos, pausas técnicas, antes de puertas). Tecla S. -->
+<div id="standby" class="standby" hidden></div>
+
 <!-- Mensaje flash (2c-C): enorme, parpadea; se cierra solo (duración en Configuración → Mensajes) o con el botón -->
 <div id="flash" role="alert" hidden><div class="fl-box"><div id="flash-txt"></div><div class="fl-bar"><div id="flash-prog"></div></div></div><button id="flash-x" class="iconbtn" title="Cerrar mensaje"><svg class="ic"><use href="#i-x"/></svg></button></div>
 
@@ -103,6 +107,7 @@
   <button id="zmin" class="iconbtn" title="Más tiempo visible"><svg class="ic"><use href="#i-plus"/></svg></button>
   <span id="zlbl"></span>
   <button id="zmax" class="iconbtn" title="Menos tiempo visible"><svg class="ic"><use href="#i-minus"/></svg></button>
+  <button id="stbbtn" class="iconbtn" title="Standby · Modo Cartel: el cartel de Showtime y la hora (S)" aria-pressed="false"><svg class="ic"><use href="#i-pause"/></svg></button>
   <button id="fullbtn" class="iconbtn" title="Pantalla completa (F)"><svg class="ic"><use href="#i-full"/></svg></button>
   </div>
   <span id="docktag" title="La línea de tiempo está desplazada"></span>
@@ -143,12 +148,13 @@
   </div>
 </div>
 
-<script src="core.js?v=20261044"></script>
-<script src="meteo.js?v=20261044"></script>
-<script src="datos.js?v=20261044"></script>
-<script src="emision.js?v=20261044"></script>
-<script src="vistas.js?v=20261044"></script>
-<script src="live.js?v=20261044"></script>
-<script src="pwa.js?v=20261044"></script>
+<script src="core.js?v=20261045"></script>
+<script src="meteo.js?v=20261045"></script>
+<script src="datos.js?v=20261045"></script>
+<script src="emision.js?v=20261045"></script>
+<script src="vistas.js?v=20261045"></script>
+<script src="marca.js?v=20261045"></script>
+<script src="live.js?v=20261045"></script>
+<script src="pwa.js?v=20261045"></script>
 </body>
 </html>
