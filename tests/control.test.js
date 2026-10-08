@@ -931,6 +931,18 @@
     ok(/id="spotlight"[^>]*hidden/.test(ih) && /id="spot-q"/.test(ih) && /id="spot-list"/.test(ih), 'markup de la paleta');
     ok(/\.spot-box\{width:min\(600px,100%\)/.test(css) && /\.spot-foot/.test(css), 'diseño de la paleta');
   });
+  test('Paleta: encabezados de grupo atenuados con separador; cada fila lleva micro-etiqueta a la izquierda; ⌘K y atajos en una sola etiqueta', () => {
+    const css = D.src('control.css'), js = D.src('control.js');
+    ok(/\.spot-g\{[^}]*font-size:11px[^}]*letter-spacing:\.12em[^}]*color:var\(--dim,#8a8f98\)[^}]*padding:14px 10px 6px[^}]*border-top:1px solid var\(--hair\)/.test(css), 'encabezado: 11px, .12em, atenuado, 14px arriba, línea sutil');
+    ok(/\.spot-list>\.spot-g:first-child\{border-top:0/.test(css), 'el primer encabezado no lleva línea');
+    ok(/spot-pill tp-' \+ b\.kind/.test(js) && /\.spot-pill\.tp-show\{--pc:#ff5d73\}/.test(css), 'bandas: píldora de tipo (SHOW, PRUEBA, TAREA, HITO)');
+    ok(/ic: 'i-clock'/.test(js) && /ic: 'i-out'/.test(js), 'vistas y acciones: icono a la izquierda');
+    const t = dashboard(); t.env.fire('document', 'keydown', { key: 'k', metaKey: true, preventDefault() {} });
+    const html = t.env.getEl('spot-list').innerHTML;
+    ok(/class="spot-g">Vistas</.test(html) && /class="spot-g">Acciones</.test(html), 'encabezados Vistas y Acciones');
+    ok(/<button type="button" class="spot-i[^"]*" data-i="0"><span class="spot-slot"><svg class="ic spot-ic" aria-hidden="true"><use href="#i-clock"\/>/.test(html) && html.indexOf('spot-slot') < html.indexOf('spot-t'), 'icono a la izquierda de cada vista');
+    ok(/<kbd>⇧⌘F<\/kbd>/.test(html) && /<kbd>⌘S<\/kbd>/.test(html), 'atajos en una sola etiqueta <kbd>');
+  });
   test('QR: el título es «Pantallas QR», sin «móviles»', () => {
     const js = D.src('control.js');
     ok(/Pantallas QR<\/div>/.test(js) && !/Pantallas QR \(móviles\)/.test(js), 'sin «(móviles)»');

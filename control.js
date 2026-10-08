@@ -2767,24 +2767,24 @@
     if (!FEST) return [];
     return C.buildBlocks(FEST, { mode: 'all', day: 'all' }).filter(b => C.isBand(b)).map(b => ({
       group: 'Bandas', label: b.name || '(sin nombre)', sub: fmtDay(b.jornada) + ' · ' + C.fmtHM(b.si) + ' · ' + (b.stage || 'Sin zona'),
-      badge: b.kind === 'sc' ? 'SOUNDCHECK' : 'SHOW', kbd: '', search: (b.name || '') + ' ' + (b.stage || '') + ' ' + fmtDay(b.jornada),
+      pill: '<span class="spot-pill tp-' + b.kind + '" aria-hidden="true">' + (PILL_TXT[b.kind] || '') + '</span>', kbd: '', search: (b.name || '') + ' ' + (b.stage || '') + ' ' + fmtDay(b.jornada),
       run: () => spotJump(b)
     }));
   }
   function spotActions() {
     return [
-      { group: 'Vistas', label: 'Jornada completa', sub: 'Todos los días, todo el horario', search: 'jornada completa todo dia', run: () => { spotSetDay('all'); spotSetMode('all'); } },
-      { group: 'Vistas', label: 'Shows', sub: 'Solo conciertos', search: 'shows conciertos', run: () => spotSetMode('show') },
-      { group: 'Vistas', label: 'Soundchecks', sub: 'Solo soundchecks', search: 'soundchecks pruebas', run: () => spotSetMode('sc') },
-      { group: 'Vistas', label: 'Modo Foco', kbd: '⇧⌘F', sub: focusOn() ? 'Activado · desactivar' : 'Solo lo de directo, letra grande', search: 'modo foco directo', run: () => { setFocus(!focusOn()); toast(focusOn() ? 'Modo foco activado' : 'Modo foco desactivado', false, 2000); } },
-      { group: 'Vistas', label: 'Alto Contraste (Escenario / Sol)', kbd: '⇧⌘C', sub: panelStyle() === 'escenario' ? 'Activado · volver al tema anterior' : 'Para el sol en directo', search: 'alto contraste escenario sol', run: () => togglePanelContrast() },
-      { group: 'Vistas', label: 'Standby en Confidence', sub: standbyOn() ? 'Activado · quitar' : 'Cartel y hora en las Confidence', search: 'standby confidence cartel', run: () => setStandby(!standbyOn()) },
-      { group: 'Acciones', label: 'Importar horario', sub: 'Pegar o abrir un horario', search: 'importar pegar horario excel csv pdf', run: () => openImport('') },
-      { group: 'Acciones', label: 'Guardar (exportar JSON)', kbd: '⌘S', sub: 'Copia de seguridad del evento', search: 'guardar exportar json copia', run: () => { if (!FEST) toast('No hay evento abierto', true); else exportJSON(); } },
-      { group: 'Acciones', label: 'Nuevo evento', kbd: '⌘N', sub: 'Empezar un evento vacío o desde un horario', search: 'nuevo evento crear', run: () => askNew() },
-      { group: 'Acciones', label: 'Abrir evento', kbd: '⌘O', sub: 'Abrir un .json de Showtime o Synapse', search: 'abrir evento json', run: () => $('file').click() },
-      { group: 'Acciones', label: 'Configuración', sub: 'Estilos, zonas, mensajes y más', search: 'configuracion ajustes opciones', run: () => openConfig() },
-      { group: 'Acciones', label: 'Atajos y ayuda', kbd: '⇧⌘7', sub: 'Lista de atajos', search: 'ayuda atajos teclas', run: () => openHelp() }
+      { group: 'Vistas', label: 'Jornada completa', ic: 'i-clock', sub: 'Todos los días, todo el horario', search: 'jornada completa todo dia', run: () => { spotSetDay('all'); spotSetMode('all'); } },
+      { group: 'Vistas', label: 'Shows', ic: 'i-stage', sub: 'Solo conciertos', search: 'shows conciertos', run: () => spotSetMode('show') },
+      { group: 'Vistas', label: 'Soundchecks', ic: 'i-stage', sub: 'Solo soundchecks', search: 'soundchecks pruebas', run: () => spotSetMode('sc') },
+      { group: 'Vistas', label: 'Modo Foco', ic: 'i-expand', kbd: '⇧⌘F', sub: focusOn() ? 'Activado · desactivar' : 'Solo lo de directo, letra grande', search: 'modo foco directo', run: () => { setFocus(!focusOn()); toast(focusOn() ? 'Modo foco activado' : 'Modo foco desactivado', false, 2000); } },
+      { group: 'Vistas', label: 'Alto Contraste (Escenario / Sol)', ic: 'i-sun', kbd: '⇧⌘C', sub: panelStyle() === 'escenario' ? 'Activado · volver al tema anterior' : 'Para el sol en directo', search: 'alto contraste escenario sol', run: () => togglePanelContrast() },
+      { group: 'Vistas', label: 'Standby en Confidence', ic: 'i-pause', sub: standbyOn() ? 'Activado · quitar' : 'Cartel y hora en las Confidence', search: 'standby confidence cartel', run: () => setStandby(!standbyOn()) },
+      { group: 'Acciones', label: 'Importar horario', ic: 'i-paste', sub: 'Pegar o abrir un horario', search: 'importar pegar horario excel csv pdf', run: () => openImport('') },
+      { group: 'Acciones', label: 'Guardar (exportar JSON)', ic: 'i-out', kbd: '⌘S', sub: 'Copia de seguridad del evento', search: 'guardar exportar json copia', run: () => { if (!FEST) toast('No hay evento abierto', true); else exportJSON(); } },
+      { group: 'Acciones', label: 'Nuevo evento', ic: 'i-plus', kbd: '⌘N', sub: 'Empezar un evento vacío o desde un horario', search: 'nuevo evento crear', run: () => askNew() },
+      { group: 'Acciones', label: 'Abrir evento', ic: 'i-in', kbd: '⌘O', sub: 'Abrir un .json de Showtime o Synapse', search: 'abrir evento json', run: () => $('file').click() },
+      { group: 'Acciones', label: 'Configuración', ic: 'i-gear', sub: 'Estilos, zonas, mensajes y más', search: 'configuracion ajustes opciones', run: () => openConfig() },
+      { group: 'Acciones', label: 'Atajos y ayuda', ic: 'i-dots', kbd: '⇧⌘7', sub: 'Lista de atajos', search: 'ayuda atajos teclas', run: () => openHelp() }
     ];
   }
   /** Lo que coincide con lo escrito (todas las palabras). Sin texto: vistas y acciones; con texto, también bandas. */
@@ -2804,8 +2804,8 @@
     SPOT.items.forEach((it, i) => {
       if (it.group !== g) { g = it.group; h += '<div class="spot-g">' + esc(g) + '</div>'; }
       h += '<button type="button" class="spot-i' + (i === SPOT.active ? ' on' : '') + '" data-i="' + i + '">' +
+        '<span class="spot-slot">' + (it.pill || (it.ic ? '<svg class="ic spot-ic" aria-hidden="true"><use href="#' + it.ic + '"/></svg>' : '')) + '</span>' +
         '<span class="spot-t">' + esc(it.label) + '</span>' +
-        (it.badge ? '<span class="spot-badge">' + esc(it.badge) + '</span>' : '') +
         (it.sub ? '<span class="sm">' + esc(it.sub) + '</span>' : '') +
         (it.kbd ? '<kbd>' + esc(it.kbd) + '</kbd>' : '') + '</button>';
     });
