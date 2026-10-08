@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <meta name="robots" content="noindex">
 <title>Showtime · Mando</title>
-<link rel="stylesheet" href="remote.css?v=20261111">
+<link rel="stylesheet" href="remote.css?v=20261112">
 </head>
 <body>
 
@@ -34,7 +34,7 @@
 
 <header class="rh">
   <div class="rh-top">
-    <span class="brand">SHOWTIME</span><span class="tag">MANDO</span>
+    <span class="brand">SHOWTIME</span><span class="tag" data-i18n>MANDO</span>
     <span id="rx" class="rx connecting"><span class="rx-dot"></span><span id="rx-t">CONECTANDO…</span></span>
   </div>
   <div class="rh-mid"><div id="clk" class="clk">--:--:--</div><div id="evn" class="evn"></div></div>
@@ -47,11 +47,11 @@
 
   <!-- Banda sobre la que actúan ▶ / ■ / En hora -->
   <section class="card">
-    <div id="zones" class="zones" role="tablist" aria-label="Zona"></div>
+    <div id="zones" class="zones" role="tablist" aria-label="Zona" data-i18n-aria></div>
     <div class="bnav">
-      <button id="prev" class="nav" aria-label="Banda anterior"><svg class="ic"><use href="#i-left"/></svg></button>
+      <button id="prev" class="nav" aria-label="Banda anterior" data-i18n-aria><svg class="ic"><use href="#i-left"/></svg></button>
       <div id="band" class="binfo"></div>
-      <button id="next" class="nav" aria-label="Banda siguiente"><svg class="ic"><use href="#i-right"/></svg></button>
+      <button id="next" class="nav" aria-label="Banda siguiente" data-i18n-aria><svg class="ic"><use href="#i-right"/></svg></button>
     </div>
     <div id="drift" class="drift"></div>
   </section>
@@ -60,39 +60,39 @@
 <div class="col-r">
   <!-- Retrasos: siempre con resumen y Confirmar -->
   <section class="card">
-    <h2>Retraso</h2>
+    <h2 data-i18n>Retraso</h2>
     <div class="row3">
-      <button class="tbtn" data-delay="5">+5 min</button>
-      <button class="tbtn" data-delay="10">+10 min</button>
-      <button class="tbtn" data-delay="n">+N min</button>
+      <button class="tbtn" data-delay="5" data-i18n>+5 min</button>
+      <button class="tbtn" data-delay="10" data-i18n>+10 min</button>
+      <button class="tbtn" data-delay="n" data-i18n>+N min</button>
     </div>
     <p id="delay-hint" class="hint"></p>
   </section>
 
   <!-- Prompter -->
   <section class="card">
-    <h2>Mensaje a escena</h2>
-    <div class="seg4" id="msg-to" role="group" aria-label="Destino"><button data-to="all" class="on">Todas</button><button data-to="confidence">Confidence</button><button data-to="backstage">Backstage</button><button data-to="manager">Manager</button></div>
-    <div id="msg-zones" class="mzones" hidden><span>Confidence en</span><div id="msg-zl" class="zrow"></div></div>
+    <h2 data-i18n>Mensaje a escena</h2>
+    <div class="seg4" id="msg-to" role="group" aria-label="Destino" data-i18n-aria><button data-to="all" class="on" data-i18n>Todas</button><button data-to="confidence" data-i18n>Confidence</button><button data-to="backstage" data-i18n>Backstage</button><button data-to="manager" data-i18n>Manager</button></div>
+    <div id="msg-zones" class="mzones" hidden><span data-i18n>Confidence en</span><div id="msg-zl" class="zrow"></div></div>
     <div id="flash-cur" class="flash-cur" hidden></div>
     <div class="row2">
-      <button class="tbtn msgp" data-msg="5 MINUTOS">5 MINUTOS</button>
-      <button class="tbtn msgp" data-msg="ÚLTIMO TEMA">ÚLTIMO TEMA</button>
+      <button class="tbtn msgp" data-msg="5 MINUTOS" data-i18n>5 MINUTOS</button>
+      <button class="tbtn msgp" data-msg="ÚLTIMO TEMA" data-i18n>ÚLTIMO TEMA</button>
     </div>
     <form id="msg-form" class="msgf" autocomplete="off">
-      <input id="msg-text" type="text" maxlength="140" placeholder="Aviso libre…" enterkeyhint="send" spellcheck="false">
-      <button class="tbtn send" type="submit">Enviar</button>
+      <input id="msg-text" type="text" maxlength="140" placeholder="Aviso libre…" enterkeyhint="send" spellcheck="false" data-i18n-placeholder>
+      <button class="tbtn send" type="submit" data-i18n>Enviar</button>
     </form>
   </section>
 </div>
-  <p class="foot">Las órdenes las ejecuta el Dashboard del Mac (quedan en su Deshacer). Este enlace es privado.</p>
+  <p class="foot" data-i18n>Las órdenes las ejecuta el Dashboard del Mac (quedan en su Deshacer). Este enlace es privado.</p>
 </main>
 
 <!-- Botonera al pulgar: SIEMPRE abajo, en vertical y en horizontal (así no hace falta scroll) -->
-<nav class="actbar" aria-label="Actividad">
-  <button id="b-start" class="act start"><svg class="ic"><use href="#i-play"/></svg><span>EMPEZAR</span></button>
-  <button id="b-stop" class="act stop"><svg class="ic"><use href="#i-stop"/></svg><span>TERMINAR</span></button>
-  <button id="b-ontime" class="act ontime"><svg class="ic"><use href="#i-undo"/></svg><span>EN HORA</span></button>
+<nav class="actbar" aria-label="Actividad" data-i18n-aria>
+  <button id="b-start" class="act start"><svg class="ic"><use href="#i-play"/></svg><span data-i18n>EMPEZAR</span></button>
+  <button id="b-stop" class="act stop"><svg class="ic"><use href="#i-stop"/></svg><span data-i18n>TERMINAR</span></button>
+  <button id="b-ontime" class="act ontime"><svg class="ic"><use href="#i-undo"/></svg><span data-i18n>EN HORA</span></button>
 </nav>
 
 
@@ -101,19 +101,19 @@
   <div class="sheet-box" role="dialog" aria-modal="true" aria-labelledby="sh-t">
     <h3 id="sh-t"></h3>
     <div id="sh-b" class="sh-b"></div>
-    <div class="sheet-acts"><button id="sh-no" class="tbtn">Cancelar</button><button id="sh-yes" class="tbtn primary">Confirmar</button></div>
+    <div class="sheet-acts"><button id="sh-no" class="tbtn" data-i18n>Cancelar</button><button id="sh-yes" class="tbtn primary">Confirmar</button></div>
   </div>
 </div>
 
 <div id="toast" class="toast" role="status" hidden></div>
-<div id="bad" class="badlink" hidden><svg class="ic"><use href="#i-alert"/></svg><b>Enlace no válido</b><span id="bad-t">Escanea el QR del Stage Manager (Dashboard › Emisión › Stage Manager · mando).</span></div>
+<div id="bad" class="badlink" hidden><svg class="ic"><use href="#i-alert"/></svg><b data-i18n>Enlace no válido</b><span id="bad-t" data-i18n>Escanea el QR del Stage Manager (Dashboard › Emisión › Stage Manager · mando).</span></div>
 
-<script src="i18n.js?v=20261111"></script>
-<script src="core.js?v=20261111"></script>
-<script src="datos.js?v=20261111"></script>
-<script src="emision.js?v=20261111"></script>
-<script src="mando.js?v=20261111"></script>
-<script src="remote.js?v=20261111"></script>
-<script src="pwa.js?v=20261111"></script>
+<script src="i18n.js?v=20261112"></script>
+<script src="core.js?v=20261112"></script>
+<script src="datos.js?v=20261112"></script>
+<script src="emision.js?v=20261112"></script>
+<script src="mando.js?v=20261112"></script>
+<script src="remote.js?v=20261112"></script>
+<script src="pwa.js?v=20261112"></script>
 </body>
 </html>

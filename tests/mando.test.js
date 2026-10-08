@@ -486,6 +486,32 @@
   });
 
   // ── Ejecutor asíncrono ────────────────────────────────────────────────
+  // ── Idioma (Fase 3): la píldora sale en el idioma activo; los mensajes de las órdenes se guardan en español y se leen en inglés ──
+  const I18 = () => (isNode ? require('../i18n.js') : window.ShowtimeI18n);
+  test('idioma: píldora de retraso en inglés y de vuelta; los mensajes de las órdenes, en español (log) y traducidos al enseñarlos', () => {
+    const I = I18(); if (!I) return;
+    const F = fest();
+    const kA = key(F.s, 'Banda A'), alg = M.stretchPlan(F.s, kA, true, at('21:00')).state;
+    const r = M.realPlan(alg, CFG, kA, 'f', at('22:00'));
+    const z = C.delayByZone(r.state, at('22:05')).find(x => x.zoneId === F.P);
+    I.setLang('en');
+    try {
+      const p = M.delayPill(z);
+      eq(p.text, 'Principal: +15 min (+30 live) · buffer exhausted');
+      ok(/^Accumulated delay: what follows is \+15 min/.test(p.title), p.title);
+      eq(M.delayPill(C.delayByZone(F.s, at('20:00'))[0]).text, 'Principal · On time');
+      // ▶ tarde: el mensaje sigue en español (va al log y a Deshacer) y se lee en inglés
+      const st = M.realPlan(F.s, CFG, kA, 'i', at('20:40'));
+      ok(/^Banda A: empieza 20:40 · sale 10 min tarde/.test(st.msg), 'guardado en español: ' + st.msg);
+      ok(/^Banda A: starts 20:40 · starts 10 min late/.test(I.txBack(st.msg)), I.txBack(st.msg));
+      const ot = M.onTimePlan(F.s, kA, at('21:00'));
+      eq(I.txBack(ot.error), 'Banda A is already on time');
+      eq(I.txBack(M.checkCmd({ op: 'nada' })), 'Unknown command');
+      ok(/^Reconciliation: Stage /.test(I.txBack(M.onTimePlan(st.state, kA, at('20:45')).logTxt)), 'reconciliación');
+    } finally { I.setLang('es'); }
+    eq(M.delayPill(z).text, 'Principal: +15 min (+30 vivo) · buffer agotado', 'vuelve al español');
+  });
+
   (async () => {
     let pass = 0; const fails = [];
     for (const [n, f] of tests) { try { await f(); pass++; } catch (e) { fails.push([n, e.message]); } }

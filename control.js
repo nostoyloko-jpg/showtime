@@ -55,7 +55,7 @@
   let toastOut = 0;
   function toast(msg, bad, ms) {
     const t = $('toast'), d = ms || (bad ? 4500 : 2600);
-    t.textContent = tx(msg); t.className = 'toast' + (bad ? ' bad' : ''); t.hidden = false;   // los avisos fijos se traducen solos
+    t.textContent = I18 && I18.txBack ? I18.txBack(msg) : tx(msg); t.className = 'toast' + (bad ? ' bad' : ''); t.hidden = false;   // los avisos fijos se traducen solos
     clearTimeout(toastT); clearTimeout(toastOut);
     toastOut = setTimeout(() => t.classList.add('out'), Math.max(0, d - 300));
     toastT = setTimeout(() => { t.hidden = true; t.classList.remove('out'); }, d);

@@ -1210,7 +1210,126 @@
       "(nueva)": "(new)",
       "Incluye": "Includes",
       "Generado": "Generated",
-      "evento": "event"
+      "evento": "event",
+      "Mensaje → {to}: «{_t}»": "Message → {to}: “{_t}”"
+    },
+    remote: {
+      "Este es el QR de Staff (solo lectura). Para mandar, escanea el QR del Stage Manager (Dashboard › Emisión › Stage Manager · mando).": "This is the Staff QR code (read-only). To send commands, scan the Stage Manager QR code (Dashboard › Broadcast › Stage Manager · remote).",
+      "EMISIÓN DETENIDA": "BROADCAST STOPPED",
+      "SIN CONEXIÓN CON EL MAC": "NO CONNECTION WITH THE MAC",
+      "CONECTADO": "CONNECTED",
+      "La emisión está parada en el Dashboard": "The broadcast is stopped on the Dashboard",
+      "Esperando los datos del Mac…": "Waiting for the Mac’s data…",
+      "faltan {t}": "{t} to go",
+      "Confirmar": "Confirm",
+      "Sin shows ni soundchecks hoy en {z}": "No shows or soundchecks today on {z}",
+      "Terminada {h}": "Finished {h}",
+      "Tiempo extra · +{n} min · ■ cuando acabe": "Extra time · +{n} min · ■ when it ends",
+      "En curso · quedan {t}": "In progress · {t} left",
+      "Empieza en {t}": "Starts in {t}",
+      "Sonando según el horario · ■ cuando acabe": "Playing as scheduled · ■ when it ends",
+      "Pasada sin registros": "Past, no records",
+      "Estimado": "Estimated",
+      "pisada por {n}": "overlapped by {n}",
+      "TIEMPO EXTRA · ACTIVADO": "EXTRA TIME · ON",
+      "ELEGIDA": "SELECTED",
+      "PROPUESTA": "SUGGESTED",
+      "{i} de {n}": "{i} of {n}",
+      "volver a la propuesta": "back to the suggestion",
+      "Zona {z} (o todas, en el resumen) · lo que empiece desde las {h}": "Stage {z} (or all, in the summary) · what starts from {h}",
+      "EN PANTALLA": "ON SCREEN",
+      "se cierra en {n} s": "closes in {n} s",
+      "Hecho": "Done",
+      "No se ha hecho": "Not done",
+      "En hora": "On time",
+      "Empieza (o empezó) a su hora prevista: <b>{h}</b> (estaba estimada a las {e}).": "Starts (or started) at its planned time: <b>{h}</b> (it was estimated at {e}).",
+      "Empieza (o empezó) a su hora prevista: <b>{h}</b>.": "Starts (or started) at its planned time: <b>{h}</b>.",
+      "El retraso que arrastraba la zona <b>se cancela</b>. Los retrasos manuales (+5, +10…) se mantienen.": "The delay the stage was carrying <b>is cancelled</b>. Manual delays (+5, +10…) are kept.",
+      "Sí, en hora": "Yes, on time",
+      "Retraso en cascada": "Cascading delay",
+      "Solo {z}": "Only {z}",
+      "Lo que empiece desde las {h} · respeta los DELAY en rojo y los bloqueos del Dashboard": "What starts from {h} · respects red DELAY entries and the Dashboard locks",
+      "mueve {n}": "moves {n}",
+      "{n} fija": "{n} fixed",
+      "{n} fijas": "{n} fixed",
+      "{n} choque": "{n} clash",
+      "{n} choques": "{n} clashes",
+      "{n} choca con «{w}» ({h}, DELAY rojo)": "{n} clashes with “{w}” ({h}, red DELAY)",
+      "No hay nada pendiente que mover con esa selección.": "Nothing pending to move with that selection.",
+      "Nada que mover": "Nothing to move",
+      "No se pudo conectar: {e}": "Could not connect: {e}",
+      "MANDO": "REMOTE",
+      "Banda anterior": "Previous band",
+      "Banda siguiente": "Next band",
+      "+5 min": "+5 min",
+      "+10 min": "+10 min",
+      "+N min": "+N min",
+      "Mensaje a escena": "Message to stage",
+      "Destino": "Destination",
+      "Aviso libre…": "Free message…",
+      "Las órdenes las ejecuta el Dashboard del Mac (quedan en su Deshacer). Este enlace es privado.": "Commands are carried out by the Dashboard on the Mac (they go into its Undo). This link is private.",
+      "Actividad": "Activity",
+      "EMPEZAR": "START",
+      "TERMINAR": "FINISH",
+      "EN HORA": "ON TIME",
+      "Enlace no válido": "Invalid link",
+      "Escanea el QR del Stage Manager (Dashboard › Emisión › Stage Manager · mando).": "Scan the Stage Manager QR code (Dashboard › Broadcast › Stage Manager · remote)."
+    },
+    mando: {
+      "Retraso acumulado: lo que viene va +{n} min respecto al horario original (retrasos y desbordes ya aplicados)": "Accumulated delay: what follows is +{n} min against the original schedule (delays and overruns already applied)",
+      "+{a} min (+{l} vivo)": "+{a} min (+{l} live)",
+      "buffer agotado": "buffer exhausted",
+      "Desfase en vivo de {w}: +{n} min": "Live drift of {w}: +{n} min",
+      "desborda el cambio en +{n} min": "overruns the changeover by +{n} min",
+      "se absorbe en el cambio": "absorbed in the changeover",
+      "En vivo: adelanto de {n} min": "Live: {n} min early",
+      "En hora (−{n} vivo)": "On time (−{n} live)",
+      "{w} va {n} min adelantada": "{w} is {n} min early",
+      "Sin retraso acumulado ni desfase en vivo": "No accumulated delay or live drift",
+      "siguiente {_n} {h} ({d} sobre lo previsto)": "next {_n} {h} ({d} over plan)",
+      "siguiente {_n} {h} (en hora)": "next {_n} {h} (on time)",
+      "{d} min en 1 entrada de la zona": "{d} min on 1 stage entry",
+      "{d} min en {n} entradas de la zona": "{d} min on {n} stage entries",
+      "{_n}: inicio real {h} (antes {o})": "{_n}: actual start {h} (was {o})",
+      "{_n}: inicio real {h} (antes {o}, asumido a su hora)": "{_n}: actual start {h} (was {o}, assumed on time)",
+      "Esa entrada ya no está en el horario": "That entry is no longer in the schedule",
+      "Solo los shows y soundchecks tienen ▶ / ■": "Only shows and soundchecks have ▶ / ■",
+      "{_n} ya tiene inicio real ({h})": "{_n} already has an actual start ({h})",
+      "{_n} ya tiene fin real ({h})": "{_n} already has an actual end ({h})",
+      "{_n} ya acabó a su hora ({h}). Para que pueda pasarse, activa Tiempo extra antes": "{_n} already ended on time ({h}). To let it run over, enable Extra time first",
+      "El fin ({h}) no puede ser anterior al inicio real de {_n} ({i}). ¿Cambio de hora? Corrige el inicio con doble clic en el Dashboard": "The end ({h}) can’t be before the actual start of {_n} ({i}). Time change? Fix the start with a double click on the Dashboard",
+      "{_n} aún no ha empezado": "{_n} hasn’t started yet",
+      "{_n} aún no ha empezado (empieza a las {h})": "{_n} hasn’t started yet (starts at {h})",
+      "Solo los shows y soundchecks": "Only shows and soundchecks",
+      "{_n} ya ha terminado ({h}): para corregirlo, Deshacer": "{_n} has already finished ({h}): to fix it, Undo",
+      "{_n} ya está en hora": "{_n} is already on time",
+      "Solo los shows y soundchecks tienen hora real": "Only shows and soundchecks have an actual time",
+      "La hora real de inicio no puede ser posterior a ahora ({h})": "The actual start can’t be later than now ({h})",
+      "Tiene que ser anterior a su fin real ({h})": "It must be before its actual end ({h})",
+      "Esa hora cae fuera de su jornada": "That time falls outside its day",
+      "Pisa el fin real de {_n} ({h})": "Overlaps the actual end of {_n} ({h})",
+      "{_n} ya tiene ese inicio real": "{_n} already has that actual start",
+      "Solo los shows y soundchecks tienen Tiempo extra": "Only shows and soundchecks have Extra time",
+      "{_n} ya ha terminado": "{_n} has already finished",
+      "{_x} ya ha empezado (▶ {h}): {w}": "{_x} has already started (▶ {h}): {w}",
+      "la prueba de {_n} ya no se puede extender": "the soundcheck of {_n} can no longer be extended",
+      "el bis de {_n} ya no se puede rescatar": "the encore of {_n} can no longer be brought back",
+      "Han pasado {m} min desde el fin de {_n} ({h}): {w} (ventana de {x} min)": "{m} min have passed since {_n} ended ({h}): {w} ({x} min window)",
+      "Han pasado {m} min desde el fin de {_n} ({h}): {w} (ventana de {x} min, lo que dura el cambio)": "{m} min have passed since {_n} ended ({h}): {w} ({x} min window, the length of the changeover)",
+      "{_n} ya tiene Tiempo extra": "{_n} already has Extra time",
+      "{_n} no tenía Tiempo extra": "{_n} didn’t have Extra time",
+      "Minutos de 1 a 600": "Minutes from 1 to 600",
+      "Falta desde cuándo": "“From” time missing",
+      "Orden vacía": "Empty command",
+      "Orden desconocida": "Unknown command",
+      "Zonas no válidas": "Invalid stages",
+      "Falta el resumen confirmado": "Confirmed summary missing",
+      "Mensaje vacío o de más de 140 caracteres": "Message empty or longer than 140 characters",
+      "Destino del mensaje no válido": "Invalid message destination",
+      "Zonas del mensaje no válidas": "Invalid message stages",
+      "No hay evento abierto en el Dashboard": "No event open on the Dashboard",
+      "¡choque con entrada en rojo!": "clash with a red entry!",
+      "El horario ha cambiado desde el resumen: revísalo y confirma otra vez": "The schedule changed since the summary: check it and confirm again"
     }
     /*UI-EN-END*/
   };
@@ -1243,7 +1362,7 @@
         if (m) { names.push(m[1]); return m[1].charAt(0) === '_' ? '([^«»]+?)' : '([\\s\\S]+?)'; }   // un nombre entre comillas no se come las comillas
         lit += p.length; return p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       }).join('');
-      return { k, re: new RegExp('^' + src + '$'), names, lit };
+      return { k, re: new RegExp('^' + src + '$'), names, lit, dots: k.indexOf(' · ') >= 0, tail: /\{[a-zA-Z]\w*\}$/.test(k) };
     };
     const tpl = o => Object.keys(o || {}).filter(k => /\{\w+\}/.test(k) && !/\}\{/.test(k)).map(mk).sort((x, y) => y.lit - x.lit);
     const rest = {}; Object.keys(UI_EN).forEach(g => { if (g !== 'log') Object.assign(rest, UI_EN[g]); });
@@ -1254,15 +1373,28 @@
     const s = String(src == null ? '' : src), d = depth || 0;
     if (norm(lang || cur) !== 'en' || !s || d > 5) return s;
     if (has(UI, s)) return UI[s];
-    const list = backList();
+    const list = backList(), parts = splitDots(s), multi = parts.length > 1;
     for (let i = 0; i < list.length; i++) {
+      if (multi && !list[i].dots && !list[i].tail) continue;   // con varios trozos « · »: plantillas que los tienen o que acaban en una variable (que se lleva el resto)
       const m = list[i].re.exec(s); if (!m) continue;
       const v = {};
       list[i].names.forEach((n, j) => { v[n] = n.charAt(0) === '_' ? m[j + 1] : txBack(m[j + 1], 'en', d + 1); });
       return fill(UI[list[i].k], v);
     }
-    if (s.indexOf(' · ') > 0) return s.split(' · ').map(x => txBack(x, 'en', d + 1)).join(' · ');
+    if (multi) return parts.map(x => txBack(x, 'en', d + 1)).join(' · ');
     return s;
+  }
+  /** Trozos separados por « · », sin partir lo que va entre «comillas» (lo escrito por la gente). */
+  function splitDots(s) {
+    const out = []; let depth = 0, cur = '';
+    for (let i = 0; i < s.length; i++) {
+      const c = s.charAt(i);
+      if (c === '«') depth++; else if (c === '»') depth = Math.max(0, depth - 1);
+      if (!depth && s.substr(i, 3) === ' · ') { out.push(cur); cur = ''; i += 2; continue; }
+      cur += c;
+    }
+    out.push(cur);
+    return out;
   }
 
   let cur = 'es';

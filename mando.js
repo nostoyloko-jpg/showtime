@@ -14,6 +14,10 @@
   'use strict';
   const isNode = typeof module !== 'undefined' && module.exports;
   const C = isNode ? require('./core.js') : root.ShowtimeCore;
+  // Idioma (Fase 3): los mensajes de las órdenes salen en español (quedan en el log y en Deshacer) y se traducen al
+  // enseñarlos (txBack en el Panel y en el Mando). Solo la píldora de retraso, que no se guarda, sale ya traducida.
+  const I18 = () => root.ShowtimeI18n || (isNode ? (() => { try { return require('./i18n.js'); } catch (e) { return null; } })() : null);
+  const tx = (s, v) => { const I = I18(); return I ? I.tx(s, v) : (v ? String(s).replace(/\{(\w+)\}/g, (m, k) => (v[k] !== undefined && v[k] !== null ? String(v[k]) : m)) : s); };
 
   const OPS = ['start', 'stop', 'onTime', 'stretch', 'delay', 'flash', 'flashOff', 'callOk'];
   const CATS = ['show', 'sc', 'tarea', 'hito'];
@@ -252,17 +256,17 @@
   // ── Píldora de retraso por zona (Panel y mando) ─────────────────────
   /** z = una fila de core.delayByZone → { cls: 'ok'|'early'|'acc'|'absorb'|'over', text, title } */
   function delayPill(z, zoneLabel) {
-    const nm = zoneLabel || z.zone || 'Sin zona';
+    const nm = zoneLabel || z.zone || tx('Sin zona');
     const who = z.liveBlock ? z.liveBlock.name : '';
-    const accT = 'Retraso acumulado: lo que viene va +' + z.acc + ' min respecto al horario original (retrasos y desbordes ya aplicados)';
+    const accT = tx('Retraso acumulado: lo que viene va +{n} min respecto al horario original (retrasos y desbordes ya aplicados)', { n: z.acc });
     if (z.live > 0) {
       const over = z.status === 'overflow';
-      return { cls: over ? 'over' : 'absorb', text: nm + ': +' + z.acc + ' min (+' + z.live + ' vivo)' + (over ? ' · buffer agotado' : ''),
-        title: accT + '\nDesfase en vivo de ' + who + ': +' + z.live + ' min' + (over ? ' · desborda el cambio en +' + z.overflow + ' min' : ' · se absorbe en el cambio') };
+      return { cls: over ? 'over' : 'absorb', text: nm + ': ' + tx('+{a} min (+{l} vivo)', { a: z.acc, l: z.live }) + (over ? ' · ' + tx('buffer agotado') : ''),
+        title: accT + '\n' + tx('Desfase en vivo de {w}: +{n} min', { w: who, n: z.live }) + ' · ' + (over ? tx('desborda el cambio en +{n} min', { n: z.overflow }) : tx('se absorbe en el cambio')) };
     }
-    if (z.acc > 0) return { cls: 'acc', text: nm + ': +' + z.acc + ' min', title: accT + (z.early ? '\nEn vivo: adelanto de ' + z.early + ' min' : '') };
-    if (z.early > 0) return { cls: 'early', text: nm + ' · En hora (−' + z.early + ' vivo)', title: who + ' va ' + z.early + ' min adelantada' };
-    return { cls: 'ok', text: nm + ' · En hora', title: 'Sin retraso acumulado ni desfase en vivo' };
+    if (z.acc > 0) return { cls: 'acc', text: nm + ': +' + z.acc + ' min', title: accT + (z.early ? '\n' + tx('En vivo: adelanto de {n} min', { n: z.early }) : '') };
+    if (z.early > 0) return { cls: 'early', text: nm + ' · ' + tx('En hora (−{n} vivo)', { n: z.early }), title: tx('{w} va {n} min adelantada', { w: who, n: z.early }) };
+    return { cls: 'ok', text: nm + ' · ' + tx('En hora'), title: tx('Sin retraso acumulado ni desfase en vivo') };
   }
 
   const API = { withBlk, OPS, delayPill, isBlocked, targets, suggest, actionsFor, startedBySchedule, findBlock, realPlan, onTimePlan, stretchPlan, editStartPlan, bisWindow, bisState, bisMinutes, BIS_OPTS, BIS_DEFAULT, delayPlan, delayStamp, checkCmd, };

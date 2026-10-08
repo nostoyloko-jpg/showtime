@@ -184,6 +184,65 @@
     t.Dt.loadSnapshot({ festival: fest(), config: { lang: 'es' }, callDone: [], flash: null, avisos: [] });
     eq(t.env.win.ShowtimeI18n.getLang(), 'es');
   });
+  // ── Idioma, Fase 3: el Mando entero en el idioma que manda el Panel; cambia en caliente y vuelve ──
+  const snapL = (t, lang, F) => t.Dt.loadSnapshot({ festival: F, config: { lang }, callDone: [], flash: null, avisos: [] });
+  test('Idioma (Fase 3): banda, estado de conexión, pista de retraso y píldora en inglés al llegar lang:en, y de vuelta', async () => {
+    const t = await mando(), F = fest(), el = id => t.env.getEl(id);
+    snapL(t, 'en', F);
+    eq(el('rx-t').textContent, 'CONNECTED');
+    const band = el('band').innerHTML;
+    ok(/SUGGESTED · 1 of 2/.test(band) && /Planned /.test(band) && /Playing as scheduled · ■ when it ends|In progress/.test(band) && /EXTRA TIME/.test(band), band);
+    ok(!/PROPUESTA|Previsto|Sonando/.test(band), 'sin español');
+    ok(/^Stage Principal \(or all, in the summary\) · what starts from \d\d:\d\d$/.test(el('delay-hint').textContent), el('delay-hint').textContent);
+    ok(/Principal · On time/.test(el('drift').innerHTML), el('drift').innerHTML);
+    snapL(t, 'es', F);
+    eq(el('rx-t').textContent, 'CONECTADO');
+    ok(/PROPUESTA · 1 de 2/.test(el('band').innerHTML) && /Principal · En hora/.test(el('drift').innerHTML), 'vuelve al español');
+    eq(t.env.errors.length, 0, t.env.errors.join(' | '));
+  });
+  test('Idioma (Fase 3): la respuesta del Mac (en español) sale traducida; los mensajes rápidos salen en el idioma del Panel', async () => {
+    const t = await mando(), F = fest();
+    snapL(t, 'en', F); t.status('live');
+    t.ctl.reply = { ok: false, msg: 'Suena ya ha terminado (21:00): para corregirlo, Deshacer' };
+    t.env.fire('b-start', 'click', {}); await tick(); await tick();
+    eq(t.env.getEl('toast').textContent, 'Not done · Suena has already finished (21:00): to fix it, Undo');
+    t.ctl.reply = { ok: true, msg: 'Suena: empieza 21:10 · sale 30 min tarde' };
+    t.env.fire('b-start', 'click', {}); await tick(); await tick();
+    eq(t.env.getEl('toast').textContent, 'Done · Suena: starts 21:10 · starts 30 min late');
+    click(t, '.msgp', { dataset: { msg: '5 MINUTOS' } }); await tick(); await tick();
+    eq(t.sent[t.sent.length - 1].op, 'flash'); eq(t.sent[t.sent.length - 1].args.text, '5 MINUTES', 'el mensaje rápido, en inglés');
+    snapL(t, 'es', F);
+    click(t, '.msgp', { dataset: { msg: 'ÚLTIMO TEMA' } }); await tick(); await tick();
+    eq(t.sent[t.sent.length - 1].args.text, 'ÚLTIMO TEMA');
+  });
+  test('Idioma (Fase 3): En hora y Retraso — la hoja de confirmación en inglés', async () => {
+    const t = await mando(), F = fest();
+    snapL(t, 'en', F); t.status('live');
+    t.env.fire('b-ontime', 'click', {});
+    ok(/^On time · Suena$/.test(t.env.getEl('sh-t').textContent), t.env.getEl('sh-t').textContent);
+    eq(t.env.getEl('sh-yes').textContent, 'Yes, on time');
+    ok(/Starts \(or started\) at its planned time/.test(t.env.getEl('sh-b').innerHTML));
+    click(t, '[data-delay]', { dataset: { delay: '5' }, disabled: false });
+    eq(t.env.getEl('sh-t').textContent, 'Cascading delay'); eq(t.env.getEl('sh-yes').textContent, 'Confirm');
+    ok(/moves \d/.test(t.env.getEl('sh-b').innerHTML) && /All stages/.test(t.env.getEl('sh-b').innerHTML), t.env.getEl('sh-b').innerHTML.slice(0, 300));
+  });
+  test('Idioma (Fase 3): todo texto marcado en remote.html y todo tx() de remote.js tiene traducción; botonera START / FINISH / ON TIME', () => {
+    const I = require('../i18n.js'), h = D.src('remote.html');
+    const list = []; let m; const re = /<([a-zA-Z][\w-]*)((?:[^>"']|"[^"]*")*)>([^<]*)/g;
+    while ((m = re.exec(h))) {
+      [['aria', 'aria-label'], ['placeholder', 'placeholder'], ['title', 'title']].forEach(([d, a]) => { if (new RegExp(' data-i18n-' + d + '(?=[\\s/>]|$)').test(m[2])) { const v = new RegExp(' ' + a + '="([^"]*)"').exec(m[2]); if (v) list.push(v[1]); } });
+      if (/ data-i18n(?=[\s/>]|$)/.test(m[2]) && m[3].trim()) list.push(m[3].trim());
+    }
+    ok(list.length > 20, list.length + ' textos');
+    eq(list.filter(x => !I.txHas(x) && !/^(Confidence|Backstage|Manager)$/.test(x)).join(' | '), '', 'remote.html sin traducción');
+    ['EMPEZAR', 'TERMINAR', 'EN HORA'].forEach(x => ok(new RegExp('<span data-i18n>' + x + '</span>').test(h), x + ' marcado'));
+    eq(I.tx('EMPEZAR', null, 'en'), 'START'); eq(I.tx('TERMINAR', null, 'en'), 'FINISH'); eq(I.tx('EN HORA', null, 'en'), 'ON TIME');
+    eq(I.tx('5 MINUTOS', null, 'en'), '5 MINUTES'); eq(I.tx('ÚLTIMO TEMA', null, 'en'), 'LAST SONG');
+    const js = D.src('remote.js').replace(/^\s*\/\/.*$/gm, ''), miss = [];
+    const rt = /\btx\((?:[^'()]*\?\s*)?'((?:[^'\\]|\\.)*)'(?:\s*:\s*'((?:[^'\\]|\\.)*)')?(?:\s*:\s*'((?:[^'\\]|\\.)*)')?(?:\s*:\s*'((?:[^'\\]|\\.)*)')?/g;
+    while ((m = rt.exec(js))) [m[1], m[2], m[3], m[4]].forEach(k => { if (k && /[A-Za-zÁÉÍÓÚáéíóúÑñ]{2}/.test(k) && !I.txHas(k)) miss.push(k); });
+    eq(miss.join(' | '), '', 'remote.js sin traducción');
+  });
   test('Reconexión: al volver a la app (pantalla encendida) o recuperar la red, reconecta a fondo', async () => {
     const t = await mando();
     t.env.win.document.visibilityState = 'visible';
