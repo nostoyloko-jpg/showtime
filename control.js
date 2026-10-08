@@ -2646,6 +2646,7 @@
       '<dt><kbd>Tab</kbd></dt><dd>Pasa a la casilla siguiente</dd>' +
       '<dt>Doble clic en la hora real</dt><dd>Corrige la hora real de inicio de una banda que ya empezó</dd>' +
       '<dt><kbd>⇧</kbd> <kbd>⌘</kbd> <kbd>F</kbd></dt><dd>Modo foco: solo lo de directo, filas y letra más grandes</dd>' +
+      '<dt><kbd>⇧</kbd> <kbd>⌘</kbd> <kbd>C</kbd></dt><dd>Alterna tema Alto Contraste (Escenario / Sol) al instante</dd>' +
       '<dt><kbd>⌘</kbd> <kbd>/</kbd></dt><dd>Abre esta ayuda</dd>' +
       '</dl><p class="hint">Jornada = día del evento: lo que empieza antes de la hora de corte cuenta como la noche anterior. En la Pantalla Live: <kbd>F</kbd> pantalla completa · <kbd>V</kbd> cambia de vista.</p>',
       [{ label: 'Cerrar' }]);
@@ -2654,6 +2655,24 @@
   $('btn-focus').addEventListener('click', () => { setFocus(!focusOn()); toast(focusOn() ? 'Modo foco activado' : 'Modo foco desactivado', false, 2000); });
   document.addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'f' || e.key === 'F')) { e.preventDefault(); setFocus(!focusOn()); toast(focusOn() ? 'Modo foco activado' : 'Modo foco desactivado', false, 2000); } });
   applyFocus();
+  // ⇧⌘C: alterna el tema del Dashboard entre el normal y Escenario (alto contraste, para el sol). Recuerda el anterior.
+  const PS_PREV_KEY = 'showtime.panel.style.prev';
+  function togglePanelContrast() {
+    const cur = panelStyle();
+    let next;
+    if (cur === 'escenario') {
+      let prev = null; try { prev = JSON.parse(localStorage.getItem(PS_PREV_KEY) || 'null'); } catch (e) {}
+      next = Dt.normStyle(prev && prev !== 'escenario' ? prev : 'raycast');
+    } else {
+      next = 'escenario';
+      try { localStorage.setItem(PS_PREV_KEY, JSON.stringify(cur)); } catch (e) {}
+    }
+    try { localStorage.setItem(PS_KEY, JSON.stringify(next)); } catch (e) {}
+    applyPanelStyle(next);
+    const sel = $('cfg-style-panel'); if (sel) sel.value = next;
+    toast('Estilo del Dashboard: ' + (next === 'escenario' ? 'Escenario (Alto contraste)' : next === 'raycast' ? 'Raycast' : (sel && sel.selectedOptions[0] ? sel.selectedOptions[0].textContent : next)), false, 2000);
+  }
+  document.addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'c' || e.key === 'C')) { e.preventDefault(); togglePanelContrast(); } });
   document.addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && (e.key === '/' || e.key === '?')) { e.preventDefault(); openHelp(); } });
 
   // ── Pantalla siempre encendida ───────────────────────────────────────

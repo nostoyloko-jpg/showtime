@@ -878,6 +878,25 @@
     const js = D.src('control.js');
     ok(/Pantallas QR<\/div>/.test(js) && !/Pantallas QR \(móviles\)/.test(js), 'sin «(móviles)»');
   });
+  test('⇧⌘C: alterna Escenario (alto contraste) y vuelve al tema anterior; queda en Configuración y en la ayuda', () => {
+    const t = dashboard({ 'showtime.panel.style': '"neutro"' });
+    t.env.fire('document', 'keydown', { key: 'C', metaKey: true, shiftKey: true, preventDefault() {} });
+    eq(t.read('showtime.panel.style'), 'escenario', 'pasa a Escenario');
+    eq(t.read('showtime.panel.style.prev'), 'neutro', 'recuerda el tema anterior');
+    eq(t.env.getEl('toast').textContent, 'Estilo del Dashboard: Escenario (Alto contraste)', 'avisa');
+    eq(t.env.getEl('cfg-style-panel').value, 'escenario', 'Configuración muestra Escenario');
+    t.env.fire('document', 'keydown', { key: 'c', ctrlKey: true, shiftKey: true, preventDefault() {} });
+    eq(t.read('showtime.panel.style'), 'neutro', 'otra vez: vuelve a Neutro');
+    eq(t.env.getEl('cfg-style-panel').value, 'neutro');
+    const t2 = dashboard();
+    t2.env.fire('document', 'keydown', { key: 'C', metaKey: true, shiftKey: true, preventDefault() {} });
+    t2.env.fire('document', 'keydown', { key: 'C', metaKey: true, shiftKey: true, preventDefault() {} });
+    eq(t2.read('showtime.panel.style'), 'clasico', 'sin tema previo, vuelve al Clásico de partida');
+    const t3 = dashboard({ 'showtime.panel.style': '"escenario"' });
+    t3.env.fire('document', 'keydown', { key: 'C', metaKey: true, shiftKey: true, preventDefault() {} });
+    eq(t3.read('showtime.panel.style'), 'raycast', 'si ya estaba en Escenario sin historial, vuelve a Raycast');
+    ok(/<dt><kbd>⇧<\/kbd> <kbd>⌘<\/kbd> <kbd>C<\/kbd><\/dt><dd>Alterna tema Alto Contraste \(Escenario \/ Sol\) al instante<\/dd>/.test(D.src('control.js')), 'en la ayuda ⌘/');
+  });
   test('Modo Foco: micro-píldora del tipo (SHOW · PRUEBA · TAREA · HITO) con color fijo, en vez del cuadradito de color', () => {
     const P = panel().T.tipoPill;
     eq(P('show'), '<span class="tpill tp-show" aria-hidden="true">SHOW</span>');
