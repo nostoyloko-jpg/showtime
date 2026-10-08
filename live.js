@@ -941,6 +941,7 @@
     if (VISTA === 'confidence' && ZONA !== null) q.set('zona', ZONA); else q.delete('zona');
     try { history.replaceState(null, '', location.pathname + '?' + q.toString() + location.hash); } catch (e) {}
     applyVista();
+    reportVista();
     if (VISTA === 'confidence') { const g = Dt.getStandby ? Dt.getStandby() : null; if (g && g.on && !STANDBY) setStandby(true); }   // llega a Confidence con el Standby del Dashboard puesto
   }
   document.addEventListener('keydown', e => {
@@ -972,6 +973,8 @@
     stbAt = g.at;
     if (g.on !== STANDBY) setStandby(g.on);
   }
+  /** Dice al Dashboard qué vista muestra ESTA ventana (puede haber cambiado con la tecla V). Lo usa el desplegable de Live. */
+  function reportVista() { try { if (window.opener && !Dt.READONLY) window.opener.postMessage({ app: 'showtime', type: 'vistaState', vista: VISTA }, '*'); } catch (e) {} }
   function renderStandby() {
     const el = $('standby'); if (!el || !Mk) return;
     if ($('stbbtn')) $('stbbtn').setAttribute('aria-pressed', String(STANDBY));
@@ -1104,6 +1107,7 @@
   // ── Arranque ─────────────────────────────────────────────────────────
   load();
   applyVista();
+  reportVista();
   if (STANDBY) setStandby(true); else renderStandby();
   followStandby();
   setZoom(0);
@@ -1114,5 +1118,5 @@
   if (Dt.READONLY) startStaff();
   if (window.opener || !Dt.getFestival()) Dt.hello();   // pide los datos al Panel que la abrió (o a uno abierto)
   // Si el Panel se recarga, pierde la referencia a esta ventana: el «ping» hace que la recupere y le reenvíe todo.
-  if (window.opener && Dt.ping) setInterval(() => Dt.ping(), 2000);
+  if (window.opener && Dt.ping) setInterval(() => { Dt.ping(); reportVista(); }, 2000);
 })();
