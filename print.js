@@ -197,6 +197,7 @@
     const w = s.split(' ');
     while (w.length > 1) {
       w.pop();
+      while (w.length > 1 && HOLLOW.test(w[w.length - 1])) w.pop();   // nunca «… de…», «… +…»
       const t = w.join(' ').replace(/[\s,;:.\/\-–]+$/, '') + '…';
       if (textW(t, fs, bold) <= maxW) return t;
     }
@@ -386,14 +387,40 @@
     const totalRows = lanes.reduce((n, l) => n + l.rows, 0);
 
     // ── Carriles y barras; la leyenda resta alto a los carriles, así que se ajusta en unas pocas vueltas ──
-    const LROW = 3.8, NARROW = 20;
+    const NARROW = 20;
     const SHAPE = k => k === 'show' ? 'square' : k === 'sc' ? 'circle' : 'diamond';
     const ORDER = ['diamond', 'circle', 'square'];                       // tareas · soundchecks · shows
-    // Filas de leyenda: cada tipo en su columna con su título; con un solo tipo, título + 2 columnas
-    const legendRows = cs => { const g = ORDER.filter(k => cs[k]); return !g.length ? 0 : g.length === 1 ? 1 + Math.ceil(cs[g[0]] / 2) : 1 + Math.max.apply(null, g.map(k => cs[k])); };
-    let legendR = 0, rowH = 0, fs = 0, bars = [], lanesBottom = 0, legendTop = 0;
+    // Leyenda a todo el ancho, en columnas equilibradas, con densidad según el número de llamadas (nunca más de ~20 mm):
+    // ≤ 9 → 3 columnas, ~8 pt · 10–16 → 4 columnas, ~7 pt · > 16 → 4 columnas, ~6,5 pt (si aun así no cabe, una columna más).
+    // Flujo continuo por columnas: título del tipo justo antes de su primera llamada (nunca un título suelto al pie de columna).
+    const LEG_MAX = 21;
+    const legendPlan = cs => {
+      const g = ORDER.filter(k => cs[k]), n = g.reduce((a, k) => a + cs[k], 0);
+      if (!n) return null;
+      const d = n <= 9 ? { cols: 3, fs: 2.8, lrow: 3.7 } : n <= 16 ? { cols: 4, fs: 2.5, lrow: 3.2 } : { cols: 4, fs: 2.3, lrow: 2.9 };
+      const seq = [];
+      g.forEach(k => { seq.push({ head: true, shape: k }); for (let i = 0; i < cs[k]; i++) seq.push({ head: false, shape: k, i: i }); });
+      const place = (cols, rows) => {
+        const out = []; let c = 0, r = 0;
+        for (const it of seq) {
+          if (r >= rows || (it.head && r === rows - 1 && rows > 1 && r > 0)) { c++; r = 0; }
+          if (c >= cols) return null;
+          out.push(Object.assign({ col: c, row: r }, it)); r++;
+        }
+        return out;
+      };
+      let cols = d.cols, rows, cells;
+      for (;;) {
+        rows = Math.max(2, Math.ceil(seq.length / cols));
+        while (!(cells = place(cols, rows))) rows++;
+        if (rows * d.lrow + 3 <= LEG_MAX || cols >= 6) break;
+        cols++;
+      }
+      return { cols: cols, rows: rows, fs: d.fs, lrow: d.lrow, cells: cells, h: rows * d.lrow + 3 };
+    };
+    let legendHres = 0, rowH = 0, fs = 0, bars = [], lanesBottom = 0, legendTop = 0;
     for (let pass = 0; pass < 5; pass++) {
-      const legendH = legendR ? legendR * LROW + 3 : 0;
+      const legendH = legendHres;
       lanesBottom = H - 1 - legendH;
       legendTop = lanesBottom + 3;
       const avail = lanesBottom - lanesTop - (nL - 1) * GAP;
@@ -418,12 +445,12 @@
       }));
       const cs = { diamond: 0, circle: 0, square: 0 };
       bars.forEach(bb => { if (bb.badge < 0) cs[SHAPE(bb.kind)]++; });
-      const need = legendRows(cs);
-      if (need <= legendR) break;
-      legendR = need;
+      const plan = legendPlan(cs), need = plan ? plan.h : 0;
+      if (need <= legendHres) break;
+      legendHres = need;
     }
     // Llamadas por orden horario (y escenario), con 3 geometrías que se distinguen en blanco y negro:
-    // shows → letra en cuadrado [A]; soundchecks → número en círculo ①; tareas → número en rombo ◆1. Leyenda en 2 columnas.
+    // shows → letra en cuadrado [A]; soundchecks → número en círculo ①; tareas → número en rombo ◆1.
     const called = bars.filter(bb => bb.badge < 0).sort((p, q) => p.s - q.s || p.lane - q.lane || p.row - q.row);
     const cnt = { square: 0, circle: 0, diamond: 0 };
     called.forEach((bb, i) => {
@@ -438,21 +465,19 @@
     const legend = [];
     if (called.length) {
       const tx = T(lang).legend, HEAD = { diamond: tx.tarea, circle: tx.sc, square: tx.show };
-      const groups = ORDER.map(k => ({ k: k, items: called.filter(bb => bb.mark.shape === k) })).filter(g => g.items.length);
-      // Un tipo por columna; con un solo tipo, sus entradas en 2 columnas bajo el título
-      const cols = groups.length === 1 ? 2 : groups.length, colW = (W - LW - 1) / cols;
-      const entry = (bb, x, y) => {
-        const tail = ' (' + bb.time + ')';
-        const nm = bb.name ? fitText(bb.name, 2.6, colW - 6.8 - textW(tail, 2.6), false) : '';
-        legend.push({ num: bb.badge, mark: bb.mark, x: x, y: y, text: (nm + tail).trim() });
-      };
-      groups.forEach((g, gi) => {
-        const x0g = LW + (groups.length === 1 ? 0 : gi) * colW;
-        legend.push({ head: true, mark: { shape: g.k, label: '' }, x: x0g, y: legendTop, text: String(HEAD[g.k]).toUpperCase() });
-        if (groups.length === 1) {
-          const per = Math.ceil(g.items.length / 2);
-          g.items.forEach((bb, i) => entry(bb, LW + Math.floor(i / per) * colW, legendTop + (1 + i % per) * LROW));
-        } else g.items.forEach((bb, i) => entry(bb, x0g, legendTop + (1 + i) * LROW));
+      const cs = { diamond: 0, circle: 0, square: 0 };
+      called.forEach(bb => { cs[bb.mark.shape]++; });
+      const plan = legendPlan(cs), colW = (W - 2) / plan.cols, r = plan.fs * 0.6;
+      const byShape = { diamond: [], circle: [], square: [] };
+      called.forEach(bb => byShape[bb.mark.shape].push(bb));
+      plan.cells.forEach(c => {
+        const x = 1 + c.col * colW, y = legendTop + c.row * plan.lrow;
+        const base = { x: x, y: y, fs: plan.fs, r: r, lrow: plan.lrow };
+        if (c.head) { legend.push(Object.assign(base, { head: true, mark: { shape: c.shape, label: '' }, text: String(HEAD[c.shape]).toUpperCase() })); return; }
+        const bb = byShape[c.shape][c.i];
+        const tail = ' (' + bb.time + ')', room = colW - 2.3 * r - 2.7;
+        const nm = bb.name ? fitText(bb.name, plan.fs, room - textW(tail, plan.fs), false) : '';
+        legend.push(Object.assign(base, { num: bb.badge, mark: bb.mark, text: (nm + tail).trim() }));
       });
     }
     const ticks = [];
@@ -521,15 +546,16 @@
     });
     // Leyenda de llamadas (bloques estrechos)
     if (L.legend.length) {
-      out.push('<line x1="' + L.LW + '" x2="' + (L.W - 1) + '" y1="' + f(L.legendTop - 1.6) + '" y2="' + f(L.legendTop - 1.6) + '" stroke="#cbd5e1" stroke-width="0.2"/>');
+      out.push('<line x1="1" x2="' + (L.W - 1) + '" y1="' + f(L.legendTop - 1.6) + '" y2="' + f(L.legendTop - 1.6) + '" stroke="#cbd5e1" stroke-width="0.2"/>');
       L.legend.forEach(it => {
-        if (it.head) {                                   // título del grupo: «◆ TAREAS TÉCNICAS»
-          out.push(badge(it.x + 2.2, it.y + 1.2, it.mark, 1.2));
-          out.push('<text x="' + f(it.x + 5.2) + '" y="' + f(it.y + 2.0) + '" font-size="2.3" font-weight="800" letter-spacing="0.25" fill="#334155">' + esc(it.text) + '</text>');
+        const cy = it.y + it.lrow * 0.38, tx = f(it.x + 2.3 * it.r + 1.5);
+        if (it.head) {                                   // título del tipo: «◆ TAREAS TÉCNICAS»
+          out.push(badge(it.x + it.r + 0.2, cy, it.mark, it.r * 0.8));
+          out.push('<text x="' + tx + '" y="' + f(cy + it.fs * 0.33) + '" font-size="' + f(it.fs * 0.88) + '" font-weight="800" letter-spacing="0.22" fill="#334155">' + esc(it.text) + '</text>');
           return;
         }
-        out.push(badge(it.x + 2.2, it.y + 1.2, it.mark, 1.6));
-        out.push('<text x="' + f(it.x + 5.2) + '" y="' + f(it.y + 2.1) + '" font-size="2.6" fill="#0f172a">' + esc(it.text) + '</text>');
+        out.push(badge(it.x + it.r + 0.2, cy, it.mark, it.r));
+        out.push('<text x="' + tx + '" y="' + f(cy + it.fs * 0.35) + '" font-size="' + f(it.fs) + '" fill="#0f172a">' + esc(it.text) + '</text>');
       });
     }
     out.push('</svg>');

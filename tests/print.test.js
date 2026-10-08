@@ -376,10 +376,29 @@
     eq(es, 'diamond:TAREAS TÉCNICAS | circle:PRUEBAS DE SONIDO | square:CONCIERTOS / SHOWS');
     const en = P.layoutGantt(rows, 273, 164, 'en').legend.filter(it => it.head).map(it => it.text).join(' | ');
     eq(en, 'TECHNICAL TASKS | SOUNDCHECKS | SHOWS');
-    const L = P.layoutGantt(rows, 273, 164), xs = L.legend.filter(it => it.head).map(it => it.x);
-    ok(xs[0] < xs[1] && xs[1] < xs[2], 'un tipo por columna');
-    ok(L.legend.filter(it => !it.head).every(it => it.y > L.legendTop), 'las entradas, debajo de su título');
+    const L = P.layoutGantt(rows, 273, 164);
+    const order = L.legend.slice().sort((p, q) => p.x - q.x || p.y - q.y).map(it => (it.head ? 'H:' : '') + it.mark.shape).join(',');
+    eq(order, 'H:diamond,diamond,H:circle,circle,H:square,square', 'flujo continuo: cada título justo antes de su primera llamada');
     ok(/TAREAS TÉCNICAS/.test(P.ganttSvg(L)), 'título en el SVG');
+  });
+  test('gantt: leyenda a todo el ancho, columnas equilibradas y densidad según el número de llamadas (≤ ~20 mm)', () => {
+    // n bloques de 5 min en un día largo: todos son llamadas (mezcla de tareas, soundchecks y shows)
+    const mk = n => { const rows = [G('Relleno', 600, 1500, 'Carpa', 'tarea')];
+      for (let i = 0; i < n; i++) rows.push(G('Bloque con nombre largo número ' + (i + 1), 620 + i * 30, 625 + i * 30, 'Principal', ['tarea', 'sc', 'show'][i % 3]));
+      return P.layoutGantt(rows, 273, 164); };
+    const plan = L => { const it = L.legend.filter(x => !x.head), xs = [...new Set(L.legend.map(x => x.x.toFixed(2)))];
+      const rows = Math.round((Math.max(...L.legend.map(x => x.y)) - L.legendTop) / L.legend[0].lrow) + 1;
+      return { n: it.length, cols: xs.length, fs: L.legend[0].fs, h: rows * L.legend[0].lrow + 3, maxX: Math.max(...L.legend.map(x => x.x)), rows }; };
+    const a = plan(mk(6)), b = plan(mk(12)), c = plan(mk(24));
+    eq(a.n, 6); eq(a.cols, 3, '≤ 9 → 3 columnas'); eq(a.fs, 2.8, '~8 pt');
+    eq(b.n, 12); eq(b.cols, 4, '10–16 → 4 columnas'); eq(b.fs, 2.5, '~7 pt');
+    eq(c.n, 24); ok(c.cols >= 4, '> 16 → 4 columnas o más'); eq(c.fs, 2.3, '~6,5 pt');
+    [a, b, c].forEach(p => ok(p.h <= 21, 'la leyenda no pasa de ~20 mm (' + p.h.toFixed(1) + ')'));
+    ok(a.maxX > 273 * 0.6 && b.maxX > 273 * 0.7, 'ocupa el ancho de la página');
+    // Ningún título se queda solo al pie de una columna
+    const L = mk(12), last = {};
+    L.legend.forEach(x => { const k = x.x.toFixed(2); if (!last[k] || x.y > last[k].y) last[k] = x; });
+    ok(Object.values(last).every(x => !x.head), 'sin títulos huérfanos al pie de columna');
   });
   test('gantt: html con formato gantt → hojas apaisadas con SVG y pie', () => {
     const rows = [G('A', 690, 780), G('B', 900, 960, 'Carpa', 'show', '#0284c7')];
