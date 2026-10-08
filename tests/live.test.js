@@ -253,26 +253,50 @@
     key('S'); eq(t.env.getEl('standby').hidden, true); eq(t.title(), 'Showtime · Manager');
     key('s'); key('Escape'); eq(t.env.getEl('standby').hidden, true, 'Esc también sale');
   });
-  test('Standby desde el Dashboard (Live ▾): la Live obedece a quien la abrió y le confirma el estado', () => {
-    const got = [], opener = { closed: false, postMessage(m) { got.push(m); } };
-    const t = arrancar({ search: '?vista=manager', opener });
-    t.env.fire('window', 'message', { data: { app: 'showtime', type: 'standby', on: true }, source: {} });
-    eq(t.env.getEl('standby').hidden, true, 'otra ventana: no');
-    t.env.fire('window', 'message', { data: { app: 'showtime', type: 'standby', on: true }, source: opener });
-    eq(t.env.getEl('standby').hidden, false, 'el Dashboard que la abrió: sí');
-    ok(got.some(m => m.type === 'standbyState' && m.on === true), 'confirma al Dashboard');
-    t.env.fire('window', 'message', { data: { app: 'showtime', type: 'standby', on: false }, source: opener });
-    eq(t.env.getEl('standby').hidden, true);
-    ok(got.some(m => m.type === 'standbyState' && m.on === false));
+  const stbMsg = (t, on, at) => t.env.fire('window', 'message', { data: { app: 'showtime', type: 'standbyAll', standby: { on, at } }, source: {} });
+  test('Standby del Dashboard (Live ▾): lo siguen las Confidence del Mac; Manager y Backstage no cambian', () => {
+    const conf = arrancar({ search: '?vista=confidence&zona=z1' }), man = arrancar({ search: '?vista=manager' }), back = arrancar({ search: '?vista=backstage' });
+    [conf, man, back].forEach(t => stbMsg(t, true, 1000));
+    eq(conf.env.getEl('standby').hidden, false, 'Confidence: cartel');
+    eq(man.env.getEl('standby').hidden, true, 'Manager: sigue igual'); eq(back.env.getEl('standby').hidden, true, 'Backstage: sigue igual');
+    stbMsg(conf, false, 2000);
+    eq(conf.env.getEl('standby').hidden, true, 'se quita y vuelve a la cuenta atrás'); eq(conf.body.dataset.vista, 'confidence');
   });
-  test('Standby: los mensajes flash siguen saliendo por encima (z-index) y la Live de Staff no obedece al Dashboard', async () => {
+  test('Standby del Dashboard: la tecla S en una Confidence manda hasta la siguiente orden (y el mismo estado repetido no la pisa)', () => {
+    const t = arrancar({ search: '?vista=confidence&zona=z1' });
+    const key = k => t.env.fire('document', 'keydown', { key: k, target: { tagName: 'BODY' } });
+    stbMsg(t, true, 1000); eq(t.env.getEl('standby').hidden, false);
+    key('s'); eq(t.env.getEl('standby').hidden, true, 'S: esta pantalla sale');
+    stbMsg(t, true, 1000); eq(t.env.getEl('standby').hidden, true, 'el mismo estado otra vez (p. ej. la emisión lo repite): no vuelve');
+    stbMsg(t, true, 3000); eq(t.env.getEl('standby').hidden, false, 'una orden nueva del Dashboard: sí');
+  });
+  test('Standby del Dashboard: una Confidence que se abre (o llega con V) con el Standby puesto ya sale en cartel', () => {
+    const st = { 'showtime.standby': JSON.stringify({ on: true, at: 5 }) };
+    eq(arrancar({ search: '?vista=confidence&zona=z1', storage: Object.assign({}, st) }).env.getEl('standby').hidden, false, 'al abrir');
+    const t = arrancar({ search: '?vista=backstage', storage: Object.assign({}, st) });
+    eq(t.env.getEl('standby').hidden, true, 'Backstage no');
+    t.env.fire('document', 'keydown', { key: 'v', target: { tagName: 'BODY' } });   // backstage → manager → confidence
+    t.env.fire('document', 'keydown', { key: 'v', target: { tagName: 'BODY' } });
+    eq(t.body.dataset.vista, 'confidence'); eq(t.env.getEl('standby').hidden, false, 'al pasar a Confidence');
+  });
+  test('Standby por QR: las Confidence de Staff lo reciben en la emisión (también al entrar tarde); Manager de Staff no', async () => {
+    ROOM = ROOM || await E.newRoom();
+    const h = hashOf(E.staffUrl(ROOM, 'http://x/'));
+    const conf = arrancar({ search: '?vista=confidence&zona=z1', hash: h }), man = arrancar({ search: '?vista=manager', hash: h });
+    const snap = on => ({ festival: null, config: {}, callDone: [], flash: null, avisos: [], meteo: null, standby: { on, at: on ? 7 : 8 } });
+    [conf, man].forEach(t => t.env.win.ShowtimeDatos.loadSnapshot(snap(true)));
+    eq(conf.env.getEl('standby').hidden, false, 'Confidence de Staff: cartel');
+    eq(man.env.getEl('standby').hidden, true, 'Manager de Staff: no');
+    conf.env.win.ShowtimeDatos.loadSnapshot(snap(false));
+    eq(conf.env.getEl('standby').hidden, true, 'se quita');
+    // la orden directa de ventana a ventana ya no existe: solo manda el estado del evento
+    conf.env.fire('window', 'message', { data: { app: 'showtime', type: 'standby', on: true } });
+    eq(conf.env.getEl('standby').hidden, true);
+  });
+  test('Standby: los mensajes flash siguen saliendo por encima (z-index) y hay botón en la Live', () => {
     const css = D.src('marca.css'), lcss = D.src('live.css');
     const z = re => +re.exec(css + lcss)[1];
     ok(z(/\.standby\{position:fixed;inset:0;z-index:(\d+)/) < z(/#flash\{position:fixed;inset:0;z-index:(\d+)/), 'flash encima');
-    ROOM = ROOM || await E.newRoom();
-    const t = arrancar({ hash: hashOf(E.staffUrl(ROOM, 'http://x/')) });
-    t.env.fire('window', 'message', { data: { app: 'showtime', type: 'standby', on: true } });
-    eq(t.env.getEl('standby').hidden, true, 'Staff (QR): no');
     ok(/<button id="stbbtn"[^>]*title="Standby · Modo Cartel/.test(D.src('live.html')), 'botón en los controles de la Live');
   });
 

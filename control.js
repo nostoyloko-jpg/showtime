@@ -721,7 +721,7 @@
     if ($('lv-standby')) {
       const on = standbyOn();
       $('lv-standby-on').classList.toggle('on', on);
-      $('lv-standby-t').textContent = on ? 'Quitar Standby · volver a la vista' : 'Standby · Modo Cartel';
+      $('lv-standby-t').textContent = on ? 'Quitar Standby de las Confidence' : 'Standby en las Confidence · Modo Cartel';
     }
     meteoTick();
     if (!FEST) return;
@@ -1317,23 +1317,14 @@
     tick();
     toast(name ? 'Pantalla Live cerrada' : 'Pantallas Live cerradas');
   }
-  // ── Standby / Modo Cartel: las Live abiertas desde aquí enseñan el cartel de Showtime y la hora ──
-  const STB = new Map();   // nombre de la ventana → ¿en Standby? (lo confirma cada Live)
-  function openLives() { return Array.from(LIVES.entries()).filter(([, w]) => w && !w.closed); }
-  function standbyOn() { return openLives().some(([n]) => STB.get(n)); }
+  // ── Standby / Modo Cartel: TODAS las Confidence (las de este Mac y las que van por QR) enseñan el cartel y la hora ──
+  // Es un estado del evento (como los mensajes): viaja a las Live del Mac y va en la emisión. Manager y Backstage no cambian.
+  function standbyOn() { const s = Dt.getStandby && Dt.getStandby(); return !!(s && s.on); }
   function setStandby(on) {
-    const open = openLives();
-    if (!open.length) { toast('No hay ninguna Pantalla Live abierta: ábrela primero (Live ▾)', true); return; }
-    open.forEach(([n, w]) => { try { w.postMessage({ app: 'showtime', type: 'standby', on: !!on }, '*'); } catch (e) {} STB.set(n, !!on); });
+    Dt.setStandby(!!on);
     tick();
-    toast(on ? 'Standby: ' + (open.length === 1 ? 'la Pantalla Live muestra' : 'las ' + open.length + ' Pantallas Live muestran') + ' el cartel y la hora' : 'Standby quitado: las Pantallas Live vuelven a su vista');
+    toast(on ? 'Standby: las Confidence (también las del QR) muestran el cartel y la hora' : 'Standby quitado: las Confidence vuelven a la cuenta atrás');
   }
-  // Cada Live avisa de su estado (también si el Standby se pone o se quita en ella, con la tecla S)
-  window.addEventListener('message', e => {
-    const m = e.data; if (!m || m.app !== 'showtime' || m.type !== 'standbyState') return;
-    for (const [n, w] of LIVES) if (w === e.source) STB.set(n, !!m.on);
-    tick();
-  });
   document.addEventListener('click', e => {
     if (e.target.closest('#lv-standby')) { e.preventDefault(); e.stopPropagation(); closeMenus(); setStandby(!standbyOn()); return; }
     const x = e.target.closest('#m-live [data-close]');
@@ -2527,7 +2518,7 @@
   document.addEventListener('click', e => { const b = e.target.closest('#cast-staff [data-cv]'); if (!b) return; CAST_VISTA = b.dataset.cv; renderCast(); });
   document.addEventListener('change', e => { if (e.target.matches('#cast-staff [data-cz]')) { CAST_ZONA = e.target.value; renderCast(); } });
   // Cada cambio guardado (en este Panel o llegado de la Live, p. ej. un OK de CALL) sale hacia los móviles
-  const EM_KEYS = [Dt.KEYS.festival, Dt.KEYS.config, Dt.KEYS.callDone, Dt.KEYS.flash, Dt.KEYS.avisos, Dt.KEYS.meteo];
+  const EM_KEYS = [Dt.KEYS.festival, Dt.KEYS.config, Dt.KEYS.callDone, Dt.KEYS.flash, Dt.KEYS.avisos, Dt.KEYS.meteo, Dt.KEYS.standby];
   Dt.onWrite(k => { if (EM && EM_KEYS.indexOf(k) >= 0) EM.push(); });
   (function () { renderChat(); loadProducers(); const saved = emLoad(); if (saved) emRoom = saved.room; renderCast(); if (saved && saved.on) emStart(true); })();
 
@@ -2538,6 +2529,7 @@
     if (type === 'chat') { renderChat(); return; }
     if (type === 'flash') { renderFlash(); return; }
     if (type === 'meteo') { renderMeteo(); return; }
+    if (type === 'standbyAll') { tick(); return; }
     loadState(); renderAll();
   });
 

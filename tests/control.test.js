@@ -782,24 +782,17 @@
     ok(/Clic o Esc para cerrar/.test(ultimo(t, 'splash')) && /stm-ver/.test(ultimo(t, 'splash')));
     ok(/<button id="btn-about" class="mitem"[^>]*>.*Acerca de Showtime…<\/button>/.test(D.src('index.html')), 'en el menú Archivo');
   });
-  test('Live ▾ › Standby: pone en Modo Cartel las Live abiertas (y lo quita); sin Live abierta, avisa', async () => {
-    const t = panel(), msgs = [];
-    const w = { closed: false, focus() {}, postMessage(m) { msgs.push(m); } };
-    t.env.win.open = () => w;
+  test('Live ▾ › Standby: estado del evento para TODAS las Confidence (Mac y QR): se guarda, va a las Live y en la emisión', async () => {
+    const t = panel();
     clickStb(t);
-    ok(/No hay ninguna Pantalla Live abierta/.test(t.env.getEl('toast').textContent), 'sin Live: aviso');
-    t.env.fire('document', 'click', { target: { closest: q => q === '#m-live [data-vista]' ? { dataset: { vista: 'manager' } } : null } });
-    await new Promise(r => setImmediate(r));
+    eq(t.read('showtime.standby').on, true, 'guardado (lo leen las Live del Mac)');
+    eq(t.T.standbyOn(), true); eq(t.env.getEl('lv-standby-t').textContent, 'Quitar Standby de las Confidence');
+    ok(/Standby: las Confidence \(también las del QR\) muestran el cartel y la hora/.test(t.env.getEl('toast').textContent));
+    eq(t.env.win.ShowtimeDatos.getSnapshot().standby.on, true, 'va en la emisión (QR)');
+    ok(/Dt\.KEYS\.meteo, Dt\.KEYS\.standby\]/.test(D.src('control.js')), 'cambiarlo vuelve a emitir');
     clickStb(t);
-    ok(msgs.some(m => m.app === 'showtime' && m.type === 'standby' && m.on === true), 'la Live recibe la orden');
-    eq(t.T.standbyOn(), true); eq(t.env.getEl('lv-standby-t').textContent, 'Quitar Standby · volver a la vista');
-    ok(/Standby: la Pantalla Live muestra el cartel y la hora/.test(t.env.getEl('toast').textContent));
-    // La Live avisa de que ha salido (tecla S en ella): el menú lo refleja
-    t.env.fire('window', 'message', { data: { app: 'showtime', type: 'standbyState', on: false }, source: w });
-    eq(t.T.standbyOn(), false); eq(t.env.getEl('lv-standby-t').textContent, 'Standby · Modo Cartel');
-    clickStb(t); clickStb(t);
-    ok(msgs.filter(m => m.type === 'standby').map(m => m.on).join() === 'true,true,false', 'y se quita con el mismo botón');
-    ok(/id="lv-standby"/.test(D.src('index.html')));
+    eq(t.read('showtime.standby').on, false, 'se quita con el mismo botón'); eq(t.env.getEl('lv-standby-t').textContent, 'Standby en las Confidence · Modo Cartel');
+    ok(/id="lv-standby"[\s\S]*Todas las Confidence \(también las del QR\)/.test(D.src('index.html')));
   });
   test('Modo Foco: micro-píldora del tipo (SHOW · PRUEBA · TAREA · HITO) con color fijo, en vez del cuadradito de color', () => {
     const P = panel().T.tipoPill;

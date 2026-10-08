@@ -20,6 +20,7 @@
     flash:    'showtime.flash',        // mensaje flash activo en la Pantalla Live: { id, text, at (ms) } o null
     chat:     'showtime.chat',         // chat Producción ↔ Stage Manager: [{ id, at, from, pid, text, sm }] (NO va en la emisión general: solo a los enlaces de Producción)
     avisos:   'showtime.avisos',       // avisos escritos a mano (cinta de Backstage + barra del Dashboard): [{ id, text, at, ms (0 = permanente), from }]
+    standby:  'showtime.standby',      // Standby (Modo Cartel) de las Confidence, puesto desde el Dashboard: { on, at (ms) } o null — va también por QR
     meteo:    'showtime.meteo'         // el tiempo (2e-B): { snap, err, errAt } — lo pide el Dashboard; la Live y los dispositivos lo leen
   };
   const STYLES = ['clasico', 'escenario', 'neutro', 'raycast'];
@@ -95,6 +96,8 @@
   function flashLeft(f) { const ms = flashMs(f); return ms ? Math.max(0, ms - (Date.now() - f.at)) : null; }
   /** Mensaje flash vigente (o null si no hay o ya caducó). */
   /** El tiempo: último dato recibido y último error ({ snap, err, errAt } o null). */
+  function normStandby(v) { return v && typeof v === 'object' && Number.isFinite(v.at) ? { on: !!v.on, at: v.at } : null; }
+  function getStandby() { return normStandby(read(K.standby, null)); }
   function getMeteo() { const m = read(K.meteo, null); return m && typeof m === 'object' ? m : null; }
   function getFlash() { const f = read(K.flash, null); return f && f.text && (flashMs(f) === 0 || Date.now() - f.at < flashMs(f)) ? f : null; }
 
@@ -132,7 +135,7 @@
   const listeners = [], peerListeners = [];
 
   function addPeer(win) { if (win) peers.add(win); }
-  function snapshot() { return { app: APP, type: 'snapshot', festival: getFestival(), config: getConfig(), callDone: getCallDone(), flash: getFlash(), avisos: getAvisos(), meteo: getMeteo() }; }
+  function snapshot() { return { app: APP, type: 'snapshot', festival: getFestival(), config: getConfig(), callDone: getCallDone(), flash: getFlash(), avisos: getAvisos(), meteo: getMeteo(), standby: getStandby() }; }
 
   function send(msg) {
     if (READONLY) return;
@@ -156,6 +159,7 @@
     else if (m.type === 'meteo') write(K.meteo, m.meteo || null);
     else if (m.type === 'avisos') write(K.avisos, normAvisos(m.avisos, Date.now()));
     else if (m.type === 'chat') write(K.chat, Array.isArray(m.chat) ? m.chat : []);
+    else if (m.type === 'standbyAll') write(K.standby, normStandby(m.standby));
     else if (m.type === 'hello') { send(snapshot()); return; }
     else if (m.type === 'snapshot') {
       if (m.festival) write(K.festival, m.festival);
@@ -164,6 +168,7 @@
       if (m.flash !== undefined) write(K.flash, m.flash);
       if (m.meteo !== undefined) write(K.meteo, m.meteo);
       if (m.avisos !== undefined) write(K.avisos, normAvisos(m.avisos, Date.now()));
+      if (m.standby !== undefined) write(K.standby, normStandby(m.standby));
     } else return;
     listeners.forEach(fn => { try { fn(m.type); } catch (e) { console.error(e); } });
   }
@@ -185,7 +190,7 @@
     receive(m);
   });
   if (!READONLY) root.addEventListener('storage', e => {
-    const type = e.key === K.festival ? 'festival' : e.key === K.config ? 'config' : e.key === K.callDone ? 'callDone' : e.key === K.flash ? 'flash' : e.key === K.meteo ? 'meteo' : e.key === K.avisos ? 'avisos' : e.key === K.chat ? 'chat' : null;
+    const type = e.key === K.festival ? 'festival' : e.key === K.config ? 'config' : e.key === K.callDone ? 'callDone' : e.key === K.flash ? 'flash' : e.key === K.meteo ? 'meteo' : e.key === K.avisos ? 'avisos' : e.key === K.chat ? 'chat' : e.key === K.standby ? 'standbyAll' : null;
     if (type) listeners.forEach(fn => { try { fn(type); } catch (err) { console.error(err); } });
   });
 
@@ -198,13 +203,14 @@
     if (root.ShowtimeMeteo && c.meteo) c.meteo = root.ShowtimeMeteo.publicMeteo(c.meteo);   // sin la URL propia (puede llevar una clave)
     const m = getMeteo(), mp = m ? Object.assign({}, m) : null;
     if (mp) delete mp.key;   // la «key» de la caché lleva la URL propia: no sale del Mac
-    return { festival: getFestival(), config: c, callDone: getCallDone(), flash: read(K.flash, null), avisos: getAvisos(), meteo: mp };
+    return { festival: getFestival(), config: c, callDone: getCallDone(), flash: read(K.flash, null), avisos: getAvisos(), meteo: mp, standby: getStandby() };
   }
   /** Modo Staff: aplica el estado recibido por la emisión y avisa a la Live. */
   function loadSnapshot(s) {
     if (!READONLY || !s) return;
     write(K.festival, s.festival || null); write(K.config, normConfig(s.config)); write(K.callDone, Array.isArray(s.callDone) ? s.callDone : []); write(K.flash, s.flash || null);
     write(K.avisos, normAvisos(s.avisos, Date.now())); write(K.meteo, s.meteo || null);
+    write(K.standby, normStandby(s.standby));
     listeners.forEach(fn => { try { fn('snapshot'); } catch (e) { console.error(e); } });
   }
   function onPeer(fn) { peerListeners.push(fn); }
@@ -234,6 +240,14 @@
     write(K.flash, f); send({ type: 'flash', flash: f });
     listeners.forEach(fn => { try { fn('flash'); } catch (e) { console.error(e); } });
     return f;
+  }
+  /** Standby (Modo Cartel) para TODAS las Confidence (las de este Mac y las que van por QR). on: true / false. */
+  function setStandby(on) {
+    if (READONLY) return getStandby();
+    const v = { on: !!on, at: Date.now() };
+    write(K.standby, v); send({ type: 'standbyAll', standby: v });
+    listeners.forEach(fn => { try { fn('standbyAll'); } catch (e) { console.error(e); } });
+    return v;
   }
   /** El tiempo: guarda el dato (o el error) y lo manda a las Live abiertas. Solo el Dashboard lo pide. */
   function setMeteo(m) { if (READONLY) return; write(K.meteo, m || null); send({ type: 'meteo', meteo: m || null }); }
@@ -273,7 +287,7 @@
 
   root.ShowtimeDatos = {
     KEYS: K, STYLES, normStyle, normConfig,
-    getFestival, getConfig, getCallDone, getFlash, setFlash, getAvisos, addAviso, removeAviso, normAvisos, getChat, addChat, getMeteo, setMeteo, FLASH_MS, MSG_SECS, AVISO_SECS, flashMs, flashLeft, callMinsOf, getOriginal, setOriginal,
+    getFestival, getConfig, getCallDone, getFlash, setFlash, getAvisos, addAviso, removeAviso, normAvisos, getChat, addChat, getMeteo, setMeteo, getStandby, setStandby, normStandby, FLASH_MS, MSG_SECS, AVISO_SECS, flashMs, flashLeft, callMinsOf, getOriginal, setOriginal,
     setFestival, setConfig, markCallDone, pruneCallDone,
     onChange, onPeer, addPeer, send, hello, ping,
     READONLY, onWrite, onSaveState, getSnapshot, loadSnapshot
