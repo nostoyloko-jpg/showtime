@@ -750,12 +750,12 @@
     ok(css.indexOf('/* ── Modales sólidos') > css.indexOf('/* ── Cristal'), 'va después del cristal (gana)');
   });
 
-  test('Pantalla de inicio: el cartel de marca con versión y pie; se va sola (1,2 s), con clic o con Esc', () => {
+  test('Pantalla de inicio: el cartel de marca con versión y pie; se va sola (2,5 s), con clic o con Esc', () => {
     const t = panel(), sp = t.env.getEl('splash'), h = ultimo(t, 'splash');
     eq(sp.hidden, false, 'se ve al arrancar'); eq(sp.className, 'splash', 'inicio (no «Acerca de»)');
     ok(/class="stm-name">SHOWTIME</.test(h) && /by Synapse Live/.test(h) && /Real-Time Show Control/.test(h));
     ok(h.indexOf('v' + t.env.win.ShowtimeEmision.BUILD) > 0, 'versión activa'); ok(h.indexOf('BUILT FOR LIFE ON STAGE · © 2026 Synapse Live') > 0);
-    ok(/const SPLASH_MS = 1200;/.test(D.src('control.js')) && /if \(!about\) splashT = setTimeout\(hideSplash, SPLASH_MS\)/.test(D.src('control.js')), '1,2 s');
+    ok(/const SPLASH_MS = 2500;/.test(D.src('control.js')) && /if \(!about\) splashT = setTimeout\(hideSplash, SPLASH_MS\)/.test(D.src('control.js')), '2,5 s');
     t.env.fire('splash', 'click', {});
     ok(sp.classList.contains('out'), 'clic: se desvanece');
     const u = panel(); u.env.fire('document', 'keydown', { key: 'Escape', stopImmediatePropagation() {} });

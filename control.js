@@ -20,7 +20,7 @@
   let MSG_TO = null;                  // destino de los mensajes flash: null = todas las pantallas; si no, lista de vistas
   let MSG_ZONES = null;               // zonas de las pantallas Confidence que lo reciben: null = todas
   function zoneLabel(id) { const z = FEST && C.getEscenario(FEST, id); return z ? z.nombre : 'Sin zona'; }
-  const SPLASH_MS = 1200;   // pantalla de inicio
+  const SPLASH_MS = 2500;   // pantalla de inicio (se va sola; clic o Esc la cierran antes)
   function liveOpen(name) { const w = name ? LIVES.get(name) : null; if (name) return !!(w && !w.closed); return Array.from(LIVES.values()).some(x => x && !x.closed); }
   let pendingRender = false;       // si llegan datos mientras se edita una casilla, se pinta al salir
   const KEY_LABEL = { nombre: 'nombre', escenario: 'zona', color: 'color', tipo: 'tipo', jornada: 'jornada', fecha: 'fecha', inicio: 'inicio', fin: 'fin', call: 'CALL', notas: 'notas' };
@@ -2583,9 +2583,9 @@
   document.addEventListener('visibilitychange', requestWake);
   document.addEventListener('pointerdown', requestWake);
 
-  // ── Marca: pantalla de inicio (1,2 s o clic) y «Archivo › Acerca de Showtime…» ──
+  // ── Marca: pantalla de inicio (2,5 s o clic) y «Archivo › Acerca de Showtime…» ──
   let splashT = null;
-  /** about = false: inicio (se va sola a los 1,2 s); true: «Acerca de» (hasta clic o Esc). */
+  /** about = false: inicio (se va sola a los 2,5 s); true: «Acerca de» (hasta clic o Esc). */
   function showSplash(about) {
     const el = $('splash'), Mk = window.ShowtimeMarca; if (!el || !Mk) return;
     clearTimeout(splashT);
