@@ -314,6 +314,20 @@
     ok(got.some(m => m.type === 'vistaState' && m.vista === now), 'al cambiar con V: ' + now);
     ok(got.filter(m => m.type === 'vistaState').length >= 2, 'y se repite en el latido');
   });
+  test('Gestor del Dashboard: la Live cambia de vista, de zona y de standby solo si se lo pide quien la abrió, y se lo confirma', () => {
+    const got = [], opener = { closed: false, postMessage(m) { got.push(m); } };
+    const t = arrancar({ search: '?vista=manager', opener });
+    t.env.fire('window', 'message', { data: { app: 'showtime', type: 'setVista', vista: 'backstage' }, source: {} });
+    eq(t.body.dataset.vista, 'manager', 'otra ventana: no');
+    t.env.fire('window', 'message', { data: { app: 'showtime', type: 'setVista', vista: 'confidence', zona: 'z2' }, source: opener });
+    eq(t.body.dataset.vista, 'confidence', 'el Dashboard que la abrió: sí');
+    ok(got.some(m => m.type === 'vistaState' && m.vista === 'confidence' && m.zona === 'z2'), 'confirma vista y zona');
+    t.env.fire('window', 'message', { data: { app: 'showtime', type: 'standby', on: true }, source: opener });
+    eq(t.env.getEl('standby').hidden, false, 'standby puesto');
+    ok(got.some(m => m.type === 'vistaState' && m.standby === true), 'confirma el standby');
+    t.env.fire('window', 'message', { data: { app: 'showtime', type: 'standby', on: false }, source: opener });
+    eq(t.env.getEl('standby').hidden, true, 'standby quitado');
+  });
   test('Standby: los mensajes flash siguen saliendo por encima (z-index) y hay botón en la Live', () => {
     const css = D.src('marca.css'), lcss = D.src('live.css');
     const z = re => +re.exec(css + lcss)[1];

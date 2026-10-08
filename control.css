@@ -966,3 +966,15 @@ body[data-ps="escenario"] .mpanel,body[data-ps="escenario"] .cfg,body[data-ps="e
 main.vacia{grid-template-columns:minmax(0,1fr)}
 main.vacia>.live{display:none}
 main.vacia .list-empty{padding:16px 16px 9vh}
+
+/* ── Gestor de ventanas Live (Live ▾ › Gestionar ventanas…) ── */
+#gv{display:flex;flex-direction:column;gap:8px}
+.gv-all{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px}
+.gv-row{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) minmax(0,1fr) auto auto;gap:6px;align-items:center;padding:8px;border:1px solid var(--line2);border-radius:10px}
+.gv-row input,.gv-row select{height:36px;min-width:0;border-radius:8px;border:1px solid var(--line2);background:var(--bg2);color:var(--text);padding:0 8px;font:inherit;font-size:14px}
+.gv-row .gv-zona[hidden]{display:none}
+.gv-sb{height:36px;padding:0 12px;border-radius:8px;border:1px solid var(--line2);background:transparent;color:var(--muted);font:inherit;font-weight:700;font-size:13px;cursor:pointer}
+.gv-sb.on{background:#fff;color:#000;border-color:#fff}
+.gv-x{width:36px;height:36px;display:inline-flex;align-items:center;justify-content:center;border-radius:8px;border:1px solid var(--line2);background:transparent;color:var(--muted);cursor:pointer}
+.gv-x .ic{width:16px;height:16px}
+@media (max-width:700px){ .gv-row{grid-template-columns:1fr 1fr} .gv-row .gv-name{grid-column:1/-1} }

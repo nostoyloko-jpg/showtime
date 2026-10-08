@@ -934,8 +934,9 @@
     requestAnimationFrame(tick);
   }
   /** Cambia de vista sin recargar (tecla V): la URL se actualiza (el «#…» de la emisión se conserva). */
-  function setVista(v) {
+  function setVista(v, z) {
     VISTA = vistaOk(v);
+    if (z !== undefined) ZONA = z;   // el gestor del Dashboard puede cambiar también la zona (null = sin elegir)
     const q = new URLSearchParams(location.search);
     if (STANDBY) { q.set('vista', 'standby'); q.set('prev', VISTA); }   // en Standby, la V cambia la vista de debajo (y el Standby sigue puesto)
     else { q.set('vista', VISTA); q.delete('prev'); }
@@ -962,6 +963,7 @@
     STANDBY = !!on;
     try { history.replaceState(null, '', location.pathname + Mk.standbySearch(location.search, STANDBY) + location.hash); } catch (e) {}
     renderStandby();
+    reportVista();
   }
   /** Standby del Dashboard (Live ▾ › Standby): solo lo siguen las Confidence, aquí y por QR. Se aplica cuando CAMBIA
    *  (cada orden lleva su hora): si luego alguien lo quita o lo pone a mano con la S en una pantalla, esa pantalla manda
@@ -974,7 +976,7 @@
     if (g.on !== STANDBY) setStandby(g.on);
   }
   /** Dice al Dashboard qué vista muestra ESTA ventana (puede haber cambiado con la tecla V). Lo usa el desplegable de Live. */
-  function reportVista() { try { if (window.opener && !Dt.READONLY) window.opener.postMessage({ app: 'showtime', type: 'vistaState', vista: VISTA }, '*'); } catch (e) {} }
+  function reportVista() { try { if (window.opener && !Dt.READONLY) window.opener.postMessage({ app: 'showtime', type: 'vistaState', vista: VISTA, zona: ZONA == null ? null : String(ZONA), standby: STANDBY }, '*'); } catch (e) {} }
   function renderStandby() {
     const el = $('standby'); if (!el || !Mk) return;
     if ($('stbbtn')) $('stbbtn').setAttribute('aria-pressed', String(STANDBY));
@@ -1103,6 +1105,12 @@
 
   // El Dashboard puede cerrar esta ventana desde «Live ▾» (aunque esté en otro monitor)
   window.addEventListener('message', e => { const m = e.data; if (m && m.app === 'showtime' && m.type === 'closeLive' && !Dt.READONLY) { try { window.close(); } catch (er) {} } });
+  // Desde el gestor del Dashboard («Live ▾ › Gestionar ventanas»): solo quien la abrió puede cambiarle la vista, la zona o el standby
+  window.addEventListener('message', e => {
+    const m = e.data; if (!m || m.app !== 'showtime' || Dt.READONLY || !window.opener || e.source !== window.opener) return;
+    if (m.type === 'standby') setStandby(!!m.on);
+    else if (m.type === 'setVista' && m.vista) setVista(m.vista, m.zona == null ? null : String(m.zona));
+  });
 
   // ── Arranque ─────────────────────────────────────────────────────────
   load();

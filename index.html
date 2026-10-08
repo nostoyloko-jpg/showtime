@@ -13,8 +13,8 @@
 <meta name="apple-mobile-web-app-title" content="Showtime">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
-<link rel="stylesheet" href="control.css?v=20261062">
-<link rel="stylesheet" href="marca.css?v=20261062">
+<link rel="stylesheet" href="control.css?v=20261063">
+<link rel="stylesheet" href="marca.css?v=20261063">
 </head>
 <body>
 <div id="splash" class="splash" hidden></div>
@@ -163,12 +163,13 @@
     <button id="btn-live" class="mbtn btn primary mlive" aria-haspopup="true" aria-expanded="false"><svg class="ic"><use href="#i-screen"/></svg>Live<span id="live-state" class="state off" title="Ninguna Pantalla Live abierta"></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
     <div class="mpanel wide lvpanel" role="menu">
       <div class="mhead">Abrir una Pantalla Live</div>
-      <button class="mitem lv" data-vista="manager"><svg class="ic"><use href="#i-screen"/></svg><span class="lvt"><b>Manager</b><small>Cronograma completo · FOH y regiduría</small></span><em class="lvnow" data-now="showtime-live-manager"></em><span class="lvon" data-on="showtime-live-manager"></span><span class="lvx" role="button" data-close="showtime-live-manager" title="Cerrar esta ventana Live" hidden><svg class="ic"><use href="#i-x"/></svg></span></button>
+      <button class="mitem lv" data-vista="manager"><svg class="ic"><use href="#i-screen"/></svg><span class="lvt"><b>Manager</b><small>Cronograma completo · FOH y regiduría</small></span></button>
       <div class="lvgroup">
         <div class="mitem lvh"><svg class="ic"><use href="#i-clock"/></svg><span class="lvt"><b>Confidence</b><small>Monitor de escenario de una zona · elige cuál</small></span></div>
         <div id="lv-zones" class="lvzones"></div>
       </div>
-      <button class="mitem lv" data-vista="backstage"><svg class="ic"><use href="#i-msg"/></svg><span class="lvt"><b>Backstage</b><small>Camerinos y catering · tarjetas, 2 líneas y cinta de avisos</small></span><em class="lvnow" data-now="showtime-live-backstage"></em><span class="lvon" data-on="showtime-live-backstage"></span><span class="lvx" role="button" data-close="showtime-live-backstage" title="Cerrar esta ventana Live" hidden><svg class="ic"><use href="#i-x"/></svg></span></button>
+      <button class="mitem lv" data-vista="backstage"><svg class="ic"><use href="#i-msg"/></svg><span class="lvt"><b>Backstage</b><small>Camerinos y catering · tarjetas, 2 líneas y cinta de avisos</small></span></button>
+      <button class="mitem lv" id="lv-gestor"><svg class="ic"><use href="#i-screen"/></svg><span class="lvt"><b>Gestionar ventanas…</b><small>Nombre, vista y standby de cada Live abierta</small></span></button>
       <button class="mitem lv lvstb" id="lv-standby" title="Descansos, pausas técnicas y antes de abrir puertas. En la Live: tecla S"><svg class="ic"><use href="#i-pause"/></svg><span class="lvt"><b id="lv-standby-t">Standby en Confidence</b><small>Cartel de Showtime y hora en cada Confidence (también por QR)</small></span><span class="lvon" id="lv-standby-on"></span></button>
       <button class="mitem lvcloseall" id="lv-closeall" hidden><svg class="ic"><use href="#i-x"/></svg><span class="lvt"><b>Cerrar todas las Live</b><small>También las que no estén en este escritorio</small></span></button>
       <div class="msep"></div>
@@ -413,18 +414,18 @@
 <datalist id="zones-dl"></datalist>
 <div id="toast" class="toast" hidden></div>
 
-<script src="core.js?v=20261062"></script>
-<script src="meteo.js?v=20261062"></script>
-<script src="datos.js?v=20261062"></script>
-<script src="importar.js?v=20261062"></script>
-<script src="xlsx.js?v=20261062"></script>
-<script src="qr.js?v=20261062"></script>
-<script src="emision.js?v=20261062"></script>
-<script src="mando.js?v=20261062"></script>
-<script src="vistas.js?v=20261062"></script>
-<script src="log.js?v=20261062"></script>
-<script src="marca.js?v=20261062"></script>
-<script src="control.js?v=20261062"></script>
-<script src="pwa.js?v=20261062"></script>
+<script src="core.js?v=20261063"></script>
+<script src="meteo.js?v=20261063"></script>
+<script src="datos.js?v=20261063"></script>
+<script src="importar.js?v=20261063"></script>
+<script src="xlsx.js?v=20261063"></script>
+<script src="qr.js?v=20261063"></script>
+<script src="emision.js?v=20261063"></script>
+<script src="mando.js?v=20261063"></script>
+<script src="vistas.js?v=20261063"></script>
+<script src="log.js?v=20261063"></script>
+<script src="marca.js?v=20261063"></script>
+<script src="control.js?v=20261063"></script>
+<script src="pwa.js?v=20261063"></script>
 </body>
 </html>

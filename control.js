@@ -15,14 +15,15 @@
   let BLOCKS = [], ALL_MODE = [], TAREAS = [], DAY_MISSING = '';
   const UNDO = [];                 // festivales anteriores (JSON), para «Deshacer»
   const UNDO_MAX = 30;
-  const VISTA_NOW = new Map();        // nombre de la ventana Live → vista que muestra AHORA (la dice cada Live)
-  const LIVES = new Map();            // ventanas Live abiertas desde aquí: nombre → ventana (una por vista; Confidence, una por zona)
+  // Ventanas Live de este Dashboard: id (= nombre técnico de la ventana) → { w, name, vista, zona, standby }. Lo que dice cada ventana se actualiza en vivo.
+  const WIN = new Map();
+  const LIVE_NAMES_KEY = 'showtime.liveNames';   // { id: nombre } de las ventanas abiertas, para recordar el nombre tras recargar
+  const VISTA_OPCIONES = [['manager', 'Manager'], ['confidence', 'Confidence'], ['backstage', 'Backstage']];
   const Vs = window.ShowtimeVistas;
   let MSG_TO = null;                  // destino de los mensajes flash: null = todas las pantallas; si no, lista de vistas
   let MSG_ZONES = null;               // zonas de las pantallas Confidence que lo reciben: null = todas
   function zoneLabel(id) { const z = FEST && C.getEscenario(FEST, id); return z ? z.nombre : 'Sin zona'; }
   const SPLASH_MS = 2500;   // pantalla de inicio (se va sola; clic o Esc la cierran antes)
-  function liveOpen(name) { const w = name ? LIVES.get(name) : null; if (name) return !!(w && !w.closed); return Array.from(LIVES.values()).some(x => x && !x.closed); }
   let pendingRender = false;       // si llegan datos mientras se edita una casilla, se pinta al salir
   const KEY_LABEL = { nombre: 'nombre', escenario: 'zona', color: 'color', tipo: 'tipo', jornada: 'jornada', fecha: 'fecha', inicio: 'inicio', fin: 'fin', call: 'CALL', notas: 'notas' };
   const TIPO_TXT = { banda: 'banda', tarea: 'tarea', hito: 'hito' };
@@ -712,19 +713,17 @@
   function tick() {
     const d = new Date();
     $('clock').textContent = pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds());
-    const nOpen = Array.from(LIVES.values()).filter(x => x && !x.closed).length;
+    const nOpen = openIds().length;
     $('live-state').className = 'state ' + (nOpen ? 'on' : 'off');
     $('live-state').title = nOpen ? (nOpen === 1 ? '1 Pantalla Live abierta' : nOpen + ' Pantallas Live abiertas') : 'Ninguna Pantalla Live abierta';
     $('btn-live').title = 'Pantallas Live: Manager, Confidence (por zona) y Backstage';
-    document.querySelectorAll('#m-live [data-on]').forEach(el => el.classList.toggle('on', liveOpen(el.dataset.on)));
-    document.querySelectorAll('#m-live [data-now]').forEach(el => { const t = nowText(el.dataset.now); if (el.textContent !== t) el.textContent = t; });
-    document.querySelectorAll('#m-live [data-close]').forEach(el => { el.hidden = !liveOpen(el.dataset.close); });
     if ($('lv-closeall')) $('lv-closeall').hidden = nOpen < 2;
     if ($('lv-standby')) {
       const on = standbyOn();
       $('lv-standby-on').classList.toggle('on', on);
       $('lv-standby-t').textContent = on ? 'Quitar Standby en Confidence' : 'Standby en Confidence';
     }
+    renderGestor();
     meteoTick();
     if (!FEST) return;
     logFoto();
@@ -1271,29 +1270,37 @@
   $('btn-new2').addEventListener('click', askNew);
 
   // ── Pantallas Live (ventanas): Manager · Confidence por zona · Backstage (2e-A) ──
-  /** Texto «Ahora: …» de una ventana Live abierta (vacío si está cerrada o aún no ha dicho nada). */
-  function nowText(name) {
-    const w = LIVES.get(name); if (!w || w.closed) return '';
-    const v = VISTA_NOW.get(name); return v && Vs.VISTA_TXT[v] ? 'Ahora: ' + Vs.VISTA_TXT[v] : '';
+  // Cada ventana tiene un id, un nombre que pone el regidor (se recuerda en este navegador) y una vista que se puede cambiar
+  // desde el gestor («Live ▾ › Gestionar ventanas»). El standby es por ventana.
+  function winNames() { try { return JSON.parse(localStorage.getItem(LIVE_NAMES_KEY)) || {}; } catch (e) { return {}; } }
+  function saveWinName(id, name) {
+    const n = winNames(); delete n[id]; n[id] = name;            // el último va al final: así se poda lo más viejo
+    const keys = Object.keys(n); while (keys.length > 30) delete n[keys.shift()];
+    try { localStorage.setItem(LIVE_NAMES_KEY, JSON.stringify(n)); } catch (e) {}
   }
-  function liveName(vista, zona) { return 'showtime-live-' + vista + (vista === 'confidence' ? '-' + (zona || 'sinzona') : ''); }
+  function forgetWinName(id) { const n = winNames(); if (!(id in n)) return; delete n[id]; try { localStorage.setItem(LIVE_NAMES_KEY, JSON.stringify(n)); } catch (e) {} }
+  /** ¿Sigue abierta la ventana? Sin id: ¿hay alguna abierta desde este Dashboard? */
+  function liveOpen(id) {
+    if (id) { const x = WIN.get(id); return !!(x && x.w && !x.w.closed); }
+    return Array.from(WIN.values()).some(x => x.w && !x.w.closed);
+  }
+  function openIds() { return Array.from(WIN.keys()).filter(id => liveOpen(id)); }
   /** Zonas para Confidence: las del evento y «Sin zona» si hay bandas sin zona. */
+  function zonasLive() {
+    const zs = FEST ? (FEST.escenarios || []).map(z => ({ id: z.id, name: z.nombre, color: z.color })) : [];
+    if (FEST && C.buildBlocks(FEST, { mode: 'all', day: 'all' }).some(b => C.isBand(b) && !b.stageId)) zs.push({ id: '', name: 'Sin zona', color: '#888' });
+    return zs;
+  }
+  /** Menú de Live: solo las zonas para abrir Confidence (lo abierto se ve en el gestor). */
   function renderLiveMenu() {
     const box = $('lv-zones'); if (!box) return;
     if (!FEST) { box.innerHTML = '<p class="mnote">Sin evento cargado.</p>'; return; }
-    const zs = (FEST.escenarios || []).map(z => ({ id: z.id, name: z.nombre, color: z.color }));
-    if (C.buildBlocks(FEST, { mode: 'all', day: 'all' }).some(b => C.isBand(b) && !b.stageId)) zs.push({ id: '', name: 'Sin zona', color: '#888' });
-    const h = zs.map(z => '<button class="mitem lvz" data-vista="confidence" data-zona="' + esc(z.id) + '"><i style="background:' + esc(safeColor(z.color, '#888')) + '"></i>' + esc(z.name) +
-      '<em class="lvnow" data-now="' + esc(liveName('confidence', z.id)) + '"></em>' +
-      '<span class="lvon" data-on="' + esc(liveName('confidence', z.id)) + '"></span>' +
-      '<span class="lvx" role="button" data-close="' + esc(liveName('confidence', z.id)) + '" title="Cerrar esta ventana Live" hidden><svg class="ic"><use href="#i-x"/></svg></span></button>').join('');
+    const h = zonasLive().map(z => '<button class="mitem lvz" data-vista="confidence" data-zona="' + esc(z.id) + '"><i style="background:' + esc(safeColor(z.color, '#888')) + '"></i>' + esc(z.name) + '</button>').join('');
     if (box.dataset.h !== h) { box.innerHTML = h; box.dataset.h = h; }
   }
-  /** Abre (o trae al frente) una Pantalla Live. Con un segundo monitor (Chrome/Edge/Brave), se abre en él. */
+  /** Abre una Pantalla Live nueva (cada vez una ventana nueva: puede haber varias de la misma vista). Con un segundo monitor, se abre en él. */
   async function openLive(vista, zona) {
-    const v = Vs.normVista(vista), name = liveName(v, zona);
-    const w0 = LIVES.get(name);
-    if (w0 && !w0.closed) { try { w0.focus(); } catch (e) {} return; }
+    const v = Vs.normVista(vista), name = 'lv' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     let url = Vs.liveUrl('', v, v === 'confidence' ? (zona || '') : null), feats = 'popup=yes,width=1280,height=720', target = null;
     if ('getScreenDetails' in window) {
       try { const sd = await window.getScreenDetails(); target = Vs.pickScreen(sd.screens, sd.currentScreen); } catch (e) { target = null; }
@@ -1301,7 +1308,7 @@
     } else url += '&aviso=arrastra';
     const label = Vs.VISTA_TXT[v] + (v === 'confidence' ? ' · ' + ((C.getEscenario(FEST, zona) || {}).nombre || 'Sin zona') : '');
     const done = w => {
-      VISTA_NOW.delete(name); LIVES.set(name, w); Dt.addPeer(w); tick();
+      WIN.set(name, { w, name: label, vista: v, zona: v === 'confidence' ? (zona || '') : null, standby: false }); saveWinName(name, label); Dt.addPeer(w); tick();
       toast(target ? 'Live ' + label + ' abierta en el monitor ' + (target.label || 'externo') + ' · pulsa F en ella para pantalla completa'
         : 'Live ' + label + ' abierta' + (url.indexOf('aviso=arrastra') > 0 ? ': arrástrala al monitor y pulsa F (este navegador no puede llevarla solo)' : ''));
     };
@@ -1314,16 +1321,30 @@
     ]);
   }
   /** Cierra una ventana Live (o todas) desde aquí, esté en el monitor que esté. */
-  function closeLive(name) {
-    const names = name ? [name] : Array.from(LIVES.keys());
-    names.forEach(n => {
-      const w = LIVES.get(n);
-      try { if (w && !w.closed) w.postMessage({ app: 'showtime', type: 'closeLive' }, '*'); } catch (e) {}
-      try { if (w && !w.closed) w.close(); } catch (e) {}
-      LIVES.delete(n);
+  function closeLive(id) {
+    const ids = id ? [id] : Array.from(WIN.keys());
+    ids.forEach(k => {
+      const x = WIN.get(k);
+      try { if (x && x.w && !x.w.closed) x.w.postMessage({ app: 'showtime', type: 'closeLive' }, '*'); } catch (e) {}
+      try { if (x && x.w && !x.w.closed) x.w.close(); } catch (e) {}
+      WIN.delete(k); forgetWinName(k);
     });
     tick();
-    toast(name ? 'Pantalla Live cerrada' : 'Pantallas Live cerradas');
+    toast(id ? 'Ventana Live cerrada' : 'Ventanas Live cerradas');
+  }
+  /** Standby de UNA ventana (desde el gestor). Solo lo cambia esa ventana. */
+  function setWinStandby(id, on) {
+    const x = WIN.get(id); if (!x || !liveOpen(id)) return;
+    x.standby = !!on;
+    try { x.w.postMessage({ app: 'showtime', type: 'standby', on: !!on }, '*'); } catch (e) {}
+    tick();
+  }
+  /** Cambia la vista (y la zona, si es Confidence) de UNA ventana desde el gestor. */
+  function setWinVista(id, vista, zona) {
+    const x = WIN.get(id); if (!x || !liveOpen(id)) return;
+    x.vista = Vs.normVista(vista); x.zona = x.vista === 'confidence' ? (zona || '') : null;
+    try { x.w.postMessage({ app: 'showtime', type: 'setVista', vista: x.vista, zona: x.zona }, '*'); } catch (e) {}
+    tick();
   }
   // ── Standby / Modo Cartel: TODAS las Confidence (las de este Mac y las que van por QR) enseñan el cartel y la hora ──
   // Es un estado del evento (como los mensajes): viaja a las Live del Mac y va en la emisión. Manager y Backstage no cambian.
@@ -1333,23 +1354,83 @@
     tick();
     toast(on ? 'Standby en Confidence: cartel y hora (también por QR)' : 'Standby en Confidence quitado: vuelve la cuenta atrás');
   }
+  // ── Gestor de ventanas Live (Live ▾ › Gestionar ventanas…): nombre, vista (y zona) y standby de cada una ──
+  let gvSig = null;
+  function gestorVisible() { return !$('modal').hidden && $('modal-title').textContent === 'Ventanas Live'; }
+  function openGestor() { gvSig = null; modal('Ventanas Live', '<div id="gv"></div>', [{ label: 'Cerrar' }], { wide: true }); renderGestor(); }
+  function gvRowHtml(id) {
+    const x = WIN.get(id);
+    return '<div class="gv-row" data-id="' + esc(id) + '">' +
+      '<input class="gv-name" type="text" maxlength="40" value="' + esc(x.name) + '" aria-label="Nombre de la ventana">' +
+      '<select class="gv-vista" aria-label="Vista">' + VISTA_OPCIONES.map(o => '<option value="' + o[0] + '">' + o[1] + '</option>').join('') + '</select>' +
+      '<select class="gv-zona" aria-label="Zona">' + zonasLive().map(z => '<option value="' + esc(z.id) + '">' + esc(z.name) + '</option>').join('') + '</select>' +
+      '<button class="gv-sb" type="button" data-gv="standby" aria-pressed="false">Standby</button>' +
+      '<button class="gv-x" type="button" data-gv="close" title="Cerrar esta ventana" aria-label="Cerrar esta ventana"><svg class="ic"><use href="#i-x"/></svg></button>' +
+      '</div>';
+  }
+  /** Pone en cada fila lo que dice la ventana. No toca el nombre si lo estás escribiendo. */
+  function gvSync(ids) {
+    const box = $('gv'); if (!box) return;
+    ids.forEach(id => {
+      const x = WIN.get(id), row = Array.from(box.querySelectorAll('.gv-row')).find(r => r.dataset.id === id); if (!x || !row) return;
+      const name = row.querySelector('.gv-name'), vs = row.querySelector('.gv-vista'), zs = row.querySelector('.gv-zona'), sb = row.querySelector('.gv-sb');
+      if (name && document.activeElement !== name && name.value !== x.name) name.value = x.name;
+      if (vs && vs.value !== x.vista) vs.value = x.vista;
+      if (zs) { zs.hidden = x.vista !== 'confidence'; const z = x.zona == null ? '' : x.zona; if (zs.value !== z) zs.value = z; }
+      if (sb) { sb.setAttribute('aria-pressed', String(!!x.standby)); sb.classList.toggle('on', !!x.standby); }
+    });
+  }
+  function renderGestor() {
+    if (!gestorVisible()) return;
+    const box = $('gv'); if (!box) return;
+    const ids = openIds(), sig = ids.join('|');
+    if (sig !== gvSig) {
+      gvSig = sig;
+      box.innerHTML = ids.length
+        ? '<div class="gv-all"><button type="button" class="btn" data-gv="all" data-on="1">Todas en standby</button><button type="button" class="btn" data-gv="all" data-on="0">Quitar standby</button></div>' + ids.map(gvRowHtml).join('')
+        : '<p class="mnote">No hay ventanas Live abiertas desde este Dashboard. Ábrelas desde Live ▾.</p>';
+    }
+    gvSync(ids);
+  }
+  $('modal-body').addEventListener('change', e => {
+    const t = e.target, row = t.closest && t.closest('.gv-row'); if (!row) return;
+    const id = row.dataset.id, x = WIN.get(id); if (!x) return;
+    if (t.classList.contains('gv-name')) {
+      const n = String(t.value).replace(/\s+/g, ' ').trim().slice(0, 40) || x.name;
+      x.name = n; t.value = n; saveWinName(id, n); return;
+    }
+    if (t.classList.contains('gv-vista') || t.classList.contains('gv-zona')) setWinVista(id, row.querySelector('.gv-vista').value, row.querySelector('.gv-zona').value);
+  });
+  $('modal-body').addEventListener('click', e => {
+    const b = e.target.closest && e.target.closest('[data-gv]'); if (!b) return;
+    if (b.dataset.gv === 'all') { openIds().forEach(id => setWinStandby(id, b.dataset.on === '1')); return; }
+    const row = b.closest('.gv-row'); if (!row) return;
+    const id = row.dataset.id;
+    if (b.dataset.gv === 'standby') setWinStandby(id, !(WIN.get(id) && WIN.get(id).standby));
+    if (b.dataset.gv === 'close') closeLive(id);
+  });
   document.addEventListener('click', e => {
     if (e.target.closest('#lv-standby')) { e.preventDefault(); e.stopPropagation(); closeMenus(); setStandby(!standbyOn()); return; }
-    const x = e.target.closest('#m-live [data-close]');
-    if (x) { e.preventDefault(); e.stopPropagation(); closeLive(x.dataset.close); return; }
+    if (e.target.closest('#lv-gestor')) { e.preventDefault(); e.stopPropagation(); closeMenus(); openGestor(); return; }
     if (e.target.closest('#lv-closeall')) { closeLive(null); return; }
     const it = e.target.closest('#m-live [data-vista]'); if (!it) return;
     openLive(it.dataset.vista, it.dataset.zona);
   }, true);
-  // Cada Live dice qué vista muestra (al abrirse, al cambiar con la V y en el latido): el desplegable lo enseña
+  // Cada Live dice qué vista muestra, si está en standby y qué zona (al abrirse, al cambiar con la V y en el latido)
   window.addEventListener('message', e => {
     const m = e.data; if (!m || m.app !== 'showtime' || m.type !== 'vistaState') return;
-    for (const [n, w] of LIVES) if (w === e.source) VISTA_NOW.set(n, String(m.vista || ''));
+    for (const x of WIN.values()) if (x.w === e.source) { x.vista = String(m.vista || x.vista || ''); x.zona = m.zona == null ? null : String(m.zona); x.standby = !!m.standby; }
     tick();
   });
-  // Las Live que se abrieron antes de recargar el Dashboard se vuelven a presentar solas: se recuperan para el estado y la sincronización.
+  // Las ventanas que se abrieron antes de recargar el Dashboard se vuelven a presentar solas: se recuperan con su nombre.
   let peerN = 0;
-  if (Dt.onPeer) Dt.onPeer((w, m) => { let n = m && typeof m.name === 'string' ? m.name : ''; if (!n) { try { n = w.name; } catch (e) {} } LIVES.set(n || 'peer-' + (++peerN), w); tick(); });
+  if (Dt.onPeer) Dt.onPeer((w, m) => {
+    let id = m && typeof m.name === 'string' ? m.name : ''; if (!id) { try { id = w.name; } catch (e) {} }
+    if (!id) id = 'peer-' + (++peerN);
+    const old = WIN.get(id) || {};
+    WIN.set(id, Object.assign({ name: winNames()[id] || 'Live', vista: '', zona: null, standby: false }, old, { w }));
+    tick();
+  });
 
   // ── Abrir / Exportar ─────────────────────────────────────────────────
   function readFile(file) {
@@ -2648,5 +2729,5 @@
     if (ok) toast('Se vuelve a guardar con normalidad');
   });
 
-  window.ShowtimePanel = { liveNow: nowText, reload: () => { loadState(); renderAll(); }, _test: { emProdMessage, emRegenProd, hitoChips, emUrl, prodBigTitle, fileKind, handleFile, emCommand, importSummary, hidesSome, tipoPill, setWake, wakeState: () => ({ on: wakeOn, lock: !!wakeLock }), showSplash, hideSplash, setStandby, standbyOn, room: () => emRoom } };   // _test: solo para tests/control.test.js
+  window.ShowtimePanel = { reload: () => { loadState(); renderAll(); }, _test: { winState: () => Array.from(WIN.entries()).map(([id, x]) => ({ id, name: x.name, vista: x.vista, zona: x.zona, standby: !!x.standby })), setWinVista, setWinStandby, closeLive, openGestor, gestorVisible, emProdMessage, emRegenProd, hitoChips, emUrl, prodBigTitle, fileKind, handleFile, emCommand, importSummary, hidesSome, tipoPill, setWake, wakeState: () => ({ on: wakeOn, lock: !!wakeLock }), showSplash, hideSplash, setStandby, standbyOn, room: () => emRoom } };   // _test: solo para tests/control.test.js
 })();

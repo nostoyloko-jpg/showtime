@@ -794,24 +794,38 @@
     eq(t.read('showtime.standby').on, false, 'se quita con el mismo botón'); eq(t.env.getEl('lv-standby-t').textContent, 'Standby en Confidence');
     ok(/id="lv-standby"[\s\S]*Cartel de Showtime y hora en cada Confidence \(también por QR\)/.test(D.src('index.html')));
   });
-  test('Live ▾: cada ventana abierta dice qué vista muestra ahora (Manager, Confidence o Backstage), aunque la ventana se llame de otra', async () => {
-    const t = panel();
-    const w = { closed: false, focus() {}, postMessage() {} };
+  test('Gestor de ventanas Live: cada Live tiene nombre, vista y standby; se cambian desde el gestor, se recuerdan y se cierran', async () => {
+    const t = panel(), msgs = [];
+    const w = { closed: false, focus() {}, postMessage(m) { msgs.push(m); }, close() { this.closed = true; } };
     t.env.win.open = () => w;
     t.env.fire('document', 'click', { target: { closest: q => q === '#m-live [data-vista]' ? { dataset: { vista: 'manager' } } : null } });
     await new Promise(r => setImmediate(r));
-    eq(t.env.win.ShowtimePanel.liveNow('showtime-live-manager'), '', 'al abrir aún no ha dicho nada');
-    t.env.fire('window', 'message', { data: { app: 'showtime', type: 'vistaState', vista: 'manager' }, source: w });
-    eq(t.env.win.ShowtimePanel.liveNow('showtime-live-manager'), 'Ahora: Manager');
-    t.env.fire('window', 'message', { data: { app: 'showtime', type: 'vistaState', vista: 'backstage' }, source: w });
-    eq(t.env.win.ShowtimePanel.liveNow('showtime-live-manager'), 'Ahora: Backstage', 'si la ventana cambia con V, el menú lo sigue');
-    t.env.fire('window', 'message', { data: { app: 'showtime', type: 'vistaState', vista: 'confidence' }, source: {} });
-    eq(t.env.win.ShowtimePanel.liveNow('showtime-live-manager'), 'Ahora: Backstage', 'un mensaje de otra ventana no cuenta');
-    w.closed = true;
-    eq(t.env.win.ShowtimePanel.liveNow('showtime-live-manager'), '', 'cerrada: no muestra nada');
-    ok(/data-now="showtime-live-manager"/.test(D.src('index.html')) && /data-now="showtime-live-backstage"/.test(D.src('index.html')), 'filas de Manager y Backstage');
-    ok(/class="lvnow" data-now="' \+ esc\(liveName\('confidence', z\.id\)\)/.test(D.src('control.js')), 'filas de Confidence por zona');
-    ok(/\.lvnow\{margin-left:auto;/.test(D.src('control.css')), 'con estilo');
+    const [a] = t.T.winState();
+    ok(a && a.name === 'Manager' && a.vista === 'manager' && a.standby === false, 'se abre con su nombre por defecto');
+    // se cambia la vista desde el gestor (y la zona, si es Confidence)
+    t.T.setWinVista(a.id, 'confidence', 'z1');
+    ok(msgs.some(m => m.type === 'setVista' && m.vista === 'confidence' && m.zona === 'z1'), 'la ventana recibe la vista y la zona');
+    eq(t.T.winState()[0].vista, 'confidence'); eq(t.T.winState()[0].zona, 'z1');
+    // standby solo de esa ventana
+    t.T.setWinStandby(a.id, true);
+    ok(msgs.some(m => m.type === 'standby' && m.on === true), 'la ventana recibe el standby');
+    eq(t.T.winState()[0].standby, true);
+    // lo que dice la ventana se refleja (vista y standby)
+    t.env.fire('window', 'message', { data: { app: 'showtime', type: 'vistaState', vista: 'backstage', zona: null, standby: false }, source: w });
+    eq(t.T.winState()[0].vista, 'backstage'); eq(t.T.winState()[0].standby, false, 'la ventana manda lo que muestra');
+    // el gestor se abre con la lista
+    t.T.openGestor();
+    eq(t.env.getEl('modal').hidden, false); eq(t.T.gestorVisible(), true);
+    // renombrar: se guarda y se recuerda
+    t.env.fire('modal-body', 'change', { target: { value: '  Stage   Left ', classList: { contains: c => c === 'gv-name' }, closest: q => q === '.gv-row' ? { dataset: { id: a.id } } : null } });
+    eq(t.T.winState()[0].name, 'Stage Left', 'nombre limpio');
+    eq(t.read('showtime.liveNames')[a.id], 'Stage Left', 'y recordado en este navegador');
+    // cerrar esa ventana
+    t.T.closeLive(a.id);
+    ok(msgs.some(m => m.type === 'closeLive'), 'se le pide cerrarse');
+    eq(t.T.winState().length, 0); eq(t.read('showtime.liveNames')[a.id], undefined, 'y se olvida el nombre');
+    ok(/id="lv-gestor"/.test(D.src('index.html')), 'el gestor está en el menú de Live');
+    ok(!/data-now=|data-close=|lvnow|data-on=/.test(D.src('index.html')), 'el menú ya no lleva las marcas viejas por nombre');
   });
   test('Modo Foco: micro-píldora del tipo (SHOW · PRUEBA · TAREA · HITO) con color fijo, en vez del cuadradito de color', () => {
     const P = panel().T.tipoPill;
