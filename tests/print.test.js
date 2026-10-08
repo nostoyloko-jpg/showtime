@@ -282,7 +282,7 @@
     ok(L.lanesBottom < L.legendTop, 'la leyenda va debajo de los carriles');
     L.bars.filter(b => b.w >= 25).forEach(b => ok(b.lines.length >= 2, 'ancho: nombre + horario'));
     const svg = P.ganttSvg(L);
-    ok(svg.indexOf('<circle') >= 0, 'distintivo dibujado (no depende de la fuente)');
+    ok(svg.indexOf('<rect') >= 0 && L.bars.filter(b => b.mark).every(b => b.mark.shape), 'distintivo dibujado (no depende de la fuente)');
   });
   test('gantt: OMEGA no se trunca si cabe en 2 líneas; medida por carácter', () => {
     eq(P.wrapLines('OMEGA 30.º Aniversario', '', 32, 3, 3).join('|'), 'OMEGA 30.º|Aniversario', 'dos líneas sin «…»');
@@ -307,6 +307,35 @@
     const rows = P.rowsOf(s, { day: 'all', content: 'all' });
     ok(rows.length && rows.every(r => r.zoneOrder === 0 || r.zoneOrder === 1), 'rowsOf trae la posición de la zona en la configuración');
     ok(rows.some(r => r.zone === 'Principal' && r.zoneOrder === 0), 'Principal es la primera zona');
+  });
+  test('gantt: 3 geometrías de llamada (show [A] · soundcheck ① · tarea ◆1), también en la leyenda', () => {
+    const rows = [G('Banda de apertura larga', 600, 610, 'Principal', 'show'), G('Otra banda larga', 610, 620, 'Principal', 'show'),
+      G('Linecheck Lagartija', 620, 630, 'Principal', 'sc'), G('Montaje suelo escenario', 630, 640, 'Principal', 'tarea'),
+      G('Descarga camiones', 640, 650, 'Principal', 'tarea'), G('Relleno', 660, 1200, 'Carpa', 'tarea')];
+    const L = P.layoutGantt(rows, 273, 164);
+    const m = L.bars.filter(b => b.mark).map(b => b.kind + ':' + b.mark.shape + ':' + b.mark.label).join(',');
+    eq(m, 'show:square:A,show:square:B,sc:circle:1,tarea:diamond:1,tarea:diamond:2', 'letras en cuadrado, números en círculo y en rombo');
+    eq(L.legend.map(it => it.mark.shape + it.mark.label).join(','), 'squareA,squareB,circle1,diamond1,diamond2', 'la leyenda usa las mismas formas');
+    const svg = P.ganttSvg(L);
+    ok(svg.indexOf('<polygon') >= 0 && svg.indexOf('<circle') >= 0 && />A<\/text>/.test(svg), 'rombo, círculo y cuadrado con letra en el SVG');
+  });
+  test('gantt: anclaje inteligente de hitos al final del día; solo el nombre principal', () => {
+    const rows = [G('A', 1080, 1500), G('Apertura de puertas', 1200, null, 'Principal', 'hito'),
+      G('Curfew de sonido', 1410, null, 'Principal', 'hito'), G('Curfew de camerinos (Hora exacta TBC)', 1470, null, 'Principal', 'hito')];
+    const L = P.layoutGantt(rows, 273, 164);
+    const h = L.hitos.find(x => x.time === '00:30');
+    eq(h.anchor, 'end', '00:30 se escribe hacia la izquierda');
+    eq(h.label, '00:30 Curfew de camerinos', 'completo y sin la nota entre paréntesis');
+    eq(L.hitos.find(x => x.time === '20:00').anchor, 'start', 'los de antes de las 22:30, hacia la derecha');
+    ok(L.hitos.find(x => x.time === '23:30').anchor === 'end', '23:30 también hacia la izquierda');
+  });
+  test('gantt: un hito que chocaría con los que vienen de la derecha cambia de lado', () => {
+    const rows = [G('A', 690, 1470), G('Fin de pruebas', 1170, null, 'Principal', 'hito'), G('Apertura puertas', 1170, null, 'Principal', 'hito'),
+      G('Apertura de puertas', 1260, null, 'Principal', 'hito'), G('Curfew de sonido', 1410, null, 'Principal', 'hito'),
+      G('Curfew de camerinos', 1470, null, 'Principal', 'hito')];
+    const L = P.layoutGantt(rows, 273, 164);
+    eq(L.hitos[0].anchor, 'end', '19:30 pasa a escribirse hacia la izquierda');
+    ok(L.hitos.every(h => h.label.indexOf('…') < 0), 'todas las etiquetas completas: ' + L.hitos.map(h => h.label).join(' | '));
   });
   test('gantt: html con formato gantt → hojas apaisadas con SVG y pie', () => {
     const rows = [G('A', 690, 780), G('B', 900, 960, 'Carpa', 'show', '#0284c7')];

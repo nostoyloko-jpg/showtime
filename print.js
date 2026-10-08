@@ -264,6 +264,20 @@
     return { lines: lines, complete: complete };
   }
 
+  /** A, B, … Z, AA, AB… (llamadas de shows). */
+  function letters(n) {
+    let s = '';
+    while (n > 0) { n--; s = String.fromCharCode(65 + n % 26) + s; n = Math.floor(n / 26); }
+    return s;
+  }
+
+  /** Nombre principal de un hito para la cabecera: sin aclaraciones entre paréntesis o corchetes
+   *  («Curfew de camerinos (hora exacta TBC)» → «Curfew de camerinos») ni lo que va tras « · ». */
+  function hitoName(name) {
+    const n = clean(name).replace(/\s*[\(\[][^\)\]]*[\)\]]/g, '').split(/\s+·\s+/)[0].trim();
+    return n || clean(name);
+  }
+
   /** Etiqueta que cabe en un ancho (mm): «Nombre horario» → «Nombre» → «Nomb…» → vacío. */
   function fitLabel(name, time, maxW, fs) {
     const cw = fs * 0.6;                       // ancho medio de carácter (mm) con negrita
@@ -313,28 +327,63 @@
       lanes.push(l);
     });
 
-    // ── Hitos: un grupo por hora, en 2 niveles alternos; cada etiqueta se recorta hasta el siguiente de su nivel ──
+    // ── Hitos: un grupo por hora, en 2 niveles alternos. Anclaje inteligente: los del final del día (desde las 22:30)
+    //    o cerca del borde derecho se escriben hacia la izquierda de su línea. Cada etiqueta se recorta sin pisar a otra. ──
     const HFS = 2.6, HROW = 3.4;
     const byTime = new Map();
     items.filter(r => r.kind === 'hito').forEach(r => {
       if (!byTime.has(r.s)) byTime.set(r.s, []);
-      const n = clean(r.name);
+      const n = hitoName(r.name);
       if (n && byTime.get(r.s).indexOf(n) < 0) byTime.get(r.s).push(n);
     });
     const hitos = [...byTime.entries()].sort((p, q) => p[0] - q[0])
-      .map(([s, names], i) => ({ x: X(s), text: (C.fmtHM(s) + ' ' + names.join(' / ')).trim(), row: i % 2 }));
+      .map(([s, names], i) => ({ s: s, x: X(s), time: C.fmtHM(s), text: (C.fmtHM(s) + ' ' + names.join(' / ')).trim(), row: i % 2 }));
+    const LATE = 22 * 60 + 30;
+    hitos.forEach(h => {
+      const late = (h.s % 1440) >= LATE || h.s >= 1440 || h.x > x0 + 0.7 * (x1 - x0);
+      h.end = late && h.x - x0 > 40;                           // hacia la izquierda solo si hay sitio detrás
+    });
+    // Si una etiqueta que va hacia la derecha choca con una de las que vienen escritas hacia la izquierda,
+    // también cambia de lado (de derecha a izquierda, en cascada), siempre que tenga sitio detrás.
+    const ext = h => { const w = textW(h.text, HFS, true); return h.end ? [h.x - 0.8 - w, h.x - 0.8] : [h.x + 0.8, h.x + 0.8 + w]; };
+    for (let i = hitos.length - 2; i >= 0; i--) {
+      const h = hitos[i];
+      if (h.end) continue;
+      const e = ext(h), w = e[1] - e[0];
+      const choca = hitos.slice(i + 1).some(o => { if (!o.end) return false; const oe = ext(o); return e[1] + 1.2 > oe[0] && e[0] < oe[1] + 1.2; });
+      if (choca && h.x - 0.8 - w >= 0.5) h.end = true;
+    }
+    // Nivel: alterna con el anterior; si la etiqueta entera choca allí y en el otro nivel cabe, va al otro
+    const placed = [[], []];
+    hitos.forEach((h, i) => {
+      const w = textW(h.text, HFS, true);
+      const l = h.end ? h.x - 0.8 - w : h.x + 0.8, r = l + w;
+      const free = k => placed[k].every(p => r + 1.2 <= p.l || l >= p.r + 1.2);
+      const pref = i ? 1 - hitos[i - 1].row : 0;
+      h.row = free(pref) ? pref : free(1 - pref) ? 1 - pref : pref;
+      placed[h.row].push({ l: l, r: r });
+    });
     hitos.forEach((h, i) => {
       const next = hitos.slice(i + 1).find(o => o.row === h.row);
       const prev = hitos.slice(0, i).reverse().find(o => o.row === h.row);
-      let anchor = 'start', tx = h.x + 0.8;
-      let avail = (next ? next.x - 1.2 : W - 0.5) - tx;
-      if (!next && textW(h.text, HFS, true) > avail) {          // el último de su nivel: si cabe mejor, a la izquierda de la línea
-        const availL = (h.x - 0.8) - (prev ? prev.endX + 1.2 : 0.5);
-        if (availL > avail) { anchor = 'end'; tx = h.x - 0.8; avail = availL; }
+      let tx, avail;
+      if (h.end) {
+        tx = h.x - 0.8;
+        avail = tx - (prev ? prev.endX + 1.2 : 0.5);
+      } else {
+        tx = h.x + 0.8;
+        // si el siguiente de su nivel escribe hacia atrás, se le reserva su sitio (los del final del día mandan)
+        let lim = next ? (next.end ? next.x - 0.8 - textW(next.text, HFS, true) - 1.2 : next.x - 1.2) : W - 0.5;
+        lim = Math.max(lim, tx + textW(h.time, HFS, true));
+        avail = lim - tx;
+        if (!next && textW(h.text, HFS, true) > avail) {        // el último de su nivel: si cabe mejor, a la izquierda
+          const availL = (h.x - 0.8) - (prev ? prev.endX + 1.2 : 0.5);
+          if (availL > avail) { h.end = true; tx = h.x - 0.8; avail = availL; }
+        }
       }
       h.label = fitText(h.text, HFS, avail, true);
-      h.anchor = anchor; h.tx = tx;
-      h.endX = anchor === 'start' ? tx + textW(h.label, HFS, true) : tx;
+      h.anchor = h.end ? 'end' : 'start'; h.tx = tx;
+      h.endX = h.end ? tx : tx + textW(h.label, HFS, true);
     });
     const bandH = hitos.length ? Math.min(2, hitos.length) * HROW + 0.6 : 0;
     const tickY = TOP + bandH + 2.8;                          // línea base de las horas
@@ -372,9 +421,16 @@
       if (n <= legendN) break;
       legendN = n;
     }
-    // Llamadas numeradas por orden horario (y escenario), y su leyenda en 2 columnas
+    // Llamadas por orden horario (y escenario), con 3 geometrías que se distinguen en blanco y negro:
+    // shows → letra en cuadrado [A]; soundchecks → número en círculo ①; tareas → número en rombo ◆1. Leyenda en 2 columnas.
     const called = bars.filter(bb => bb.badge < 0).sort((p, q) => p.s - q.s || p.lane - q.lane || p.row - q.row);
-    called.forEach((bb, i) => { bb.badge = i + 1; bb.cx = bb.x + bb.w / 2; bb.cy = bb.y + bb.h / 2; });
+    const cnt = { square: 0, circle: 0, diamond: 0 };
+    called.forEach((bb, i) => {
+      const shape = bb.kind === 'show' ? 'square' : bb.kind === 'sc' ? 'circle' : 'diamond';
+      const n = ++cnt[shape];
+      bb.badge = i + 1; bb.cx = bb.x + bb.w / 2; bb.cy = bb.y + bb.h / 2;
+      bb.mark = { shape: shape, label: shape === 'square' ? letters(n) : String(n) };
+    });
     const legend = [];
     if (called.length) {
       const rows = Math.ceil(called.length / 2), colW = (W - LW - 1) / 2;
@@ -382,8 +438,8 @@
         const col = Math.floor(i / rows), row = i % rows;
         const x = LW + col * colW, y = legendTop + row * LROW;
         const tail = ' (' + bb.time + ')';
-        const nm = bb.name ? fitText(bb.name, 2.6, colW - 6 - textW(tail, 2.6), false) : '';
-        legend.push({ num: bb.badge, x: x, y: y, text: (nm + tail).trim() });
+        const nm = bb.name ? fitText(bb.name, 2.6, colW - 6.8 - textW(tail, 2.6), false) : '';
+        legend.push({ num: bb.badge, mark: bb.mark, x: x, y: y, text: (nm + tail).trim() });
       });
     }
     const ticks = [];
@@ -397,8 +453,18 @@
   function ganttSvg(L) {
     const f = (n) => Math.round(n * 100) / 100;
     const out = [];
-    const badge = (cx, cy, n, r) => '<circle cx="' + f(cx) + '" cy="' + f(cy) + '" r="' + r + '" fill="#fff" stroke="#0f172a" stroke-width="0.3"/>' +
-      '<text x="' + f(cx) + '" y="' + f(cy + r * 0.42) + '" text-anchor="middle" font-size="' + f(n > 9 ? r * 0.95 : r * 1.2) + '" font-weight="800" fill="#0f172a">' + n + '</text>';
+    // Distintivo de llamada: cuadrado (show) · círculo (soundcheck) · rombo (tarea); r = medio lado / radio
+    const badge = (cx, cy, m, r) => {
+      const st = ' fill="#fff" stroke="#0f172a" stroke-width="0.3"';
+      const k = m.shape === 'diamond' ? 1.3 : 1;
+      const shape = m.shape === 'square'
+        ? '<rect x="' + f(cx - r) + '" y="' + f(cy - r) + '" width="' + f(2 * r) + '" height="' + f(2 * r) + '" rx="0.3"' + st + '/>'
+        : m.shape === 'diamond'
+          ? '<polygon points="' + [[cx, cy - r * k], [cx + r * k, cy], [cx, cy + r * k], [cx - r * k, cy]].map(p => f(p[0]) + ',' + f(p[1])).join(' ') + '"' + st + '/>'
+          : '<circle cx="' + f(cx) + '" cy="' + f(cy) + '" r="' + r + '"' + st + '/>';
+      const fsz = m.label.length > 1 ? r * 0.95 : r * 1.2;
+      return shape + '<text x="' + f(cx) + '" y="' + f(cy + fsz * 0.36) + '" text-anchor="middle" font-size="' + f(fsz) + '" font-weight="800" fill="#0f172a">' + esc(m.label) + '</text>';
+    };
     out.push('<svg class="gantt" viewBox="0 0 ' + L.W + ' ' + L.H + '" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Cronograma de escenarios">');
     L.ticks.forEach(t => {
       out.push('<line x1="' + f(t.x) + '" x2="' + f(t.x) + '" y1="' + f(L.tickY + 0.8) + '" y2="' + f(L.lanesBottom) + '" stroke="#e2e8f0" stroke-width="0.15"/>');
@@ -432,7 +498,7 @@
           b.lines.map((t, i) => '<tspan x="' + tx + '" dy="' + (i ? f(lh) : 0) + '" font-weight="' +
             (timeLast && i === b.lines.length - 1 ? 500 : (b.strong ? 800 : 700)) + '">' + esc(t) + '</tspan>').join('') + '</text>');
       } else if (b.badge > 0) {
-        out.push(badge(b.cx, b.cy, b.badge, 2));
+        out.push(badge(b.cx, b.cy, b.mark, 2));
       }
     });
     // Hitos: etiqueta horizontal en la pista superior (2 niveles).
@@ -444,8 +510,8 @@
     if (L.legend.length) {
       out.push('<line x1="' + L.LW + '" x2="' + (L.W - 1) + '" y1="' + f(L.legendTop - 1.6) + '" y2="' + f(L.legendTop - 1.6) + '" stroke="#cbd5e1" stroke-width="0.2"/>');
       L.legend.forEach(it => {
-        out.push(badge(it.x + 1.8, it.y + 1.2, it.num, 1.6));
-        out.push('<text x="' + f(it.x + 4.4) + '" y="' + f(it.y + 2.1) + '" font-size="2.6" fill="#0f172a">' + esc(it.text) + '</text>');
+        out.push(badge(it.x + 2.2, it.y + 1.2, it.mark, 1.6));
+        out.push('<text x="' + f(it.x + 5.2) + '" y="' + f(it.y + 2.1) + '" font-size="2.6" fill="#0f172a">' + esc(it.text) + '</text>');
       });
     }
     out.push('</svg>');
@@ -557,7 +623,7 @@
     return true;
   }
 
-  const API = { CONTENT, KINDS, TYPE, I18N, rowsOf, densityFor, dayLabel, printedAt, daysOf, html, summary, launch, esc, layoutGantt, ganttSvg, fitLabel, wrapLines, cutWords, textW, fitText };
+  const API = { CONTENT, KINDS, TYPE, I18N, rowsOf, densityFor, dayLabel, printedAt, daysOf, html, summary, launch, esc, layoutGantt, ganttSvg, fitLabel, wrapLines, cutWords, textW, fitText, letters, hitoName };
   if (isNode) module.exports = API;
   else root.ShowtimePrint = API;
 })(typeof window !== 'undefined' ? window : globalThis);
