@@ -829,6 +829,12 @@
     ok(/id="lv-gestor"/.test(D.src('index.html')), 'el gestor está en el menú de Live');
     ok(!/data-now=|data-close=|lvnow|data-on=/.test(D.src('index.html')), 'el menú ya no lleva las marcas viejas por nombre');
   });
+  test('Parpadeo del sobretiempo: referencia junto a la velocidad (mismo color y ritmo; quieta si el parpadeo está apagado)', () => {
+    const html = D.src('index.html'), css = D.src('control.css'), js = D.src('control.js');
+    ok(/id="sc-bprev" class="blkprev"/.test(html), 'la referencia está junto al campo de velocidad');
+    ok(/\.blkprev\{[^}]*animation:blkprev var\(--blink-speed,1s\) steps\(1,end\) infinite/.test(css) && /\.blkprev\.still\{animation:none\}/.test(css), 'parpadea a la velocidad elegida; quieta si está apagado');
+    ok(/bp\.style\.setProperty\('--blink-speed', sc\.conf\.blinkSpeed \+ 's'\)/.test(js) && /bp\.style\.color = sc\.conf\.overNum/.test(js), 'mismo ritmo y color que la Live');
+  });
   test('Chat: ventana flotante con botón ⤢ Ventana; lista con scroll y formulario abajo; Esc, ✕ o clic fuera la cierran', () => {
     const html = D.src('index.html'), css = D.src('control.css'), js = D.src('control.js');
     ok(/id="chat-pop" class="chatpop"[^>]*>⤢ Ventana</.test(html), 'botón ⤢ Ventana en la cabecera del chat');

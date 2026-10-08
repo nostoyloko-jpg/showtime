@@ -1058,3 +1058,8 @@ td input:focus,td select:focus,.imp-src textarea:focus,.imp-prev td input[type=t
 .chat-box .chat-head{padding:0 0 10px;margin-bottom:8px;border-bottom:1px solid var(--hair)}
 .chat-box .chat-list-pop{flex:1 1 auto;min-height:0;max-height:none;overflow-y:auto;margin:0 0 10px}
 .chat-box .chat-form,.chat-box .mnote{flex:0 0 auto}
+
+/* Referencia del parpadeo del sobretiempo (Configuración › Pantallas Live) */
+.blkprev{font-style:normal;font-weight:900;font-size:13px;font-variant-numeric:tabular-nums;margin-left:10px;padding:2px 8px;border-radius:6px;background:rgba(255,255,255,.06);animation:blkprev var(--blink-speed,1s) steps(1,end) infinite}
+.blkprev.still{animation:none}
+@keyframes blkprev{50%{color:#fff!important}}

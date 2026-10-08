@@ -998,6 +998,9 @@
     });
     const pv = $('sc-tprev'); pv.style.background = sc.ticker.bg; pv.style.color = sc.ticker.fg; pv.className = 'tkprev ' + sc.ticker.mode;
     pv.style.setProperty('--tk-speed', (sc.ticker.speed * 0.3) + 's');   // la vista previa va proporcional (más corta)
+    // referencia del parpadeo: el mismo número en el mismo color y ritmo que verá la Live
+    const bp = $('sc-bprev');
+    if (bp) { bp.style.setProperty('--blink-speed', sc.conf.blinkSpeed + 's'); bp.style.color = sc.conf.overNum; bp.classList.toggle('still', !sc.conf.blink); }
   }
   function saveScreens(el) {
     const sc = JSON.parse(JSON.stringify(CONFIG.screens || Vs.normScreens()));
