@@ -1519,7 +1519,7 @@
     // Por defecto, visibles y cambiables: la jornada que se está viendo (o la única del evento) y el único escenario si solo hay uno
     const days = FEST ? C.eventDays(FEST) : [], stg = FEST ? FEST.escenarios || [] : [];
     IMP = { text: text || '', mode: CONFIG.mode === 'sc' ? 'sc' : 'show', fresh: !FEST, base: FEST, jorTouched: false,
-      defJor: FEST && CONFIG.day !== 'all' ? CONFIG.day : days.length === 1 ? days[0] : '', defEsc: stg.length === 1 ? stg[0].id : '',
+      defJor: FEST && CONFIG.day !== 'all' ? CONFIG.day : days.length === 1 ? days[0] : '', defEsc: stg.length === 1 ? stg[0].nombre : '',
       header: undefined, map: null, create: {}, extend: true, include: {}, edits: {}, read: null, pv: null };
     $('imp-notice').hidden = !notice; $('imp-notice').textContent = notice || '';
     setAddTabs('paste');
@@ -1527,6 +1527,13 @@
     $('imp').hidden = false;
     impRecompute();
     $('imp-text').focus();
+  }
+  /** Zona por defecto escrita: { id } si ya existe (sin mirar mayúsculas ni acentos) o { name } si es nueva. */
+  function impDefZone() {
+    const v = String(IMP.defEsc || '').trim();
+    if (!v) return { id: '', name: '' };
+    const st = (IMP.base.escenarios || []).find(e => I.norm(e.nombre) === I.norm(v));
+    return st ? { id: st.id, name: '' } : { id: '', name: v };
   }
   function closeImport() { $('imp').hidden = true; IMP = null; }
 
@@ -1548,7 +1555,8 @@
       IMP.map = null; rd = I.read(IMP.text, ctx, IMP.header !== undefined ? { header: IMP.header } : {});
     }
     IMP.read = rd;
-    IMP.pv = I.preview(IMP.base, rd.records, { mode: IMP.mode, ctx: ctx, defaultJornada: IMP.defJor, defaultStageId: IMP.defEsc,
+    const dz = impDefZone();
+    IMP.pv = I.preview(IMP.base, rd.records, { mode: IMP.mode, ctx: ctx, defaultJornada: IMP.defJor, defaultStageId: dz.id, defaultStageName: dz.name,
       createStages: IMP.create, include: IMP.include, edits: IMP.edits });
     impRender();
   }
@@ -1563,8 +1571,9 @@
     const jor = IMP.fresh ? C.eventDays(IMP.base) : jornadaOptions();
     $('imp-jor').innerHTML = '<option value="">— ninguna —</option>' + jor.map(d => '<option value="' + d + '">' + esc(fmtDay(d)) + '</option>').join('');
     $('imp-jor').value = IMP.defJor;
-    $('imp-esc').innerHTML = '<option value="">— ninguna —</option>' + (IMP.base.escenarios || []).map(e => '<option value="' + esc(e.id) + '">' + esc(e.nombre) + '</option>').join('');
-    $('imp-esc').value = IMP.defEsc;
+    const zl = (IMP.base.escenarios || []).map(e => '<option value="' + esc(e.nombre) + '"></option>').join('');
+    if ($('imp-zones-dl').innerHTML !== zl) $('imp-zones-dl').innerHTML = zl;
+    if (document.activeElement !== $('imp-esc') && $('imp-esc').value !== IMP.defEsc) $('imp-esc').value = IMP.defEsc;
     $('imp-head-l').hidden = rd.kind !== 'tabla';
     $('imp-head').checked = !!rd.hasHeader;
     // Mapeo de columnas (tablas)
@@ -1749,7 +1758,11 @@
   });
   document.querySelectorAll('#imp [data-imode]').forEach(b => b.addEventListener('click', () => { IMP.mode = b.dataset.imode; impResetRows(); impRecompute(); }));
   $('imp-jor').addEventListener('change', e => { IMP.defJor = e.target.value; IMP.jorTouched = true; impRecompute(); });
-  $('imp-esc').addEventListener('change', e => { IMP.defEsc = e.target.value; impRecompute(); });
+  // «Zona por defecto»: se elige de la lista o se escribe una nueva (se crea al importar, para todas las filas sin zona)
+  let impZoneTimer = null;
+  const impSetZone = v => { if (!IMP) return; v = String(v || '').replace(/\s+/g, ' ').trim(); if (v === IMP.defEsc) return; IMP.defEsc = v; impRecompute(); };
+  $('imp-esc').addEventListener('input', e => { clearTimeout(impZoneTimer); impZoneTimer = setTimeout(() => impSetZone(e.target.value), 300); });
+  $('imp-esc').addEventListener('change', e => { clearTimeout(impZoneTimer); impSetZone(e.target.value); });
   $('imp-head').addEventListener('change', e => { IMP.header = e.target.checked; IMP.map = null; impResetRows(); impRecompute(); });
   $('imp-map').addEventListener('change', e => {
     const s = e.target.closest('select[data-col]'); if (!s) return;

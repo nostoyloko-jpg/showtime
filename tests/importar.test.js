@@ -388,6 +388,35 @@
     const sin = I.preview(S, I.read(t, CTX).records, { ctx: CTX, defaultJornada: '2026-07-10' });
     deq(sin.rows.map(r => r.escenario), ['', '', '', K.nombre], 'sin zona por defecto: las tareas quedan sin zona');
   });
+  test('«Zona por defecto» ESCRITA (zona nueva): va a todas las filas sin zona, se propone crearla y se crea al importar', () => {
+    const t = '09:00 Transfer hotel - recinto\n19:00 Apertura de puertas\n20:00 Banda Uno\n21:00 Banda Dos (Carpa)';
+    const K = S.escenarios[1];
+    const pv = I.preview(S, I.read(t, CTX).records, { ctx: CTX, defaultJornada: '2026-07-10', defaultStageName: '  Escenario   Río ' });
+    deq(pv.rows.map(r => r.escenario), ['Escenario Río', 'Escenario Río', 'Escenario Río', K.nombre], 'también tareas e hitos (no va a notas)');
+    deq(pv.newStages, ['Escenario Río']);
+    ok(pv.rows.slice(0, 3).every(r => r.warns.indexOf('Zona nueva: Escenario Río') >= 0 && !r.errs.length));
+    eq(pv.rows[0].notas, '', 'la zona por defecto no se pasa a notas');
+    const ap = I.apply(S, pv, {});
+    eq(ap.stagesCreated, 1);
+    const z = ap.state.escenarios.find(e => e.nombre === 'Escenario Río');
+    ok(z, 'zona creada');
+    eq(ap.state.artists.filter(a => a.escenarioId === z.id).length, 3);
+    // Sin marcar «crear»: error en las filas que la usan
+    const no = I.preview(S, I.read(t, CTX).records, { ctx: CTX, defaultJornada: '2026-07-10', defaultStageName: 'Escenario Río', createStages: { [I.norm('Escenario Río')]: false } });
+    ok(no.rows.slice(0, 3).every(r => r.status === 'err'));
+  });
+  test('«Zona por defecto» escrita con otra grafía de una zona que ya existe: usa la existente (no crea otra)', () => {
+    const P = S.escenarios[0];
+    const pv = I.preview(S, I.read('20:00 Banda Uno', CTX).records, { ctx: CTX, defaultJornada: '2026-07-10', defaultStageName: P.nombre.toUpperCase() });
+    eq(pv.rows[0].stageId, P.id); deq(pv.newStages, []);
+  });
+  test('Sin ninguna zona en el evento: la zona por defecto escrita crea la primera', () => {
+    const vacio = C.newFestival({ nombre: 'X', fechaInicio: '2026-07-10', fechaFin: '2026-07-10', dayCutoff: '06:00', coMin: 15 }).state;
+    const pv = I.preview(vacio, I.read('20:00 Banda Uno\n13:00 Comida', I.contextOf(vacio)).records, { ctx: I.contextOf(vacio), defaultJornada: '2026-07-10', defaultStageName: 'Principal' });
+    const ap = I.apply(vacio, pv, {});
+    deq(ap.state.escenarios.map(e => e.nombre), ['Principal']);
+    ok(ap.state.artists.every(a => a.escenarioId === ap.state.escenarios[0].id));
+  });
   let pass = 0; const fails = [];
   tests.forEach(([n, f]) => { try { f(); pass++; } catch (e) { fails.push([n, e.message]); } });
   const summary = 'Importar: ' + pass + '/' + tests.length + ' tests OK' + (fails.length ? ' — ' + fails.length + ' FALLAN' : '');

@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="Showtime">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
-<link rel="stylesheet" href="control.css?v=20261043">
+<link rel="stylesheet" href="control.css?v=20261044">
 </head>
 <body>
 <div id="savewarn" class="savewarn" role="alert" hidden><b>NO SE ESTÁ GUARDANDO</b> · el navegador no tiene espacio. Lo que cambies se ve y se emite, pero se pierde si recargas: guarda el evento en un archivo (.json), exporta el log y libera espacio.</div>
@@ -393,7 +393,7 @@
     <div class="imp-opts">
       <span class="imp-lbl">Bandas como</span><div class="seg" role="group" aria-label="Bandas como"><button data-imode="show">Show</button><button data-imode="sc">Soundcheck</button></div>
       <label>Jornada por defecto <select id="imp-jor"></select></label>
-      <label>Zona por defecto <select id="imp-esc"></select></label>
+      <label>Zona por defecto <input id="imp-esc" type="text" list="imp-zones-dl" placeholder="— ninguna — (o escribe una nueva)" title="Elige una zona o escribe una nueva: se crea al importar y se pone en todas las filas sin zona" autocomplete="off" spellcheck="false"></label><datalist id="imp-zones-dl"></datalist>
       <label id="imp-head-l"><input id="imp-head" type="checkbox"> La primera fila es cabecera</label>
     </div>
     <div id="imp-map" class="imp-map"></div>
@@ -407,17 +407,17 @@
 <datalist id="zones-dl"></datalist>
 <div id="toast" class="toast" hidden></div>
 
-<script src="core.js?v=20261043"></script>
-<script src="meteo.js?v=20261043"></script>
-<script src="datos.js?v=20261043"></script>
-<script src="importar.js?v=20261043"></script>
-<script src="xlsx.js?v=20261043"></script>
-<script src="qr.js?v=20261043"></script>
-<script src="emision.js?v=20261043"></script>
-<script src="mando.js?v=20261043"></script>
-<script src="vistas.js?v=20261043"></script>
-<script src="log.js?v=20261043"></script>
-<script src="control.js?v=20261043"></script>
-<script src="pwa.js?v=20261043"></script>
+<script src="core.js?v=20261044"></script>
+<script src="meteo.js?v=20261044"></script>
+<script src="datos.js?v=20261044"></script>
+<script src="importar.js?v=20261044"></script>
+<script src="xlsx.js?v=20261044"></script>
+<script src="qr.js?v=20261044"></script>
+<script src="emision.js?v=20261044"></script>
+<script src="mando.js?v=20261044"></script>
+<script src="vistas.js?v=20261044"></script>
+<script src="log.js?v=20261044"></script>
+<script src="control.js?v=20261044"></script>
+<script src="pwa.js?v=20261044"></script>
 </body>
 </html>

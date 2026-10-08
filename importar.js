@@ -731,7 +731,8 @@
   }
 
   // ── Vista previa (validación contra el evento) ──────────────────────
-  /** opts: { mode (tipo por defecto de las bandas: show|sc), defaultJornada, defaultStageId, createStages:{normName:true},
+  /** opts: { mode (tipo por defecto de las bandas: show|sc), defaultJornada, defaultStageId,
+   *          defaultStageName (zona por defecto escrita a mano: si no existe, es zona nueva para todo), createStages:{normName:true},
    *          include:{idx:bool}, edits:{idx:{campo:valor}} } — edits.tipo cambia el tipo propuesto.
    *  Devuelve { rows, newStages:[nombre], outside:[iso], counts }. Cada fila lleva tipo (show|sc|tarea|hito) y tipoWhy. */
   function preview(state, records, opts) {
@@ -741,6 +742,7 @@
     (state.escenarios || []).forEach(e => { stagesByNorm[norm(e.nombre)] = e; });
     const evDays = C.eventDays(state);
     const newStages = [], seenNew = {}, outside = [];
+    const defName = String(o.defaultStageName || '').replace(/\s+/g, ' ').trim();
     const rows = records.map((r0, idx) => {
       const ed = (o.edits && o.edits[idx]) || null;
       const r = Object.assign({}, r0, ed ? reinterpretEdits(r0, ed, o.ctx) : {});
@@ -764,7 +766,7 @@
       const sameDay = (state.artists || []).find(a => r.banda && norm(a.nombre) === norm(r.banda) &&
         (band ? C.tipoOf(a) === 'banda' && C.entersMode(a, mode) : C.tipoOf(a) === tipo) && C.jornadaOf(state, a, mode) === jornada0);
       // Escenario
-      let stage = null, stageNew = '';
+      let stage = null, stageNew = '', stageDef = false;
       if (r.escenario) {
         stage = stagesByNorm[norm(r.escenario)] || null;
         if (!stage) {
@@ -774,6 +776,13 @@
           else warns.push('Zona nueva: ' + r.escenario);
         }
       } else if (o.defaultStageId && C.getEscenario(state, o.defaultStageId)) stage = C.getEscenario(state, o.defaultStageId);   // «Zona por defecto»: para todo lo que no trae zona
+      else if (defName && stagesByNorm[norm(defName)]) stage = stagesByNorm[norm(defName)];
+      else if (defName) {      // «Zona por defecto» escrita a mano y que aún no existe: zona nueva para todo (también tareas e hitos)
+        stageNew = defName; stageDef = true;
+        if (!seenNew[norm(defName)]) { seenNew[norm(defName)] = true; newStages.push(defName); }
+        if (o.createStages && o.createStages[norm(defName)] === false) errs.push('La zona «' + defName + '» no existe (marca «crear» o cámbiala)');
+        else warns.push('Zona nueva: ' + defName);
+      }
       else if (!band) { /* tareas e hitos: escenario opcional */ }
       else if ((state.escenarios || []).length) errs.push('Falta la zona (elige una por defecto o una columna)');
       // Jornada
@@ -806,7 +815,7 @@
       const status = errs.length ? 'err' : warns.length ? 'warn' : 'ok';
       const defInclude = status !== 'err';
       const include = o.include && o.include[idx] !== undefined ? (o.include[idx] && status !== 'err') : defInclude;
-      return { idx, src: r.src, raw: r.raw, banda: r.banda, tipo, tipoWhy, escenario: stage ? stage.nombre : stageNew, stageId: stage ? stage.id : '', stageNew,
+      return { idx, src: r.src, raw: r.raw, banda: r.banda, tipo, tipoWhy, escenario: stage ? stage.nombre : stageNew, stageId: stage ? stage.id : '', stageNew, stageDef,
         jornada, inicio: r.inicio, fin: fin || '', finTxt: r.fin, duracion: r.duracion, call: call, notas: r.notas,
         action, target, warns, errs, status, include };
     });
@@ -814,7 +823,7 @@
     // Si ninguna banda toca en ese sitio, va a notas y no se crea la zona.
     const bandPlaces = new Set(rows.filter(r => (r.tipo === 'show' || r.tipo === 'sc') && r.stageNew).map(r => norm(r.stageNew)));
     rows.forEach(r => {
-      if (!r.stageNew || r.tipo === 'show' || r.tipo === 'sc' || bandPlaces.has(norm(r.stageNew))) return;
+      if (!r.stageNew || r.stageDef || r.tipo === 'show' || r.tipo === 'sc' || bandPlaces.has(norm(r.stageNew))) return;
       const place = r.stageNew;
       r.notas = r.notas ? place + ' · ' + r.notas : place;
       r.warns = r.warns.filter(w => w !== 'Zona nueva: ' + place);

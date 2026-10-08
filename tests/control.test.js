@@ -713,6 +713,42 @@
     eq(c.read('showtime.festival').artists.length, 2);
   });
 
+  test('«Zona por defecto» se escribe: lista con las zonas del evento; una nueva se propone crear y va a todas las filas sin zona', () => {
+    const F = fest(), t = panel({ 'showtime.festival': JSON.stringify(F.s) });
+    t.env.fire('document', 'paste', pasteEv('22:00-23:00 Banda Nueva\n14:00 Comida'));
+    const z = t.env.getEl('imp-esc');
+    eq(z.value, 'Principal', 'con una sola zona, ya viene puesta');
+    ok(/<option value="Principal">/.test(t.env.getEl('imp-zones-dl').innerHTML), 'la lista ofrece las zonas que hay');
+    z.value = 'Escenario Río'; t.env.fire('imp-esc', 'change', { target: z });
+    ok(/crear «Escenario Río»/.test(ultimo(t, 'imp-new')), 'se propone crear la zona');
+    t.env.fire('imp-go', 'click', {});
+    const s = t.read('showtime.festival'), rio = s.escenarios.find(e => e.nombre === 'Escenario Río');
+    ok(rio, 'zona creada al importar');
+    eq(s.artists.filter(a => a.escenarioId === rio.id).length, 2, 'la banda y la comida');
+    eq(t.env.errors.length, 0, t.env.errors.join(' | '));
+  });
+  test('«Zona por defecto» sin evento ni zonas: escribirla crea la primera zona del «Evento sin nombre»', () => {
+    const t = panel();
+    t.env.fire('document', 'paste', pasteEv('10/07/2026 20:00 Banda Uno\n10/07/2026 21:30 Banda Dos'));
+    const z = t.env.getEl('imp-esc');
+    eq(z.value, '', 'sin zonas: vacía');
+    z.value = 'principal'; t.env.fire('imp-esc', 'change', { target: z });
+    t.env.fire('imp-go', 'click', {});
+    const s = t.read('showtime.festival');
+    eq(s.escenarios.map(e => e.nombre).join(), 'principal');
+    ok(s.artists.length === 2 && s.artists.every(a => a.escenarioId === s.escenarios[0].id));
+  });
+  test('Modales sólidos (Safari): fondo oscurecido con desenfoque y caja opaca sin cristal, en los 4 estilos', () => {
+    const css = D.src('control.css'), tail = css.slice(css.lastIndexOf('/* ── Modales sólidos'));
+    ok(/\.modal\{background:rgba\(0,0,0,\.75\);-webkit-backdrop-filter:blur\(8px\);backdrop-filter:blur\(8px\)\}/.test(tail));
+    ok(/\.modal-box,\.imp-box\{--modal-bg:#0d0f15;background:var\(--modal-bg\);-webkit-backdrop-filter:none;backdrop-filter:none;border:1px solid rgba\(255,255,255,\.1\);box-shadow:0 24px 64px rgba\(0,0,0,\.8\),0 2px 8px rgba\(0,0,0,\.5\)\}/.test(tail));
+    ['raycast', 'neutro', 'escenario'].forEach(ps => {
+      const m = new RegExp('body\\[data-ps="' + ps + '"\\] \\.modal-box,body\\[data-ps="' + ps + '"\\] \\.imp-box\\{--modal-bg:(#[0-9a-f]{3,6})').exec(tail);
+      ok(m, ps + ': color propio y opaco');
+    });
+    ok(css.indexOf('/* ── Modales sólidos') > css.indexOf('/* ── Cristal'), 'va después del cristal (gana)');
+  });
+
   test('Imágenes (foto del cartel, captura): sin OCR — se abre «Pegar horario» con el truco de Texto en Vivo', () => {
     const IMG = '💡 Para fotos y capturas: Selecciona el texto sobre la imagen con el ratón o el dedo (Texto en Vivo de Mac/iOS/Android), pulsa ⌘C y pégalo aquí con ⌘V.';
     const F = (name, type) => new File(['x'], name, { type: type || '' });

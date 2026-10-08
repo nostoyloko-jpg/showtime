@@ -923,3 +923,12 @@ body[data-ps="escenario"] .imp-prev thead th{background:#000}
 .toast.good{border-color:color-mix(in srgb,var(--ok) 60%,transparent);color:var(--ok)}
 /* App instalada (iPad/iPhone, barra de estado translúcida): la barra superior no queda debajo del reloj del sistema */
 .bar{padding-top:max(8px,env(safe-area-inset-top,0px));padding-left:max(14px,env(safe-area-inset-left,0px));padding-right:max(14px,env(safe-area-inset-right,0px))}
+
+/* ── Modales sólidos (patrón Raycast Pro): en Safari/WebKit el cristal translúcido dejaba ver la tabla de detrás.
+      Fondo de pantalla oscurecido y desenfocado; la caja, opaca y sin backdrop-filter propio. ── */
+.modal{background:rgba(0,0,0,.75);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.modal-box,.imp-box{--modal-bg:#0d0f15;background:var(--modal-bg);-webkit-backdrop-filter:none;backdrop-filter:none;border:1px solid rgba(255,255,255,.1);box-shadow:0 24px 64px rgba(0,0,0,.8),0 2px 8px rgba(0,0,0,.5)}
+body[data-ps="raycast"] .modal-box,body[data-ps="raycast"] .imp-box{--modal-bg:#0d0e11}
+body[data-ps="neutro"] .modal-box,body[data-ps="neutro"] .imp-box{--modal-bg:#1a1a1c}
+body[data-ps="escenario"] .modal{background:rgba(0,0,0,.85)}
+body[data-ps="escenario"] .modal-box,body[data-ps="escenario"] .imp-box{--modal-bg:#000;border-color:rgba(255,214,0,.55)}
