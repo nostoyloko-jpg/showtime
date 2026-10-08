@@ -215,6 +215,26 @@
     eq(P.wrapLines('Corta', '15:20', 40, 4, 3).join('|'), 'Corta|15:20', 'la hora va en su línea si cabe');
     eq(P.wrapLines('Algo', '15:20', 40, 4, 0).length, 0, 'sin líneas si no hay alto');
   });
+  test('gantt: nunca parte palabras; «…» quita palabras enteras', () => {
+    eq(P.wrapLines('Montaje suelo flamenco', '', 20, 3, 3).join('|'), 'Montaje|suelo|flamenco', 'palabras enteras');
+    const t = P.wrapLines('Montaje suelo flamenco de la noche', '', 20, 3, 2);
+    ok(t.length === 2 && t[1].slice(-1) === '…', 'truncado con «…»');
+    ok(t.every(l => l.replace('…', '').split(' ').every(w => ['Montaje','suelo','flamenco','de','la','noche'].indexOf(w) >= 0)), 'ninguna palabra amputada');
+    eq(P.cutWords('Apertura de puertas recinto', 20), 'Apertura de…', 'cut limpio en palabra');
+  });
+  test('gantt: carriles de igual altura que llenan el alto; hitos verticales; margen derecho', () => {
+    const H = 164;
+    const L = P.layoutGantt([G('A', 600, 660), G('B', 700, 760), G('C', 630, 700, 'Carpa', 'show', '#0284c7'),
+      G('Fin de pruebas', 690, null, 'Principal', 'hito'), G('Apertura de puertas recinto', 1140, null, 'Principal', 'hito')], 273, H);
+    eq(L.lanes.length, 2, 'dos carriles');
+    eq(L.lanes[0].h.toFixed(2), L.lanes[1].h.toFixed(2), 'misma altura por escenario');
+    const bottom = L.lanes[L.lanes.length - 1].y + L.lanes[L.lanes.length - 1].h;
+    ok(Math.abs(bottom - (H - 1)) < 1.5, 'los carriles llegan casi al pie');
+    ok(L.lanes[0].h > 40, 'carriles altos (no tope de 22 mm)');
+    const svg = P.ganttSvg(L);
+    ok(svg.indexOf('rotate(-90') >= 0, 'etiquetas de hito verticales');
+    ok(L.x1 < L.W - 5, 'margen derecho para la última hora');
+  });
   test('gantt: html con formato gantt → hojas apaisadas con SVG y pie', () => {
     const rows = [G('A', 690, 780), G('B', 900, 960, 'Carpa', 'show', '#0284c7')];
     const doc = P.html({ rows, days: [J1], title: 'Prueba', format: 'gantt', orient: 'portrait', now: new Date() });

@@ -143,28 +143,50 @@
     return r.kind === 'show' || (r.kind === 'hito' && /curfew|apertura|fin de/i.test(r.name));
   }
 
-  /** Parte el texto en líneas que caben en maxW (mm). Si no caben en maxLines, la última acaba en «…».
-   *  Al final, la hora («15:20–16:10») va en su propia línea si hay sitio. */
+  /** Corta un texto a n caracteres como mucho sin partir palabras: acaba en «…» quitando palabras enteras. */
+  function cutWords(s, n) {
+    s = String(s || '');
+    if (s.length <= n) return s;
+    if (n < 2) return '';
+    const t = s.slice(0, n - 1);
+    const sp = t.lastIndexOf(' ');
+    if (sp <= 0) return '';                                  // una sola palabra que no cabe: mejor nada que una palabra amputada
+    return t.slice(0, sp).replace(/[\s,;:.\-–]+$/, '') + '…';
+  }
+
+  /** Parte el texto en líneas que caben en maxW (mm). Nunca parte una palabra: si no cabe todo,
+   *  la última línea acaba en «…» quitando palabras enteras. Si la banda es muy estrecha, solo la hora. */
   function wrapLines(name, time, maxW, fs, maxLines) {
     if (maxLines < 1) return [];
-    const cw = fs * 0.66, per = Math.max(1, Math.floor(maxW / cw));   // 0.66 em: margen para negrita
+    const cw = fs * 0.66, per = Math.floor(maxW / cw);   // 0.66 em: margen para negrita
+    const tOk = !!time && time.length * cw <= maxW;
+    if (per < 4) return tOk ? [time] : [];
     const words = String(name || '').split(/\s+/).filter(Boolean);
     const lines = [];
-    let cur = '';
-    words.forEach(w => {
+    let cur = '', trunc = false;
+    for (const w of words) {
+      if (w.length > per) { trunc = true; break; }          // no cabe ni sola: se corta aquí, sin partirla
       const cand = cur ? cur + ' ' + w : w;
       if (cand.length <= per) cur = cand;
-      else { if (cur) lines.push(cur); cur = w.length > per ? w.slice(0, per) : w; }
-    });
-    if (cur) lines.push(cur);
-    if (lines.length > maxLines) {
-      const kept = lines.slice(0, maxLines);
-      const last = kept[maxLines - 1];
-      kept[maxLines - 1] = (last.length >= per ? last.slice(0, per - 1) : last) + '…';
-      return kept;
+      else { lines.push(cur); cur = w; }
     }
-    if (time && lines.length < maxLines && time.length * cw <= maxW) lines.push(time);
+    if (cur) lines.push(cur);
+    if (lines.length > maxLines) { lines.length = maxLines; trunc = true; }
+    if (trunc && lines.length) {
+      let last = lines[lines.length - 1];
+      while ((last + '…').length > per && last.indexOf(' ') > 0) last = last.slice(0, last.lastIndexOf(' '));
+      lines[lines.length - 1] = (last + '…').length <= per ? last + '…' : last;
+    }
+    if (tOk && lines.length < maxLines) lines.push(time);
     return lines;
+  }
+
+  /** Texto de una barra: nombre + horario; si el nombre no cabe (bloque estrecho), solo la hora de inicio. */
+  function barLines(name, s, time, maxW, fs, maxLines) {
+    const named = wrapLines(name, '', maxW, fs, maxLines);
+    if (named.length) return wrapLines(name, time, maxW, fs, maxLines);
+    const hora = C.fmtHM(s);                          // la hora sola cabe con la letra normal (sin margen de negrita)
+    return maxLines >= 1 && hora.length * fs * 0.56 <= maxW ? [hora] : [];
   }
 
   /** Etiqueta que cabe en un ancho (mm): «Nombre horario» → «Nombre» → «Nomb…» → vacío. */
@@ -180,7 +202,8 @@
   /**
    * Cronograma (Gantt) de un día: geometría en mm dentro de un viewBox W×H.
    * Rango dinámico: desde el primer bloque (−30 min, a hora completa) hasta el último (+30 min, a hora completa).
-   * Carriles = escenarios; bloques solapados en el mismo escenario van en sub-filas; hitos = líneas verticales.
+   * Carriles = escenarios, todos de la misma altura que llenan el alto útil; bloques solapados en el mismo
+   * escenario van en sub-filas; hitos = líneas verticales con etiqueta vertical junto a la línea, en una banda superior.
    * list: filas de rowsOf (con s/e en minutos). Devuelve null si no hay nada que dibujar.
    */
   function layoutGantt(list, W, H) {
@@ -191,7 +214,7 @@
     const a = Math.floor((minS - 30) / 60) * 60;
     const b = Math.ceil((maxE + 30) / 60) * 60;
     const step = b - a <= 360 ? 30 : 60;
-    const LW = 44, AX = 13, GAP = 1.4, x0 = LW, x1 = W - 2;
+    const TOP = 6, LW = 44, GAP = 1.4, x0 = LW, x1 = W - 7;   // 7 mm a la derecha: la etiqueta 01:00 no se corta
     const X = t => x0 + (t - a) / (b - a) * (x1 - x0);
     const laneMap = new Map();
     items.filter(r => r.kind !== 'hito').slice().sort((p, q) => p.s - q.s).forEach(r => {
@@ -210,37 +233,46 @@
       l.rows = Math.max(1, ends.length);
       lanes.push(l);
     });
-    const totalRows = lanes.reduce((n, l) => n + l.rows, 0);
-    const avail = H - AX - lanes.length * GAP - 2;
-    const rowH = Math.min(22, avail / totalRows);      // pocas filas → barras altas y nombres grandes
-    const fs = Math.min(4.2, rowH * 0.36);
-    let y = AX + 0.5;
-    lanes.forEach(l => { l.y = y; l.h = l.rows * rowH; y += l.h + GAP; });
+    // Banda de hitos: etiquetas verticales (−90º). Alto de la banda = la etiqueta más larga, tope 52 mm.
+    const HFS = 2.6, HCW = HFS * 0.66;
+    const hraw = items.filter(r => r.kind === 'hito').map(r => ({ x: X(r.s), t: C.fmtHM(r.s) + ' ' + clean(r.name) }));
+    const maxLen = hraw.reduce((m, h) => Math.max(m, h.t.length), 0);
+    const HB = hraw.length ? Math.min(52, maxLen * HCW + 2) : 0;
+    const hcap = Math.max(4, Math.floor((HB - 2) / HCW));
+    const hitos = hraw.map(h => ({ x: h.x, label: cutWords(h.t, hcap) }));
+    // Carriles de igual altura que llenan el alto útil; las filas de cada carril reparten esa altura.
+    const lanesTop = TOP + (HB ? HB + 1.5 : 0);
+    const nL = lanes.length;
+    const laneH = Math.max(4, (H - lanesTop - 1 - (nL - 1) * GAP) / nL);
+    let y = lanesTop;
+    lanes.forEach(l => { l.y = y; l.h = laneH; l.rowH = laneH / l.rows; y += laneH + GAP; });
+    const minRow = Math.min.apply(null, lanes.map(l => l.rowH));
+    const fs = Math.min(4.6, Math.max(3, minRow / 6));          // una sola letra para todo el cronograma
     const bars = [];
     lanes.forEach(l => l.items.forEach(r => {
       const e = Number.isFinite(r.e) ? r.e : r.s;
       const x = X(r.s), w = Math.max(0.8, X(e) - X(r.s));
       const time = C.fmtHM(r.s) + (Number.isFinite(r.e) ? '–' + C.fmtHM(r.e) : '');
-      // Letra por barra: las barras estrechas bajan de tamaño para que las palabras no se partan
-      const bfs = Math.max(2.4, Math.min(fs, w / 9));
-      const maxLines = Math.max(0, Math.floor((rowH - 1.2) / (bfs * 1.2)));
-      bars.push({ kind: r.kind, x: x, y: l.y + r.row * rowH + 0.5, w: w, h: rowH - 1, color: r.zoneColor,
-        strong: isStrong(r), zone: r.zone, fs: bfs, lines: wrapLines(clean(r.name), time, w - 2.6, bfs, maxLines) });
+      const h = l.rowH - 1;
+      const maxLines = Math.max(0, Math.floor(h / (fs * 1.2)));
+      bars.push({ kind: r.kind, x: x, y: l.y + r.row * l.rowH + 0.5, w: w, h: h, color: r.zoneColor,
+        strong: isStrong(r), zone: r.zone, fs: fs, lines: barLines(clean(r.name), r.s, time, w - 2.6, fs, maxLines) });
     }));
     const ticks = [];
     for (let t = a; t <= b; t += step) ticks.push({ x: X(t), label: C.fmtHM(t) });
-    const hitos = items.filter(r => r.kind === 'hito').map(r => ({ x: X(r.s), label: clean(r.name) }));
-    return { W: W, H: H, a: a, b: b, step: step, x0: x0, x1: x1, AX: AX, LW: LW, lanes: lanes, bars: bars, ticks: ticks, hitos: hitos, rowH: rowH, fs: fs };
+    return { W: W, H: H, TOP: TOP, a: a, b: b, step: step, x0: x0, x1: x1, LW: LW, lanes: lanes, bars: bars, ticks: ticks,
+      hitos: hitos, lanesTop: lanesTop, rowH: minRow, fs: fs };
   }
 
   /** SVG vectorial inline del cronograma (sin gráficos de fondo: se imprime igual con o sin esa opción). */
   function ganttSvg(L) {
     const f = (n) => Math.round(n * 100) / 100;
     const out = [];
+    const TOP = L.TOP, TICK_Y = TOP - 1.6;
     out.push('<svg class="gantt" viewBox="0 0 ' + L.W + ' ' + L.H + '" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Cronograma de escenarios">');
     L.ticks.forEach(t => {
-      out.push('<line x1="' + f(t.x) + '" x2="' + f(t.x) + '" y1="' + L.AX + '" y2="' + (L.H - 1) + '" stroke="#e2e8f0" stroke-width="0.15"/>');
-      out.push('<text x="' + f(t.x) + '" y="' + (L.AX - 1.5) + '" text-anchor="middle" font-size="2.8" fill="#334155">' + esc(t.label) + '</text>');
+      out.push('<line x1="' + f(t.x) + '" x2="' + f(t.x) + '" y1="' + (TOP - 1) + '" y2="' + (L.H - 1) + '" stroke="#e2e8f0" stroke-width="0.15"/>');
+      out.push('<text x="' + f(t.x) + '" y="' + TICK_Y + '" text-anchor="middle" font-size="2.8" fill="#334155">' + esc(t.label) + '</text>');
     });
     L.lanes.forEach((l, i) => {
       out.push('<rect x="0" y="' + f(l.y) + '" width="1.2" height="' + f(l.h) + '" fill="' + esc(l.color) + '"/>');
@@ -262,10 +294,12 @@
           b.lines.map((t, i) => '<tspan x="' + f(b.x + (show ? 2.2 : 1.4)) + '" dy="' + (i ? f(lh) : 0) + '">' + esc(t) + '</tspan>').join('') + '</text>');
       }
     });
+    // Hitos: línea roja discontinua y etiqueta vertical (−90º) pegada a la izquierda de la línea, en la banda superior.
     L.hitos.forEach(h => {
-      out.push('<line x1="' + f(h.x) + '" x2="' + f(h.x) + '" y1="' + (L.AX - 6) + '" y2="' + (L.H - 1) + '" stroke="#dc2626" stroke-width="0.3" stroke-dasharray="1.1,0.8"/>');
-      const anchor = h.x > L.x1 - 30 ? 'end' : 'start';
-      out.push('<text x="' + f(h.x + (anchor === 'end' ? -0.8 : 0.8)) + '" y="' + (L.AX - 7) + '" text-anchor="' + anchor + '" font-size="2.6" font-weight="700" fill="#991b1b">' + esc(h.label) + '</text>');
+      out.push('<line x1="' + f(h.x) + '" x2="' + f(h.x) + '" y1="' + (TOP - 1) + '" y2="' + (L.H - 1) + '" stroke="#dc2626" stroke-width="0.3" stroke-dasharray="1.1,0.8"/>');
+      if (!h.label) return;
+      const hx = f(h.x - 0.6), hy = f(TOP + 0.6);
+      out.push('<text transform="rotate(-90 ' + hx + ' ' + hy + ')" x="' + hx + '" y="' + hy + '" text-anchor="end" font-size="2.6" font-weight="700" fill="#991b1b">' + esc(h.label) + '</text>');
     });
     out.push('</svg>');
     return out.join('');
@@ -273,7 +307,7 @@
 
   /** Una hoja de cronograma (apaisada) para un día. */
   function ganttSheet(list, d, idx, total, title, printed) {
-    const L = layoutGantt(list, 273, 160);
+    const L = layoutGantt(list, 273, 164);
     const bloques = list.filter(r => !r.aviso).length;
     const meta = [d ? dayLabel(d) : 'Todas las jornadas', (L ? L.lanes.length : 0) + ' escenarios', bloques + ' bloques'].join(' · ');
     const footerLeft = 'Showtime Regiduría · ' + title + ' · ' + (d ? dayLabel(d) : 'Todas las jornadas');
@@ -370,7 +404,7 @@
     return true;
   }
 
-  const API = { CONTENT, KINDS, TYPE, rowsOf, densityFor, dayLabel, printedAt, daysOf, html, summary, launch, esc, layoutGantt, ganttSvg, fitLabel, wrapLines };
+  const API = { CONTENT, KINDS, TYPE, rowsOf, densityFor, dayLabel, printedAt, daysOf, html, summary, launch, esc, layoutGantt, ganttSvg, fitLabel, wrapLines, cutWords };
   if (isNode) module.exports = API;
   else root.ShowtimePrint = API;
 })(typeof window !== 'undefined' ? window : globalThis);
