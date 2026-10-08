@@ -32,7 +32,8 @@
         brand: 'Showtime · Hoja de ruta', brandGantt: 'Showtime · Cronograma', footer: 'Showtime Regiduría',
         printed: 'Impreso: ', page: 'Pág ', allDays: 'Todas las jornadas', noDay: 'Todo el evento',
         allStages: 'Todos los escenarios', full: 'Todo el horario', blocks: 'bloques', stages: 'escenarios',
-        zone: 'Zona: ', noZone: 'Sin zona', empty: 'Nada que imprimir con estos filtros.', emptyGantt: 'Nada que dibujar con estos filtros.'
+        zone: 'Zona: ', noZone: 'Sin zona', empty: 'Nada que imprimir con estos filtros.', emptyGantt: 'Nada que dibujar con estos filtros.',
+        legend: { tarea: 'Tareas técnicas', sc: 'Pruebas de sonido', show: 'Conciertos / Shows' }
       }
     },
     en: {
@@ -51,7 +52,8 @@
         brand: 'Showtime · Running order', brandGantt: 'Showtime · Timeline', footer: 'Showtime Stage Management',
         printed: 'Printed: ', page: 'Page ', allDays: 'All days', noDay: 'Whole event',
         allStages: 'All stages', full: 'Full schedule', blocks: 'blocks', stages: 'stages',
-        zone: 'Stage: ', noZone: 'No stage', empty: 'Nothing to print with these filters.', emptyGantt: 'Nothing to draw with these filters.'
+        zone: 'Stage: ', noZone: 'No stage', empty: 'Nothing to print with these filters.', emptyGantt: 'Nothing to draw with these filters.',
+        legend: { tarea: 'Technical tasks', sc: 'Soundchecks', show: 'Shows' }
       }
     }
   };

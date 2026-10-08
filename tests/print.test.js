@@ -276,9 +276,10 @@
     ok(L.bars.every(b => b.lines.length || b.badge > 0), 'toda barra tiene texto o llamada');
     const called = L.bars.filter(b => b.badge > 0);
     ok(called.length >= 1 && called.every(b => b.w < 25), 'solo llevan llamada los estrechos');
-    eq(L.legend.length, called.length, 'una entrada de leyenda por llamada');
+    const ent = L.legend.filter(it => !it.head);
+    eq(ent.length, called.length, 'una entrada de leyenda por llamada');
     eq(called.map(b => b.badge).join(','), called.map((b, i) => i + 1).join(','), 'numeradas 1, 2, 3… por hora');
-    ok(L.legend[0].text.indexOf('(10:00–10:15)') >= 0, 'leyenda con nombre y horario');
+    ok(ent[0].text.indexOf('(10:00–10:15)') >= 0, 'leyenda con nombre y horario');
     ok(L.lanesBottom < L.legendTop, 'la leyenda va debajo de los carriles');
     L.bars.filter(b => b.w >= 25).forEach(b => ok(b.lines.length >= 2, 'ancho: nombre + horario'));
     const svg = P.ganttSvg(L);
@@ -315,7 +316,7 @@
     const L = P.layoutGantt(rows, 273, 164);
     const m = L.bars.filter(b => b.mark).map(b => b.kind + ':' + b.mark.shape + ':' + b.mark.label).join(',');
     eq(m, 'show:square:A,show:square:B,sc:circle:1,tarea:diamond:1,tarea:diamond:2', 'letras en cuadrado, números en círculo y en rombo');
-    eq(L.legend.map(it => it.mark.shape + it.mark.label).join(','), 'diamond1,diamond2,circle1,squareA,squareB', 'leyenda agrupada: tareas, soundchecks, shows');
+    eq(L.legend.filter(it => !it.head).map(it => it.mark.shape + it.mark.label).join(','), 'diamond1,diamond2,circle1,squareA,squareB', 'leyenda agrupada: tareas, soundchecks, shows');
     const svg = P.ganttSvg(L);
     ok(svg.indexOf('<polygon') >= 0 && svg.indexOf('<circle') >= 0 && />A<\/text>/.test(svg), 'rombo, círculo y cuadrado con letra en el SVG');
   });
@@ -360,6 +361,25 @@
     ok(b.w < 20, 'es un bloque de menos de 20 mm (' + b.w.toFixed(1) + ')');
     eq(b.lines.slice(0, 2).join(' '), 'Concierto Alhambra');
     ok(!b.mark, 'sin llamada');
+  });
+  test('gantt: un truncado que solo deja palabras huecas («Parada para…») se convierte en llamada', () => {
+    eq(P.wrapLines('Llegada y descarga Omega', '', 16, 3, 2).join('|'), 'Llegada…', 'nunca acaba en «y…»');
+    ok(!/\b(para|de|y|con|en)…$/.test(P.wrapLines('Parada para comer técnicos locales', '', 16, 3, 2).join(' ')), 'sin hueca al final');
+    const rows = [G('Parada para comer técnicos locales', 870, 930, 'Principal', 'tarea'), G('A', 690, 1470, 'Carpa', 'tarea')];
+    const b = P.layoutGantt(rows, 273, 164).bars.find(x => x.zone === 'Principal');
+    ok(b.w < 20 && b.mark && b.mark.shape === 'diamond', 'llamada en rombo (' + b.w.toFixed(1) + ' mm): ' + JSON.stringify(b.lines));
+  });
+  test('gantt: la leyenda lleva un título por tipo, en el idioma de la hoja', () => {
+    const rows = [G('Banda de apertura larga', 600, 610, 'Principal', 'show'), G('Linecheck Lagartija', 620, 630, 'Principal', 'sc'),
+      G('Montaje suelo escenario', 630, 640, 'Principal', 'tarea'), G('Relleno', 660, 1200, 'Carpa', 'tarea')];
+    const es = P.layoutGantt(rows, 273, 164).legend.filter(it => it.head).map(it => it.mark.shape + ':' + it.text).join(' | ');
+    eq(es, 'diamond:TAREAS TÉCNICAS | circle:PRUEBAS DE SONIDO | square:CONCIERTOS / SHOWS');
+    const en = P.layoutGantt(rows, 273, 164, 'en').legend.filter(it => it.head).map(it => it.text).join(' | ');
+    eq(en, 'TECHNICAL TASKS | SOUNDCHECKS | SHOWS');
+    const L = P.layoutGantt(rows, 273, 164), xs = L.legend.filter(it => it.head).map(it => it.x);
+    ok(xs[0] < xs[1] && xs[1] < xs[2], 'un tipo por columna');
+    ok(L.legend.filter(it => !it.head).every(it => it.y > L.legendTop), 'las entradas, debajo de su título');
+    ok(/TAREAS TÉCNICAS/.test(P.ganttSvg(L)), 'título en el SVG');
   });
   test('gantt: html con formato gantt → hojas apaisadas con SVG y pie', () => {
     const rows = [G('A', 690, 780), G('B', 900, 960, 'Carpa', 'show', '#0284c7')];

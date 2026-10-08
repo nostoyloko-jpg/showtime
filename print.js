@@ -203,6 +203,10 @@
     return w[0];
   }
 
+  /** Palabras huecas: una etiqueta truncada no puede acabar en ellas («Parada para…» no dice nada). ES / EN. */
+  const HOLLOW = /^(?:a|al|y|e|o|u|de|del|la|las|el|los|lo|un|una|unos|unas|en|con|por|para|sin|sobre|tras|entre|hacia|hasta|desde|the|an|of|and|or|for|to|in|on|at|with|by|from|&|\+|-|–|\/)$/i;
+  const meaningful = ws => ws.filter(w => !HOLLOW.test(w.replace(/[…,;:.]+$/, ''))).length;
+
   /** Parte el texto en líneas que caben en maxW (mm), medidas con textW en negrita. Nunca parte una palabra:
    *  si no cabe todo, la última línea acaba en «…» quitando palabras enteras. Banda muy estrecha: solo la hora. */
   function wrapLines(name, time, maxW, fs, maxLines) {
@@ -222,10 +226,11 @@
     if (lines.length > maxLines) { lines.length = maxLines; trunc = true; }
     // Truncado: la última línea acaba en «…» (quitando palabras enteras). Si ni así cabe, se quita esa línea y se
     // prueba con la anterior: nunca un texto cortado que parezca completo.
+    // Además, nunca acaba en una palabra hueca: «Llegada y…» → «Llegada…».
     while (trunc && lines.length) {
-      let last = lines[lines.length - 1];
-      while (textW(last + '…', fs, true) > maxW && last.indexOf(' ') > 0) last = last.slice(0, last.lastIndexOf(' '));
-      if (textW(last + '…', fs, true) <= maxW) { lines[lines.length - 1] = last + '…'; break; }
+      const ws = lines[lines.length - 1].split(' ');
+      while (ws.length && (HOLLOW.test(ws[ws.length - 1]) || textW(ws.join(' ').replace(/[\s,;:.\-–]+$/, '') + '…', fs, true) > maxW)) ws.pop();
+      if (ws.length) { lines[lines.length - 1] = ws.join(' ').replace(/[\s,;:.\-–]+$/, '') + '…'; break; }
       lines.pop();
     }
     if (tOk && lines.length < maxLines) lines.push(time);
@@ -244,7 +249,7 @@
     const shown = nameLines.join(' ').replace(/…$/, '').split(/\s+/).filter(Boolean);
     const complete = words.length ? (shown.length === words.length && !/…$/.test(last)) : !!tLine;
     const lines = tLine && (nameLines.length || !words.length) ? nameLines.concat([tLine]) : nameLines;
-    return { lines: lines, complete: complete, words: words.length ? shown.length : 0 };
+    return { lines: lines, complete: complete, words: words.length ? meaningful(shown) : 0 };   // palabras con contenido que se leen
   }
 
   /** A, B, … Z, AA, AB… (llamadas de shows). */
@@ -284,7 +289,7 @@
    * de llamadas ①②③ de los bloques estrechos cuyo nombre no cabe. Ningún bloque queda vacío.
    * list: filas de rowsOf (con s/e en minutos). Devuelve null si no hay nada que dibujar.
    */
-  function layoutGantt(list, W, H) {
+  function layoutGantt(list, W, H, lang) {
     const items = (list || []).filter(r => !r.aviso && Number.isFinite(r.s));
     if (!items.length) return null;
     const minS = Math.min.apply(null, items.map(r => r.s));
@@ -382,9 +387,13 @@
 
     // ── Carriles y barras; la leyenda resta alto a los carriles, así que se ajusta en unas pocas vueltas ──
     const LROW = 3.8, NARROW = 20;
-    let legendN = 0, rowH = 0, fs = 0, bars = [], lanesBottom = 0, legendTop = 0;
+    const SHAPE = k => k === 'show' ? 'square' : k === 'sc' ? 'circle' : 'diamond';
+    const ORDER = ['diamond', 'circle', 'square'];                       // tareas · soundchecks · shows
+    // Filas de leyenda: cada tipo en su columna con su título; con un solo tipo, título + 2 columnas
+    const legendRows = cs => { const g = ORDER.filter(k => cs[k]); return !g.length ? 0 : g.length === 1 ? 1 + Math.ceil(cs[g[0]] / 2) : 1 + Math.max.apply(null, g.map(k => cs[k])); };
+    let legendR = 0, rowH = 0, fs = 0, bars = [], lanesBottom = 0, legendTop = 0;
     for (let pass = 0; pass < 5; pass++) {
-      const legendH = legendN ? Math.ceil(legendN / 2) * LROW + 3 : 0;
+      const legendH = legendR ? legendR * LROW + 3 : 0;
       lanesBottom = H - 1 - legendH;
       legendTop = lanesBottom + 3;
       const avail = lanesBottom - lanesTop - (nL - 1) * GAP;
@@ -401,15 +410,17 @@
         const maxLines = Math.min(3, Math.max(0, Math.floor(h / (fs * 1.2))));   // nunca una torre: 2 líneas de nombre + horario
         const name = clean(r.name);
         const t = barText(name, time, w - (r.kind === 'show' ? 2.8 : 2.0), fs, maxLines);
-        // Si el nombre cabe entero (1–2 líneas) va dentro. Si no: con ≥ 20 mm, o si se leen al menos 2 palabras,
-        // truncado con «…» («Llegada y / descarga… / 11:30»); si ni eso, llamada numerada.
-        const ok = t.lines.length && (t.complete || w >= NARROW || t.words >= 2);
+        // Si el nombre cabe entero (1–2 líneas) va dentro. Si no, truncado con «…» solo si se leen al menos 2 palabras
+        // con contenido (o 1 en un bloque de ≥ 20 mm); las huecas (para, de, y…) no cuentan. Si no, llamada.
+        const ok = t.lines.length && (t.complete || t.words >= 2 || (w >= NARROW && t.words >= 1));
         bars.push({ kind: r.kind, x: x, y: l.y + r.row * rowH + 0.5, w: w, h: h, color: r.zoneColor, s: r.s, lane: li, row: r.row,
           strong: isStrong(r), zone: r.zone, fs: fs, lines: ok ? t.lines : [], badge: ok ? 0 : -1, name: name, time: time });
       }));
-      const n = bars.filter(bb => bb.badge < 0).length;
-      if (n <= legendN) break;
-      legendN = n;
+      const cs = { diamond: 0, circle: 0, square: 0 };
+      bars.forEach(bb => { if (bb.badge < 0) cs[SHAPE(bb.kind)]++; });
+      const need = legendRows(cs);
+      if (need <= legendR) break;
+      legendR = need;
     }
     // Llamadas por orden horario (y escenario), con 3 geometrías que se distinguen en blanco y negro:
     // shows → letra en cuadrado [A]; soundchecks → número en círculo ①; tareas → número en rombo ◆1. Leyenda en 2 columnas.
@@ -426,13 +437,22 @@
     called.forEach((bb, i) => { bb.badge = i + 1; });
     const legend = [];
     if (called.length) {
-      const rows = Math.ceil(called.length / 2), colW = (W - LW - 1) / 2;
-      called.forEach((bb, i) => {
-        const col = Math.floor(i / rows), row = i % rows;
-        const x = LW + col * colW, y = legendTop + row * LROW;
+      const tx = T(lang).legend, HEAD = { diamond: tx.tarea, circle: tx.sc, square: tx.show };
+      const groups = ORDER.map(k => ({ k: k, items: called.filter(bb => bb.mark.shape === k) })).filter(g => g.items.length);
+      // Un tipo por columna; con un solo tipo, sus entradas en 2 columnas bajo el título
+      const cols = groups.length === 1 ? 2 : groups.length, colW = (W - LW - 1) / cols;
+      const entry = (bb, x, y) => {
         const tail = ' (' + bb.time + ')';
         const nm = bb.name ? fitText(bb.name, 2.6, colW - 6.8 - textW(tail, 2.6), false) : '';
         legend.push({ num: bb.badge, mark: bb.mark, x: x, y: y, text: (nm + tail).trim() });
+      };
+      groups.forEach((g, gi) => {
+        const x0g = LW + (groups.length === 1 ? 0 : gi) * colW;
+        legend.push({ head: true, mark: { shape: g.k, label: '' }, x: x0g, y: legendTop, text: String(HEAD[g.k]).toUpperCase() });
+        if (groups.length === 1) {
+          const per = Math.ceil(g.items.length / 2);
+          g.items.forEach((bb, i) => entry(bb, LW + Math.floor(i / per) * colW, legendTop + (1 + i % per) * LROW));
+        } else g.items.forEach((bb, i) => entry(bb, x0g, legendTop + (1 + i) * LROW));
       });
     }
     const ticks = [];
@@ -503,6 +523,11 @@
     if (L.legend.length) {
       out.push('<line x1="' + L.LW + '" x2="' + (L.W - 1) + '" y1="' + f(L.legendTop - 1.6) + '" y2="' + f(L.legendTop - 1.6) + '" stroke="#cbd5e1" stroke-width="0.2"/>');
       L.legend.forEach(it => {
+        if (it.head) {                                   // título del grupo: «◆ TAREAS TÉCNICAS»
+          out.push(badge(it.x + 2.2, it.y + 1.2, it.mark, 1.2));
+          out.push('<text x="' + f(it.x + 5.2) + '" y="' + f(it.y + 2.0) + '" font-size="2.3" font-weight="800" letter-spacing="0.25" fill="#334155">' + esc(it.text) + '</text>');
+          return;
+        }
         out.push(badge(it.x + 2.2, it.y + 1.2, it.mark, 1.6));
         out.push('<text x="' + f(it.x + 5.2) + '" y="' + f(it.y + 2.1) + '" font-size="2.6" fill="#0f172a">' + esc(it.text) + '</text>');
       });
@@ -514,7 +539,7 @@
   /** Una hoja de cronograma (apaisada) para un día. */
   function ganttSheet(list, d, idx, total, title, printed, lang) {
     const t = T(lang);
-    const L = layoutGantt(list, 273, 164);
+    const L = layoutGantt(list, 273, 164, lang);
     const bloques = list.filter(r => !r.aviso).length;
     const meta = [d ? dayLabel(d, lang) : t.allDays, (L ? L.lanes.length : 0) + ' ' + t.stages, bloques + ' ' + t.blocks].join(' · ');
     const footerLeft = t.footer + ' · ' + title + ' · ' + (d ? dayLabel(d, lang) : t.allDays);
