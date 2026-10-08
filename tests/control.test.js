@@ -8,6 +8,10 @@
   if (typeof module === 'undefined' || !module.exports) { console.log('control.test.js: solo en Node (node tests/control.test.js)'); return; }
   const vm = require('vm');
   const D = require('./_dom.js'), C = require('../core.js'), E = require('../emision.js');
+  // Las directivas de idioma (data-i18n*) no cuentan para la forma del HTML: los tests de maquetación miran el HTML sin ellas
+  const noI18n = h => h.replace(/ data-i18n(?:-[a-z]+)?(?:="[^"]*")?/g, '');
+  const srcRaw = D.src;
+  D.src = f => (f === 'index.html' ? noI18n(srcRaw(f)) : srcRaw(f));
   const MODULOS = ['i18n.js', 'core.js', 'meteo.js', 'datos.js', 'importar.js', 'xlsx.js', 'qr.js', 'emision.js', 'mando.js', 'vistas.js', 'log.js', 'marca.js', 'control.js'];
 
   const tests = [];
@@ -41,7 +45,7 @@
   test('Modal: si una acción falla, el botón no se queda mudo (aviso en el modal y el modal sigue abierto)', () => {
     const s = D.src('control.js');
     ok(/try \{ res = a\.run \? a\.run\(\) : undefined; \}\s*catch \(err\) \{/.test(s), 'la acción va protegida');
-    ok(/m\.id = 'modal-fail'/.test(s) && /'No se pudo completar: '/.test(s), 'el fallo se ve en el propio modal');
+    ok(/m\.id = 'modal-fail'/.test(s) && /'No se pudo completar: \{err\}/.test(s), 'el fallo se ve en el propio modal');
   });
 
   test('control.js: arranca sin errores (navegador sin cifrado)', () => {
@@ -904,12 +908,12 @@
     ok(/\.gv-sb\.on \.gv-led\{[^}]*box-shadow/.test(css), 'LED encendido con resplandor');
     ok(/\.gv-row select:hover,\.gv-row select:focus\{background-image:url/.test(css) && /background-image:url\("data:image\/svg\+xml,[^"]*6f747e/.test(css), 'flecha sutil en reposo, más brillante en hover y focus');
     ok(/\.gv-row input,\.gv-row select\{height:32px/.test(css) && /\.gv-sb\{height:34px/.test(css) && /\.gv-x\{width:36px;height:32px/.test(css), 'altura: 32px en campos y ✕, 34px en la píldora');
-    ok(/class="gv-row gv-hd"/.test(js) && />Nombre</.test(js) && />Standby</.test(js) && /\.gv-hd\{display:none\}/.test(css), 'cabecera NOMBRE · VISTA · ZONA · STANDBY en escritorio; oculta en móvil');
+    ok(/class="gv-row gv-hd"/.test(js) && /tx\('Nombre'\)/.test(js) && /tx\('Standby'\)/.test(js) && /\.gv-hd\{display:none\}/.test(css), 'cabecera NOMBRE · VISTA · ZONA · STANDBY en escritorio; oculta en móvil');
     ok(/\.gv-row select:disabled\{[^}]*border-color:transparent;background:transparent/.test(css), 'zona sin usar: «—» plano, sin caja');
     ok(/\.gv-foot \.gv-close\{background:#1c1e26;border:1px solid var\(--hair2\);color:#fff\}/.test(css) && /class="btn gv-close" data-gv="done"/.test(js), 'Cerrar en gris Raycast, sin rojo');
     ok(/\.gv-qr\{[^}]*border-top:1px solid/.test(css) && !/dashed/.test(css.slice(css.indexOf('.gv-qr{'), css.indexOf('.gv-qr{')+200)), 'QR: hairline continua, sin marco de puntos');
-    ok(/data-gv="all" data-on="1">⏸ Todas en standby/.test(js) && /data-gv="all" data-on="0">▶ Reanudar todas/.test(js), 'cabecera: todas en standby / reanudar');
-    ok(/data-gv="new">\+ Abrir ventana Live</.test(js) && /data-gv="done"/.test(js), 'pie: abrir a la izquierda, cerrar a la derecha');
+    ok(/data-gv="all" data-on="1">' \+ tx\('⏸ Todas en standby'\)/.test(js) && /data-gv="all" data-on="0">' \+ tx\('▶ Reanudar todas'\)/.test(js), 'cabecera: todas en standby / reanudar');
+    ok(/data-gv="new">' \+ tx\('\+ Abrir ventana Live'\)/.test(js) && /data-gv="done"/.test(js), 'pie: abrir a la izquierda, cerrar a la derecha');
     const t = panel(), msgs = [];
     const w = { closed: false, focus() {}, postMessage(m) { msgs.push(m); }, close() { this.closed = true; } };
     t.env.win.open = () => w;
@@ -932,7 +936,7 @@
     eq(t.T.winState()[0].fs, false, 'y que ya no');
     ok(/x\.fs = !!m\.fs/.test(js), 'el Dashboard guarda fs al recibir vistaState');
     ok(/<span class="gv-fs" aria-live="polite"><\/span>/.test(js) && /'⛶ Pantalla completa' : 'Ventana'/.test(js), 'la fila muestra ⛶ Pantalla completa o Ventana');
-    ok(/<span>Pantalla<\/span>/.test(js), 'cabecera con la columna PANTALLA');
+    ok(/<span>' \+ tx\('Pantalla'\) \+ '<\/span>/.test(js), 'cabecera con la columna PANTALLA');
     ok(/\.gv-fs\.on::before\{[^}]*box-shadow/.test(css) && /\.gv-fs\{[^}]*color:var\(--dim/.test(css), 'iluminado si está en completa; atenuado si es Ventana');
     ok(/fs: !!\(document\.fullscreenElement \|\| document\.webkitFullscreenElement\)/.test(live), 'la Live lee su estado de pantalla completa en reportVista');
   });
@@ -1029,7 +1033,7 @@
   });
   test('QR: el título es «Pantallas QR», sin «móviles»', () => {
     const js = D.src('control.js');
-    ok(/Pantallas QR<\/div>/.test(js) && !/Pantallas QR \(móviles\)/.test(js), 'sin «(móviles)»');
+    ok(/tx\('Pantallas QR'\) \+ '<\/div>/.test(js) && !/Pantallas QR \(móviles\)/.test(js), 'sin «(móviles)»');
   });
   test('⇧⌘C: alterna Escenario (alto contraste) y vuelve al tema anterior; queda en Configuración y en la ayuda', () => {
     const t = dashboard({ 'showtime.panel.style': '"neutro"' });
@@ -1048,7 +1052,7 @@
     const t3 = dashboard({ 'showtime.panel.style': '"escenario"' });
     t3.env.fire('document', 'keydown', { key: 'C', metaKey: true, shiftKey: true, preventDefault() {} });
     eq(t3.read('showtime.panel.style'), 'raycast', 'si ya estaba en Escenario sin historial, vuelve a Raycast');
-    ok(/<dt><kbd>⇧<\/kbd> <kbd>⌘<\/kbd> <kbd>C<\/kbd><\/dt><dd>Alterna tema Alto Contraste \(Escenario \/ Sol\) al instante<\/dd>/.test(D.src('control.js')), 'en la ayuda');
+    ok(/<dt><kbd>⇧<\/kbd> <kbd>⌘<\/kbd> <kbd>C<\/kbd><\/dt><dd>' \+ tx\('Alterna tema Alto Contraste \(Escenario \/ Sol\) al instante'\) \+ '<\/dd>/.test(D.src('control.js')), 'en la ayuda');
   });
   test('Modo Foco: micro-píldora del tipo (SHOW · SOUNDCHECK · TAREA · HITO) con color fijo, en vez del cuadradito de color', () => {
     const P = panel().T.tipoPill;
@@ -1125,7 +1129,7 @@
 
   test('Cambio en STANDBY: el botón pone «SB» en vez de los minutos (los minutos quedan en el título)', () => {
     const src = D.src('control.js');
-    ok(/'<button class="gapbtn sb" data-act="standby" data-on="0" title="STANDBY · ' \+ co\.mins \+ ' min\. Pulsa para volver a CHANGEOVER"><svg class="ic"><use href="#i-pause"\/><\/svg>SB<\/button>'/.test(src));
+    ok(/'<button class="gapbtn sb" data-act="standby" data-on="0" title="' \+ tx\('STANDBY · \{n\} min\. Pulsa para volver a CHANGEOVER', \{ n: co\.mins \}\) \+ '"><svg class="ic"><use href="#i-pause"\/><\/svg>SB<\/button>'/.test(src));
     // Con datos: dos bandas en la misma zona, el hueco marcado como STANDBY
     let s = C.newFestival({ nombre: 'SB', fechaInicio: '2026-07-10', fechaFin: '2026-07-10', dayCutoff: '06:00', coMin: 15 }).state;
     s = C.addStage(s, 'Principal').state; const z = s.escenarios[0].id;
@@ -1258,6 +1262,115 @@
     ok(/<script src="i18n\.js\?v=\d+"><\/script>\n<script src="core\.js/.test(D.src('index.html')), 'i18n.js se carga el primero en el Panel');
     ['live.html', 'remote.html'].forEach(f => ok(D.src(f).indexOf('<script src="i18n.js?v=') >= 0, f + ' carga i18n.js'));
     ok(/if \(window\.ShowtimeI18n\) window\.ShowtimeI18n\.setLang\(CONFIG\.lang\)/.test(D.src('live.js')) && /if \(window\.ShowtimeI18n\) window\.ShowtimeI18n\.setLang\(CONFIG\.lang\)/.test(D.src('remote.js')), 'Live y Mando siguen al Panel');
+  });
+
+  // ── Idioma, Fase 1: todo el Panel de Control traducido (index.html + control.js) ──────────────
+  /** Textos que el HTML marca para traducir: data-i18n sin valor (cada trozo de texto propio) y -title/-placeholder/-aria sin valor. */
+  function htmlI18nTexts(h) {
+    const out = [], VOID = /^(input|br|meta|link|img|source|hr|wbr|col)$/;
+    const tagRe = /<(\/?)([a-zA-Z][\w-]*)((?:[^>"']|"[^"]*"|'[^']*')*)>/g;
+    const ent = x => x.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&nbsp;/g, ' ').replace(/&#10;/g, '\n');
+    let m;
+    while ((m = tagRe.exec(h))) {
+      if (m[1]) continue;
+      const attrs = m[3];
+      [['title', 'title'], ['placeholder', 'placeholder'], ['aria', 'aria-label']].forEach(([d, a]) => {
+        if (new RegExp(' data-i18n-' + d + '(?=[\\s/>]|$)').test(attrs)) { const v = new RegExp(' ' + a + '="([^"]*)"').exec(attrs); if (v && v[1].trim()) out.push(ent(v[1])); }
+      });
+      if (!/ data-i18n(?=[\s/>]|$)/.test(attrs)) continue;
+      // trozos de texto propios del elemento (no los de sus hijos)
+      let d = 0, j = tagRe.lastIndex; const re2 = /<(\/?)([a-zA-Z][\w-]*)((?:[^>"']|"[^"]*"|'[^']*')*)>/g; re2.lastIndex = j; let k;
+      while ((k = re2.exec(h))) {
+        if (!d) { const t = ent(h.slice(j, k.index)).replace(/\s+/g, ' ').trim(); if (t) out.push(t); }
+        if (k[1]) { if (!d) break; d--; } else if (!VOID.test(k[2]) && !/\/$/.test(k[3])) d++;
+        j = re2.lastIndex;
+      }
+    }
+    return out;
+  }
+  test('Idioma (Fase 1): todo texto marcado en index.html tiene traducción al inglés', () => {
+    const I = require('../i18n.js'), h = srcRaw('index.html');
+    const list = htmlI18nTexts(h);
+    ok(list.length > 250, 'hay ' + list.length + ' textos marcados');
+    const miss = list.filter(x => /[A-Za-zÁÉÍÓÚáéíóúÑñ]{2}/.test(x) && !I.txHas(x) && !/^(Live|OK|CALL|Showtime|Manager|Confidence|Backstage|Staff|SC|Raycast)$/.test(x));
+    eq(miss.join(' | '), '', 'sin traducción');
+    ok(/<span class="mlbl" data-i18n>Ver:<\/span>/.test(h) && /data-i18n>Pegar horario/.test(h), 'directivas sin valor: el español es la clave');
+  });
+  test('Idioma (Fase 1): lo que reescribe el JS no lleva data-i18n (la traducción la pone control.js)', () => {
+    const h = srcRaw('index.html'), js = D.src('control.js');
+    const ids = new Set(); let m; const re = /\$\('([\w-]+)'\)\.(textContent|innerHTML)\s*=/g;
+    while ((m = re.exec(js))) ids.add(m[1]);
+    ids.forEach(id => { const tag = new RegExp('<[^>]*\\bid="' + id + '"[^>]*>').exec(h); ok(!tag || !/ data-i18n(?:-html)?(?=[\s>])/.test(tag[0]), '#' + id + ' lo escribe el JS'); });
+    ['fest-name', 'clock', 'imp-go', 'btn-lang'].forEach(id => ok(ids.has(id) || id === 'btn-lang', id));
+  });
+  test('Idioma (Fase 1): todo texto fijo de control.js (tx, avisos, ventanas, botones, Deshacer) tiene traducción', () => {
+    const I = require('../i18n.js');
+    const js = D.src('control.js').replace(/^\s*\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+function args(s, i) {   // s[i] es '(' → argumentos de nivel superior (texto)
+  let d = 0, q = null, cur = ''; const out = [];
+  for (let j = i + 1; j < s.length; j++) {
+    const c = s[j];
+    if (q) { cur += c; if (c === '\\') { cur += s[++j]; continue; } if (c === q) q = null; continue; }
+    if (c === "'" || c === '"' || c === '`') { q = c; cur += c; continue; }
+    if (c === '(' || c === '[' || c === '{') d++;
+    if (c === ')' || c === ']' || c === '}') { if (!d) { out.push(cur); return out; } d--; }
+    if (c === ',' && !d) { out.push(cur); cur = ''; continue; }
+    cur += c;
+  }
+  return out;
+}
+/** Literales «sueltos» (también los dos lados de un ?: y el primero de [plantilla, vars]); no los comparados con === ni los concatenados. */
+function lits(a) {
+  if (/^\s*'(?:[^'\\]|\\.)*'\s*\+/.test(a) || /\+\s*'(?:[^'\\]|\\.)*'\s*$/.test(a)) return [];
+  const out = []; let d = 0, br = [];
+  const re = /'((?:[^'\\]|\\.)*)'|[(\[{]|[)\]}]/g; let m;
+  while ((m = re.exec(a))) {
+    const c = m[0];
+    if (c === '(' || c === '[' || c === '{') { d++; br.push(c === '[' ? m.index : -1); }
+    else if (c === ')' || c === ']' || c === '}') { d--; br.pop(); }
+    else {
+      const before = a.slice(0, m.index);
+      if (/[!=]==\s*$/.test(before)) continue;
+      if (!d || (d === 1 && br[0] >= 0 && /\[\s*(?:[^'\[\]]*\?\s*)?$/.test(before.slice(br[0])))) out.push(m[1].replace(/\\'/g, "'"));
+    }
+  }
+  return out;
+}
+const found = new Set();
+const re = /\b(tx|toast|modal|commitFestival|loadNew|stageCommit)\(/g; let m;
+while ((m = re.exec(js))) {
+  const a = args(js, m.index + m[0].length - 1), x = /^(tx|toast|modal)$/.test(m[1]) ? a[0] : a[1];
+  if (x === undefined || (m[1] !== 'tx' && /^\s*tx\(/.test(x))) continue;
+  lits(x).forEach(l => { if (/[A-Za-zÁÉÍÓÚáéíóúÑñ]/.test(l)) found.add(l); });
+}
+const lab = /label: '((?:[^'\\]|\\.)*)'/g;
+while ((m = lab.exec(js))) found.add(m[1]);
+const miss = [...found].filter(k => !I.txHas(k) && !/^(OK|CALL|SC|Live|Raycast|Stage Manager|Staff)$/.test(k));
+    ok(found.size > 450, found.size + ' textos');
+    eq(miss.join(' | '), '', 'sin traducción');
+  });
+  test('Idioma (Fase 1): en inglés el Panel se pinta en inglés al momento; en español, idéntico al de siempre', () => {
+    const es = dashboard(), en = dashboard({ 'showtime.config': JSON.stringify({ lang: 'en' }) });
+    [es, en].forEach(t => t.env.fire('btn-paste', 'click', {}));
+    eq(es.env.getEl('imp-go').textContent, 'Importar 0 entradas', 'español: como siempre');
+    eq(en.env.getEl('imp-go').textContent, 'Import 0 entries', 'inglés');
+    eq(en.env.getEl('imp-kind').textContent, 'Waiting for a schedule…');
+    eq(es.env.getEl('imp-kind').textContent, 'Esperando horario…');
+    // cambio en caliente: el aviso y lo que pinta el JS pasan al otro idioma sin recargar
+    es.env.fire('btn-lang', 'click', {});
+    eq(es.env.getEl('imp-go').textContent, 'Import 0 entries', 'se repinta al cambiar a inglés');
+    eq(es.env.getEl('toast').textContent, 'Language: English');
+    es.env.fire('btn-lang', 'click', {});
+    eq(es.env.getEl('imp-go').textContent, 'Importar 0 entradas', 'y vuelve al español');
+  });
+  test('Idioma (Fase 1): Deshacer y log siempre en español; el aviso, en el idioma del Panel', () => {
+    const t = dashboard({ 'showtime.config': JSON.stringify({ lang: 'en' }) });
+    const r = t.env.win.ShowtimePanel._test.importSummary([{ tipo: 'show', jornada: 'x' }, { tipo: 'sc', jornada: 'x' }], 2);
+    eq(r, '✓ 2 entries imported successfully (1 show · 1 soundcheck)');
+    const js = D.src('control.js');
+    ok(/msg = obj \? msg0\.es : mm\[0\] \? txEs\(mm\[0\], mm\[1\]\)/.test(js), 'Deshacer y log: txEs (español)');
+    ok(/const msg = \{ es: impMsg\(txEs\), ui: impMsg\(tx\) \}/.test(js), 'importar: {es, ui}');
+    ok(/sendFlash\(tx\(b\.dataset\.msg\)\)/.test(js), 'los mensajes rápidos salen en el idioma del Panel');
   });
 
   // ── Ejecutor ─────────────────────────────────────────────────────────

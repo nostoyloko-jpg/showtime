@@ -74,6 +74,58 @@
     } finally { reset(); }
   });
 
+  // ── Fase 1: textos de la interfaz con el español como clave (tx) ──────────────────────────────
+  const UI = Object.assign({}, ...Object.keys(I.UI_EN).map(g => I.UI_EN[g]));
+  test('tx: en español sale idéntico (también lo que no está en el diccionario); en inglés, traducido', () => {
+    reset();
+    eq(I.tx('Pegar horario'), 'Pegar horario', 'español: tal cual');
+    eq(I.tx('Texto que no existe'), 'Texto que no existe');
+    eq(I.tx('Importar {n} entradas', { n: 3 }), 'Importar 3 entradas', 'variables en español');
+    I.setLang('en');
+    try {
+      eq(I.tx('Pegar horario'), 'Paste schedule');
+      eq(I.tx('Importar {n} entradas', { n: 3 }), 'Import 3 entries');
+      eq(I.tx('Texto que no existe'), 'Texto que no existe', 'sin traducción: cae al español, nunca en blanco');
+      eq(I.tx('Pegar horario', null, 'es'), 'Pegar horario', 'pidiendo el español (log, Deshacer)');
+      ok(I.txHas('Pegar horario') && !I.txHas('Texto que no existe'));
+    } finally { reset(); }
+  });
+  test('tx: glosario oficial del Panel de Control', () => {
+    const G = { 'Configuración': 'Settings', 'Emisión': 'Broadcast', 'Siguiente': 'Next', 'En escena': 'On stage', 'Hitos': 'Milestones',
+      'Modo Foco': 'Focus Mode', 'Tiempo extra': 'Extra time', 'Pegar horario': 'Paste schedule', 'Jornada': 'Day', 'Zona': 'Stage',
+      'Retrasos': 'Delays', 'Deshacer': 'Undo', 'Soundchecks': 'Soundchecks', 'Exportar log del evento…': 'Export event log…' };
+    Object.keys(G).forEach(k => eq(I.tx(k, null, 'en'), G[k], k));
+    Object.keys(UI).forEach(k => ok(!/\b(Zone|Zones|Journey|Workday|Rehearsal|Emission|Configuration)\b/.test(UI[k]), 'fuera del glosario: ' + UI[k]));
+  });
+  test('tx: diccionario de la interfaz sano (grupos, sin huecos, mismas variables y etiquetas HTML que el español)', () => {
+    ['panel', 'modals', 'toasts', 'spotlight'].forEach(g => ok(I.UI_EN[g] && Object.keys(I.UI_EN[g]).length > 10, 'grupo ' + g));
+    ok(Object.keys(UI).length > 600, 'más de 600 textos');
+    const vars = s => (String(s).match(/\{\w+\}/g) || []).sort().join(' ');
+    const tags = s => (String(s).match(/<\/?[a-z]+/g) || []).sort().join(' ');
+    Object.keys(UI).forEach(k => {
+      ok(typeof UI[k] === 'string' && (UI[k].trim().length > 0 || !k.trim().length), 'traducción vacía: ' + k);
+      eq(vars(UI[k]), vars(k), 'variables de «' + k + '»');
+      eq(tags(UI[k]), tags(k), 'etiquetas HTML de «' + k + '»');
+    });
+    const seen = {};
+    Object.keys(I.UI_EN).forEach(g => Object.keys(I.UI_EN[g]).forEach(k => { ok(!seen[k], 'repetido en ' + seen[k] + ' y ' + g + ': ' + k); seen[k] = g; }));
+  });
+  test('apply (modo texto): traduce los trozos de texto sin tocar los iconos, y vuelve al español', () => {
+    const txt = v => ({ nodeType: 3, nodeValue: v }), icon = { nodeType: 1, nodeValue: null };
+    const n1 = txt('  Pegar horario '), el = { childNodes: [icon, n1], getAttribute: () => '' };
+    const at = { a: { title: 'Deshacer', 'data-i18n-title': '' }, getAttribute(k) { return this.a[k]; }, setAttribute(k, v) { this.a[k] = v; } };
+    const els = { '[data-i18n]': [el], '[data-i18n-title]': [at] };
+    const rootEl = { querySelectorAll: sel => els[sel] || [] };
+    I.setLang('en');
+    try {
+      I.apply(rootEl);
+      eq(n1.nodeValue, '  Paste schedule ', 'conserva los espacios'); eq(el.childNodes[0], icon, 'el icono sigue');
+      eq(at.a.title, 'Undo');
+      I.setLang('es'); I.apply(rootEl);
+      eq(n1.nodeValue, '  Pegar horario ', 'vuelve al español original'); eq(at.a.title, 'Deshacer');
+    } finally { reset(); }
+  });
+
   let fail = 0;
   if (!NT) for (const [name, fn] of tests) {
     try { fn(); console.log('  ✓ ' + name); }
