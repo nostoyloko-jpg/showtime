@@ -1001,3 +1001,19 @@ main.vacia .list-empty{padding:16px 16px 9vh}
 .gv-foot .gv-close{background:#1c1e26;border:1px solid var(--hair2);color:#fff}
 .gv-foot .gv-close:hover{background:#252832}
 @media (max-width:700px){ .gv-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;grid-template-areas:"name name x" "vista zona sb"} .gv-hd{display:none} }
+
+/* ═══ Jerarquía de color (Raycast/Linear): el rojo SOLO para borrar (.btn.danger) y el Live ▾ de emisión.
+   Primario = blanco sólido · selección = gris elevado translúcido · foco = borde blanco translúcido ═══ */
+.seg button.on,.days button.on,.dtb.on,.addtabs button.on{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.16);color:#fff;font-weight:700}
+.mitem.on{color:#fff;font-weight:700}
+.mitem.on::after{background:#fff}
+.mpanel .days button.on{background:rgba(255,255,255,.08);color:#fff;border:0}
+td input:focus,td select:focus,.imp-src textarea:focus,.imp-prev td input[type=text]:focus,#tbl tbody td input[type=text]:focus,#tbl tbody td select:focus,.cprod-add input:focus,.gv-row input:focus,.gv-row select:focus{border-color:rgba(255,255,255,.35);box-shadow:0 0 0 1px rgba(255,255,255,.15)}
+.imp-box.drag{outline-color:rgba(255,255,255,.35)}
+.drop>div{border-color:rgba(255,255,255,.35)}
+.drop>.drop-box{border-color:rgba(255,255,255,.3)}
+.drop-box .ic{color:var(--text)}
+.imp-notice{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.16)}
+.addtabs button[data-addtab="paste"] .ic{color:#fff}
+.focusitem.on .fbox{background:#fff;border-color:#fff}
+.focusitem.on .fbox::after{border-color:#000}

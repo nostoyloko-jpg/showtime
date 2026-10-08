@@ -866,6 +866,14 @@
     ok(/\.btn\.primary:disabled\{background:rgba\(255,255,255,\.18\);border-color:transparent;color:rgba\(255,255,255,\.35\)/.test(css), 'desactivado apagado');
     ok(!/^\.btn\.primary,/m.test(css) && !/[,{]\s*\.btn\.primary\s*,/.test(css.replace(/\.btn\.primary\{[^}]*\}/g,'')), 'ninguna regla de acento pinta .btn.primary');
   });
+  test('Acento: rojo solo en borrar y Live ▾; selección en gris elevado; foco en blanco translúcido', () => {
+    const css = D.src('control.css');
+    ok(/\.seg button\.on,\.days button\.on,\.dtb\.on,\.addtabs button\.on\{background:rgba\(255,255,255,\.12\)/.test(css), 'segmentos activos en gris elevado');
+    ok(/\.mitem\.on\{color:#fff;font-weight:700\}/.test(css) && /\.mitem\.on::after\{background:#fff\}/.test(css), 'menús: seleccionado en blanco, sin rojo');
+    ok(/\.mpanel \.days button\.on\{background:rgba\(255,255,255,\.08\);color:#fff/.test(css), 'Día: seleccionado en blanco');
+    ok(/td input:focus,td select:focus,\.imp-src textarea:focus[^{]*\{border-color:rgba\(255,255,255,\.35\);box-shadow:0 0 0 1px rgba\(255,255,255,\.15\)\}/.test(css), 'foco de campos en blanco translúcido');
+    ok(/\.focusitem\.on \.fbox\{background:#fff/.test(css), 'casillas marcadas en blanco');
+  });
   test('QR: el título es «Pantallas QR», sin «móviles»', () => {
     const js = D.src('control.js');
     ok(/Pantallas QR<\/div>/.test(js) && !/Pantallas QR \(móviles\)/.test(js), 'sin «(móviles)»');
