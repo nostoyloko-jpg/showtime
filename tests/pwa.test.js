@@ -70,7 +70,7 @@
   /** Arranca sw.js con caché, red y relojes de mentira. net: 'on' | 'off' | 'cuelga' */
   function sw(opts) {
     const o = opts || {};
-    const stores = new Map(), handlers = {}, log = { skip: 0, claim: 0, fetched: [] };
+    const stores = new Map(), handlers = {}, log = { skip: 0, claim: 0, fetched: [], modes: [] };
     const keyOf = (r, ign) => { const u = new URL(typeof r === 'string' ? r : r.url, 'https://app.test/showtime/'); return ign ? u.origin + u.pathname : u.href; };
     function store(name) {
       if (!stores.has(name)) {
@@ -86,7 +86,7 @@
     }
     const caches = { open: async n => store(n), keys: async () => Array.from(stores.keys()), delete: async n => stores.delete(n) };
     const fetch = req => {
-      log.fetched.push(req.url);
+      log.fetched.push(req.url); log.modes.push(req.cache);
       if (o.net === 'off') return Promise.reject(new TypeError('Failed to fetch'));
       if (o.net === 'cuelga') return new Promise(() => {});
       const r = new Response('red:' + req.url); Object.defineProperty(r, 'type', { value: 'basic' }); return Promise.resolve(r);
@@ -117,6 +117,14 @@
     return { stores, store, caches, lifecycle, get, log, VERSION, setNet: n => { o.net = n; } };
   }
 
+  test('SW · versión nueva al momento: las páginas sin «?v=» se revalidan siempre con el servidor (Safari no sirve su copia vieja); lo versionado usa la caché normal', async () => {
+    const s = sw({ net: 'on' });
+    await s.lifecycle('install'); s.log.fetched.length = 0; s.log.modes.length = 0;
+    const r = await s.get('index.html', { mode: 'navigate' });
+    eq(r.text, 'red:https://app.test/showtime/index.html'); eq(s.log.modes[0], 'no-cache', 'la página');
+    await s.get('manifest.webmanifest'); eq(s.log.modes[1], 'no-cache', 'el manifest');
+    await s.get('control.js?v=' + s.VERSION); eq(s.log.modes[2], 'default', 'lo que lleva ?v=');
+  });
   test('SW · instalar: guarda la precaché en «showtime-VERSION» y se activa sin esperar', async () => {
     const s = sw({ net: 'on' });
     await s.lifecycle('install');

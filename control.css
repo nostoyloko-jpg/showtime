@@ -245,7 +245,7 @@ body[data-ps="escenario"] thead th,body[data-ps="escenario"] tfoot tr.add td,bod
 .filebar{display:flex;gap:6px}
 
 /* ── Cristal: UNA sola definición (menús, panel lateral, modales, avisos y QR grande) ── */
-:root{--glass-bg:rgba(22,24,30,.72);--glass-line:rgba(255,255,255,.16);--glass-blur:blur(24px) saturate(160%)}   /* cristal esmerilado (ver «Cristal esmerilado» al final: Safari) */
+:root{--glass-bg:rgba(22,24,30,.9);--glass-line:rgba(255,255,255,.16);--glass-blur:blur(24px) saturate(160%)}   /* cristal esmerilado (ver «Cristal esmerilado» al final: Safari) */
 .mpanel,.cfg,.modal-box,.toast,.qr-big-box{background:var(--glass-bg);-webkit-backdrop-filter:var(--glass-blur);backdrop-filter:var(--glass-blur);border:1px solid var(--glass-line)}
 .mpanel,.cfg,.modal-box,.qr-big-box{background-image:linear-gradient(180deg,rgba(255,255,255,.09),rgba(255,255,255,.02) 40%,rgba(255,255,255,0))}
 .cfg{border-width:0 0 0 1px}
@@ -945,13 +945,13 @@ body[data-ps="escenario"] .tpill{background:#000}
 
 /* ── Cristal esmerilado (Safari): el desenfoque se escribe con valores LITERALES — Safari ignora
       -webkit-backdrop-filter cuando lleva var(), y por eso el menú quedaba transparente y sin desenfocar.
-      Más desenfoque y un velo más denso: lo de detrás se intuye, pero sus letras no se leen. ── */
+      Velo al 90 %: aunque un Safari no desenfoque, las letras de detrás no se leen; donde sí desenfoca, queda el cristal. ── */
 .mpanel,.cfg,.toast,.qr-big-box,.cfg-h,.morep{-webkit-backdrop-filter:blur(24px) saturate(160%);backdrop-filter:blur(24px) saturate(160%)}
-.cfg-h{background:rgba(14,16,20,.8)}
+.cfg-h{background:rgba(14,16,20,.92)}
 .morep{background:var(--glass-bg)}
 .mpanel{box-shadow:0 18px 50px rgba(0,0,0,.6),0 2px 8px rgba(0,0,0,.4)}
-body[data-ps="raycast"]{--glass-bg:rgba(18,19,22,.74)}
-body[data-ps="neutro"]{--glass-bg:rgba(31,31,34,.76)}
+body[data-ps="raycast"]{--glass-bg:rgba(18,19,22,.9)}
+body[data-ps="neutro"]{--glass-bg:rgba(31,31,34,.92)}
 body[data-ps="escenario"] .mpanel,body[data-ps="escenario"] .cfg,body[data-ps="escenario"] .toast,body[data-ps="escenario"] .qr-big-box,body[data-ps="escenario"] .cfg-h,body[data-ps="escenario"] .morep{-webkit-backdrop-filter:none;backdrop-filter:none}
 /* Navegador sin desenfoque: fondo opaco (nunca letras superpuestas) */
 @supports not ((-webkit-backdrop-filter:blur(1px)) or (backdrop-filter:blur(1px))){

@@ -8,7 +8,7 @@
  * (sin recargar ninguna pantalla: lo nuevo se usa la próxima vez que se abra).
  */
 'use strict';
-const VERSION = '20261048';
+const VERSION = '20261049';
 const CACHE = 'showtime-' + VERSION;
 const NET_TIMEOUT = 3000;
 const PRECACHE = [
@@ -29,11 +29,20 @@ self.addEventListener('activate', e => {
     .then(() => self.clients.claim()));
 });
 
+/** Lo que no lleva versión (las páginas, el manifest, sw.js) se pregunta SIEMPRE al servidor (no-cache = revalidar, un 304 si no cambió).
+ *  Sin esto, Safari contesta con su copia HTTP (GitHub Pages la deja 10 min) y la app sigue enseñando la versión vieja.
+ *  Lo que lleva «?v=» no cambia nunca: caché normal del navegador. */
+function netRequest(req) {
+  let u; try { u = new URL(req.url); } catch (e) { return req; }
+  if (u.searchParams.has('v')) return req;
+  if (req.mode === 'navigate') return new Request(req.url, { cache: 'no-cache', credentials: 'same-origin' });
+  return new Request(req, { cache: 'no-cache' });
+}
 /** Red con tiempo límite: si no contesta a tiempo, se rechaza (y entra la caché). */
 function fromNetwork(req) {
   return new Promise((resolve, reject) => {
     const t = setTimeout(() => reject(new Error('timeout')), NET_TIMEOUT);
-    fetch(req).then(r => { clearTimeout(t); resolve(r); }, err => { clearTimeout(t); reject(err); });
+    fetch(netRequest(req)).then(r => { clearTimeout(t); resolve(r); }, err => { clearTimeout(t); reject(err); });
   });
 }
 /** Lo guardado: la misma URL o, si no está, la misma ruta sin «?v=…» (la versión anti-caché). */
