@@ -101,7 +101,7 @@
     '.meta{font-size:7.5pt;color:#334155;letter-spacing:.02em}',
     '.tbl{flex:1 1 auto;min-height:0}',
     'table{width:100%;height:100%;border-collapse:collapse;table-layout:fixed}',
-    'th{font-size:6.5pt;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#334155;text-align:left;padding:4px 5px;border-bottom:.75pt solid #0f172a;vertical-align:bottom}',
+    'th{font-size:6.5pt;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#334155;text-align:left;padding:4px 5px;border-bottom:.75pt solid #0f172a;vertical-align:bottom;white-space:nowrap;overflow:hidden}',
     'td{padding:var(--pad,2mm) 5px;border-bottom:.5pt solid #cbd5e1;vertical-align:middle;font-size:var(--fs,8.5pt);line-height:1.25}',
     'tr{break-inside:avoid}',
     'tr.sep td{border-top:1.6pt solid #0f172a}',
@@ -153,9 +153,9 @@
       const showZone = !zoneOne;
       const showCall = !!o.call && list.some(r => !r.aviso && r.call);  // CALL solo si alguna fila la tiene
       const showNotes = !!o.notes;
-      const cols = [{ h: 'Horario', w: 15 }, { h: 'Duración', w: 9 }]
+      const cols = [{ h: 'Horario', w: 15 }, { h: 'Duración', w: 11 }]
         .concat(showCall ? [{ h: 'CALL', w: 7 }] : [])
-        .concat(showZone ? [{ h: 'Escenario / zona', w: 16 }] : [])
+        .concat(showZone ? [{ h: 'Escenario / zona', w: 19 }] : [])
         .concat([{ h: 'Tipo', w: 9 }, { h: 'Artista / actividad', w: 0 }])
         .concat(showNotes ? [{ h: 'Notas / operativa', w: 20 }] : []);
       const fixed = cols.reduce((a, c) => a + c.w, 0);
