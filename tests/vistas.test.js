@@ -74,7 +74,8 @@
   });
 
   test('cuenta atrás: MM:SS, horas, negativo y 00:00 justo al final', () => {
-    eq(V.fmtClock(590), '09:50'); eq(V.fmtClock(0.2), '00:01'); eq(V.fmtClock(0), '00:00');
+    eq(V.fmtClock(590), '09:50'); eq(V.fmtClock(0.2), '00:00', 'redondeo al segundo más cercano'); eq(V.fmtClock(0), '00:00');
+    eq(V.fmtClock(5.00000000022), '00:05', 'flotantes: no se cuela un segundo de más'); eq(V.fmtClock(null), '--:--'); eq(V.fmtClock(NaN), '--:--');
     eq(V.fmtClock(-135), '-02:15'); eq(V.fmtClock(-0.4), '-00:00'); eq(V.fmtClock(3700), '1:01:40');
   });
 

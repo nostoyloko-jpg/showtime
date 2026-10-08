@@ -89,8 +89,9 @@
   }
   /** «MM:SS» (o «H:MM:SS» desde una hora); negativo con «-». Hacia arriba, para que 00:00 sea el final exacto. */
   function fmtClock(sec) {
-    const neg = sec < 0;
-    let s = neg ? Math.floor(-sec) : Math.ceil(sec);
+    if (sec === null || sec === undefined || Number.isNaN(sec)) return '--:--';
+    const neg = sec < -0.001;
+    let s = Math.round(Math.abs(sec));
     const h = Math.floor(s / 3600); s -= h * 3600;
     const m = Math.floor(s / 60), r = s - m * 60, p = n => (n < 10 ? '0' : '') + n;
     return (neg ? '-' : '') + (h ? h + ':' + p(m) : p(m)) + ':' + p(r);

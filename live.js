@@ -1157,9 +1157,7 @@
       : '<span class="tk-it">SIN AVISOS</span>';
     if (t.mode === 'crawl') {
       tk.innerHTML = '<div class="tk-track"><div class="tk-run">' + html + '<span class="tk-sep"></span></div><div class="tk-run" aria-hidden="true">' + html + '<span class="tk-sep"></span></div></div>';
-      const run = tk.querySelector('.tk-run');
-      const secs = Math.max(12, run.scrollWidth / 90);           // ~90 px/s, siempre a la misma velocidad de lectura
-      tk.querySelector('.tk-track').style.animationDuration = secs + 's';
+      // La duración de una vuelta la pone la velocidad de Configuración (--tk-speed, en el CSS), no el ancho del texto
     } else tk.innerHTML = '<div class="tk-static">' + html + '</div>';
   }
 
