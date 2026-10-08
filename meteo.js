@@ -23,7 +23,7 @@
   const HORIZON = [1, 2, 3, 6, 12];         // horas de previsión que se miran para los avisos
   const AQI_TH = [60, 80, 100];             // Mala · Muy mala · Extremadamente mala (índice europeo)
   const DEFAULT_METEO = {
-    on: false, source: 'openmeteo', place: '', lat: null, lon: null,
+    on: true, source: 'openmeteo', place: '', lat: null, lon: null,
     url: '', map: { temp: '', rain: '', wind: '', gust: '', code: '' },
     manual: { temp: null, rain: null, wind: null, gust: null, uv: null, at: null },
     th: { wind: null, gust: null, rain: null, heat: null, storm: true, uvOn: true, uv: 8, aqiOn: false, aqi: 80 },
@@ -46,7 +46,7 @@
   function normMeteo(m) {
     const s = m || {}, D = DEFAULT_METEO, th = s.th || {}, mp = s.map || {}, mn = s.manual || {};
     return {
-      on: s.on === true,
+      on: s.on !== false,   // el tiempo sale por defecto; solo se oculta si se apaga en Configuración › Meteo
       source: SOURCES.indexOf(s.source) >= 0 ? s.source : D.source,
       place: str(s.place, 120),
       lat: num(s.lat, -90, 90), lon: num(s.lon, -180, 180),
@@ -75,7 +75,7 @@
   function ll(cfg) { return 'latitude=' + cfg.lat.toFixed(4) + '&longitude=' + cfg.lon.toFixed(4); }
   function forecastUrl(m) {
     const c = normMeteo(m); if (c.lat === null || c.lon === null) return '';
-    return OM_FC + '?' + ll(c) + '&current=' + CURRENT + '&hourly=' + HOURLY + '&wind_speed_unit=kmh&timeformat=unixtime&timezone=GMT&past_hours=1&forecast_hours=24';
+    return OM_FC + '?' + ll(c) + '&current=' + CURRENT + '&hourly=' + HOURLY + '&daily=sunrise,sunset&wind_speed_unit=kmh&timeformat=unixtime&timezone=GMT&past_hours=1&forecast_hours=24';
   }
   function airUrl(m) {
     const c = normMeteo(m); if (c.lat === null || c.lon === null) return '';
@@ -103,7 +103,18 @@
     // UV de la hora en curso (Open-Meteo lo da por horas)
     const h0 = hours.filter(h => h.t <= cur.t).pop();
     if (h0) { cur.uv = h0.uv; if (cur.aqi === null) cur.aqi = h0.aqi; }
-    return { src: 'openmeteo', t: fetchedMs, cur, hours };
+    // Amanecer y puesta de sol (unix → ms), si Open-Meteo los manda
+    const D = fc.daily || {}, toMs = a => (Array.isArray(a) ? a.map(v => (Number.isFinite(v) ? v * 1000 : null)).filter(v => v !== null) : []);
+    const sun = (Array.isArray(D.sunrise) || Array.isArray(D.sunset)) ? { rise: toMs(D.sunrise), set: toMs(D.sunset) } : null;
+    return { src: 'openmeteo', t: fetchedMs, cur, hours, sun };
+  }
+  /** Próximo amanecer y próxima puesta después de «ahora» (ms), o null si no hay dato. */
+  function sunNext(snap, nowMs) {
+    const s = snap && snap.sun; if (!s) return null;
+    const now = nowMs || Date.now();
+    const next = a => { const f = (a || []).filter(t => t > now).sort((x, y) => x - y); return f.length ? f[0] : null; };
+    const rise = next(s.rise), set = next(s.set);
+    return rise === null && set === null ? null : { rise, set };
   }
 
   /** Lee «a.b.0.c» de un JSON. */
@@ -297,7 +308,7 @@
 
   const API = { OM_FC, OM_AQ, OM_GEO, AEMET_URL, ATTRIB, SOURCES, REFRESH, HORIZON, AQI_TH, DEFAULT_METEO,
     normMeteo, publicMeteo, staleMins, forecastUrl, airUrl, geoUrl, parseOpenMeteo, getPath, parseGeneric, manualSnap, fetchSnap, parseGeo,
-    sky, uvText, aqiText, hhmm, summary, alerts, pendingAlerts, ack, pruneAcks, pillText, tickerList, fmt1: r1 };
+    sky, uvText, aqiText, hhmm, sunNext, summary, alerts, pendingAlerts, ack, pruneAcks, pillText, tickerList, fmt1: r1 };
   if (isNode) module.exports = API;
   else root.ShowtimeMeteo = API;
 })(typeof window !== 'undefined' ? window : globalThis);

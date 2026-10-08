@@ -32,7 +32,7 @@
   // ── Ajustes ───────────────────────────────────────────────────────────
   test('ajustes: viento y ráfagas VACÍOS por defecto; UV 8 sí; calidad del aire apagada', () => {
     const d = W.normMeteo();
-    eq(d.on, false); eq(d.th.gust, null); eq(d.th.wind, null); eq(d.th.rain, null); eq(d.th.heat, null);
+    eq(d.on, true, 'el tiempo sale por defecto'); eq(W.normMeteo({ on: false }).on, false, 'apagado en Configuración: se respeta'); eq(d.th.gust, null); eq(d.th.wind, null); eq(d.th.rain, null); eq(d.th.heat, null);
     eq(d.th.storm, true); eq(d.th.uvOn, true); eq(d.th.uv, 8); eq(d.th.aqiOn, false); eq(d.th.aqi, 80);
     eq(d.horizon, 3); eq(d.refresh, 15); eq(d.source, 'openmeteo');
   });
@@ -46,11 +46,19 @@
     const p = W.publicMeteo({ source: 'url', url: 'https://estacion.example/api?token=SECRETO', map: { gust: 'a.b' } });
     eq(p.url, ''); eq(p.map.gust, ''); eq(p.source, 'url');
   });
+  test('Amanecer y puesta: se toma la próxima después de ahora; sin dato, nada', () => {
+    const past = NOW / 1000 - 3600, fut1 = NOW / 1000 + 6 * 3600, fut2 = NOW / 1000 + 30 * 3600;
+    const s = W.parseOpenMeteo(Object.assign(fc(), { daily: { sunrise: [past, fut2], sunset: [fut1, fut2 + 43200] } }), null, NOW);
+    const n = W.sunNext(s, NOW);
+    eq(n.rise, fut2 * 1000, 'amanecer: el siguiente'); eq(n.set, fut1 * 1000, 'puesta: la siguiente');
+    eq(W.sunNext(W.parseOpenMeteo(fc(), null, NOW), NOW), null, 'sin daily: nada que mostrar');
+  });
   test('URL de Open-Meteo: km/h, hora unix y las variables que se usan', () => {
     const u = W.forecastUrl(CFG());
     ok(u.indexOf('latitude=37.1800&longitude=-3.6000') > 0); ok(/wind_gusts_10m/.test(u)); ok(/uv_index/.test(u)); ok(/wind_speed_unit=kmh/.test(u)); ok(/timeformat=unixtime/.test(u));
     eq(W.forecastUrl({}), '', 'sin lugar no hay URL');
     ok(/european_aqi/.test(W.airUrl(CFG())));
+    ok(/daily=sunrise,sunset/.test(u), 'pide amanecer y puesta');
   });
 
   // ── Lectura de datos ──────────────────────────────────────────────────

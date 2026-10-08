@@ -2086,6 +2086,11 @@
     } else {
       const s = st.sum;
       h += '<div class="mt-now' + (s.stale ? ' stale' : '') + '"><svg class="ic mt-sky"><use href="#i-' + s.icon + '"/></svg><span class="mt-t">' + (s.temp === null ? '—' : Math.round(s.temp) + '°') + '</span><span class="mt-sk">' + esc(s.sky || '') + (where ? '<small>' + esc(where) + '</small>' : '') + '</span></div>';
+      const sn = W.sunNext(st.snap, Date.now());
+      if (sn) {
+        const fmt = t => { const tm = new Date(t), tomorrow = tm.toDateString() !== new Date().toDateString(); return '<b>' + W.hhmm(t) + '</b>' + (tomorrow ? ' <small>mañana</small>' : ''); };
+        h += '<div class="mt-sun"><svg class="ic"><use href="#i-sun"/></svg>' + (sn.rise !== null ? 'Amanece ' + fmt(sn.rise) : '') + (sn.rise !== null && sn.set !== null ? ' · ' : '') + (sn.set !== null ? 'Se pone ' + fmt(sn.set) : '') + '</div>';
+      }
       if (s.stale) h += '<div class="mt-stale"><svg class="ic"><use href="#i-alert"/></svg>' + esc(s.staleTxt) + (st.m && st.m.err ? '<small>' + esc(st.m.err) + '</small>' : '') + '</div>';
       h += '<div class="mt-grid">' +
         '<span><svg class="ic"><use href="#i-drop"/></svg>Lluvia <b>' + mtNum(s.rain, true) + '</b> mm/h</span>' +
