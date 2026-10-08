@@ -1632,6 +1632,8 @@
   }
 
   let IMP_LAST = [];
+  /** ¿La vista (all | show | sc) escondería alguno de estos tipos? «Shows» solo enseña shows; «Soundchecks», solo pruebas. */
+  function hidesSome(mode, tipos) { return mode !== 'all' && Array.from(tipos || []).some(t => t !== mode); }
   /** «✓ 39 entradas importadas en 3 jornadas (8 shows · 8 pruebas · 23 tareas/hitos)» — solo lo que hay. */
   function importSummary(rows, added) {
     const n = Number.isFinite(added) ? added : rows.length, c = t => rows.filter(x => x.tipo === t).length;
@@ -1645,18 +1647,20 @@
     const r = I.apply(base, IMP.pv, { mode: IMP.mode, createStages: IMP.create, extendEvent: IMP.extend });
     IMP_LAST = IMP.pv.rows.filter(x => x.include && x.status !== 'err');
     const used = new Set(IMP.pv.rows.filter(x => x.include && x.status !== 'err').map(x => x.tipo));
-    const hidden = CONFIG.mode !== 'all' && Array.from(used).some(t => t !== CONFIG.mode);
+    const hidden = hidesSome(CONFIG.mode, used);
     closeImport();
     let msg = 'Importado: ' + r.added + (r.added === 1 ? ' entrada nueva' : ' entradas nuevas');
     if (r.stagesCreated) msg += ', ' + r.stagesCreated + (r.stagesCreated === 1 ? ' zona nueva' : ' zonas nuevas');
-    if (hidden) msg += ' · todo junto en Jornada completa';
+    if (hidden) msg += ' · Ver: Todo';
     if (fresh) {   // evento nuevo: la referencia es el evento vacío, así lo importado cuenta como «sin exportar» y se puede deshacer
       loadNew(base, 'Evento creado');
       msg = 'Evento creado · ' + msg.charAt(0).toLowerCase() + msg.slice(1) + '. Ponle nombre en Configuración';
     }
+    // La vista actual («Ver: Shows» / «Ver: Soundchecks») escondería parte de lo importado: se pasa a «Ver: Todo» para ver la foto completa
+    if (hidden) CONFIG = Dt.setConfig({ mode: 'all' });
     commitFestival(r.state, msg);
     // Confirmación clara (2,5 s, en verde) y la tabla arriba para ver el evento recién importado
-    toast(importSummary(IMP_LAST, r.added) + (fresh ? ' · ponle nombre en Configuración' : ''), false, 2500);
+    toast(importSummary(IMP_LAST, r.added) + (hidden ? ' · Ver: Todo' : '') + (fresh ? ' · ponle nombre en Configuración' : ''), false, 2500);
     $('toast').classList.add('good');
     const tw = document.querySelector('.tblwrap'); if (tw && tw.scrollTo) tw.scrollTo({ top: 0, behavior: 'smooth' });
     if (r.errors.length) modal('Algunas filas no entraron', '<ul>' + r.errors.map(e => '<li>' + esc(e) + '</li>').join('') + '</ul>', [{ label: 'Entendido', kind: 'primary' }]);
@@ -2545,5 +2549,5 @@
     if (ok) toast('Se vuelve a guardar con normalidad');
   });
 
-  window.ShowtimePanel = { reload: () => { loadState(); renderAll(); }, _test: { emProdMessage, emRegenProd, hitoChips, emUrl, prodBigTitle, fileKind, handleFile, emCommand, importSummary, room: () => emRoom } };   // _test: solo para tests/control.test.js
+  window.ShowtimePanel = { reload: () => { loadState(); renderAll(); }, _test: { emProdMessage, emRegenProd, hitoChips, emUrl, prodBigTitle, fileKind, handleFile, emCommand, importSummary, hidesSome, room: () => emRoom } };   // _test: solo para tests/control.test.js
 })();

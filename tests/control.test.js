@@ -688,6 +688,31 @@
     ok(/\.imp-prev thead th\{position:sticky;top:0;z-index:10;background:#14151b;box-shadow:inset 0 -1px 0/.test(css));
   });
 
+  test('Importar con «Ver: Shows» o «Ver: Soundchecks» y varios tipos: pasa a «Ver: Todo»; si todo se ve, la vista no cambia', () => {
+    const H = panel().T.hidesSome;
+    eq(H('show', ['show']), false); eq(H('show', ['show', 'tarea']), true); eq(H('show', ['sc']), true);
+    eq(H('sc', ['sc']), false); eq(H('sc', ['sc', 'show']), true); eq(H('all', ['show', 'sc', 'tarea', 'hito']), false);
+    const F = fest(), conf = mode => JSON.stringify({ mode, day: 'all' });
+    // Ver: Shows + un show y una comida → Ver: Todo
+    const a = panel({ 'showtime.festival': JSON.stringify(F.s), 'showtime.config': conf('show') });
+    a.env.fire('document', 'paste', pasteEv('22:00-23:00 Banda Nueva Principal\n14:00 Comida'));
+    a.env.fire('imp-go', 'click', {});
+    eq(a.read('showtime.config').mode, 'all', 'la comida no se vería en «Shows»');
+    ok(/· Ver: Todo/.test(a.env.getEl('toast').textContent), a.env.getEl('toast').textContent);
+    // Ver: Shows + solo shows → se queda en Shows
+    const b = panel({ 'showtime.festival': JSON.stringify(F.s), 'showtime.config': conf('show') });
+    b.env.fire('document', 'paste', pasteEv('22:00-23:00 Banda Nueva Principal'));
+    b.env.fire('imp-go', 'click', {});
+    eq(b.read('showtime.config').mode, 'show', 'todo lo importado se ve: no se toca la vista');
+    ok(!/Ver: Todo/.test(b.env.getEl('toast').textContent));
+    // Ver: Soundchecks + un show → Ver: Todo (también sin evento abierto). Ojo: en «Soundchecks» las bandas sin palabra clave entran como prueba.
+    const c = panel({ 'showtime.config': conf('sc') });
+    c.env.fire('document', 'paste', pasteEv('10/07/2026 20:00 Concierto Banda Uno\n10/07/2026 17:00 Prueba de sonido Banda Uno'));
+    c.env.fire('imp-go', 'click', {});
+    eq(c.read('showtime.config').mode, 'all');
+    eq(c.read('showtime.festival').artists.length, 2);
+  });
+
   // ── Tanda 4: órdenes del mando (emCommand) — reloj simulado ────────────────────────
   const NOWc = new Date(2026, 6, 10, 21, 10).getTime(), nAbs = Math.floor(C.nowAbs(new Date(NOWc)));
   function festMando() {
