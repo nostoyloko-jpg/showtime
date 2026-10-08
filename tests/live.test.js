@@ -38,9 +38,10 @@
 
   test('Ancho del panel de info: automático y estable (medida a tamaño de referencia), mínimo 280 px y máximo 45 vw', () => {
     const src = D.src('live.js');
-    ok(/const INFO_REF_NAME = 37, INFO_REF_TIME = 20, INFO_PAD = 56, INFO_MIN = 280;/.test(src), 'tamaños de referencia y margen');
-    ok(/Math\.max\(INFO_MIN, Math\.min\(need \+ INFO_PAD, hi\)\)/.test(src) && /const hi = window\.innerWidth \* 0\.45/.test(src), 'clamp: mín. 280 px, máx. 45 vw');
-    ok(/\.toUpperCase\(\), 900, INFO_REF_NAME/.test(src) && /C\.fmtHM\(b\.si\) \+ '–' \+ C\.fmtHM\(b\.sf\)/.test(src), 'mide el nombre (900) y el horario');
+    ok(/const INFO_REF_NAME = 37, INFO_REF_TIME = 20, INFO_PAD = 80, INFO_MIN = 280;/.test(src), 'tamaños de referencia y margen');
+    ok(/const nameSz = Math\.max\(INFO_REF_NAME, realSz\);/.test(src), 'mide el nombre al tamaño real si es mayor (Backstage)');
+    ok(/Math\.max\(INFO_MIN, Math\.min\(need \+ INFO_PAD, hi\)\)/.test(src) && /const hi = window\.innerWidth \* 0\.55/.test(src), 'clamp: mín. 280 px, máx. 55 vw');
+    ok(/\.toUpperCase\(\), 900, nameSz, fam\)/.test(src) && /C\.fmtHM\(b\.si\) \+ '–' \+ C\.fmtHM\(b\.sf\)/.test(src), 'mide el nombre (900) y el horario');
     const rec = {}, t = arrancar({ rec });
     eq(t.env.errors.length, 0, t.env.errors.join(' | '));
     eq(rec['--info-w'], '280px', 'sin datos: el mínimo de 280 px');

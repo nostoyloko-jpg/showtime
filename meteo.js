@@ -229,7 +229,10 @@
     const g = maxOf(pts, 'gust'), u = maxOf(pts, 'uv');
     const stale = snap.src !== 'manual' && now - snap.t > staleMins(c) * 60000;
     const s = sky(snap.cur.code);
+    // Puesta de sol de HOY, solo si aún no ha ocurrido (de noche no ocupa sitio)
+    const sn = sunNext(snap, now), sameDay = sn && sn.set !== null && new Date(sn.set).toDateString() === new Date(now).toDateString();
     return {
+      sunset: sameDay ? sn.set : null,
       src: snap.src, at: snap.t, stale, staleTxt: stale ? 'SIN DATOS DESDE ' + hhmm(snap.t) : '',
       temp: snap.cur.temp, rain: snap.cur.rain, wind: snap.cur.wind, gust: snap.cur.gust,
       gustMax: g ? g.v : null, gustMaxAt: g ? g.t : null, uv: snap.cur.uv, uvMax: u ? u.v : null, aqi: snap.cur.aqi,
@@ -288,6 +291,7 @@
     if (sum.gustMax !== null) p.push('RÁF. MÁX ' + r0(sum.gustMax) + ' KM/H');
     else if (sum.gust !== null) p.push('RÁF. ' + r0(sum.gust) + ' KM/H');
     if (sum.rain !== null && sum.rain > 0) p.push('LLUVIA ' + r1(sum.rain));
+    if (sum.sunset) p.push('PUESTA ' + hhmm(sum.sunset));
     return p.join(' · ');
   }
 
@@ -302,6 +306,7 @@
     if (sum.wind !== null) p.push('VIENTO ' + r0(sum.wind) + ' KM/H');
     if (sum.gustMax !== null) p.push('RÁFAGAS MÁX ' + r0(sum.gustMax) + ' KM/H');
     const out = p.length ? [{ kind: 'meteo', level: 'ok', text: p.join(' · ') }] : [];
+    if (sum.sunset) out.push({ kind: 'meteo', level: 'ok', text: 'PUESTA DE SOL ' + hhmm(sum.sunset) });
     (list || []).forEach(a => out.push({ kind: 'meteo', level: 'warn', text: 'PREVISIÓN · ' + a.short }));
     return out;
   }

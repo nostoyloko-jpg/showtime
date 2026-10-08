@@ -236,6 +236,15 @@
     const sin = fest(); eq(V.confidence(sin.s, sin.P, now, null).mode === 'show', false, 'sin nada sonando, no');
   });
 
+  test('Cinta de Backstage: la puesta de sol sale como aviso del tiempo (si hay dato) y la vista Confidence no lleva meteo', () => {
+    const sun = { sunset: Date.UTC(2026, 6, 10, 20, 5), temp: 25, sky: 'Despejado', rain: null, wind: null, gustMax: null, stale: false };
+    const st = { event: { nombre: 'x', fechaInicio: '2026-07-10', fechaFin: '2026-07-10', dayCutoff: '06:00' }, escenarios: [], artists: [] };
+    const W = isNode ? require('../meteo.js') : window.ShowtimeMeteo;
+    const items = V.tickerItems(st, { ticker: { delays: false, hitos: false, meteo: true } }, 0, W.tickerList(sun, []));
+    ok(items.some(x => x.kind === 'meteo' && /^PUESTA DE SOL \d{2}:\d{2}$/.test(x.text)), 'la puesta sale en la cinta');
+    const conf = V.tickerItems(st, { ticker: { delays: false, hitos: false, meteo: true } }, 0, null);
+    ok(!conf.some(x => x.kind === 'meteo'), 'sin meteo no hay nada de tiempo (Confidence queda limpia)');
+  });
   test('Cinta: la última banda de la noche tocando con retraso NO sale como «EN HORA»', () => {
     const J = '2026-07-10', at2 = (d, h) => C.toAbs(d, h);
     let s = C.newFestival({ nombre: 'x', fechaInicio: J, fechaFin: J, dayCutoff: '06:00', coMin: 15 }).state;

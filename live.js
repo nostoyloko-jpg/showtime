@@ -254,13 +254,20 @@
   }
 
   // ── Panel de información de cada barra ──────────────────────────────
+  /** Si el nombre no cabe en una línea (p. ej. en Backstage, con la fila alta), baja su tamaño hasta que quepa (mín. 14 px). */
+  function fitName(nm) {
+    const cs = parseFloat(getComputedStyle(nm).fontSize) || 0, cw = nm.clientWidth, sw = nm.scrollWidth;
+    if (cw > 0 && cs > 14 && sw > cw + 1) nm.style.fontSize = Math.max(14, Math.floor(cs * cw / sw * 0.97)) + 'px';
+  }
   function setInfo(i, block, label) {
     const s = document.querySelector('.strip[data-i="' + i + '"]');
     if (!s) return;
     s.querySelector('.lbl').textContent = label;
     const nm = s.querySelector('.aname'), tm = s.querySelector('.atime'), nt = s.querySelector('.anotes'), cl = s.querySelector('.acall');
-    if (!block) { nm.textContent = '—'; tm.textContent = ''; nt.textContent = ''; cl.hidden = true; s.classList.remove('task'); return; }
+    if (!block) { nm.textContent = '—'; nm.style.fontSize = ''; tm.textContent = ''; nt.textContent = ''; cl.hidden = true; s.classList.remove('task'); return; }
     nm.textContent = block.name.toUpperCase();
+    nm.style.fontSize = '';
+    fitName(nm);
     s.classList.toggle('task', block.kind === 'tarea');
     tm.textContent = (block.kind === 'sc' && CONFIG.mode === 'all' ? 'SOUNDCHECK  ·  ' : '') + C.fmtHM(block.si) + '–' + C.fmtHM(C.blockEnd(block));
     if (block.stage) {
@@ -699,7 +706,9 @@
   // ── Ancho del panel de información: automático (nombre más largo del día) o manual (si lo arrastraste) ──
   // La medida usa el tamaño de REFERENCIA de .aname/.atime (el que tienen con el ancho por defecto de 340px),
   // no el actual: así el resultado es estable y no se persigue a sí mismo.
-  const INFO_REF_NAME = 37, INFO_REF_TIME = 20, INFO_PAD = 56, INFO_MIN = 280;
+  // INFO_PAD = relleno real del .info (36 px a cada lado en escritorio) + holgura. Si el nombre se ve a un tamaño
+  // mayor que la referencia (p. ej. en Backstage, donde la altura de la fila lo agranda), se mide a ese tamaño.
+  const INFO_REF_NAME = 37, INFO_REF_TIME = 20, INFO_PAD = 80, INFO_MIN = 280;
   let INFO_CTX = null;
   function measureTxt(txt, weight, size, fam) {
     try {
@@ -708,16 +717,18 @@
     } catch (e) {}
     return String(txt).length * size * 0.62;   // respaldo si no hay canvas
   }
-  /** Ancho automático: el nombre (o el horario) más largo de la jornada + margen, entre 280 px y 45 vw. */
+  /** Ancho automático: el nombre (o el horario) más largo de la jornada + margen, entre 280 px y 55 vw. */
   function autoInfoWidth() {
     const el = document.querySelector('.aname') || document.body;
-    const fam = (getComputedStyle(el) && getComputedStyle(el).fontFamily) || 'sans-serif';
+    const cs = getComputedStyle(el), fam = (cs && cs.fontFamily) || 'sans-serif';
+    const realSz = el.matches && el.matches('.aname') ? (parseFloat(cs.fontSize) || 0) : 0;
+    const nameSz = Math.max(INFO_REF_NAME, realSz);
     let need = 0;
     (BLOCKS || []).forEach(b => {
-      need = Math.max(need, measureTxt(String(b.name || '').toUpperCase(), 900, INFO_REF_NAME, fam));
+      need = Math.max(need, measureTxt(String(b.name || '').toUpperCase(), 900, nameSz, fam));
       if (b.si !== null && b.si !== undefined && b.sf !== null && b.sf !== undefined) need = Math.max(need, measureTxt(C.fmtHM(b.si) + '–' + C.fmtHM(b.sf), 500, INFO_REF_TIME, fam));
     });
-    const hi = window.innerWidth * 0.45;
+    const hi = window.innerWidth * 0.55;   // tope: que quepa el nombre más largo; el resto, para la línea de tiempo
     return Math.round(Math.max(INFO_MIN, Math.min(need + INFO_PAD, hi)));
   }
   /** Aplica el ancho: el manual guardado, o el automático. En móvil vertical manda el CSS (36 vw). */

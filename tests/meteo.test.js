@@ -153,6 +153,19 @@
     const st = W.summary(SNAP, CFG(), NOW + 3600000);
     eq(W.pillText(st), st.staleTxt); eq(W.tickerList(st, a)[0].text, 'EL TIEMPO: ' + st.staleTxt);
   });
+  test('puesta de sol: en la píldora y en la cinta solo mientras no ha ocurrido; sin dato, nada', () => {
+    const SUN = NOW + 2 * 3600000;
+    const sunSnap = W.parseOpenMeteo(fc({ daily: null }), null, NOW);
+    sunSnap.sun = { rise: [NOW - 8 * 3600000], set: [SUN] };
+    const s = W.summary(sunSnap, CFG(), NOW);
+    eq(s.sunset, SUN, 'puesta de hoy');
+    ok(W.pillText(s).endsWith('PUESTA ' + W.hhmm(SUN)), 'píldora: PUESTA hh:mm al final');
+    ok(W.tickerList(s, []).some(x => x.text === 'PUESTA DE SOL ' + W.hhmm(SUN)), 'cinta: PUESTA DE SOL hh:mm');
+    const after = W.summary(sunSnap, CFG(), SUN + 60000);
+    eq(after.sunset, null, 'pasada la puesta: ya no sale');
+    ok(!/PUESTA/.test(W.pillText(after)) && !W.tickerList(after, []).some(x => /PUESTA/.test(x.text)), 'ni en la píldora ni en la cinta');
+    eq(W.summary(SNAP, CFG(), NOW).sunset, null, 'sin dato de sol, no sale');
+  });
   test('cielo, UV y calidad del aire en palabras', () => {
     eq(W.sky(0).icon, 'sun'); eq(W.sky(95).icon, 'storm'); eq(W.sky(99).text, 'Tormenta con granizo'); eq(W.sky(63).text, 'Lluvia');
     eq(W.uvText(8), 'muy alto'); eq(W.uvText(11), 'extremo'); eq(W.aqiText(85), 'muy mala'); eq(W.aqiText(15), 'buena');
