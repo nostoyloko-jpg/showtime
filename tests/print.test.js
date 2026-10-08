@@ -266,7 +266,7 @@
     const svg = P.ganttSvg(L);
     ok(!/rotate\(-90[^>]*fill="#991b1b"/.test(svg), 'hitos sin texto vertical');
     ok(L.LW === 14 && /rotate\(-90[^>]*>Principal</.test(svg), 'escenario en vertical en una columna de 14 mm');
-    ok(L.hitos.length === 2 && L.hitos[0].y === undefined && svg.indexOf('Apertura de puertas recinto') >= 0, 'hitos con etiqueta horizontal');
+    ok(L.hitos.length === 2 && L.hitos[0].y === undefined && svg.indexOf('Apertura recinto') >= 0, 'hitos con etiqueta horizontal');
     ok(L.x1 < L.W - 5, 'margen derecho para la última hora');
   });
   test('gantt: ningún bloque vacío; estrechos sin sitio → llamada numerada y leyenda', () => {
@@ -315,7 +315,7 @@
     const L = P.layoutGantt(rows, 273, 164);
     const m = L.bars.filter(b => b.mark).map(b => b.kind + ':' + b.mark.shape + ':' + b.mark.label).join(',');
     eq(m, 'show:square:A,show:square:B,sc:circle:1,tarea:diamond:1,tarea:diamond:2', 'letras en cuadrado, números en círculo y en rombo');
-    eq(L.legend.map(it => it.mark.shape + it.mark.label).join(','), 'squareA,squareB,circle1,diamond1,diamond2', 'la leyenda usa las mismas formas');
+    eq(L.legend.map(it => it.mark.shape + it.mark.label).join(','), 'diamond1,diamond2,circle1,squareA,squareB', 'leyenda agrupada: tareas, soundchecks, shows');
     const svg = P.ganttSvg(L);
     ok(svg.indexOf('<polygon') >= 0 && svg.indexOf('<circle') >= 0 && />A<\/text>/.test(svg), 'rombo, círculo y cuadrado con letra en el SVG');
   });
@@ -336,6 +336,30 @@
     const L = P.layoutGantt(rows, 273, 164);
     eq(L.hitos[0].anchor, 'end', '19:30 pasa a escribirse hacia la izquierda');
     ok(L.hitos.every(h => h.label.indexOf('…') < 0), 'todas las etiquetas completas: ' + L.hitos.map(h => h.label).join(' | '));
+  });
+  test('gantt: hitos con solo el título limpio (sin «Hora exacta TBC» ni aclaraciones)', () => {
+    eq(P.hitoName('Apertura de puertas auditorio Hora exacta TBC'), 'Apertura auditorio');
+    eq(P.hitoName('Apertura de puertas recinto'), 'Apertura recinto');
+    eq(P.hitoName('Apertura de puertas'), 'Apertura de puertas', 'sin nada detrás, se queda');
+    eq(P.hitoName('Curfew de camerinos (Hora exacta TBC)'), 'Curfew de camerinos');
+    eq(P.hitoName('Curfew de sonido - aprox.'), 'Curfew de sonido');
+    eq(P.hitoName('Fin de pruebas por confirmar'), 'Fin de pruebas');
+    eq(P.hitoName('Fin de pruebas'), 'Fin de pruebas');
+  });
+  test('gantt: sin torres: 2 líneas de nombre + horario; un texto truncado siempre acaba en «…»', () => {
+    const rows = [G('Llegada y descarga Omega Crew de artista + crew local + 4 hands', 690, 810, 'Principal', 'tarea'), G('Relleno', 600, 1300, 'Carpa', 'tarea')];
+    const L = P.layoutGantt(rows, 273, 164), b = L.bars.find(x => x.zone === 'Principal');
+    ok(b.lines.length <= 3, 'como mucho 3 líneas: ' + JSON.stringify(b.lines));
+    ok(b.lines.some(l => /…$/.test(l)), 'truncado con «…»');
+    eq(b.lines[b.lines.length - 1], '11:30–13:30', 'el horario, abajo');
+    eq(P.wrapLines('Llegada y descarga Omega', '', 16, 3, 2).join('|'), 'Llegada…', 'si «…» no cabe en la 2.ª línea, se quita esa línea');
+  });
+  test('gantt: un bloque de 1 h con el nombre que cabe en 2 líneas lleva el texto dentro, no una llamada', () => {
+    const rows = [G('Concierto Alhambra', 1230, 1290, 'Secundario', 'show'), G('A', 690, 1470, 'Principal', 'tarea')];   // 11:30–00:30, como el NDB: 1 h ≈ 18 mm
+    const L = P.layoutGantt(rows, 273, 164), b = L.bars.find(x => x.zone === 'Secundario');
+    ok(b.w < 20, 'es un bloque de menos de 20 mm (' + b.w.toFixed(1) + ')');
+    eq(b.lines.slice(0, 2).join(' '), 'Concierto Alhambra');
+    ok(!b.mark, 'sin llamada');
   });
   test('gantt: html con formato gantt → hojas apaisadas con SVG y pie', () => {
     const rows = [G('A', 690, 780), G('B', 900, 960, 'Carpa', 'show', '#0284c7')];

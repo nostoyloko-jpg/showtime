@@ -220,10 +220,13 @@
     }
     if (cur) lines.push(cur);
     if (lines.length > maxLines) { lines.length = maxLines; trunc = true; }
-    if (trunc && lines.length) {
+    // Truncado: la última línea acaba en «…» (quitando palabras enteras). Si ni así cabe, se quita esa línea y se
+    // prueba con la anterior: nunca un texto cortado que parezca completo.
+    while (trunc && lines.length) {
       let last = lines[lines.length - 1];
       while (textW(last + '…', fs, true) > maxW && last.indexOf(' ') > 0) last = last.slice(0, last.lastIndexOf(' '));
-      lines[lines.length - 1] = textW(last + '…', fs, true) <= maxW ? last + '…' : last;
+      if (textW(last + '…', fs, true) <= maxW) { lines[lines.length - 1] = last + '…'; break; }
+      lines.pop();
     }
     if (tOk && lines.length < maxLines) lines.push(time);
     return lines;
@@ -236,12 +239,12 @@
     if (maxLines < 1 || maxW < fs * 2.2) return { lines: [], complete: false };
     const hora = time.split('–')[0];
     const tLine = maxLines >= 2 || !words.length ? (textW(time, fs) <= maxW ? time : textW(hora, fs) <= maxW ? hora : '') : '';
-    const nameLines = words.length ? wrapLines(name, '', maxW, fs, tLine ? maxLines - 1 : maxLines) : [];
+    const nameLines = words.length ? wrapLines(name, '', maxW, fs, Math.min(2, tLine ? maxLines - 1 : maxLines)) : [];   // título corto: 2 líneas como mucho
     const last = nameLines[nameLines.length - 1] || '';
     const shown = nameLines.join(' ').replace(/…$/, '').split(/\s+/).filter(Boolean);
     const complete = words.length ? (shown.length === words.length && !/…$/.test(last)) : !!tLine;
     const lines = tLine && (nameLines.length || !words.length) ? nameLines.concat([tLine]) : nameLines;
-    return { lines: lines, complete: complete };
+    return { lines: lines, complete: complete, words: words.length ? shown.length : 0 };
   }
 
   /** A, B, … Z, AA, AB… (llamadas de shows). */
@@ -253,8 +256,14 @@
 
   /** Nombre principal de un hito para la cabecera: sin aclaraciones entre paréntesis o corchetes
    *  («Curfew de camerinos (hora exacta TBC)» → «Curfew de camerinos») ni lo que va tras « · ». */
+  const HITO_NOTE = /\s+(?:hora\s+(?:exacta|aprox(?:imada)?\.?|por\s+confirmar|a\s+confirmar)|aprox(?:imadamente|\.)?|tbc|tbd|por\s+confirmar|a\s+confirmar|pendiente(?:\s+de\s+confirmar)?|exact\s+time|time\s+tbc|to\s+be\s+confirmed)\b.*$/i;
   function hitoName(name) {
-    const n = clean(name).replace(/\s*[\(\[][^\)\]]*[\)\]]/g, '').split(/\s+·\s+/)[0].trim();
+    let n = clean(name)
+      .replace(/\s*[\(\[][^\)\]]*[\)\]]/g, '')           // (…) y […]
+      .split(/\s+[·|]\s+|\s+[—–-]\s+|\s*[:;]\s+/)[0]     // lo que va tras « · », « — », «: »
+      .replace(HITO_NOTE, '')                               // «Hora exacta TBC», «aprox.», «por confirmar»…
+      .replace(/^(apertura)\s+de\s+puertas\s+(?=\S)/i, '$1 ')   // «Apertura de puertas auditorio» → «Apertura auditorio»
+      .trim();
     return n || clean(name);
   }
 
@@ -372,7 +381,7 @@
     const totalRows = lanes.reduce((n, l) => n + l.rows, 0);
 
     // ── Carriles y barras; la leyenda resta alto a los carriles, así que se ajusta en unas pocas vueltas ──
-    const LROW = 3.8, NARROW = 25;
+    const LROW = 3.8, NARROW = 20;
     let legendN = 0, rowH = 0, fs = 0, bars = [], lanesBottom = 0, legendTop = 0;
     for (let pass = 0; pass < 5; pass++) {
       const legendH = legendN ? Math.ceil(legendN / 2) * LROW + 3 : 0;
@@ -389,11 +398,12 @@
         const x = X(r.s), w = Math.max(0.8, X(e) - X(r.s));
         const time = C.fmtHM(r.s) + (Number.isFinite(r.e) ? '–' + C.fmtHM(r.e) : '');
         const h = rowH - 1;
-        const maxLines = Math.max(0, Math.floor(h / (fs * 1.2)));
+        const maxLines = Math.min(3, Math.max(0, Math.floor(h / (fs * 1.2))));   // nunca una torre: 2 líneas de nombre + horario
         const name = clean(r.name);
-        const t = barText(name, time, w - (r.kind === 'show' ? 3.4 : 2.6), fs, maxLines);
-        // Ancho ≥ 25 mm: nombre + horario (aunque haya que truncar). Estrecho: solo si el nombre cabe entero.
-        const ok = t.lines.length && (w >= NARROW || t.complete);
+        const t = barText(name, time, w - (r.kind === 'show' ? 2.8 : 2.0), fs, maxLines);
+        // Si el nombre cabe entero (1–2 líneas) va dentro. Si no: con ≥ 20 mm, o si se leen al menos 2 palabras,
+        // truncado con «…» («Llegada y / descarga… / 11:30»); si ni eso, llamada numerada.
+        const ok = t.lines.length && (t.complete || w >= NARROW || t.words >= 2);
         bars.push({ kind: r.kind, x: x, y: l.y + r.row * rowH + 0.5, w: w, h: h, color: r.zoneColor, s: r.s, lane: li, row: r.row,
           strong: isStrong(r), zone: r.zone, fs: fs, lines: ok ? t.lines : [], badge: ok ? 0 : -1, name: name, time: time });
       }));
@@ -411,6 +421,9 @@
       bb.badge = i + 1; bb.cx = bb.x + bb.w / 2; bb.cy = bb.y + bb.h / 2;
       bb.mark = { shape: shape, label: shape === 'square' ? letters(n) : String(n) };
     });
+    const GROUP = { diamond: 0, circle: 1, square: 2 };   // leyenda por tipo: tareas, soundchecks, shows
+    called.sort((p, q) => GROUP[p.mark.shape] - GROUP[q.mark.shape] || p.s - q.s || p.lane - q.lane || p.row - q.row);
+    called.forEach((bb, i) => { bb.badge = i + 1; });
     const legend = [];
     if (called.length) {
       const rows = Math.ceil(called.length / 2), colW = (W - LW - 1) / 2;
