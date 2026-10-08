@@ -196,6 +196,65 @@
     ok(html.indexOf('<script>alert') < 0, 'HTML escapado'); ok(/BORRADA 16:05/.test(html)); ok(/@page/.test(html));
   });
 
+  // ── Idioma: el informe en el idioma del Panel; los apuntes se guardan en español; lo escrito por la gente, intacto ──
+  const I18 = () => (isNode ? require('../i18n.js') : window.ShowtimeI18n);
+  function bothLangs(fn) {
+    const I = I18(); if (!I) return;
+    const R = day();
+    R.log = L.record(R.log, [{ type: 'call', key: key(R.s, 'Banda A'), text: 'CALL OK · Banda A · Stage Manager (mando)' },
+      { type: 'meteo', amber: true, text: 'Aviso (previsión): Viento medio 45 km/h ahora · umbral 40' },
+      { type: 'real', text: 'Reconciliación: Zona Principal vuelve a EN HORA (absorbidos +10 min en changeover) · Banda A 20:30 · Stage Manager' },
+      { type: 'buffer', key: key(R.s, 'Banda A'), text: 'BIS · Banda A: Tiempo extra tardío a las 21:40 (+5 min desde su fin, 21:35). Vuelve a estar en escena; gasta el colchón y, pasado, retrasa lo que viene de su zona hasta ■' },
+      { type: 'delay', text: 'Retraso +15 min (Principal, desde 21:00): 1 entrada movida' }], { t: at('21:20'), src: 'panel' }, R.s);
+    const rep = L.report(R.log, R.s, { day: JOR });
+    try { I.setLang('en'); fn.en(L.toTxt(rep), L.toCsv(rep), L.toHtml(rep), R); } finally { I.setLang('es'); }
+    fn.es(L.toTxt(rep), L.toCsv(rep), L.toHtml(rep), R);
+  }
+  test('idioma: TXT en inglés (título, columnas, tipos y sucesos) y en español como siempre', () => bothLangs({
+    en: (txt, csv, html, R) => {
+      ok(/^SHOWTIME · EVENT LOG · DAILY REPORT/.test(txt), 'título');
+      ok(/TIME\s+TYPE\s+EVENT \/ ACTION · STAGE\s+PLANNED\s+ACTUAL\s+STATUS \/ USER/.test(txt), 'columnas');
+      ok(/>> MESSAGE: “ÚLTIMO TEMA” → Confidence \(Stage Remote\)/.test(txt), 'el texto del mensaje no se toca');
+      ok(/>> CALL CONFIRMED: CALL confirmed · Banda A · Stage Manager \(Stage Remote\) · Principal \(Dashboard\)/.test(txt), 'CALL confirmado + escenario + usuario');
+      ok(/>> WEATHER ALERT: Weather alert \(forecast\): Mean wind 45 km\/h now · threshold 40/.test(txt), 'alerta meteo');
+      ok(/>> RECONCILIATION: Reconciliation: Stage Principal back to ON TIME \(\+10 min absorbed in changeover\)/.test(txt), 'reconciliación');
+      ok(/>> ENCORE: ENCORE · Banda A: late Extra time at 21:40/.test(txt), 'bis');
+      ok(/>> DELAY: Manual delay: \+15 min on Principal \(from 21:00\): 1 entry moved/.test(txt), 'retraso manual');
+      ok(/>> ACTUAL TIME: ■ Show “Banda A” ends 21:10 \(started on time, 20:30\)/.test(txt), 'fin real');
+      ok(/DELETED 16:05/.test(txt) && /Summary: /.test(txt));
+      ok(!/MENSAJE|BORRADA|Resumen|previstas/.test(txt), 'sin restos en español');
+      ok(/^\ufeffDay;Time;Row;Type;Event \/ action;Stage;/.test(csv), 'CSV: cabecera');
+      ok(/;Incident;Weather alert;Weather alert \(forecast\)/.test(csv), 'CSV: incidencia');
+      ok(/<html lang="en">/.test(html) && /EVENT LOG · DAILY REPORT/.test(html) && /Event Log · Daily report/.test(html) && /\(new\)/.test(html), 'PDF: título, pie y «(new)»');
+      ok(/Stage Remote/.test(html) && !/Mando del Stage Manager/.test(html), 'PDF: usuario');
+      // lo guardado sigue en español
+      ok(R.log.entries.every(e => !/Stage Remote|CALL confirmed/.test(e.text)), 'el log se guarda en español');
+    },
+    es: (txt, csv, html) => {
+      ok(/^SHOWTIME · REGISTRO DE EVENTOS · INFORME DE JORNADA/.test(txt), 'título');
+      ok(/HORA\s+TIPO\s+SUCESO \/ ACCIÓN · ESCENARIO\s+PREVISTO\s+REAL\s+ESTADO \/ USUARIO/.test(txt), 'columnas');
+      ok(/>> MENSAJE: «ÚLTIMO TEMA» → Confidence \(Mando del Stage Manager\)/.test(txt));
+      ok(/>> CALL CONFIRMADO: CALL OK · Banda A · Stage Manager \(mando\) · Principal \(Dashboard\)/.test(txt));
+      ok(/>> ALERTA METEO: Aviso \(previsión\)/.test(txt) && />> RECONCILIACIÓN: Reconciliación:/.test(txt) && />> BIS: BIS · Banda A/.test(txt) && />> RETRASO: Retraso \+15 min/.test(txt));
+      ok(/^\ufeffJornada;Hora;Fila;Tipo;Suceso \/ acción;Escenario;/.test(csv), 'CSV: cabecera');
+      ok(/<html lang="es">/.test(html) && /Registro de eventos · Informe de jornada/.test(html) && /\(nueva\)/.test(html));
+    }
+  }));
+  test('idioma: los sucesos de Tiempo extra y Extender prueba tienen su tipo; texto libre de la gente intacto', () => {
+    const I = I18(); if (!I) return;
+    const R = rig();
+    R.log = L.record(R.log, [{ type: 'buffer', text: 'EXTENDER PRUEBA · Prueba A: Tiempo extra tardío a las 17:50 (+5 min desde su fin, 17:45). Vuelve a estar en escena; gasta el colchón y, pasado, retrasa lo que viene de su zona hasta ■' },
+      { type: 'buffer', text: 'Banda A: TIEMPO EXTRA · puede gastar el colchón del cambio; pasado, retrasa lo que viene de su zona hasta ■' },
+      { type: 'msg', text: 'Aviso puntual: «Comida en 10 min · traed hielo» · Producción (Marta)' }], { t: at('20:00'), src: 'produccion' }, R.s);
+    I.setLang('en');
+    try {
+      const txt = L.toTxt(L.report(R.log, R.s, { day: JOR }));
+      ok(/>> EXTEND SOUNDCHECK: EXTEND SOUNDCHECK · Prueba A: late Extra time at 17:50/.test(txt), 'extender prueba');
+      ok(/>> EXTRA TIME: Banda A: EXTRA TIME enabled · may use the changeover buffer/.test(txt), 'tiempo extra');
+      ok(/>> MESSAGE: One-off alert: “Comida en 10 min · traed hielo” · Production \(Marta\) \(Production\)/.test(txt), 'mensaje de Producción: su texto, intacto');
+    } finally { I.setLang('es'); }
+  });
+
   test('CALL OK: queda apuntado quién lo dio (Stage Manager o Producción) y sobrevive a recargar', () => {
     const R = rig();
     R.log = L.record(R.log, [{ type: 'call', text: 'CALL OK · Banda A · Stage Manager' }], { t: at('15:00'), src: 'panel' }, R.s);
@@ -206,7 +265,7 @@
     eq(calls.length, 3, 'las entradas de CALL no se pierden al recargar');
     eq(calls[0].src, 'panel'); eq(calls[1].src, 'produccion'); eq(calls[2].src, 'mando');
     ok(calls[1].text.indexOf('Producción (Marta)') > 0, 'el nombre de quien lo dio va en el texto');
-    eq(L.SRC_TXT.produccion, 'Producción'); eq(L.TYPE_TXT.call, 'CALL OK');
+    eq(L.SRC_TXT.produccion, 'Producción'); eq(L.TYPE_TXT.call, 'CALL confirmado');
   });
 
   test('noReal: la orden (En hora, corrección) pone su propio texto y no se duplica con el ▶ genérico', () => {

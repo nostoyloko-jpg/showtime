@@ -1648,7 +1648,7 @@
       const rep = Lg.report(LOG, FEST, { day: LX.day, cats: LX.cats, nowMs: Date.now() });
       if (!rep.sections.some(x => x.rows.length)) { toast('No hay nada que exportar con esos filtros', true); return false; }
       const d = new Date(), stamp = pad2(d.getHours()) + pad2(d.getMinutes());
-      const base = slugOf(FEST) + '-log-' + (LX.day === 'all' ? 'evento' : LX.day) + '-' + stamp;
+      const base = slugOf(FEST) + '-log-' + (LX.day === 'all' ? tx('evento') : LX.day) + '-' + stamp;
       if (LX.fmt === 'pdf') { printReport(Lg.toHtml(rep)); toast('Informe listo: en la impresión, elige «Guardar como PDF»'); }
       else if (LX.fmt === 'txt') { download(base + '.txt', Lg.toTxt(rep), 'text/plain;charset=utf-8'); toast(tx('Exportado: {f}', { f: base + '.txt' })); }
       else { download(base + '.csv', Lg.toCsv(rep), 'text/csv;charset=utf-8'); toast(tx('Exportado: {f}', { f: base + '.csv' })); }

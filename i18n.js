@@ -1088,6 +1088,129 @@
       "Sin conexión o el servidor no permite leerlo desde el navegador": "No connection, or the server does not allow reading it from the browser",
       "Falta la URL (https://…)": "URL missing (https://…)",
       "Falta el lugar del evento": "Event location missing"
+    },
+    log: {
+      "{k} «{_n}»: tipo {a} → {b}": "{k} “{_n}”: type {a} → {b}",
+      "{k} «{_n}»": "{k} “{_n}”",
+      "sin hora": "no time",
+      "«{_n}»: {r}": "“{_n}”: {r}",
+      "nombre «{_a}» → «{_b}»": "name “{_a}” → “{_b}”",
+      "zona {a} → {b}": "stage {a} → {b}",
+      "{k} «{_n}»: {r}": "{k} “{_n}”: {r}",
+      "jornada {a} → {b}": "day {a} → {b}",
+      "inicio {a} → {b}": "start {a} → {b}",
+      "fin {a} → {b}": "end {a} → {b}",
+      "{k} «{_n}»: registros ▶ / ■ borrados (vuelve a ir en hora)": "{k} “{_n}”: ▶ / ■ records cleared (back on time)",
+      "■ {k} «{_n}» termina {h} (inicio en hora, {i}) · {d}": "■ {k} “{_n}” ends {h} (started on time, {i}) · {d}",
+      "▶ {k} «{_n}» empieza {h} · {d}": "▶ {k} “{_n}” starts {h} · {d}",
+      "■ {k} «{_n}» termina {h} · {d}": "■ {k} “{_n}” ends {h} · {d}",
+      "acaba {m} min antes": "ends {m} min early",
+      "en hora": "on time",
+      "Desborde de «{_who}»: +{n} min en {z}": "Overrun from “{_who}”: +{n} min on {z}",
+      "nada que mover (bloqueado o en rojo)": "nothing to move (locked or red)",
+      "{n} entrada movida": "{n} entry moved",
+      "Retraso +{n} min ({z}, desde {h}): {r}": "Manual delay: +{n} min on {z} (from {h}): {r}",
+      "Retraso +{n} min ({z}): {r}": "Manual delay: +{n} min on {z}: {r}",
+      "«{_t}» → {to}": "“{_t}” → {to}",
+      "Aviso retirado por el Stage Manager: «{_t}»": "Alert removed by the Stage Manager: “{_t}”",
+      "Aviso puntual: «{_t}» · {w}": "One-off alert: “{_t}” · {w}",
+      "Aviso permanente: «{_t}» · {w}": "Permanent alert: “{_t}” · {w}",
+      "Aviso (previsión): {a}": "Weather alert (forecast): {a}",
+      "Visto: {a}": "Seen: {a}",
+      "ahora": "now",
+      "hacia las {h}": "around {h}",
+      "CALL OK · {_b} · {w}": "CALL confirmed · {_b} · {w}",
+      "Stage Manager (mando)": "Stage Manager (Stage Remote)",
+      "Stage Manager (pantalla Live)": "Stage Manager (Live screen)",
+      "Reconciliación: Zona {z} vuelve a EN HORA (absorbidos +{n} min en changeover)": "Reconciliation: Stage {z} back to ON TIME (+{n} min absorbed in changeover)",
+      "Reconciliación: Zona {z} vuelve a EN HORA (anulado un adelanto de {n} min)": "Reconciliation: Stage {z} back to ON TIME (early start of {n} min cancelled)",
+      "Corrección de inicio real: «{_n}» {h} (antes {o})": "Actual start corrected: “{_n}” {h} (was {o})",
+      "Corrección de inicio real: «{_n}» {h} (antes {o}, asumido)": "Actual start corrected: “{_n}” {h} (was {o}, assumed)",
+      "{_n}: TIEMPO EXTRA · puede gastar el colchón del cambio; pasado, retrasa lo que viene de su zona hasta ■": "{_n}: EXTRA TIME enabled · may use the changeover buffer; beyond it, delays what follows on its stage until ■",
+      "{_n}: Tiempo extra desactivado": "{_n}: Extra time disabled",
+      "BIS · {_n}: Tiempo extra tardío a las {h} (+{m} min desde su fin, {f}). Vuelve a estar en escena; gasta el colchón y, pasado, retrasa lo que viene de su zona hasta ■": "ENCORE · {_n}: late Extra time at {h} (+{m} min after its end, {f}). Back on stage; uses the buffer and, beyond it, delays what follows on its stage until ■",
+      "EXTENDER PRUEBA · {_n}: Tiempo extra tardío a las {h} (+{m} min desde su fin, {f}). Vuelve a estar en escena; gasta el colchón y, pasado, retrasa lo que viene de su zona hasta ■": "EXTEND SOUNDCHECK · {_n}: late Extra time at {h} (+{m} min after its end, {f}). Back on stage; uses the buffer and, beyond it, delays what follows on its stage until ■",
+      "Borrada: {_n}": "Deleted: {_n}",
+      "{_n}: empieza {h}": "{_n}: starts {h}",
+      "{_n}: termina {h}": "{_n}: ends {h}",
+      "{_n}: termina {h} (inicio {i}, a su hora)": "{_n}: ends {h} (start {i}, on time)",
+      "sale {m} min tarde": "starts {m} min late",
+      "sale {m} min antes de lo estimado": "starts {m} min earlier than estimated",
+      "a su hora": "on time",
+      "{m} min tarde": "{m} min late",
+      "acaba {m} min antes: el tiempo se suma al cambio (no se adelanta nada)": "ends {m} min early: the time is added to the changeover (nothing is brought forward)",
+      "{_n}: en hora, empieza {h}": "{_n}: on time, starts {h}",
+      "{_n}: en hora, empieza {h} (estaba estimada a las {e})": "{_n}: on time, starts {h} (was estimated at {e})",
+      "REGISTRO DE EVENTOS · INFORME DE JORNADA": "EVENT LOG · DAILY REPORT",
+      "Registro de eventos · Informe de jornada": "Event Log · Daily report",
+      "Dashboard": "Dashboard",
+      "Mando del Stage Manager": "Stage Remote",
+      "Hora real": "Actual time",
+      "Reconciliación": "Reconciliation",
+      "Retraso": "Delay",
+      "Bis": "Encore",
+      "Extender prueba": "Extend soundcheck",
+      "Mensaje": "Message",
+      "Alerta meteo": "Weather alert",
+      "Alta": "Added",
+      "Borrado": "Deleted",
+      "nada": "nothing",
+      "BORRADA": "DELETED",
+      "BORRADA {h}": "DELETED {h}",
+      "MOVIDA a {d}": "MOVED to {d}",
+      "AÑADIDA": "ADDED",
+      "AÑADIDA {h}": "ADDED {h}",
+      "hora real": "actual time",
+      "movida {d}": "moved {d}",
+      "inicio {d}": "start {d}",
+      "fin {d}": "end {d}",
+      "Previsto: el horario tal como estaba a las {h} (foto de la jornada)": "Planned: the schedule as it was at {h} (day snapshot)",
+      "Previsto: el horario actual (esta jornada no tiene foto)": "Planned: the current schedule (this day has no snapshot)",
+      "Evento:": "Event:",
+      "Jornada:": "Day:",
+      "Incluye:": "Includes:",
+      "Generado:": "Generated:",
+      "Leyenda: * = hora distinta de la prevista · >> = incidencia": "Key: * = time differs from the plan · >> = incident",
+      "(Sin nada que mostrar con estos filtros)": "(Nothing to show with these filters)",
+      "HORA": "TIME",
+      "ESCENARIO": "STAGE",
+      "TIPO": "TYPE",
+      "SUCESO / ACCIÓN": "EVENT / ACTION",
+      "PREVISTO": "PLANNED",
+      "REAL": "ACTUAL",
+      "ESTADO": "STATUS",
+      "USUARIO": "USER",
+      "Resumen: {a} previstas · {b} con hora cambiada · {c} borradas o movidas · {d} añadidas · {e} incidencias": "Summary: {a} planned · {b} with changed time · {c} deleted or moved · {d} added · {e} incidents",
+      "Fila": "Row",
+      "Suceso / acción": "Event / action",
+      "Escenario": "Stage",
+      "Inicio previsto": "Planned start",
+      "Fin previsto": "Planned end",
+      "Inicio real": "Actual start",
+      "Fin real": "Actual end",
+      "Cambio de hora": "Time changed",
+      "Usuario": "User",
+      "Incidencia": "Incident",
+      "Horario": "Schedule",
+      "sí": "yes",
+      "Suceso / acción · escenario": "Event / action · stage",
+      "Previsto": "Planned",
+      "<b>{n}</b> previstas": "<b>{n}</b> planned",
+      "<b>{n}</b> con hora cambiada": "<b>{n}</b> with changed time",
+      "<b>{n}</b> borradas o movidas": "<b>{n}</b> deleted or moved",
+      "<b>{n}</b> añadidas": "<b>{n}</b> added",
+      "<b>{n}</b> incidencias": "<b>{n}</b> incidents",
+      "Nada que mostrar con estos filtros.": "Nothing to show with these filters.",
+      "Registro · {e} · {d}": "Log · {e} · {d}",
+      "todo el evento": "whole event",
+      "Vista para imprimir · en el diálogo, elige <b>Guardar como PDF</b>": "Print view · in the dialog, choose <b>Save as PDF</b>",
+      "hora distinta de la prevista (con barra lateral)": "time differs from the plan (with side bar)",
+      "incidencia (hora en que pasó)": "incident (time it happened)",
+      "borrada o movida": "deleted or moved",
+      "(nueva)": "(new)",
+      "Incluye": "Includes",
+      "Generado": "Generated",
+      "evento": "event"
     }
     /*UI-EN-END*/
   };
@@ -1102,6 +1225,45 @@
   }
   /** ¿Tiene traducción? (para los tests: ningún texto de la interfaz sin traducir) */
   function txHas(src) { return has(UI, String(src)); }
+
+  /* ── Traducir un texto YA ESCRITO en español (el log del evento guarda sus apuntes en español) ──────────
+   *  txBack('▶ Show «OMEGA» empieza 21:45 · +5 min', 'en') → '▶ Show “OMEGA” starts 21:45 · +5 min'.
+   *  1) el texto entero es una clave; 2) encaja con una plantilla («{h}» = cualquier cosa; primero las del grupo log,
+   *  las más concretas antes); 3) si no, se traduce cada trozo separado por « · ». Las variables con «_» delante
+   *  ({_n}: nombres, textos escritos por la gente) se copian tal cual; el resto se traduce a su vez.
+   *  Lo que no se reconoce se queda como está (nunca se pierde nada). En español devuelve el texto intacto. */
+  let BACK = null;
+  function backList() {
+    if (BACK) return BACK;
+    const mk = k => {
+      const parts = k.split(/(\{\w+\})/), names = [];
+      let lit = 0;
+      const src = parts.map(p => {
+        const m = /^\{(\w+)\}$/.exec(p);
+        if (m) { names.push(m[1]); return m[1].charAt(0) === '_' ? '([^«»]+?)' : '([\\s\\S]+?)'; }   // un nombre entre comillas no se come las comillas
+        lit += p.length; return p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      }).join('');
+      return { k, re: new RegExp('^' + src + '$'), names, lit };
+    };
+    const tpl = o => Object.keys(o || {}).filter(k => /\{\w+\}/.test(k) && !/\}\{/.test(k)).map(mk).sort((x, y) => y.lit - x.lit);
+    const rest = {}; Object.keys(UI_EN).forEach(g => { if (g !== 'log') Object.assign(rest, UI_EN[g]); });
+    BACK = tpl(UI_EN.log).concat(tpl(rest));
+    return BACK;
+  }
+  function txBack(src, lang, depth) {
+    const s = String(src == null ? '' : src), d = depth || 0;
+    if (norm(lang || cur) !== 'en' || !s || d > 5) return s;
+    if (has(UI, s)) return UI[s];
+    const list = backList();
+    for (let i = 0; i < list.length; i++) {
+      const m = list[i].re.exec(s); if (!m) continue;
+      const v = {};
+      list[i].names.forEach((n, j) => { v[n] = n.charAt(0) === '_' ? m[j + 1] : txBack(m[j + 1], 'en', d + 1); });
+      return fill(UI[list[i].k], v);
+    }
+    if (s.indexOf(' · ') > 0) return s.split(' · ').map(x => txBack(x, 'en', d + 1)).join(' · ');
+    return s;
+  }
 
   let cur = 'es';
   const listeners = [];
@@ -1207,7 +1369,7 @@
     return { en: es.filter(k => en.indexOf(k) < 0), es: en.filter(k => es.indexOf(k) < 0) };
   }
 
-  const API = { LANGS, DICT, UI_EN, norm, getLang, setLang, onChange, t, tx, txHas, fill, group, apply, keys, missing };
+  const API = { LANGS, DICT, UI_EN, norm, getLang, setLang, onChange, t, tx, txHas, txBack, fill, group, apply, keys, missing };
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
   else root.ShowtimeI18n = API;
 })(typeof window !== 'undefined' ? window : globalThis);

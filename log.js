@@ -20,18 +20,19 @@
   const MAX = 20000;                 // tope de seguridad (un día normal son decenas o cientos)
   const SRC_TXT = { panel: 'Dashboard', mando: 'Mando del Stage Manager', produccion: 'Producción' };
   const KIND_TXT = { show: 'Show', sc: 'Soundcheck', tarea: 'Tarea', hito: 'Marcador' };
-  const TYPE_TXT = { real: 'Hora real', delay: 'Retraso', buffer: 'Tiempo extra', msg: 'Mensaje', call: 'CALL OK', meteo: 'Meteo', add: 'Alta', del: 'Borrado', edit: 'Cambio', undo: 'Deshecho' };
+  const TYPE_TXT = { real: 'Hora real', delay: 'Retraso', buffer: 'Tiempo extra', msg: 'Mensaje', call: 'CALL confirmado', meteo: 'Alerta meteo', add: 'Alta', del: 'Borrado', edit: 'Cambio', undo: 'Deshecho' };
   const CATS = ['show', 'sc', 'tarea', 'hito', 'inc'];
   const CAT_TXT = { show: 'Shows', sc: 'Soundchecks', tarea: 'Tareas', hito: 'Marcadores / Eventos', inc: 'Incidencias' };
 
   // ── Utilidades ────────────────────────────────────────────────────────
   const hm = v => v === null || v === undefined ? '—' : C.fmtHM(v);
   function devTxt(d) { return d === 0 ? 'en hora' : (d > 0 ? '+' : '−') + Math.abs(d) + ' min'; }
-  function fmtDay(iso, long) {
+  function fmtDay(iso, long, ui) {   // ui: en el idioma activo (informe); sin ui, en español (lo que se guarda en el log)
     const i = C.dayIndex(iso);
     if (i === null) return iso || '—';
     const o = long ? { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' } : { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' };
-    return new Date(Date.UTC(2000, 0, 1) + i * 864e5).toLocaleDateString('es-ES', o);
+    const I = ui ? (root.ShowtimeI18n || (isNode ? (() => { try { return require('./i18n.js'); } catch (e) { return null; } })() : null)) : null;
+    return new Date(Date.UTC(2000, 0, 1) + i * 864e5).toLocaleDateString(I && I.getLang() === 'en' ? 'en-GB' : 'es-ES', o);
   }
   function uniq(a) { return a.filter((x, i) => x && a.indexOf(x) === i); }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
@@ -194,7 +195,7 @@
         real: [b.ri !== null, b.rf !== null], chg: [false, false], status: 'added', when: ae ? ae.t : null });
       stats.add++;
     });
-    if (cats.inc) ents.forEach(e => { rows.push({ r: 'inc', t: e.t, n: e.n, type: e.type, text: e.text, src: e.src, amber: e.amber }); stats.inc++; });
+    if (cats.inc) ents.forEach(e => { rows.push({ r: 'inc', t: e.t, n: e.n, type: e.type, text: e.text, src: e.src, amber: e.amber, stage: e.key && allNow.has(e.key) ? allNow.get(e.key).stage || '' : '' }); stats.inc++; });
     rows.sort((a, b) => (a.t - b.t) || (a.r === b.r ? (a.n || 0) - (b.n || 0) : a.r === 'sched' ? -1 : 1));
     return { jornada: j, foto: !!foto, fotoAt: foto ? foto.at : null, rows, stats };
   }
@@ -213,61 +214,87 @@
   }
 
   // ── Formatos ──────────────────────────────────────────────────────────
-  function genTxt(ms) { const d = new Date(ms); return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) + ' ' + C.pad2(d.getHours()) + ':' + C.pad2(d.getMinutes()); }
-  function catsTxt(cats) { const on = CATS.filter(k => cats[k]); return on.length === CATS.length ? 'Todo' : on.map(k => CAT_TXT[k]).join(' · ') || 'nada'; }
+  // Idioma (i18n): el informe sale en el idioma del Panel. Los apuntes se GUARDAN en español y se traducen al pintarlos
+  // (txBack: plantillas de i18n.js); lo que escribe la gente («mensajes», chat) va entre comillas y no se toca.
+  const I18 = () => root.ShowtimeI18n || (isNode ? (() => { try { return require('./i18n.js'); } catch (e) { return null; } })() : null);
+  const tx = (s, v) => { const I = I18(); return I ? I.tx(s, v) : (v ? String(s).replace(/\{(\w+)\}/g, (m, k) => (v[k] !== undefined && v[k] !== null ? String(v[k]) : m)) : String(s)); };
+  const back = s => { const I = I18(); return I && I.txBack ? I.txBack(s) : s; };
+  const isEn = () => { const I = I18(); return !!(I && I.getLang() === 'en'); };
+  const dayUi = (iso, long) => fmtDay(iso, long, true);
+  /** Tipo del apunte para el informe: el guardado y, dentro de él, el suceso concreto (Reconciliación, Bis, Extender prueba). */
+  const TYPE_EN = { 'Hora real': 'Actual time', 'Reconciliación': 'Reconciliation', 'Retraso': 'Delay', 'Tiempo extra': 'Extra time', 'Bis': 'Encore', 'Extender prueba': 'Extend soundcheck',
+    'Mensaje': 'Message', 'CALL confirmado': 'CALL confirmed', 'Alerta meteo': 'Weather alert', 'Alta': 'Added', 'Borrado': 'Deleted', 'Cambio': 'Change', 'Deshecho': 'Undone' };
+  function typeEs(r) {
+    const t = String(r.text || '');
+    if (r.type === 'real' && /^Reconciliación:/.test(t)) return 'Reconciliación';
+    if (r.type === 'buffer' && /^BIS · /.test(t)) return 'Bis';
+    if (r.type === 'buffer' && /^EXTENDER PRUEBA · /.test(t)) return 'Extender prueba';
+    return TYPE_TXT[r.type];
+  }
+  function typeTxt(r) { const es = typeEs(r); return isEn() ? (TYPE_EN[es] || es) : es; }
+  const kindTxt = k => tx(KIND_TXT[k]);
+  const srcTxt = s => tx(SRC_TXT[s]);
+  const incTxt = r => back(r.text);
+  const devUi = d => tx(devTxt(d));
+  function genTxt(ms) { const d = new Date(ms); return d.toLocaleDateString(isEn() ? 'en-GB' : 'es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) + ' ' + C.pad2(d.getHours()) + ':' + C.pad2(d.getMinutes()); }
+  function catsTxt(cats) { const on = CATS.filter(k => cats[k]); return on.length === CATS.length ? tx('Todo') : on.map(k => tx(CAT_TXT[k])).join(' · ') || tx('nada'); }
   function stateTxt(r) {
-    if (r.status === 'deleted') return 'BORRADA' + (r.when !== null ? ' ' + hm(r.when) : '');
-    if (r.status === 'moved') return 'MOVIDA a ' + fmtDay(r.movedTo);
-    if (r.status === 'added') return 'AÑADIDA' + (r.when !== null ? ' ' + hm(r.when) : '');
+    if (r.status === 'deleted') return r.when !== null ? tx('BORRADA {h}', { h: hm(r.when) }) : tx('BORRADA');
+    if (r.status === 'moved') return tx('MOVIDA a {d}', { d: dayUi(r.movedTo) });
+    if (r.status === 'added') return r.when !== null ? tx('AÑADIDA {h}', { h: hm(r.when) }) : tx('AÑADIDA');
     const p = [];
-    if (r.real[0] || r.real[1]) p.push('hora real');
+    if (r.real[0] || r.real[1]) p.push(tx('hora real'));
     const di = r.chg[0] && r.plan[0] !== null ? r.fin[0] - r.plan[0] : null;
     const df = r.chg[1] && r.plan[1] !== null && r.plan[1] !== undefined && r.fin[1] !== null ? r.fin[1] - r.plan[1] : null;
-    if (di !== null && df !== null && di === df) p.push('movida ' + devTxt(di));          // se desplaza entera (retraso)
+    if (di !== null && df !== null && di === df) p.push(tx('movida {d}', { d: devUi(di) }));          // se desplaza entera (retraso)
     else {
-      if (di !== null) p.push('inicio ' + devTxt(di));
-      if (df !== null) p.push(df < 0 ? 'acaba ' + (-df) + ' min antes' : 'fin ' + devTxt(df));
+      if (di !== null) p.push(tx('inicio {d}', { d: devUi(di) }));
+      if (df !== null) p.push(df < 0 ? tx('acaba {m} min antes', { m: -df }) : tx('fin {d}', { d: devUi(df) }));
     }
     return p.join(' · ');
   }
+  const stageUi = s => s === 'sin zona' ? tx('sin zona') : s;
   function nameTxt(r) { return r.name + (r.newName ? ' → ' + r.newName : ''); }
-  function stageTxt(r) { return (r.stage || '') + (r.newStage ? ' → ' + r.newStage : ''); }
+  function stageTxt(r) { return stageUi(r.stage || '') + (r.newStage ? ' → ' + stageUi(r.newStage) : ''); }
   function rangeTxt(a, b, chg, mark) {
     if (a === null || a === undefined) return '';
     return hm(a) + (chg && chg[0] && mark ? mark : '') + (b !== null && b !== undefined ? '–' + hm(b) + (chg && chg[1] && mark ? mark : '') : '');
   }
-  function secTitle(s) { return fmtDay(s.jornada, true); }
-  function secNote(s) { return s.foto ? 'Previsto: el horario tal como estaba a las ' + hm(s.fotoAt) + ' (foto de la jornada)' : 'Previsto: el horario actual (esta jornada no tiene foto)'; }
+  function secTitle(s) { return dayUi(s.jornada, true); }
+  function secNote(s) { return s.foto ? tx('Previsto: el horario tal como estaba a las {h} (foto de la jornada)', { h: hm(s.fotoAt) }) : tx('Previsto: el horario actual (esta jornada no tiene foto)'); }
+  const TITLE = () => tx('REGISTRO DE EVENTOS · INFORME DE JORNADA');
 
   function toTxt(rep) {
     const L = [], pad = (s, n) => { s = String(s); return s.length >= n ? s.slice(0, n - 1) + ' ' : s + ' '.repeat(n - s.length); };
-    L.push('SHOWTIME · LOG DEL EVENTO', '='.repeat(72), 'Evento:    ' + rep.event, 'Jornada:   ' + (rep.day === 'all' ? 'Todo el evento' : fmtDay(rep.day, true)),
-      'Incluye:   ' + catsTxt(rep.cats), 'Generado:  ' + genTxt(rep.generated), '', 'Leyenda: * = hora distinta de la prevista · >> = incidencia', '');
-    if (!rep.sections.length) L.push('(Sin nada que mostrar con estos filtros)');
+    const lab = (k, n) => pad(tx(k), n || 11);
+    L.push('SHOWTIME · ' + TITLE(), '='.repeat(72), lab('Evento:') + rep.event, lab('Jornada:') + (rep.day === 'all' ? tx('Todo el evento') : dayUi(rep.day, true)),
+      lab('Incluye:') + catsTxt(rep.cats), lab('Generado:') + genTxt(rep.generated), '', tx('Leyenda: * = hora distinta de la prevista · >> = incidencia'), '');
+    if (!rep.sections.length) L.push(tx('(Sin nada que mostrar con estos filtros)'));
     rep.sections.forEach(s => {
       L.push('', '── ' + secTitle(s).toUpperCase() + ' ' + '─'.repeat(Math.max(3, 66 - secTitle(s).length)), secNote(s), '');
-      L.push(pad('HORA', 7) + pad('TIPO', 12) + pad('ENTRADA', 30) + pad('PREVISTO', 14) + pad('REAL', 15) + 'ESTADO');
+      L.push(pad(tx('HORA'), 7) + pad(tx('TIPO'), 12) + pad(tx('SUCESO / ACCIÓN') + ' · ' + tx('ESCENARIO'), 30) + pad(tx('PREVISTO'), 14) + pad(tx('REAL'), 15) + tx('ESTADO') + ' / ' + tx('USUARIO'));
       s.rows.forEach(r => {
-        if (r.r === 'inc') { L.push(pad(hm(r.t), 7) + '>> ' + TYPE_TXT[r.type].toUpperCase() + ': ' + r.text + ' (' + SRC_TXT[r.src] + ')'); return; }
+        if (r.r === 'inc') { L.push(pad(hm(r.t), 7) + '>> ' + typeTxt(r).toUpperCase() + ': ' + incTxt(r) + (r.stage ? ' · ' + stageUi(r.stage) : '') + ' (' + srcTxt(r.src) + ')'); return; }
         const nm = nameTxt(r) + (r.stage || r.newStage ? ' · ' + stageTxt(r) : '');
-        L.push(pad(hm(r.t), 7) + pad(KIND_TXT[r.k], 12) + pad(nm, 30) + pad(rangeTxt(r.plan[0], r.plan[1]), 14) + pad(r.status === 'deleted' || r.status === 'moved' ? '—' : rangeTxt(r.fin[0], r.fin[1], r.chg, '*'), 15) + stateTxt(r));
+        L.push(pad(hm(r.t), 7) + pad(kindTxt(r.k), 12) + pad(nm, 30) + pad(rangeTxt(r.plan[0], r.plan[1]), 14) + pad(r.status === 'deleted' || r.status === 'moved' ? '—' : rangeTxt(r.fin[0], r.fin[1], r.chg, '*'), 15) + stateTxt(r));
       });
       const st = s.stats;
-      L.push('', 'Resumen: ' + st.plan + ' previstas · ' + st.chg + ' con hora cambiada · ' + st.del + ' borradas o movidas · ' + st.add + ' añadidas · ' + st.inc + ' incidencias');
+      L.push('', tx('Resumen: {a} previstas · {b} con hora cambiada · {c} borradas o movidas · {d} añadidas · {e} incidencias', { a: st.plan, b: st.chg, c: st.del, d: st.add, e: st.inc }));
     });
     return L.join('\n') + '\n';
   }
 
   function toCsv(rep) {
     const q = v => { const s = String(v == null ? '' : v); return /[";\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
-    const out = [['Jornada', 'Hora', 'Fila', 'Tipo', 'Entrada / incidencia', 'Zona', 'Inicio previsto', 'Fin previsto', 'Inicio real', 'Fin real', 'Cambio de hora', 'Estado', 'Origen']];
+    const out = [['Jornada', 'Hora', 'Fila', 'Tipo', 'Suceso / acción', 'Escenario', 'Inicio previsto', 'Fin previsto', 'Inicio real', 'Fin real', 'Cambio de hora', 'Estado', 'Usuario'].map(h => tx(h))];
+    const yes = tx('sí');
     rep.sections.forEach(s => s.rows.forEach(r => {
-      if (r.r === 'inc') { out.push([s.jornada, hm(r.t), 'Incidencia', TYPE_TXT[r.type], r.text, '', '', '', '', '', r.amber ? 'sí' : '', '', SRC_TXT[r.src]]); return; }
+      if (r.r === 'inc') { out.push([s.jornada, hm(r.t), tx('Incidencia'), typeTxt(r), incTxt(r), stageUi(r.stage || ''), '', '', '', '', r.amber ? yes : '', '', srcTxt(r.src)]); return; }
       const gone = r.status === 'deleted' || r.status === 'moved';
-      out.push([s.jornada, hm(r.t), 'Horario', KIND_TXT[r.k], nameTxt(r), stageTxt(r), r.plan[0] !== null ? hm(r.plan[0]) : '', r.plan[1] !== null && r.plan[1] !== undefined ? hm(r.plan[1]) : '',
-        gone || r.fin[0] === null ? '' : hm(r.fin[0]), gone || r.fin[1] === null || r.fin[1] === undefined ? '' : hm(r.fin[1]), r.chg[0] || r.chg[1] ? 'sí' : '', stateTxt(r), '']);
+      out.push([s.jornada, hm(r.t), tx('Horario'), kindTxt(r.k), nameTxt(r), stageTxt(r), r.plan[0] !== null ? hm(r.plan[0]) : '', r.plan[1] !== null && r.plan[1] !== undefined ? hm(r.plan[1]) : '',
+        gone || r.fin[0] === null ? '' : hm(r.fin[0]), gone || r.fin[1] === null || r.fin[1] === undefined ? '' : hm(r.fin[1]), r.chg[0] || r.chg[1] ? yes : '', stateTxt(r), '']);
     }));
-    return '﻿' + out.map(r => r.map(q).join(';')).join('\r\n') + '\r\n';   // BOM y «;»: Excel y Numbers en español lo abren directo
+    return '\ufeff' + out.map(r => r.map(q).join(';')).join('\r\n') + '\r\n';   // BOM y «;»: Excel y Numbers en español lo abren directo
   }
 
   /** Página para imprimir / «Guardar como PDF» (sin librerías). */
@@ -275,37 +302,39 @@
     const kindCls = { show: 'k-show', sc: 'k-sc', tarea: 'k-tarea', hito: 'k-hito' };
     const t = (v, c) => '<span class="' + (c ? 'chg' : '') + '">' + hm(v) + '</span>';
     const rng = (a, b, ch) => a === null || a === undefined ? '<span class="mut">—</span>' : t(a, ch && ch[0]) + (b !== null && b !== undefined ? '<span class="mut">–</span>' + t(b, ch && ch[1]) : '');
+    const empty = '<p class="empty">' + esc(tx('Nada que mostrar con estos filtros.')) + '</p>';
     const secs = rep.sections.map(s => {
       const st = s.stats;
       const rows = s.rows.map(r => {
-        if (r.r === 'inc') return '<tr class="inc' + (r.amber ? ' hot' : '') + '"><td class="h">' + hm(r.t) + '</td><td colspan="5"><span class="tag">' + esc(TYPE_TXT[r.type]) + '</span> ' + esc(r.text) + '<span class="src">' + esc(SRC_TXT[r.src]) + '</span></td></tr>';
+        if (r.r === 'inc') return '<tr class="inc' + (r.amber ? ' hot' : '') + '"><td class="h">' + hm(r.t) + '</td><td colspan="5"><span class="tag">' + esc(typeTxt(r)) + '</span> ' + esc(incTxt(r)) +
+          (r.stage ? ' <small class="stg">· ' + esc(stageUi(r.stage)) + '</small>' : '') + '<span class="src">' + esc(srcTxt(r.src)) + '</span></td></tr>';
         const gone = r.status === 'deleted' || r.status === 'moved';
         const stt = stateTxt(r);
         const badge = r.status === 'deleted' || r.status === 'moved' ? '<span class="tag">' + esc(stt) + '</span>' : r.status === 'added' ? '<span class="tag">' + esc(stt) + '</span>' : esc(stt);
         return '<tr class="' + (gone ? 'gone' : '') + (r.status === 'added' ? ' added' : '') + (r.chg[0] || r.chg[1] ? ' moved' : '') + '"><td class="h">' + hm(r.t) + '</td>' +
-          '<td><span class="kind ' + kindCls[r.k] + '">' + esc(KIND_TXT[r.k]) + '</span></td>' +
-          '<td class="nm"><b>' + esc(r.name) + '</b>' + (r.newName ? ' <span class="chg">→ ' + esc(r.newName) + '</span>' : '') + (r.stage || r.newStage ? '<small>' + esc(r.stage || '') + (r.newStage ? ' <span class="chg">→ ' + esc(r.newStage) + '</span>' : '') + '</small>' : '') + '</td>' +
+          '<td><span class="kind ' + kindCls[r.k] + '">' + esc(kindTxt(r.k)) + '</span></td>' +
+          '<td class="nm"><b>' + esc(r.name) + '</b>' + (r.newName ? ' <span class="chg">→ ' + esc(r.newName) + '</span>' : '') + (r.stage || r.newStage ? '<small>' + esc(stageUi(r.stage || '')) + (r.newStage ? ' <span class="chg">→ ' + esc(stageUi(r.newStage)) + '</span>' : '') + '</small>' : '') + '</td>' +
           '<td class="tm">' + rng(r.plan[0], r.plan[1]) + '</td>' +
           '<td class="tm">' + (gone ? '<span class="mut">—</span>' : rng(r.fin[0], r.fin[1], r.chg)) + '</td>' +
           '<td class="st">' + badge + '</td></tr>';
       }).join('');
+      const pill = (k, n, hot) => '<span class="' + (hot ? 'hot' : '') + '">' + tx(k, { n: n }) + '</span>';
       return '<section><div class="sh"><h2>' + esc(secTitle(s)) + '</h2><p class="note">' + esc(secNote(s)) + '</p>' +
-        '<div class="stats"><span><b>' + st.plan + '</b> previstas</span><span class="' + (st.chg ? 'hot' : '') + '"><b>' + st.chg + '</b> con hora cambiada</span><span class="' + (st.del ? 'hot' : '') + '"><b>' + st.del + '</b> borradas o movidas</span><span class="' + (st.add ? 'hot' : '') + '"><b>' + st.add + '</b> añadidas</span><span class="' + (st.inc ? 'hot' : '') + '"><b>' + st.inc + '</b> incidencias</span></div></div>' +
-        (s.rows.length ? '<table><colgroup><col class="c-h"><col class="c-k"><col><col class="c-t"><col class="c-t"><col class="c-s"></colgroup><thead><tr><th>Hora</th><th>Tipo</th><th>Entrada · zona</th><th>Previsto</th><th>Real</th><th>Estado</th></tr></thead><tbody>' + rows + '</tbody></table>'
-          : '<p class="empty">Nada que mostrar con estos filtros.</p>') + '</section>';
+        '<div class="stats">' + pill('<b>{n}</b> previstas', st.plan) + pill('<b>{n}</b> con hora cambiada', st.chg, st.chg) + pill('<b>{n}</b> borradas o movidas', st.del, st.del) + pill('<b>{n}</b> añadidas', st.add, st.add) + pill('<b>{n}</b> incidencias', st.inc, st.inc) + '</div></div>' +
+        (s.rows.length ? '<table><colgroup><col class="c-h"><col class="c-k"><col><col class="c-t"><col class="c-t"><col class="c-s"></colgroup><thead><tr><th>' + esc(tx('Hora')) + '</th><th>' + esc(tx('Tipo')) + '</th><th>' + esc(tx('Suceso / acción · escenario')) + '</th><th>' + esc(tx('Previsto')) + '</th><th>' + esc(tx('Real')) + '</th><th>' + esc(tx('Estado')) + ' / ' + esc(tx('Usuario')) + '</th></tr></thead><tbody>' + rows + '</tbody></table>'
+          : empty) + '</section>';
     }).join('');
-    const title = 'Log · ' + rep.event + ' · ' + (rep.day === 'all' ? 'todo el evento' : fmtDay(rep.day));
-    return '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' + esc(title) + '</title><style>' + PRINT_CSS + '</style></head><body>' +
-      '<div class="bar"><span>Vista para imprimir · en el diálogo, elige <b>Guardar como PDF</b></span><button onclick="window.print()">Imprimir / Guardar PDF</button></div>' +
-      '<main><header><div class="brand">SHOWTIME · LOG DEL EVENTO</div><h1>' + esc(rep.event) + '</h1>' +
-      '<dl><div><dt>Jornada</dt><dd>' + esc(rep.day === 'all' ? 'Todo el evento' : fmtDay(rep.day, true)) + '</dd></div><div><dt>Incluye</dt><dd>' + esc(catsTxt(rep.cats)) + '</dd></div><div><dt>Generado</dt><dd>' + esc(genTxt(rep.generated)) + '</dd></div></dl>' +
-      '<p class="legend"><span class="sw chgsw">21:04</span> hora distinta de la prevista (con barra lateral) <span class="sw incsw"></span> incidencia (hora en que pasó) <span class="sw gonesw">Banda</span> borrada o movida</p></header>' +
-      (secs || '<p class="empty">Nada que mostrar con estos filtros.</p>') + '</main></body></html>';
+    const title = tx('Registro · {e} · {d}', { e: rep.event, d: rep.day === 'all' ? tx('todo el evento') : dayUi(rep.day) });
+    return '<!DOCTYPE html><html lang="' + (isEn() ? 'en' : 'es') + '"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' + esc(title) + '</title><style>' + printCss() + '</style></head><body>' +
+      '<div class="bar"><span>' + tx('Vista para imprimir · en el diálogo, elige <b>Guardar como PDF</b>') + '</span><button onclick="window.print()">' + esc(tx('Imprimir / Guardar PDF')) + '</button></div>' +
+      '<main><header><div class="brand">SHOWTIME · ' + esc(TITLE()) + '</div><h1>' + esc(rep.event) + '</h1>' +
+      '<dl><div><dt>' + esc(tx('Jornada')) + '</dt><dd>' + esc(rep.day === 'all' ? tx('Todo el evento') : dayUi(rep.day, true)) + '</dd></div><div><dt>' + esc(tx('Incluye')) + '</dt><dd>' + esc(catsTxt(rep.cats)) + '</dd></div><div><dt>' + esc(tx('Generado')) + '</dt><dd>' + esc(genTxt(rep.generated)) + '</dd></div></dl>' +
+      '<p class="legend"><span class="sw chgsw">21:04</span> ' + esc(tx('hora distinta de la prevista (con barra lateral)')) + ' <span class="sw incsw"></span> ' + esc(tx('incidencia (hora en que pasó)')) + ' <span class="sw gonesw">Banda</span> ' + esc(tx('borrada o movida')) + '</p></header>' +
+      (secs || empty) + '</main></body></html>';
   }
-
   const PRINT_CSS = [
     '@page{size:A4;margin:14mm 12mm 16mm}',
-    '@page{@bottom-left{content:"Showtime · Log del evento";font:7.5pt -apple-system,Helvetica,Arial,sans-serif;color:#9ca3af}@bottom-right{content:counter(page) " / " counter(pages);font:7.5pt -apple-system,Helvetica,Arial,sans-serif;color:#9ca3af}}',
+    '@page{@bottom-left{content:"Showtime · @@FOOT@@";font:7.5pt -apple-system,Helvetica,Arial,sans-serif;color:#9ca3af}@bottom-right{content:counter(page) " / " counter(pages);font:7.5pt -apple-system,Helvetica,Arial,sans-serif;color:#9ca3af}}',
     ':root{--ink:#14161b;--mut:#6b7280;--line:#e6e8ec;--soft:#f6f7f9;--amb:#b45309;--ambln:#f59e0b;--ambbg:#fff7eb;--sc:#7c3aed;--tarea:#2563eb}',
     '*{box-sizing:border-box}html,body{margin:0;background:#fff}',
     'body{font:9.4pt/1.38 -apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,Arial,sans-serif;color:var(--ink);-webkit-print-color-adjust:exact;print-color-adjust:exact}',
@@ -334,13 +363,15 @@
     'td.st{font-size:8pt;color:var(--mut)}tr.moved td.st{color:var(--amb)}',
     'tr.moved td.h{box-shadow:inset 3px 0 0 var(--amb);color:var(--amb)}',
     'tr.gone td{color:#9ca3af}tr.gone td.nm b{text-decoration:line-through}tr.gone .kind{color:#9ca3af}',
-    'tr.added td.nm b::after{content:" (nueva)";font-weight:400;color:var(--amb)}',
+    'tr.added td.nm b::after{content:" @@NEW@@";font-weight:400;color:var(--amb)}',
     '.tag{display:inline-block;font-size:6.8pt;font-weight:800;letter-spacing:.07em;text-transform:uppercase;padding:1px 5px;border-radius:3px;border:1px solid currentColor;color:var(--amb);margin-right:4px;vertical-align:1px;white-space:nowrap}',
     'tr.inc td{background:var(--ambbg);border-bottom-color:#fde7c7}tr.inc td.h{border-left:3px solid var(--ambln);color:var(--amb)}',
     'tr.inc.hot td:last-child{font-weight:650}',
     '.src{float:right;margin-left:10px;font-size:7.5pt;color:var(--mut)}',
     '.empty{color:var(--mut);font-style:italic;padding:10px 0}'
   ].join('\n');
+  /** La hoja de estilos con el pie y la marca «(nueva)» en el idioma activo. */
+  const printCss = () => PRINT_CSS.replace('@@FOOT@@', tx('Registro de eventos · Informe de jornada').replace(/"/g, '')).replace('@@NEW@@', tx('(nueva)').replace(/"/g, ''));
 
   const API = { VERSION, SRC_TXT, KIND_TXT, TYPE_TXT, CATS, CAT_TXT, eventKey, empty, norm, fotoOf, ensureFoto, record, diff, commit, reportDays, report, toTxt, toCsv, toHtml, fmtDay };
   if (isNode) module.exports = API;

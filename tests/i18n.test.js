@@ -148,6 +148,21 @@
     ok(/EN HORA · SIN INCIDENCIAS/.test(txt()), 'vuelve al español');
   });
 
+  test('txBack: los apuntes del Registro de eventos (guardados en español) se leen en inglés; el texto de la gente no se toca', () => {
+    const B = s => I.txBack(s, 'en');
+    eq(I.txBack('▶ Show «OMEGA» empieza 21:45 · +5 min', 'es'), '▶ Show «OMEGA» empieza 21:45 · +5 min', 'en español, intacto');
+    eq(B('▶ Show «OMEGA» empieza 21:45 · +5 min'), '▶ Show “OMEGA” starts 21:45 · +5 min');
+    eq(B('■ Show «OMEGA» termina 23:30 · acaba 10 min antes'), '■ Show “OMEGA” ends 23:30 · ends 10 min early');
+    eq(B('Reconciliación: Zona Escenario 1 vuelve a EN HORA (absorbidos +10 min en changeover) · Stage Manager'), 'Reconciliation: Stage Escenario 1 back to ON TIME (+10 min absorbed in changeover) · Stage Manager');
+    eq(B('Retraso +15 min (Escenario Principal): 3 entradas movidas'), 'Manual delay: +15 min on Escenario Principal: 3 entries moved');
+    eq(B('CALL OK · OMEGA · Producción (Marta)'), 'CALL confirmed · OMEGA · Production (Marta)');
+    eq(B('OMEGA: TIEMPO EXTRA · puede gastar el colchón del cambio; pasado, retrasa lo que viene de su zona hasta ■'), 'OMEGA: EXTRA TIME enabled · may use the changeover buffer; beyond it, delays what follows on its stage until ■');
+    eq(B('Aviso (previsión): Viento medio 45 km/h ahora · umbral 40'), 'Weather alert (forecast): Mean wind 45 km/h now · threshold 40');
+    eq(B('«Comida · en 5 min, ya» → Todas las pantallas'), '“Comida · en 5 min, ya” → All screens', 'mensaje: su texto, tal cual');
+    eq(B('«Banda B»: nombre «Banda B» → «Banda Beta» · zona Carpa → sin zona'), '“Banda B”: name “Banda B” → “Banda Beta” · stage Carpa → no stage');
+    eq(B('Algo que no conoce nadie'), 'Algo que no conoce nadie', 'lo desconocido se queda como está');
+  });
+
   let fail = 0;
   if (!NT) for (const [name, fn] of tests) {
     try { fn(); console.log('  ✓ ' + name); }
