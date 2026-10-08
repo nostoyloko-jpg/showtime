@@ -132,7 +132,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%}
 #close{position:fixed;top:14px;right:14px;z-index:100;opacity:.55}
 #close:hover{opacity:1}
 #close[hidden]{display:none}
-#zoomctl{position:fixed;right:14px;bottom:14px;z-index:200;display:flex;align-items:center;gap:6px;background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.15);border-radius:9px;padding:5px 8px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+#zoomctl{position:fixed;right:14px;bottom:14px;z-index:200;display:flex;align-items:center;gap:6px;background:rgba(10,11,14,.72);border:1px solid rgba(255,255,255,.15);border-radius:9px;padding:5px 8px;backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%)}
 #zlbl{font-size:11px;color:rgba(255,255,255,.75);min-width:52px;text-align:center}
 #offlbl{font-size:11px;color:var(--call);text-align:center;font-weight:700}
 #offlbl:empty{display:none}
@@ -363,7 +363,7 @@ body:not([data-vista="manager"]) .mtpill{display:none}
 .cf-kind.sc{color:#c9b6ff}
 
 /* Producción: menú de mensajes a la izquierda (mismo comportamiento que el de la derecha) */
-.mdock{position:fixed;left:14px;bottom:14px;z-index:200;display:flex;flex-direction:column-reverse;align-items:flex-start;gap:6px;background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.15);border-radius:9px;padding:4px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);opacity:.55;transition:opacity .2s}
+.mdock{position:fixed;left:14px;bottom:14px;z-index:200;display:flex;flex-direction:column-reverse;align-items:flex-start;gap:6px;background:rgba(10,11,14,.72);border:1px solid rgba(255,255,255,.15);border-radius:9px;padding:4px;backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);opacity:.55;transition:opacity .2s}
 .mdock[hidden]{display:none}
 .mdock:hover,.mdock.open{opacity:1}
 #mdbody{display:none;flex-direction:column;gap:8px;padding:4px 6px 6px;width:min(340px,80vw)}
@@ -392,7 +392,7 @@ body:not([data-vista="manager"]) .mtpill{display:none}
 .pm-opts small{font-size:12px;color:rgba(255,255,255,.6)}
 .pm-no{align-self:flex-end}
 /* Producción: chat (encima del menú de mensajes) */
-.cdock{position:fixed;left:14px;bottom:66px;z-index:205;display:flex;flex-direction:column-reverse;align-items:flex-start;gap:6px;background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.15);border-radius:9px;padding:4px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);opacity:.55;transition:opacity .2s}
+.cdock{position:fixed;left:14px;bottom:66px;z-index:205;display:flex;flex-direction:column-reverse;align-items:flex-start;gap:6px;background:rgba(10,11,14,.72);border:1px solid rgba(255,255,255,.15);border-radius:9px;padding:4px;backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);opacity:.55;transition:opacity .2s}
 .cdock[hidden]{display:none}
 .cdock:hover,.cdock.open{opacity:1}
 #cdbtn{position:relative;border-color:transparent;background:transparent}

@@ -802,6 +802,19 @@
     ['show', 'sc', 'tarea', 'hito'].forEach(k => ok(new RegExp('\\.tpill\\.tp-' + k + '\\{--pc:#[0-9a-f]{6}\\}').test(css), k + ': color fijo'));
   });
 
+  test('Safari: cristal esmerilado de verdad en menús, Configuración y avisos (desenfoque literal, velo denso, opaco si no hay desenfoque)', () => {
+    const css = D.src('control.css'), tail = css.slice(css.indexOf('/* ── Cristal esmerilado'));
+    ok(css.indexOf('/* ── Cristal esmerilado') > css.indexOf('/* ── Cristal: UNA'), 'va después del cristal');
+    ok(/\.mpanel,\.cfg,\.toast,\.qr-big-box,\.cfg-h,\.morep\{-webkit-backdrop-filter:blur\(24px\) saturate\(160%\);backdrop-filter:blur\(24px\) saturate\(160%\)\}/.test(tail), 'sin var(): Safari lo aplica');
+    const alpha = re => +re.exec(css)[1];
+    ok(alpha(/:root\{--glass-bg:rgba\(\d+,\d+,\d+,(\.\d+)\)/) >= 0.7, 'velo denso (clásico)');
+    ok(alpha(/body\[data-ps="raycast"\]\{--glass-bg:rgba\(\d+,\d+,\d+,(\.\d+)\)\}/) >= 0.7 && alpha(/body\[data-ps="neutro"\]\{--glass-bg:rgba\(\d+,\d+,\d+,(\.\d+)\)\}/) >= 0.7);
+    ok(/body\[data-ps="escenario"\]\{--glass-bg:#000;/.test(css), 'escenario: negro');
+    ok(/@supports not \(\(-webkit-backdrop-filter:blur\(1px\)\) or \(backdrop-filter:blur\(1px\)\)\)\{\s*\.mpanel,\.cfg,\.toast,\.qr-big-box,\.cfg-h,\.morep\{background-color:#[0-9a-f]{6}\}/.test(tail), 'sin desenfoque: opaco');
+    const live = D.src('live.css');
+    ['#zoomctl{', '.mdock{', '.cdock{'].forEach(sel => { const b = live.slice(live.indexOf(sel), live.indexOf('}', live.indexOf(sel))); ok(/background:rgba\(10,11,14,\.72\)/.test(b) && /-webkit-backdrop-filter:blur\(20px\) saturate\(160%\)/.test(b), 'Live ' + sel); });
+  });
+
   test('Imágenes (foto del cartel, captura): sin OCR — se abre «Pegar horario» con el truco de Texto en Vivo', () => {
     const IMG = '💡 Para fotos y capturas: Selecciona el texto sobre la imagen con el ratón o el dedo (Texto en Vivo de Mac/iOS/Android), pulsa ⌘C y pégalo aquí con ⌘V.';
     const F = (name, type) => new File(['x'], name, { type: type || '' });
