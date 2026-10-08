@@ -135,13 +135,26 @@
     return { ok: true, state: r.state, logTxt, absorbed: was, msg: b.name + ': en hora, empieza ' + C.fmtHM(b.pmi) + (b.si !== b.pmi ? ' (estaba estimada a las ' + C.fmtHM(b.si) + ')' : '') + effectTxt(zoneEffect(before, after, nb)) };
   }
 
-  /** Ventana del bis: hasta que la siguiente banda de su zona dé ▶ y como mucho 15 min (o el colchón del cambio, si es mayor). */
-  const BIS_MIN = 15;
-  function bisWindow(state, b, now) {
+  /** Bis (shows) / Extender prueba (soundchecks): rescatar una banda que ya acabó, con Tiempo extra tardío.
+   *  Ventana = min(ajuste del regidor, cambio real hasta la siguiente banda de su zona).
+   *  Ajuste: CONFIG.bisWindow = 5 · 10 · 15 min (por defecto 10). Cambio real = inicio ESTIMADO de la siguiente − fin de esta.
+   *  Si la siguiente ya dio ▶, se acabó. Tareas e hitos: nunca. */
+  const BIS_OPTS = [5, 10, 15], BIS_DEFAULT = 10;
+  function bisMinutes(cfg) { const v = Number(cfg && cfg.bisWindow); return BIS_OPTS.indexOf(v) >= 0 ? v : BIS_DEFAULT; }
+  function bisWindow(state, b, now, cfg) {
     const list = allBlocks(state, now).filter(x => C.isBand(x) && x.psi !== null && x.jornada === b.jornada && (x.stageId || '') === (b.stageId || '') && x.pmi > b.pmi).sort((x, y) => x.pmi - y.pmi);
-    const next = list[0] || null;
-    const gap = next && next.psi !== null && b.psf !== null ? next.psi - b.psf : 0;
-    return { next, max: Math.max(BIS_MIN, gap) };
+    const next = list[0] || null, cap = bisMinutes(cfg);
+    const end = b.nf !== null && b.nf !== undefined ? b.nf : b.psf;
+    const gap = next && next.si !== null && end !== null && end !== undefined ? Math.max(0, Math.floor(next.si - end)) : null;
+    return { next, cap, gap, max: gap === null ? cap : Math.min(cap, gap) };
+  }
+  /** ¿Se puede rescatar ahora? → { ok, kind:'show'|'sc', late, left, max, reason: 'next' (la siguiente ya dio ▶) | 'expired' | 'no' } */
+  function bisState(state, b, now, cfg) {
+    if (!b || !C.isBand(b) || b.rf !== null || b.alargar || b.nf === null || b.nf === undefined || !(now >= b.nf)) return { ok: false, reason: 'no' };
+    const w = bisWindow(state, b, now, cfg), late = Math.floor(now - b.nf), kind = b.kind === 'sc' ? 'sc' : 'show';
+    if (w.next && w.next.ri !== null) return { ok: false, reason: 'next', kind, late, max: w.max, next: w.next };
+    if (late > w.max) return { ok: false, reason: 'expired', kind, late, max: w.max };
+    return { ok: true, kind, late, max: w.max, left: w.max - late, next: w.next };
   }
 
   /** Corregir la hora REAL de inicio (solo desde el Dashboard): p. ej. no se pudo pulsar ▶ a tiempo y se dio por empezada a su hora.
@@ -167,23 +180,24 @@
   }
 
   /** Alargar: la banda puede gastar el colchón del cambio; pasado, cada minuto suma al estimado de su zona hasta ■. */
-  function stretchPlan(state, key, on, abs) {
+  function stretchPlan(state, key, on, abs, cfg) {
     const now = Number.isFinite(abs) ? Math.floor(abs) : Math.floor(C.nowAbs());
     const b = findBlock(state, key, now);
     if (!b) return { ok: false, error: 'Esa entrada ya no está en el horario' };
     if (!C.isBand(b)) return { ok: false, error: 'Solo los shows y soundchecks tienen Tiempo extra' };
     if (on && b.rf !== null) return { ok: false, error: b.name + ' ya ha terminado' };
-    // Bis: pasada su hora (ya en cambio de escenario) se puede rescatar, pero solo dentro de la ventana y si la siguiente no ha dado ▶
+    // Bis / Extender prueba: pasada su hora se puede rescatar, solo dentro de la ventana y si la siguiente no ha dado ▶
     let late = null;
+    const sc = b.kind === 'sc', what = sc ? 'la prueba de ' + b.name + ' ya no se puede extender' : 'el bis de ' + b.name + ' ya no se puede rescatar';
     if (on && !b.alargar && b.nf !== null && b.nf !== undefined && now >= b.nf) {
-      const w = bisWindow(state, b, now);
-      if (w.next && w.next.ri !== null) return { ok: false, error: w.next.name + ' ya ha empezado (▶ ' + C.fmtHM(w.next.ri) + '): el bis de ' + b.name + ' ya no se puede rescatar' };
+      const w = bisWindow(state, b, now, cfg);
+      if (w.next && w.next.ri !== null) return { ok: false, error: w.next.name + ' ya ha empezado (▶ ' + C.fmtHM(w.next.ri) + '): ' + what };
       late = Math.floor(now - b.nf);
-      if (late > w.max) return { ok: false, error: 'Han pasado ' + late + ' min desde el fin de ' + b.name + ' (' + C.fmtHM(b.nf) + '): el bis solo se puede rescatar en los primeros ' + w.max + ' min' };
+      if (late > w.max) return { ok: false, error: 'Han pasado ' + late + ' min desde el fin de ' + b.name + ' (' + C.fmtHM(b.nf) + '): ' + what + ' (ventana de ' + w.max + ' min' + (w.gap !== null && w.gap < w.cap ? ', lo que dura el cambio' : '') + ')' };
     }
     const r = C.setAlargar(state, b.id, b.kind === 'sc' ? 'sc' : 'show', !!on); if (!r.ok) return { ok: false, error: r.error };
     if (!r.changed) return { ok: false, error: b.name + (on ? ' ya tiene Tiempo extra' : ' no tenía Tiempo extra') };
-    if (late !== null) return { ok: true, state: r.state, late, msg: 'BIS · ' + b.name + ': Tiempo extra tardío a las ' + C.fmtHM(now) + ' (+' + late + ' min desde su fin, ' + C.fmtHM(b.nf) + '). Vuelve a estar en escena; gasta el colchón y, pasado, retrasa lo que viene de su zona hasta ■' };
+    if (late !== null) return { ok: true, state: r.state, late, kind: sc ? 'sc' : 'show', msg: (sc ? 'EXTENDER PRUEBA · ' : 'BIS · ') + b.name + ': Tiempo extra tardío a las ' + C.fmtHM(now) + ' (+' + late + ' min desde su fin, ' + C.fmtHM(b.nf) + '). Vuelve a estar en escena; gasta el colchón y, pasado, retrasa lo que viene de su zona hasta ■' };
     return { ok: true, state: r.state, msg: b.name + (on ? ': TIEMPO EXTRA · puede gastar el colchón del cambio; pasado, retrasa lo que viene de su zona hasta ■' : ': Tiempo extra desactivado') };
   }
 
@@ -251,7 +265,7 @@
     return { cls: 'ok', text: nm + ' · En hora', title: 'Sin retraso acumulado ni desfase en vivo' };
   }
 
-  const API = { withBlk, OPS, delayPill, isBlocked, targets, suggest, actionsFor, startedBySchedule, findBlock, realPlan, onTimePlan, stretchPlan, editStartPlan, bisWindow, BIS_MIN, delayPlan, delayStamp, checkCmd, };
+  const API = { withBlk, OPS, delayPill, isBlocked, targets, suggest, actionsFor, startedBySchedule, findBlock, realPlan, onTimePlan, stretchPlan, editStartPlan, bisWindow, bisState, bisMinutes, BIS_OPTS, BIS_DEFAULT, delayPlan, delayStamp, checkCmd, };
   if (isNode) module.exports = API;
   else root.ShowtimeMando = API;
 })(typeof window !== 'undefined' ? window : globalThis);

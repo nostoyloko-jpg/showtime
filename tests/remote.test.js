@@ -136,11 +136,38 @@
     // la propuesta es «Entra»: se elige «Acaba» (la anterior)
     if (t.Rm.current().band.name !== 'Acaba') t.env.fire('prev', 'click', {});
     eq(t.Rm.current().band.name, 'Acaba');
-    click(t, '#b-stretch', { dataset: { on: '1' }, disabled: false });
+    ok(/id="b-bis"[^>]*data-kind="show"/.test(t.env.getEl('band').innerHTML) && /Bis · Acaba/.test(t.env.getEl('band').innerHTML), 'botón «Bis · Acaba»');
+    ok(/5 min/.test(t.env.getEl('band').innerHTML), 'quedan 5 de los 10 min de la ventana');
+    click(t, '#b-bis', { dataset: { kind: 'show' }, disabled: false });
     ok(/^Bis · Acaba/.test(t.env.getEl('sh-t').textContent), 'confirma el bis: ' + t.env.getEl('sh-t').textContent);
     eq(t.sent.length, 0);
     t.env.fire('sh-yes', 'click', {}); await tick(); await tick();
     eq(t.sent[0].op, 'stretch'); eq(t.sent[0].args.on, true);
+  });
+  test('Extender prueba desde el mando (soundcheck); con la siguiente ya en ▶, desactivado; pasada la ventana, nada', async () => {
+    const n = Math.floor(C.nowAbs(new Date(NOW)));
+    let s = fest((add, P) => { add('Entra', P, 15, 75); });
+    const P = s.escenarios[0].id;
+    const r = C.addArtist(s, 'sc', { jornada: '2026-07-10', nombre: 'Prueba Omega', modo: 'sc', escenarioId: P, inicio: hm(n - 40), fin: hm(n - 3) }); ok(r.ok, r.error); s = r.state;
+    const t = await mando({ fest: s });
+    if (t.Rm.current().band.name !== 'Prueba Omega') t.env.fire('prev', 'click', {});
+    eq(t.Rm.current().band.name, 'Prueba Omega');
+    ok(/data-kind="sc"/.test(t.env.getEl('band').innerHTML) && /Extender prueba · Prueba Omega/.test(t.env.getEl('band').innerHTML), 'botón «Extender prueba»: ' + t.env.getEl('band').innerHTML.slice(-300));
+    // La siguiente da ▶: el botón sigue a la vista pero desactivado
+    const e = C.buildBlocks(s, { mode: 'all', day: 'all' }).find(b => b.name === 'Entra');
+    const s2 = C.setReal(s, e.id, 'show', 'i', n - 1).state;
+    t.Dt.loadSnapshot({ festival: s2, config: {}, callDone: [], flash: null, avisos: [] });
+    if (t.Rm.current().band.name !== 'Prueba Omega') t.env.fire('prev', 'click', {});
+    ok(/id="b-bis"[^>]*disabled/.test(t.env.getEl('band').innerHTML) && /Entra ya ha empezado/.test(t.env.getEl('band').innerHTML), 'desactivado: ' + t.env.getEl('band').innerHTML.slice(-300));
+    // Con ventana de 5 min (ajuste del Panel) y la prueba acabada hace 8: ni bis ni Tiempo extra
+    const base3 = fest((add, P2) => { add('Entra', P2, 15, 75); });
+    const s3 = C.addArtist(base3, 'sc', { jornada: '2026-07-10', nombre: 'Prueba Vieja', modo: 'sc', escenarioId: base3.escenarios[0].id, inicio: hm(n - 40), fin: hm(n - 8) });
+    ok(s3.ok, s3.error);
+    const t3 = await mando({ fest: s3.state });
+    t3.Dt.loadSnapshot({ festival: s3.state, config: { bisWindow: 5 }, callDone: [], flash: null, avisos: [] });
+    if (t3.Rm.current().band.name !== 'Prueba Vieja') t3.env.fire('prev', 'click', {});
+    eq(t3.Rm.current().band.name, 'Prueba Vieja');
+    ok(!/b-bis|b-stretch/.test(t3.env.getEl('band').innerHTML), 'pasada la ventana, sin botón');
   });
   test('OK de CALL y Retirar mensaje', async () => {
     const t = await mando();

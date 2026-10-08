@@ -12,6 +12,7 @@
   const pad2 = n => (n < 10 ? '0' : '') + n;
   const ZKEY = 'showtime.remote.zone';
   const KIND = { show: 'SHOW', sc: 'SOUNDCHECK' };
+  const i18t = (k, v) => window.ShowtimeI18n ? window.ShowtimeI18n.t(k, v) : k;   // texto en el idioma activo (lo manda el Panel)
 
   let FEST = null, CONFIG = null, ST = null, BUSY = false;
   let ZONE = (() => { try { return JSON.parse(localStorage.getItem(ZKEY)); } catch (e) { return null; } })();
@@ -99,8 +100,20 @@
       const est = b.si !== b.psi || b.sf !== b.psf || b.ri !== null || b.rf !== null;
       const real = est ? '<div class="breal ' + (b.clash ? 'clash' : 'late') + '">' + (b.ri !== null || b.rf !== null ? 'Real ' : 'Estimado ') + C.fmtHM(b.si) + (b.sf !== null ? '–' + C.fmtHM(b.sf) : '') +
         (b.si !== b.psi ? ' · ' + deltaTxt(b.si - b.psi) + ' min' : '') + (b.clash ? ' · pisada por ' + esc(b.clashWith) : '') + '</div>' : '';
-      const alg = b.rf === null ? '<button class="tbtn stretch' + (b.alargar ? ' on' : '') + '" id="b-stretch" data-on="' + (b.alargar ? '0' : '1') + '"' + (live() && !BUSY ? '' : ' disabled') + '><svg class="ic"><use href="#i-stretch"/></svg>' +
-        (b.alargar ? 'TIEMPO EXTRA · ACTIVADO' : 'TIEMPO EXTRA') + '</button>' : '';
+      // Acabada a su hora (sin ■ ni Tiempo extra): Bis (show) / Extender prueba (soundcheck) dentro de la ventana; si la
+      // siguiente ya dio ▶, desactivado; pasada la ventana, nada. Si no ha acabado: TIEMPO EXTRA de siempre.
+      const bs = FEST ? M.bisState(FEST, b, Math.floor(n), CONFIG) : { ok: false, reason: 'no' };
+      const ended = b.rf === null && !b.alargar && b.nf !== null && b.nf !== undefined && n >= b.nf;
+      let alg = '';
+      if (ended && (bs.ok || bs.reason === 'next')) {
+        const label = i18t(bs.kind === 'sc' ? 'bis.sc' : 'bis.show', { name: b.name });
+        const sub = bs.ok ? i18t('bis.min', { n: bs.left }) : i18t('bis.next', { next: bs.next ? bs.next.name : '' });
+        alg = '<button class="tbtn stretch bis" id="b-bis" data-kind="' + bs.kind + '"' + (bs.ok && live() && !BUSY ? '' : ' disabled') + '><svg class="ic"><use href="#i-undo"/></svg>' +
+          esc(label) + ' <small>' + esc(sub) + '</small></button>';
+      } else if (b.rf === null && !ended) {
+        alg = '<button class="tbtn stretch' + (b.alargar ? ' on' : '') + '" id="b-stretch" data-on="' + (b.alargar ? '0' : '1') + '"' + (live() && !BUSY ? '' : ' disabled') + '><svg class="ic"><use href="#i-stretch"/></svg>' +
+          (b.alargar ? 'TIEMPO EXTRA · ACTIVADO' : 'TIEMPO EXTRA') + '</button>';
+      }
       bh = '<div class="bpos">' + (SEL ? 'ELEGIDA' : 'PROPUESTA') + ' · ' + (i + 1) + ' de ' + cur.list.length + (SEL ? ' · <button class="link" id="b-auto">volver a la propuesta</button>' : '') + '</div>'
         + '<div class="bkind">' + (KIND[b.kind] || '') + '</div><div class="bname" style="--bc:' + esc(b.color || '#888') + '">' + esc(b.name) + '</div>'
         + '<div class="btime">Previsto ' + C.fmtHM(b.psi) + (b.psf !== null ? '–' + C.fmtHM(b.psf) : '') + '</div>' + real + st + alg;
@@ -169,13 +182,18 @@
     });
   });
   document.addEventListener('click', e => {
+    const bb = e.target.closest('#b-bis');
+    if (bb && !bb.disabled) {   // Bis / Extender prueba: se confirma antes, con lo que va a pasar (mismas reglas que el Mac)
+      const b = selBand(); if (!b || !FEST) return;
+      const p = M.stretchPlan(FEST, b.key, true, Math.floor(now()), CONFIG), sc = bb.dataset.kind === 'sc';
+      if (!p.ok) { openSheet({ title: i18t(sc ? 'bis.sc' : 'bis.show', { name: b.name }), body: () => '<p class="big">' + esc(p.error) + '</p>', can: () => false, run: () => null }); return; }
+      openSheet({ title: i18t(sc ? 'bis.sc' : 'bis.show', { name: b.name }), body: () => '<p class="big">' + esc(p.msg) + '</p>', yes: i18t(sc ? 'bis.yesSc' : 'bis.yesShow'), run: () => send('stretch', { key: b.key, on: true }) });
+      return;
+    }
     const sg = e.target.closest('#b-stretch');
     if (sg && !sg.disabled) {
       const b = selBand(); if (!b) return;
-      const on = sg.dataset.on === '1', p = on && FEST ? M.stretchPlan(FEST, b.key, true, Math.floor(now())) : null;
-      if (p && p.ok && p.late !== null && p.late !== undefined) {   // bis: pasada su hora, se confirma antes
-        openSheet({ title: 'Bis · ' + b.name, body: () => '<p class="big">' + esc(p.msg) + '</p>', yes: 'Rescatar', run: () => send('stretch', { key: b.key, on: true }) });
-      } else send('stretch', { key: b.key, on });
+      send('stretch', { key: b.key, on: sg.dataset.on === '1' });
       return;
     }
     const ck = e.target.closest('.callok'); if (ck && !ck.disabled) { send('callOk', { key: ck.dataset.ck }); return; }

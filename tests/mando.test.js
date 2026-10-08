@@ -416,22 +416,48 @@
     ok(!r.ok && /anterior al inicio real.*cambio de hora/i.test(r.error), r.error);
   });
 
-  test('Bis: Tiempo extra pasada su hora, dentro de la ventana (máx(15, colchón)), si la siguiente no dio ▶', async () => {
-    const F = fest(), k = key(F.s, 'Banda A');
-    eq(M.bisWindow(F.s, blk(F.s, 'Banda A'), at('21:40')).max, 30, 'colchón de 30 (21:30 → 22:00) > 15');
+  test('Bis: Tiempo extra pasada su hora; ventana = min(ajuste, cambio real), 10 min por defecto; si la siguiente dio ▶, no', async () => {
+    const F = fest(), k = key(F.s, 'Banda A'), bA = blk(F.s, 'Banda A');
+    const w = M.bisWindow(F.s, bA, at('21:35'));
+    eq(w.cap, 10, 'por defecto, 10 min'); eq(w.gap, 30, 'cambio real 21:30 → 22:00'); eq(w.max, 10, 'min(10, 30)');
+    eq(M.bisWindow(F.s, bA, at('21:35'), { bisWindow: 5 }).max, 5, 'ajuste 5');
+    eq(M.bisWindow(F.s, bA, at('21:35'), { bisWindow: 15 }).max, 15, 'ajuste 15');
+    eq(M.bisWindow(F.s, bA, at('21:35'), { bisWindow: 99 }).max, 10, 'valor raro → 10');
     const r = M.stretchPlan(F.s, k, true, at('21:40'));
-    ok(r.ok, r.error); eq(r.late, 10); ok(/^BIS · Banda A: Tiempo extra tardío a las 21:40 \(\+10 min desde su fin, 21:30\)/.test(r.msg), r.msg);
+    ok(r.ok, r.error); eq(r.late, 10); eq(r.kind, 'show'); ok(/^BIS · Banda A: Tiempo extra tardío a las 21:40 \(\+10 min desde su fin, 21:30\)/.test(r.msg), r.msg);
     ok(blk(r.state, 'Banda A').alargar, 'vuelve a estar en escena');
     ok(M.actionsFor(blk(r.state, 'Banda A'), at('21:41')).stop, 'y se le puede dar ■');
-    const tarde = M.stretchPlan(F.s, k, true, at('22:01'));
-    ok(!tarde.ok && /primeros 30 min/.test(tarde.error), tarde.error);
-    const bEmpezada = M.realPlan(F.s, CFG, key(F.s, 'Banda B'), 'i', at('21:45')).state;
-    const tarde2 = M.stretchPlan(bEmpezada, k, true, at('21:46'));
+    const tarde = M.stretchPlan(F.s, k, true, at('21:41'));
+    ok(!tarde.ok && /ventana de 10 min/.test(tarde.error), tarde.error);
+    ok(M.stretchPlan(F.s, k, true, at('21:45'), { bisWindow: 15 }).ok, 'con ajuste de 15, a los 15 min sí');
+    const bEmpezada = M.realPlan(F.s, CFG, key(F.s, 'Banda B'), 'i', at('21:35')).state;
+    const tarde2 = M.stretchPlan(bEmpezada, k, true, at('21:36'));
     ok(!tarde2.ok && /Banda B ya ha empezado/.test(tarde2.error), tarde2.error);
-    const kA = key(F.s, 'Acústico');   // sin siguiente en su zona: ventana de 15
-    ok(M.stretchPlan(F.s, kA, true, at('22:15')).ok, 'a los 15 min, sí');
-    ok(!M.stretchPlan(F.s, kA, true, at('22:16')).ok, 'a los 16, no');
+    eq(M.bisState(bEmpezada, blk(bEmpezada, 'Banda A'), at('21:36')).reason, 'next', 'el botón se desactiva');
+    const kA = key(F.s, 'Acústico');   // sin siguiente en su zona: la ventana del ajuste
+    ok(M.stretchPlan(F.s, kA, true, at('22:10')).ok, 'a los 10 min, sí');
+    ok(!M.stretchPlan(F.s, kA, true, at('22:11')).ok, 'a los 11, no');
     ok(M.stretchPlan(F.s, k, true, at('21:00')).late === undefined, 'antes de su hora no es bis');
+  });
+  test('Bis: un cambio corto acorta la ventana (nunca pisa a la siguiente)', async () => {
+    const F = fest();
+    const r = C.addArtist(F.s, 'show', { jornada: JOR, nombre: 'Pegada', escenarioId: F.P, inicio: '21:35', fin: '21:55' }); ok(r.ok, r.error);
+    const w = M.bisWindow(r.state, blk(r.state, 'Banda A'), at('21:31'), { bisWindow: 15 });
+    eq(w.gap, 5); eq(w.max, 5, 'cambio de 5 min → ventana de 5');
+    ok(M.stretchPlan(r.state, key(r.state, 'Banda A'), true, at('21:35'), { bisWindow: 15 }).ok, 'a los 5, sí');
+    ok(!M.stretchPlan(r.state, key(r.state, 'Banda A'), true, at('21:36'), { bisWindow: 15 }).ok, 'a los 6, no');
+  });
+  test('Extender prueba (soundcheck): misma ventana; tareas e hitos, nunca', async () => {
+    const F = fest(), b = blk(F.s, 'Prueba A');
+    const st = M.bisState(F.s, b, at('17:50'));
+    ok(st.ok, JSON.stringify(st)); eq(st.kind, 'sc'); eq(st.left, 5, 'quedan 5 de 10');
+    const r = M.stretchPlan(F.s, b.key, true, at('17:50'));
+    ok(r.ok, r.error); eq(r.kind, 'sc'); ok(/^EXTENDER PRUEBA · Prueba A/.test(r.msg), r.msg);
+    eq(M.bisState(F.s, b, at('17:56')).reason, 'expired', 'cambio de 2 h 45, pero la ventana es la del ajuste');
+    const t = C.addArtist(F.s, 'show', { jornada: JOR, nombre: 'Descarga', tipo: 'tarea', escenarioId: F.P, inicio: '12:00', fin: '13:00' }); ok(t.ok, t.error);
+    const bt = C.buildBlocks(t.state, { mode: 'all', day: 'all' }).find(x => x.name === 'Descarga');
+    eq(M.bisState(t.state, bt, at('13:05')).reason, 'no', 'una tarea no tiene bis');
+    ok(!M.stretchPlan(t.state, bt.key, true, at('13:05')).ok, 'ni Tiempo extra');
   });
 
   test('Corregir el inicio real: recalcula y deja texto para el log; valida la hora', async () => {

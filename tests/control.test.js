@@ -477,6 +477,33 @@
       ok(!/xtrabtn bis/.test(ultimo(t2, 'v-now')) && !/ACABÓ/.test(ultimo(t2, 'v-now')), h + ': pasada la ventana, sin bis');
     });
   });
+  test('Bis / Extender prueba: el caso del NDB (prueba acabada hace 2 h en una zona, show recién acabado en otra) y ventana configurable', () => {
+    const now = new Date(2026, 6, 10, 21, 42).getTime(), n = Math.floor(C.nowAbs(new Date(now))), hm = m => C.fmtHM(((m % 1440) + 1440) % 1440);
+    let s = C.newFestival({ nombre: 'NDB', fechaInicio: '2026-07-10', fechaFin: '2026-07-10', dayCutoff: '06:00', coMin: 15 }).state;
+    s = C.addStage(s, 'Principal').state; s = C.addStage(s, 'Secundario').state;
+    const [P, S] = s.escenarios.map(e => e.id);
+    const add = (modo, nombre, z, a, b) => { const r = C.addArtist(s, modo, { jornada: '2026-07-10', nombre, modo, escenarioId: z, inicio: hm(n + a), fin: hm(n + b) }); if (!r.ok) throw new Error(r.error); s = r.state; };
+    add('sc', 'Omega', P, -177, -132);        // prueba 18:45–19:30
+    add('show', 'OMEGA', P, 3, 108);          // show 21:45
+    add('show', 'Alhambra', S, -72, -12);     // show 20:30–21:30, acabó hace 12 min
+    const v10 = ultimo(dashboard({ 'showtime.festival': JSON.stringify(s), 'showtime.config': JSON.stringify({ mode: 'all' }) }, now), 'v-now');
+    ok(!/xtrabtn bis/.test(v10), 'con la ventana por defecto (10 min) ninguno: ni la prueba de hace 2 h ni el show de hace 12 min: ' + v10.slice(0, 300));
+    const v15 = ultimo(dashboard({ 'showtime.festival': JSON.stringify(s), 'showtime.config': JSON.stringify({ mode: 'all', bisWindow: 15 }) }, now), 'v-now');
+    eq((v15.match(/xtrabtn bis/g) || []).length, 1, 'con 15 min, solo un botón');
+    ok(/Bis · Alhambra/.test(v15) && !/Omega<\/button>/.test(v15), 'el del show de Secundario, nunca el de la prueba de Principal: ' + v15.slice(0, 400));
+    // Una prueba que acaba de terminar: «Extender prueba»
+    add('sc', 'Linecheck', S, -40, -4);
+    const vs = ultimo(dashboard({ 'showtime.festival': JSON.stringify(s), 'showtime.config': JSON.stringify({ mode: 'all' }) }, now), 'v-now');   // las pruebas salen en «Todo»
+    ok(/xtrabtn bis sc[^>]*>.*Extender prueba · Linecheck/.test(vs), 'Extender prueba · Linecheck: ' + vs.slice(0, 400));
+  });
+  test('Configuración › Directo: ventana de Bis / Extender prueba (5 · 10 · 15 min) en la configuración (viaja al Mando)', () => {
+    const t = dashboard();
+    eq(t.read('showtime.config') ? t.read('showtime.config').bisWindow : 10, 10, 'por defecto 10');
+    t.env.getEl('cfg-bis-win').value = '5';
+    t.env.fire('cfg-bis-win', 'change', { target: { value: '5' } });
+    eq(t.read('showtime.config').bisWindow, 5);
+    ['value="5"', 'value="10"', 'value="15"'].forEach(v => ok(new RegExp('id="cfg-bis-win">[^]*' + v).test(D.src('index.html')), v));
+  });
   test('Bis: si la zona ya suena otra banda, no se ofrece (ni fila «ACABÓ»)', () => {
     RELOJES.forEach(now => {
       const t = dashboard({ 'showtime.festival': JSON.stringify(festEn(now, add => { add('Antes', -60, -8); add('Ahora', -5, 50); })) }, now), v = ultimo(t, 'v-now');

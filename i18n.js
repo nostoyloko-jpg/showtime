@@ -25,6 +25,16 @@
         btnTitle: 'Idioma: Español. Clic: English',
         changed: 'Idioma: Español'
       },
+      bis: {
+        show: 'Bis · {name}', sc: 'Extender prueba · {name}',
+        titleShow: '{name} acabó hace {late} min: rescátala si hay bis (quedan {left} min de ventana)',
+        titleSc: 'La prueba de {name} acabó hace {late} min: extiéndela si hace falta (quedan {left} min de ventana)',
+        next: '{next} ya ha empezado: ya no se puede',
+        modalShow: 'Rescatar el bis', modalSc: 'Extender la prueba', yesShow: 'Rescatar', yesSc: 'Extender',
+        cfgTitle: 'Directo', cfgLabel: 'Ventana de Bis / Extender prueba',
+        cfgNote: 'Minutos tras el fin de un show (Bis) o de una prueba de sonido (Extender prueba) en los que se puede rescatar. Nunca más que el cambio hasta la siguiente de su zona; si la siguiente da ▶, se acaba.',
+        cfgToast: 'Ventana de Bis / Extender prueba: {n} min', min: '{n} min'
+      },
       print: {
         htmlLang: 'es', locale: 'es-ES',
         cols: { time: 'Horario', dur: 'Duración', call: 'CALL', zone: 'Escenario / zona', type: 'Tipo', name: 'Artista / actividad', notes: 'Notas / operativa' },
@@ -44,6 +54,16 @@
         note: 'Set from this Panel: Live screens and the Stage remote follow it (also over the broadcast).',
         btnTitle: 'Language: English. Click: Español',
         changed: 'Language: English'
+      },
+      bis: {
+        show: 'Encore · {name}', sc: 'Extend Soundcheck · {name}',
+        titleShow: '{name} ended {late} min ago: bring them back for an encore ({left} min left in the window)',
+        titleSc: '{name} soundcheck ended {late} min ago: extend it if needed ({left} min left in the window)',
+        next: '{next} has already started: no longer possible',
+        modalShow: 'Encore', modalSc: 'Extend soundcheck', yesShow: 'Bring back', yesSc: 'Extend',
+        cfgTitle: 'Live', cfgLabel: 'Encore / Extend soundcheck window',
+        cfgNote: 'Minutes after a show (Encore) or a soundcheck (Extend soundcheck) ends during which it can be brought back. Never longer than the changeover to the next one on its stage; once the next one hits ▶, it is over.',
+        cfgToast: 'Encore / Extend soundcheck window: {n} min', min: '{n} min'
       },
       print: {
         htmlLang: 'en', locale: 'en-GB',

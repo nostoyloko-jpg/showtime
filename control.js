@@ -337,15 +337,16 @@
     return '<span class="mchip over" title="' + esc(m.band.name) + ' acaba ' + C.fmtHM(m.projEnd) + '"><svg class="ic"><use href="#i-alert"/></svg>Rebasado +' + (-m.margin) + '′</span>';
   }
 
-  /** Tiempo extra desde el Panel. Pasada su hora (bis), pide confirmación con lo que va a pasar y queda en el log como BIS. */
+  /** Tiempo extra desde el Panel. Pasada su hora (Bis / Extender prueba), pide confirmación con lo que va a pasar y queda en el log. */
   function applyStretch(key, on) {
-    const r = M.stretchPlan(FEST, key, on, logNow());
+    const r = M.stretchPlan(FEST, key, on, logNow(), CONFIG);
     if (!r.ok) { toast(r.error, true); return; }
     const go = p => commitFestival(p.state, p.msg, { noTimes: true, ev: [{ type: 'buffer', amber: p.late !== null && p.late !== undefined, text: p.msg }] });
     if (r.late === null || r.late === undefined) { go(r); return; }
-    modal('Rescatar el bis', '<p>' + esc(r.msg) + '</p>', [
+    const sc = r.kind === 'sc';
+    modal(i18t(sc ? 'bis.modalSc' : 'bis.modalShow'), '<p>' + esc(r.msg) + '</p>', [
       { label: 'Cancelar' },
-      { label: 'Rescatar', kind: 'primary', run: () => { const p = M.stretchPlan(FEST, key, on, logNow()); if (!p.ok) { toast(p.error, true); return; } go(p); } }
+      { label: i18t(sc ? 'bis.yesSc' : 'bis.yesShow'), kind: 'primary', run: () => { const p = M.stretchPlan(FEST, key, on, logNow(), CONFIG); if (!p.ok) { toast(p.error, true); return; } go(p); } }
     ]);
   }
 
@@ -640,8 +641,9 @@
     });
   }
 
-  /** Bis rescatable por zona: la última banda que ya acabó (sin ■ ni Tiempo extra) y aún dentro de la ventana del bis.
-   *  Busca en TODAS las jornadas: la que acabó puede ser de la jornada anterior (pasada la hora de corte). { zoneId: { b, late } } */
+  /** Bis (show) / Extender prueba (soundcheck) por zona: la última banda que ya acabó (sin ■ ni Tiempo extra) y aún dentro
+   *  de la ventana (min(ajuste, cambio real), mando.js). Si la siguiente ya dio ▶, el botón sale desactivado; pasada la
+   *  ventana, desaparece. Busca en TODAS las jornadas (pasada la hora de corte). { zoneId: { b, late, st } } */
   function bisCands(nowInt) {
     const last = {};
     ALL_MODE.forEach(b => {
@@ -651,13 +653,17 @@
     });
     const out = {};
     Object.keys(last).forEach(z => {
-      const p = M.stretchPlan(FEST, last[z].key, true, nowInt);
-      if (p.ok && p.late !== null && p.late !== undefined) out[z] = { b: last[z], late: p.late };
+      const st = M.bisState(FEST, last[z], nowInt, CONFIG);
+      if (st.ok || st.reason === 'next') out[z] = { b: last[z], late: st.late, st: st };
     });
     return out;
   }
+  const i18t = (k, v) => window.ShowtimeI18n ? window.ShowtimeI18n.t(k, v) : k;   // texto en el idioma activo
   function bisBtnHtml(c) {
-    return '<button class="xtrabtn bis" data-act="stretch" data-key="' + esc(c.b.key) + '" data-on="1" title="' + esc(c.b.name) + ' acabó hace ' + c.late + ' min: rescátala si hay bis (Tiempo extra tardío)"><svg class="ic"><use href="#i-undo"/></svg>Bis · ' + esc(c.b.name) + '</button>';
+    const st = c.st || { ok: true, kind: c.b.kind === 'sc' ? 'sc' : 'show', late: c.late, left: 0 }, sc = st.kind === 'sc';
+    const label = i18t(sc ? 'bis.sc' : 'bis.show', { name: c.b.name });
+    const title = st.ok ? i18t(sc ? 'bis.titleSc' : 'bis.titleShow', { name: c.b.name, late: st.late, left: st.left }) : i18t('bis.next', { next: st.next ? st.next.name : '' });
+    return '<button class="xtrabtn bis' + (sc ? ' sc' : '') + '" data-act="stretch" data-key="' + esc(c.b.key) + '" data-on="1" title="' + esc(title) + '"' + (st.ok ? '' : ' disabled') + '><svg class="ic"><use href="#i-undo"/></svg>' + esc(label) + '</button>';
   }
 
   // Vista en vivo (mismas reglas que la Pantalla Live)
@@ -987,6 +993,7 @@
     }
     $('cfg-style-panel').value = panelStyle();
     $('cfg-style-live').value = CONFIG.style;
+    if ($('cfg-bis-win')) $('cfg-bis-win').value = String(CONFIG.bisWindow || 10);
     fillMsgCfg();
     fillScreensCfg();
     fillMeteoCfg();
@@ -1094,6 +1101,12 @@
     try { localStorage.setItem(PS_KEY, JSON.stringify(e.target.value)); } catch (err) {}
     applyPanelStyle(e.target.value);
     toast('Estilo del Dashboard: ' + e.target.selectedOptions[0].textContent);
+  });
+  // Ventana de Bis / Extender prueba (5 · 10 · 15 min): viaja con la configuración al Mando
+  $('cfg-bis-win').addEventListener('change', e => {
+    CONFIG = Dt.setConfig({ bisWindow: Number(e.target.value) });
+    toast(i18t('bis.cfgToast', { n: CONFIG.bisWindow }));
+    tick();
   });
   $('cfg-style-live').addEventListener('change', e => {
     CONFIG = Dt.setConfig({ style: e.target.value });
@@ -2378,7 +2391,7 @@
       return { ok: true, msg: r.msg };
     }
     if (cmd.op === 'stretch') {
-      const r = M.stretchPlan(FEST, a.key, a.on, abs);
+      const r = M.stretchPlan(FEST, a.key, a.on, abs, CONFIG);
       if (!r.ok) return { ok: false, msg: r.error };
       commitFestival(r.state, from + r.msg, { src: 'mando', t: abs, noTimes: true, ev: [{ type: 'buffer', amber: r.late !== null && r.late !== undefined, text: r.msg }] });
       return { ok: true, msg: r.msg };
