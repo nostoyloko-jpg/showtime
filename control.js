@@ -1357,14 +1357,14 @@
   // ── Gestor de ventanas Live (Live ▾ › Gestionar ventanas…): nombre, vista (y zona) y standby de cada una ──
   let gvSig = null;
   function gestorVisible() { return !$('modal').hidden && $('modal-title').textContent === 'Ventanas Live'; }
-  function openGestor() { gvSig = null; modal('Ventanas Live', '<div id="gv"></div>', [{ label: 'Cerrar' }], { wide: true }); renderGestor(); }
+  function openGestor() { gvSig = null; modal('Ventanas Live', '<div id="gv"></div>', [], { wide: true }); renderGestor(); }
   function gvRowHtml(id) {
     const x = WIN.get(id);
     return '<div class="gv-row" data-id="' + esc(id) + '">' +
       '<input class="gv-name" type="text" maxlength="40" value="' + esc(x.name) + '" aria-label="Nombre de la ventana">' +
       '<select class="gv-vista" aria-label="Vista">' + VISTA_OPCIONES.map(o => '<option value="' + o[0] + '">' + o[1] + '</option>').join('') + '</select>' +
-      '<select class="gv-zona" aria-label="Zona">' + zonasLive().map(z => '<option value="' + esc(z.id) + '">' + esc(z.name) + '</option>').join('') + '</select>' +
-      '<button class="gv-sb" type="button" data-gv="standby" aria-pressed="false">Standby</button>' +
+      '<select class="gv-zona" aria-label="Zona"></select>' +
+      '<button class="gv-sb" type="button" data-gv="standby" aria-pressed="false"><i class="gv-led" aria-hidden="true"></i><span>Standby</span></button>' +
       '<button class="gv-x" type="button" data-gv="close" title="Cerrar esta ventana" aria-label="Cerrar esta ventana"><svg class="ic"><use href="#i-x"/></svg></button>' +
       '</div>';
   }
@@ -1376,8 +1376,13 @@
       const name = row.querySelector('.gv-name'), vs = row.querySelector('.gv-vista'), zs = row.querySelector('.gv-zona'), sb = row.querySelector('.gv-sb');
       if (name && document.activeElement !== name && name.value !== x.name) name.value = x.name;
       if (vs && vs.value !== x.vista) vs.value = x.vista;
-      if (zs) { zs.hidden = x.vista !== 'confidence'; const z = x.zona == null ? '' : x.zona; if (zs.value !== z) zs.value = z; }
-      if (sb) { sb.setAttribute('aria-pressed', String(!!x.standby)); sb.classList.toggle('on', !!x.standby); }
+      if (zs) {   // Manager y Backstage: el select queda deshabilitado con «—» (la rejilla no cambia)
+        const conf = x.vista === 'confidence', want = conf ? zonasLive().map(z => '<option value="' + esc(z.id) + '">' + esc(z.name) + '</option>').join('') : '<option value="">—</option>';
+        if (zs.dataset.h !== want) { zs.innerHTML = want; zs.dataset.h = want; }
+        zs.disabled = !conf;
+        const z = conf && x.zona != null ? x.zona : ''; if (zs.value !== z) zs.value = z;
+      }
+      if (sb) { const on = !!x.standby; sb.setAttribute('aria-pressed', String(on)); sb.classList.toggle('on', on); const t = sb.querySelector('span'); if (t) t.textContent = on ? 'STANDBY' : 'Standby'; }
     });
   }
   function renderGestor() {
@@ -1386,9 +1391,11 @@
     const ids = openIds(), sig = ids.join('|');
     if (sig !== gvSig) {
       gvSig = sig;
-      box.innerHTML = ids.length
-        ? '<div class="gv-all"><button type="button" class="btn" data-gv="all" data-on="1">Todas en standby</button><button type="button" class="btn" data-gv="all" data-on="0">Quitar standby</button></div>' + ids.map(gvRowHtml).join('')
-        : '<p class="mnote">No hay ventanas Live abiertas desde este Dashboard. Ábrelas desde Live ▾.</p>';
+      const head = '<div class="gv-top"><div class="gv-seg"><button type="button" class="gv-segb" data-gv="all" data-on="1">⏸ Todas en standby</button><button type="button" class="gv-segb" data-gv="all" data-on="0">▶ Reanudar todas</button></div></div>';
+      const rows = ids.length ? ids.map(gvRowHtml).join('') : '<p class="mnote gv-empty">No hay ventanas Live abiertas desde este Dashboard.</p>';
+      const qr = '<div class="gv-qr"><div class="gv-qrh">Pantallas QR (móviles)</div><p class="mnote">Aún vacía: aquí irán las pantallas QR con la misma rejilla.</p></div>';
+      const foot = '<div class="gv-foot"><button type="button" class="btn" data-gv="new">+ Abrir ventana Live</button><button type="button" class="btn primary" data-gv="done">Cerrar</button></div>';
+      box.innerHTML = head + '<div class="gv-list">' + rows + '</div>' + qr + foot;
     }
     gvSync(ids);
   }
@@ -1404,6 +1411,8 @@
   $('modal-body').addEventListener('click', e => {
     const b = e.target.closest && e.target.closest('[data-gv]'); if (!b) return;
     if (b.dataset.gv === 'all') { openIds().forEach(id => setWinStandby(id, b.dataset.on === '1')); return; }
+    if (b.dataset.gv === 'new') { openLive('manager', null); return; }
+    if (b.dataset.gv === 'done') { closeModal(); return; }
     const row = b.closest('.gv-row'); if (!row) return;
     const id = row.dataset.id;
     if (b.dataset.gv === 'standby') setWinStandby(id, !(WIN.get(id) && WIN.get(id).standby));
