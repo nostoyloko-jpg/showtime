@@ -7,8 +7,10 @@
   const C = isNode ? require('../core.js') : window.ShowtimeCore;
   const P = isNode ? require('../print.js') : window.ShowtimePrint;
 
+  // Con «node --test» (o «node tests/print.test.js») cada caso es un test de node:test; en el navegador, runner propio.
+  const NT = isNode ? require('node:test') : null;
   const tests = [];
-  function test(name, fn) { tests.push([name, fn]); }
+  function test(name, fn) { if (NT) NT.test(name, fn); else tests.push([name, fn]); }
   function eq(a, b, msg) { if (a !== b) throw new Error((msg ? msg + ': ' : '') + 'esperaba ' + JSON.stringify(b) + ', salió ' + JSON.stringify(a)); }
   function ok(v, msg) { if (!v) throw new Error(msg || 'esperaba verdadero'); }
 
@@ -52,20 +54,74 @@
     eq(a.kind, 'show');
   });
 
-  test('densityFor: letra decreciente al crecer el número de filas', () => {
-    const sizes = [5, 12, 20, 30, 50].map(n => parseFloat(P.densityFor(n).fs));
-    for (let i = 1; i < sizes.length; i++) ok(sizes[i] < sizes[i - 1], 'fs no decrece en índice ' + i);
+  test('densityFor: límites normal ≤14 · compact 15–22 · ultra-compact >22', () => {
+    eq(P.densityFor(1).cls, 'density-normal'); eq(P.densityFor(14).cls, 'density-normal');
+    eq(P.densityFor(15).cls, 'density-compact'); eq(P.densityFor(22).cls, 'density-compact');
+    eq(P.densityFor(23).cls, 'density-ultra-compact'); eq(P.densityFor(90).cls, 'density-ultra-compact');
+  });
+  test('densityFor: letra 10pt → 8.5pt → 7.5pt', () => {
+    eq(P.densityFor(10).fs, '10pt'); eq(P.densityFor(18).fs, '8.5pt'); eq(P.densityFor(30).fs, '7.5pt');
+  });
+  test('html: la sección lleva la clase de densidad de su jornada', () => {
+    const rows = Array.from({ length: 16 }, (_, i) => ({ jornada: J1, start: '10:00', end: '11:00', dur: '60 min', call: '', zone: 'Z', zoneColor: '#000000', kind: 'show', name: 'B' + i, notes: '' }));
+    const doc = P.html({ rows, days: [J1], title: 'X', orient: 'portrait' });
+    ok(doc.indexOf('class="sheet portrait density-compact"') >= 0, 'compact para 16 filas');
+    ok(doc.indexOf('.density-ultra-compact{') >= 0, 'CSS de ultra-compact presente');
   });
 
   test('html: una hoja por jornada con salto de página', () => {
     const { s } = fest();
     const rows = P.rowsOf(s, { day: 'all', content: 'all' });
     const doc = P.html({ rows, days: [J1, J2], title: 'Prueba print', orient: 'portrait', notes: true, call: true, now: new Date(2026, 6, 10, 9, 5) });
-    eq((doc.match(/<section class="sheet"/g) || []).length, 2, 'dos secciones');
+    eq((doc.match(/<section class="sheet /g) || []).length, 2, 'dos secciones');
     ok(doc.indexOf('break-before:page') >= 0 || doc.indexOf('.sheet+.sheet') >= 0, 'salto de página entre hojas');
     ok(doc.indexOf('Impreso: 10/07/2026 09:05') >= 0, 'fecha de impresión en el pie');
-    ok(doc.indexOf('counter(page) "/" counter(pages)') >= 0, 'paginación Pág X/Y');
+    ok(doc.indexOf('Pág 1/2') >= 0 && doc.indexOf('Pág 2/2') >= 0, 'pie con Pág X/Y dentro de cada hoja');
+    ok(doc.indexOf('<footer class="sheet-foot">') >= 0, 'pie como elemento HTML, no @page');
     ok(doc.indexOf('A4 portrait') >= 0, 'A4 vertical');
+  });
+
+  const R = (name, extra) => Object.assign({ jornada: J1, start: '10:00', end: '11:00', dur: '60 min', call: '', zone: 'Principal', zoneColor: '#e94560', kind: 'show', name, notes: '', aviso: false }, extra || {});
+  test('html: incluye el ajuste de densidad al cargar (medición real en el navegador)', () => {
+    const doc = P.html({ rows: [R('A')], days: [J1], title: 'X', orient: 'landscape' });
+    ok(doc.indexOf("'density-min'") >= 0 && doc.indexOf("querySelectorAll('section.sheet')") >= 0, 'script de ajuste presente');
+    ok(doc.indexOf('.density-min{') >= 0, 'clase density-min definida');
+  });
+  test('html: zona única → columna oculta y zona en la cabecera', () => {
+    const doc = P.html({ rows: [R('A'), R('B')], days: [J1], title: 'X', orient: 'portrait' });
+    ok(doc.indexOf('<th>Escenario / zona</th>') < 0, 'sin columna de zona');
+    ok(doc.indexOf('Zona: Principal') >= 0, 'zona en la cabecera');
+  });
+  test('html: varias zonas → la columna de zona se mantiene', () => {
+    const doc = P.html({ rows: [R('A'), R('B', { zone: 'Carpa' })], days: [J1], title: 'X', orient: 'portrait' });
+    ok(doc.indexOf('<th>Escenario / zona</th>') >= 0, 'con columna de zona');
+  });
+  test('html: CALL solo aparece si alguna fila la tiene', () => {
+    const none = P.html({ rows: [R('A')], days: [J1], title: 'X', orient: 'portrait', call: true });
+    ok(none.indexOf('<th>CALL</th>') < 0, 'sin CALL en ninguna fila → columna oculta');
+    const some = P.html({ rows: [R('A', { call: '09:45' })], days: [J1], title: 'X', orient: 'portrait', call: true });
+    ok(some.indexOf('<th>CALL</th>') >= 0, 'con CALL → columna visible');
+  });
+  test('html: separador antes de «Apertura de puertas» (no en la primera fila)', () => {
+    const doc = P.html({ rows: [R('Llegada', { kind: 'tarea' }), R('Apertura de puertas recinto', { kind: 'hito' }), R('Show')], days: [J1], title: 'X', orient: 'portrait' });
+    eq((doc.match(/<tr class="sep">/g) || []).length, 1, 'un único separador');
+    ok(doc.indexOf('<tr class="sep"><td class="t">19') < 0 && doc.indexOf('<tr class="sep">') < doc.indexOf('Apertura de puertas'), 'va justo antes de la apertura');
+    const first = P.html({ rows: [R('Apertura de puertas')], days: [J1], title: 'X', orient: 'portrait' });
+    ok(first.indexOf('class="sep"') < 0, 'no separa si es la primera fila');
+  });
+  test('html: aviso «*** … ***» ocupa todo el ancho', () => {
+    const doc = P.html({ rows: [R('Llegada', { kind: 'tarea' }), R('*** Restricciones de PA hasta las 14:00 ***', { kind: 'hito', aviso: true })], days: [J1], title: 'X', orient: 'portrait', notes: true });
+    ok(/<tr class="aviso"><td colspan="5">Restricciones de PA hasta las 14:00<\/td><\/tr>/.test(doc), 'fila de aviso con colspan total, sin asteriscos');
+    ok(doc.indexOf('***') < 0, 'los asteriscos no se imprimen');
+  });
+  test('html: negrita en shows y curfews; tareas y pruebas en regular', () => {
+    const doc = P.html({ rows: [R('Banda', { kind: 'show' }), R('Curfew de sonido', { kind: 'hito' }), R('Llegada', { kind: 'tarea' }), R('Prueba X', { kind: 'sc' })], days: [J1], title: 'X', orient: 'portrait' });
+    eq((doc.match(/class="name strong"/g) || []).length, 2, 'show y curfew en negrita');
+    eq((doc.match(/class="name"/g) || []).length, 2, 'tarea y prueba en regular');
+  });
+  test('html: nombre íntegro (sin recortar)', () => {
+    const doc = P.html({ rows: [R('CONCIERTO OMEGA 30.º ANIVERSARIO: KIKI MORENTE & LAGARTIJA NICK')], days: [J1], title: 'X', orient: 'portrait' });
+    ok(doc.indexOf('CONCIERTO OMEGA 30.º ANIVERSARIO: KIKI MORENTE &amp; LAGARTIJA NICK') >= 0, 'nombre completo y escapado');
   });
 
   test('html: orientación horizontal y columnas opcionales', () => {
@@ -115,10 +171,12 @@
   });
 
   let fail = 0;
-  for (const [name, fn] of tests) {
+  if (!NT) for (const [name, fn] of tests) {
     try { fn(); console.log('  ✓ ' + name); }
     catch (e) { fail++; console.log('  ✗ ' + name + '\n      ' + e.message); }
   }
-  console.log('\n' + (tests.length - fail) + '/' + tests.length + ' tests de impresión OK');
-  if (isNode && fail) process.exitCode = 1;
+  if (!NT) {
+    console.log('\n' + (tests.length - fail) + '/' + tests.length + ' tests de impresión OK');
+    if (fail) process.exitCode = 1;
+  }
 })();

@@ -1,7 +1,9 @@
-/* Showtime · Hoja de ruta imprimible (Running Order) — Fase 1: tabla.
+/* Showtime · Hoja de ruta imprimible (Running Order) — tabla por jornada.
  * 0 dependencias. Genera HTML para A4 (vertical u horizontal) que se imprime desde un <iframe> oculto
  * (en el diálogo, «Guardar como PDF»). Usa C.buildBlocks: horarios PREVISTOS (la escaleta), no los reales.
- * Ordenador:  node tests/print.test.js
+ * Maquetación: márgenes y pie DENTRO de cada hoja (no dependen de @page, que Safari no respeta);
+ * una jornada = una hoja; la tabla estira sus filas hasta llenar la altura útil.
+ * Ordenador:  node tests/print.test.js   ·   node --test tests/print.test.js
  */
 (function (root) {
   'use strict';
@@ -21,10 +23,13 @@
     tarea: { txt: 'TAREA', cls: 'p-tarea' },
     hito: { txt: 'HITO', cls: 'p-hito' }
   };
+  /** Convención de avisos: texto entre asteriscos («*** Restricciones de PA… ***») → fila de ancho completo. */
+  const AVISO_RE = /\*\*\*/;
 
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
   function pad2(n) { return (n < 10 ? '0' : '') + n; }
   function hexOk(c, d) { return typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c) ? c : d; }
+  function clean(s) { return String(s == null ? '' : s).replace(/\*\*\*/g, ' ').replace(/\s+/g, ' ').trim(); }
 
   /**
    * Filas de la tabla para una jornada (o todas).
@@ -41,6 +46,8 @@
         const ini = b.psi !== undefined && b.psi !== null ? b.psi : b.si;
         const fin = b.psf !== undefined && b.psf !== null ? b.psf : b.sf;
         const dur = ini !== null && ini !== undefined && fin !== null && fin !== undefined ? fin - ini : null;
+        const name = b.name || '';
+        const notes = b.notes || '';
         return {
           jornada: b.jornada || null,
           start: ini === null || ini === undefined ? '—' : C.fmtHM(ini),
@@ -50,19 +57,19 @@
           zone: b.stage || 'Sin zona',
           zoneColor: hexOk(b.stageColor || b.color, '#94a3b8'),
           kind: b.kind,
-          name: b.name || '',
-          notes: b.notes || ''
+          name: name,
+          notes: notes,
+          aviso: AVISO_RE.test(name) || AVISO_RE.test(notes)
         };
       });
   }
 
-  /** Letra y relleno según cuántas filas hay: una jornada tiene que caber en una A4 sin cortarse. */
+  /** Clase de densidad según filas de la jornada: normal ≤14 · compact 15–22 · ultra-compact >22
+   *  (letra 10pt → 8.5pt → 7.5pt). El relleno es mínimo: la tabla estira las filas hasta llenar la hoja. */
   function densityFor(n) {
-    if (n <= 10) return { fs: '10pt', pad: '3mm' };
-    if (n <= 16) return { fs: '9pt', pad: '2.4mm' };
-    if (n <= 24) return { fs: '8pt', pad: '1.8mm' };
-    if (n <= 32) return { fs: '7.2pt', pad: '1.3mm' };
-    return { fs: '6.5pt', pad: '0.9mm' };
+    if (n <= 14) return { cls: 'density-normal', fs: '10pt', pad: '3mm' };
+    if (n <= 22) return { cls: 'density-compact', fs: '8.5pt', pad: '2mm' };
+    return { cls: 'density-ultra-compact', fs: '7.5pt', pad: '1.2mm' };
   }
 
   function dayLabel(iso) {
@@ -84,34 +91,46 @@
 
   const PRINT_CSS = [
     '*{box-sizing:border-box}html,body{margin:0;background:#fff}',
-    'body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,Arial,sans-serif;color:#0f172a;-webkit-print-color-adjust:exact;print-color-adjust:exact;font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}',
-    '.sheet{padding:0}.sheet+.sheet{break-before:page}',
-    '.hd{border-bottom:1.5px solid #0f172a;padding-bottom:6px;margin-bottom:8px}',
+    'body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,Arial,sans-serif;color:#0f172a;-webkit-print-color-adjust:exact;print-color-adjust:exact;font-variant-numeric:tabular-nums}',
+    '.sheet{display:flex;flex-direction:column;overflow:visible;padding:12mm 14mm 11mm}',
+    '.sheet+.sheet{break-before:page}',
+    '.sheet.portrait{width:210mm;height:296mm}.sheet.landscape{width:297mm;height:209mm;padding:10mm 12mm 9mm}',
+    '.hd{border-bottom:1.5px solid #0f172a;padding-bottom:6px;margin-bottom:8px;flex:0 0 auto}',
     '.brand{font-size:6.5pt;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#334155}',
     'h1{font-size:15pt;line-height:1.1;margin:3px 0 4px;letter-spacing:-.01em;color:#0f172a}',
     '.meta{font-size:7.5pt;color:#334155;letter-spacing:.02em}',
-    'table{width:100%;border-collapse:collapse;table-layout:fixed}',
-    'th{font-size:6.5pt;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#334155;text-align:left;padding:4px 5px;border-bottom:.75pt solid #0f172a}',
-    'td{padding:var(--pad,2mm) 5px;border-bottom:.5pt solid #cbd5e1;vertical-align:middle;font-size:var(--fs,8pt);line-height:1.25}',
+    '.tbl{flex:1 1 auto;min-height:0}',
+    'table{width:100%;height:100%;border-collapse:collapse;table-layout:fixed}',
+    'th{font-size:6.5pt;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#334155;text-align:left;padding:4px 5px;border-bottom:.75pt solid #0f172a;vertical-align:bottom}',
+    'td{padding:var(--pad,2mm) 5px;border-bottom:.5pt solid #cbd5e1;vertical-align:middle;font-size:var(--fs,8.5pt);line-height:1.25}',
     'tr{break-inside:avoid}',
+    'tr.sep td{border-top:1.6pt solid #0f172a}',
     'td.t{font-weight:700;white-space:nowrap}td.n{color:#334155;white-space:nowrap}',
     'td.z{position:relative;padding-left:9px}td.z i{position:absolute;left:0;top:0;bottom:0;width:3px}',
     '.pill{display:inline-block;font-size:6.5pt;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:1px 6px;border-radius:999px;border:.75pt solid;background:transparent;white-space:nowrap}',
     '.p-show{border-color:#0f172a;color:#0f172a}.p-prueba{border-color:#7c3aed;color:#5b21b6}.p-tarea{border-color:#0284c7;color:#075985}.p-hito{border-color:#dc2626;color:#991b1b}',
-    'td.name{font-weight:700}td.notes{font-size:.92em;color:#334155}',
+    'td.name{font-weight:400}td.name.strong{font-weight:800}',
+    'td.notes{color:#334155}',
+    'tr.aviso td{text-align:center;font-style:italic;font-weight:600;background:#f1f5f9;color:#334155}',
+    '.density-normal{--fs:10pt;--pad:3mm}.density-compact{--fs:8.5pt;--pad:2mm}.density-ultra-compact{--fs:7.5pt;--pad:1.2mm}.density-min{--fs:6.8pt;--pad:.6mm}',
+    '.sheet-foot{flex:0 0 auto;display:flex;justify-content:space-between;gap:10px;margin-top:3mm;padding-top:2mm;border-top:.5pt solid #cbd5e1;font-size:6.5pt;color:#64748b;letter-spacing:.02em}',
     '.empty{font-size:9pt;color:#334155;padding:10mm 0}',
     '.bar{position:sticky;top:0;display:flex;gap:16px;align-items:center;justify-content:space-between;padding:10px 20px;background:#14161b;color:#e5e7eb;font-size:13px;z-index:2}',
     '@media print{.bar{display:none}}'
   ].join('\n');
 
-  /** Pie de página (márgenes de @page): evento · jornada · impresión · páginas. */
-  function pageCss(o) {
-    const size = o.orient === 'landscape' ? 'A4 landscape' : 'A4 portrait';
-    const f = 'font:6.5pt -apple-system,Helvetica,Arial,sans-serif;color:#64748b;letter-spacing:.02em';
-    return '@page{size:' + size + ';margin:' + (o.orient === 'landscape' ? '10mm 12mm 14mm' : '12mm 12mm 15mm') + '}' +
-      '@page{@bottom-left{content:"' + esc(o.footer).replace(/"/g, '\\"') + '";' + f + '}' +
-      '@bottom-center{content:"Impreso: ' + esc(o.printed) + '";' + f + '}' +
-      '@bottom-right{content:"Pág " counter(page) "/" counter(pages);' + f + '}}';
+  /** Ajuste al cargar: si la última fila se sale del pie, la hoja baja un escalón de densidad (y, como último
+   *  recurso, density-min). Así una jornada no deja una 2.ª hoja huérfana. Se mide con el diseño real del navegador. */
+  const FIT_JS = "(function(){var T=['density-normal','density-compact','density-ultra-compact','density-min'];" +
+    "document.querySelectorAll('section.sheet').forEach(function(s){var ft=s.querySelector('.sheet-foot');var rows=s.querySelectorAll('tbody tr');" +
+    "if(!ft||!rows.length)return;var last=rows[rows.length-1];" +
+    "function over(){return last.getBoundingClientRect().bottom>ft.getBoundingClientRect().top+0.5;}" +
+    "var i=0;for(var k=0;k<T.length;k++){if(s.classList.contains(T[k])){i=k;break;}}" +
+    "while(over()&&i<T.length-1){s.classList.remove(T[i]);i++;s.classList.add(T[i]);}});})();";
+
+  /** Tipos que se marcan en negrita: shows y los hitos clave (curfews, apertura, fin). */
+  function isStrong(r) {
+    return r.kind === 'show' || (r.kind === 'hito' && /curfew|apertura|fin de/i.test(r.name));
   }
 
   /**
@@ -122,35 +141,56 @@
     const o = opts || {};
     const rows = o.rows || [];
     const days = o.days && o.days.length ? o.days : [null];
+    const land = o.orient === 'landscape';
     const printed = printedAt(o.now);
-    const single = days.length === 1 && days[0];
-    const footer = 'Showtime Regiduría · ' + (o.title || 'Evento') + ' · ' + (single ? dayLabel(days[0]) : 'Todas las jornadas');
-    const cols = ['Horario', 'Duración'].concat(o.call ? ['CALL'] : []).concat(['Escenario / zona', 'Tipo', 'Artista / actividad']).concat(o.notes ? ['Notas / operativa'] : []);
-    const sheets = days.map(d => {
+    const title = o.title || 'Evento';
+    const sheets = days.map((d, idx) => {
       const list = rows.filter(r => !d || r.jornada === d);
       const dens = densityFor(list.length);
-      const W = { 'Horario': 15, 'Duración': 9, 'CALL': 7, 'Escenario / zona': 16, 'Tipo': 9, 'Notas / operativa': 20 };
-      const fixed = cols.reduce((a, c) => a + (W[c] || 0), 0);
-      const cg = '<colgroup>' + cols.map(c => '<col style="width:' + (c === 'Artista / actividad' ? Math.max(20, 100 - fixed) : (W[c] || 0)) + '%">').join('') + '</colgroup>';
-      const head = '<tr>' + cols.map(c => '<th>' + esc(c) + '</th>').join('') + '</tr>';
-      const body = list.map(r => {
+      const zones = [];
+      list.forEach(r => { if (!r.aviso && zones.indexOf(r.zone) < 0) zones.push(r.zone); });
+      const zoneOne = zones.length === 1 ? zones[0] : null;             // todas las filas en la misma zona → cabecera
+      const showZone = !zoneOne;
+      const showCall = !!o.call && list.some(r => !r.aviso && r.call);  // CALL solo si alguna fila la tiene
+      const showNotes = !!o.notes;
+      const cols = [{ h: 'Horario', w: 15 }, { h: 'Duración', w: 9 }]
+        .concat(showCall ? [{ h: 'CALL', w: 7 }] : [])
+        .concat(showZone ? [{ h: 'Escenario / zona', w: 16 }] : [])
+        .concat([{ h: 'Tipo', w: 9 }, { h: 'Artista / actividad', w: 0 }])
+        .concat(showNotes ? [{ h: 'Notas / operativa', w: 20 }] : []);
+      const fixed = cols.reduce((a, c) => a + c.w, 0);
+      const cg = '<colgroup>' + cols.map(c => '<col style="width:' + (c.w ? c.w : Math.max(20, 100 - fixed)) + '%">').join('') + '</colgroup>';
+      const head = '<tr>' + cols.map(c => '<th>' + esc(c.h) + '</th>').join('') + '</tr>';
+      const sepAt = list.findIndex((r, i) => i > 0 && /apertura de puertas/i.test(r.name));
+      const body = list.map((r, i) => {
+        if (r.aviso) {
+          const txt = clean(AVISO_RE.test(r.name) ? r.name : r.notes);
+          return '<tr class="aviso"><td colspan="' + cols.length + '">' + esc(txt) + '</td></tr>';
+        }
         const cells = ['<td class="t">' + esc(r.start) + (r.end ? ' – ' + esc(r.end) : '') + '</td>', '<td class="n">' + esc(r.dur) + '</td>'];
-        if (o.call) cells.push('<td class="n">' + esc(r.call) + '</td>');
-        cells.push('<td class="z"><i style="background:' + esc(r.zoneColor) + '"></i>' + esc(r.zone) + '</td>');
+        if (showCall) cells.push('<td class="n">' + esc(r.call) + '</td>');
+        if (showZone) cells.push('<td class="z"><i style="background:' + esc(r.zoneColor) + '"></i>' + esc(r.zone) + '</td>');
         const t = TYPE[r.kind] || { txt: esc(r.kind), cls: 'p-show' };
         cells.push('<td><span class="pill ' + t.cls + '">' + t.txt + '</span></td>');
-        cells.push('<td class="name">' + esc(r.name) + '</td>');
-        if (o.notes) cells.push('<td class="notes">' + esc(r.notes) + '</td>');
-        return '<tr>' + cells.join('') + '</tr>';
+        cells.push('<td class="name' + (isStrong(r) ? ' strong' : '') + '">' + esc(clean(r.name)) + '</td>');
+        if (showNotes) cells.push('<td class="notes">' + esc(clean(r.notes)) + '</td>');
+        return '<tr' + (i === sepAt ? ' class="sep"' : '') + '>' + cells.join('') + '</tr>';
       }).join('');
-      const meta = (single || d ? dayLabel(d) : 'Todas las jornadas') + ' · ' + list.length + ' bloques';
-      return '<section class="sheet" style="--fs:' + dens.fs + ';--pad:' + dens.pad + '">' +
-        '<div class="hd"><div class="brand">Showtime · Hoja de ruta</div><h1>' + esc(o.title || 'Evento') + '</h1><div class="meta">' + esc(meta) + '</div></div>' +
-        (list.length ? '<table>' + cg + '<thead>' + head + '</thead><tbody>' + body + '</tbody></table>' : '<p class="empty">Nada que imprimir con estos filtros.</p>') +
+      const metaParts = [d ? dayLabel(d) : 'Todas las jornadas', list.length + ' bloques'];
+      if (zoneOne) metaParts.push('Zona: ' + zoneOne);
+      const footerLeft = 'Showtime Regiduría · ' + title + ' · ' + (d ? dayLabel(d) : 'Todas las jornadas');
+      const footerRight = 'Pág ' + (idx + 1) + '/' + days.length;
+      return '<section class="sheet ' + (land ? 'landscape' : 'portrait') + ' ' + dens.cls + '">' +
+        '<div class="hd"><div class="brand">Showtime · Hoja de ruta</div><h1>' + esc(title) + '</h1><div class="meta">' + esc(metaParts.join(' · ')) + '</div></div>' +
+        (list.length
+          ? '<div class="tbl"><table>' + cg + '<thead>' + head + '</thead><tbody>' + body + '</tbody></table></div>'
+          : '<p class="empty">Nada que imprimir con estos filtros.</p>') +
+        '<footer class="sheet-foot"><span>' + esc(footerLeft) + '</span><span>Impreso: ' + esc(printed) + '</span><span>' + esc(footerRight) + '</span></footer>' +
         '</section>';
     }).join('');
-    return '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>' + esc(o.title || 'Hoja de ruta') + '</title>' +
-      '<style>' + pageCss({ orient: o.orient, footer: footer, printed: printed }) + '\n' + PRINT_CSS + '</style></head><body>' + sheets + '</body></html>';
+    return '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>' + esc(title) + '</title>' +
+      '<style>@page{size:A4 ' + (land ? 'landscape' : 'portrait') + ';margin:0}\n' + PRINT_CSS + '</style></head><body>' + sheets +
+      '<script>' + FIT_JS + '</script></body></html>';
   }
 
   /** Resumen para la vista del modal: cuántas filas y qué letra saldrá. */
@@ -159,7 +199,7 @@
     const multi = !!(days && days.length > 1);
     const per = multi ? days.map(d => list.filter(r => r.jornada === d).length) : [list.length];
     const worst = Math.max(0, ...per);
-    return { bloques: list.length, hojas: multi ? days.length : 1, letra: densityFor(worst).fs, dens: densityFor(worst) };
+    return { bloques: list.length, hojas: multi ? days.length : 1, letra: densityFor(worst).fs, cls: densityFor(worst).cls };
   }
 
   /** Imprime el HTML desde un iframe oculto (no abre pestañas ni depende de popups). */

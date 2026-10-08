@@ -87,7 +87,12 @@
     if ((m = SC_HEAD.exec(banda)) && banda.slice(m[0].length).trim()) return { tipo: 'sc', banda: banda.slice(m[0].length), why: '«' + m[1] + '»' };
     if ((m = SC_TAIL.exec(banda)) && banda.slice(0, m.index).trim()) return { tipo: 'sc', banda: banda.slice(0, m.index), why: '«' + m[1] + '»' };
     if (mH) return { tipo: 'hito', banda, why: '«' + mH[1] + '»' };
-    if ((m = SHOW_HEAD.exec(banda)) && banda.slice(m[0].length).trim()) return { tipo: 'show', banda: banda.slice(m[0].length), why: '«' + m[1] + '»' };
+    // «Concierto Dagoba» → «Dagoba». Pero si lo que queda es una frase coja («Concierto en Escenario Alhambra» → «en Escenario Alhambra») se conserva el nombre entero.
+    if ((m = SHOW_HEAD.exec(banda)) && banda.slice(m[0].length).trim()) {
+      const rest = banda.slice(m[0].length);
+      const cojo = /^(en|de|del|con|para|por|al|a|y|o|e|in|at|on|with|of|von|im|am|mit|und|avec|sur|au|du|des)\b/i.test(rest.trim());
+      return { tipo: 'show', banda: cojo ? banda : rest, why: '«' + m[1] + '»' };
+    }
     return { tipo: def, banda, why: '' };
   }
 
