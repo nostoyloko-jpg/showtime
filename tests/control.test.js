@@ -294,7 +294,7 @@
     ok(!/id="mods" class="chip warn"/.test(HTML), 'la píldora de cambios no es amarilla');
     ok(!/Configuración<\/button>/.test(der), '⚙ sin texto');
   });
-  test('Sin subtítulo repetido ni texto fijo encima de la tabla: ayuda «?» y ⌘/', () => {
+  test('Sin subtítulo repetido ni texto fijo encima de la tabla: ayuda «?» y ⇧⌘7', () => {
     const lh = seccion('<div class="list-h">', '<div class="tblwrap">');
     ok(/class="sr-only"/.test(lh), 'el título queda solo para lectores de pantalla');
     ok(lh.indexOf('Intro o salir de la casilla') < 0, 'el texto fijo ya no está');
@@ -305,7 +305,9 @@
     ok(/Intro.*Esc/.test(t.env.getEl('modal-body').innerHTML), 'los atajos están en la ayuda');
     t.env.getEl('modal-title').textContent = '';
     t.env.fire('document', 'keydown', { key: '/', metaKey: true, preventDefault() {} });
-    eq(t.env.getEl('modal-title').textContent, 'Atajos y ayuda', '⌘/');
+    eq(t.env.getEl('modal-title').textContent, '', 'sin ⇧ ya no abre la ayuda (⌘/ quitado)');
+    t.env.fire('document', 'keydown', { key: '/', metaKey: true, shiftKey: true, code: 'Digit7', preventDefault() {} });
+    eq(t.env.getEl('modal-title').textContent, 'Atajos y ayuda', '⇧⌘7 abre la ayuda');
   });
   test('Etiquetas cortas: «Ver: Todo» y «Día: Todos»', () => {
     const t = dashboard({ 'showtime.config': JSON.stringify({ mode: 'all', day: 'all' }) });
@@ -874,6 +876,61 @@
     ok(/td input:focus,td select:focus,\.imp-src textarea:focus[^{]*\{border-color:rgba\(255,255,255,\.35\);box-shadow:0 0 0 1px rgba\(255,255,255,\.15\)\}/.test(css), 'foco de campos en blanco translúcido');
     ok(/\.focusitem\.on \.fbox\{background:#fff/.test(css), 'casillas marcadas en blanco');
   });
+  test('Paleta de comandos: ⌘K y Ctrl+K abren/cierran; «/» abre fuera de un campo y no dentro', () => {
+    const t = dashboard(), sp = t.env.getEl('spotlight');
+    sp.hidden = true;   // como el resto de modales de las pruebas
+    ok(sp.hidden === true, 'cerrada de entrada');
+    t.env.fire('document', 'keydown', { key: 'k', metaKey: true, preventDefault() {} });
+    eq(sp.hidden, false, '⌘K abre'); eq(t.env.getEl('spot-q').value, '', 'campo vacío');
+    t.env.fire('document', 'keydown', { key: 'k', ctrlKey: true, preventDefault() {} });
+    eq(sp.hidden, true, 'Ctrl+K vuelve a cerrar');
+    t.env.fire('document', 'keydown', { key: '/', target: { tagName: 'DIV' }, preventDefault() {} });
+    eq(sp.hidden, false, '«/» abre fuera de campos');
+    t.env.fire('document', 'keydown', { key: 'Escape', preventDefault() {}, stopImmediatePropagation() {}, stopPropagation() {} });
+    eq(sp.hidden, true, 'Esc cierra');
+    t.env.fire('document', 'keydown', { key: '/', target: { tagName: 'INPUT' }, preventDefault() {} });
+    eq(sp.hidden, true, '«/» dentro de un campo se escribe, no abre');
+  });
+  test('Paleta de comandos: filtra, navega con flechas, ejecuta con Intro (Configuración) y muestra ⌘S ⌘O ⌘N', () => {
+    const t = dashboard();
+    t.env.fire('document', 'keydown', { key: 'k', metaKey: true, preventDefault() {} });
+    const q = t.env.getEl('spot-q');
+    q.value = 'config'; t.env.fire('spot-q', 'input', {});
+    ok(/Configuración/.test(t.env.getEl('spot-list').innerHTML), 'filtra: Configuración');
+    ok(!/Nuevo evento/.test(t.env.getEl('spot-list').innerHTML), 'oculta lo que no coincide');
+    t.env.fire('spot-q', 'keydown', { key: 'Enter', preventDefault() {} });
+    eq(t.env.getEl('spotlight').hidden, true, 'Intro ejecuta y cierra');
+    eq(t.env.getEl('cfg').hidden, false, 'Intro abre Configuración');
+    t.env.fire('document', 'keydown', { key: 'k', metaKey: true, preventDefault() {} });
+    q.value = ''; t.env.fire('spot-q', 'input', {});
+    t.env.fire('spot-q', 'keydown', { key: 'ArrowDown', preventDefault() {} });
+    ok(/class="spot-i on" data-i="1"/.test(t.env.getEl('spot-list').innerHTML), '↓ mueve la selección');
+    t.env.fire('spot-q', 'keydown', { key: 'ArrowUp', preventDefault() {} });
+    ok(/class="spot-i on" data-i="0"/.test(t.env.getEl('spot-list').innerHTML), '↑ la devuelve');
+    const html = t.env.getEl('spot-list').innerHTML;
+    ok(/<kbd>⌘S<\/kbd>/.test(html) && /<kbd>⌘O<\/kbd>/.test(html) && /<kbd>⌘N<\/kbd>/.test(html), 'muestra ⌘S ⌘O ⌘N');
+    ok(/<kbd>⇧⌘F<\/kbd>/.test(html) && /<kbd>⇧⌘C<\/kbd>/.test(html), 'vistas con su atajo');
+  });
+  test('⌘S, ⌘O y ⌘N se interceptan (preventDefault) y ejecutan su acción', () => {
+    const t = dashboard(); let pd = 0;
+    const P = { preventDefault() { pd++; } };
+    t.env.fire('document', 'keydown', Object.assign({ key: 'n', metaKey: true }, P));
+    eq(t.env.getEl('modal').hidden, false, '⌘N abre Nuevo evento');
+    t.env.getEl('modal').hidden = true;
+    t.env.fire('document', 'keydown', Object.assign({ key: 'o', metaKey: true }, P));
+    t.env.fire('document', 'keydown', Object.assign({ key: 's', metaKey: true }, P));
+    eq(pd, 3, 'los tres bloquean el comportamiento del navegador');
+  });
+  test('Paleta: el atajo ⇧⌘7 abre la ayuda (sustituye a ⌘/) y el markup está en index.html', () => {
+    const t = dashboard();
+    t.env.fire('document', 'keydown', { key: '/', metaKey: true, preventDefault() {} });
+    eq(t.env.getEl('modal-title').textContent !== 'Atajos y ayuda', true, '⌘/ ya no abre la ayuda');
+    t.env.fire('document', 'keydown', { key: '/', metaKey: true, shiftKey: true, code: 'Digit7', preventDefault() {} });
+    eq(t.env.getEl('modal-title').textContent, 'Atajos y ayuda', '⇧⌘7 abre la ayuda');
+    const ih = D.src('index.html'), css = D.src('control.css');
+    ok(/id="spotlight"[^>]*hidden/.test(ih) && /id="spot-q"/.test(ih) && /id="spot-list"/.test(ih), 'markup de la paleta');
+    ok(/\.spot-box\{width:min\(600px,100%\)/.test(css) && /\.spot-foot/.test(css), 'diseño de la paleta');
+  });
   test('QR: el título es «Pantallas QR», sin «móviles»', () => {
     const js = D.src('control.js');
     ok(/Pantallas QR<\/div>/.test(js) && !/Pantallas QR \(móviles\)/.test(js), 'sin «(móviles)»');
@@ -895,7 +952,7 @@
     const t3 = dashboard({ 'showtime.panel.style': '"escenario"' });
     t3.env.fire('document', 'keydown', { key: 'C', metaKey: true, shiftKey: true, preventDefault() {} });
     eq(t3.read('showtime.panel.style'), 'raycast', 'si ya estaba en Escenario sin historial, vuelve a Raycast');
-    ok(/<dt><kbd>⇧<\/kbd> <kbd>⌘<\/kbd> <kbd>C<\/kbd><\/dt><dd>Alterna tema Alto Contraste \(Escenario \/ Sol\) al instante<\/dd>/.test(D.src('control.js')), 'en la ayuda ⌘/');
+    ok(/<dt><kbd>⇧<\/kbd> <kbd>⌘<\/kbd> <kbd>C<\/kbd><\/dt><dd>Alterna tema Alto Contraste \(Escenario \/ Sol\) al instante<\/dd>/.test(D.src('control.js')), 'en la ayuda');
   });
   test('Modo Foco: micro-píldora del tipo (SHOW · PRUEBA · TAREA · HITO) con color fijo, en vez del cuadradito de color', () => {
     const P = panel().T.tipoPill;

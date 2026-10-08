@@ -13,8 +13,8 @@
 <meta name="apple-mobile-web-app-title" content="Showtime">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
-<link rel="stylesheet" href="control.css?v=20261070">
-<link rel="stylesheet" href="marca.css?v=20261070">
+<link rel="stylesheet" href="control.css?v=20261071">
+<link rel="stylesheet" href="marca.css?v=20261071">
 </head>
 <body>
 <div id="splash" class="splash" hidden></div>
@@ -201,7 +201,7 @@
     <div class="list-h">
       <h2 id="list-title" class="sr-only">Artistas</h2>
       <button id="btn-focus" class="btn ghost focusbtn" type="button" aria-pressed="false" title="Modo foco: solo lo de directo, filas y letra más grandes (⇧⌘F)"><span class="fled" aria-hidden="true"></span><span class="ftxt">Foco</span></button>
-      <button id="btn-help" class="btn ghost icon helpbtn" type="button" title="Atajos y ayuda (⌘/)" aria-label="Atajos y ayuda">?</button>
+      <button id="btn-help" class="btn ghost icon helpbtn" type="button" title="Atajos y ayuda (⇧⌘7)" aria-label="Atajos y ayuda">?</button>
       <button id="btn-new-row" class="btn addnew" title="Añadir una entrada (show, soundcheck, tarea o hito): se coloca sola en su sitio por hora"><svg class="ic"><use href="#i-plus"/></svg>Añadir</button>
     </div>
     <div id="list-empty" class="list-empty" hidden>
@@ -240,6 +240,11 @@
 </section>
 
 <!-- Configuración: ajustes (evento, escenarios, estilos). Archivo va en la barra superior. -->
+<div id="spotlight" class="spot" hidden><div class="spot-box" role="dialog" aria-modal="true" aria-label="Buscar o ejecutar">
+  <div class="spot-top"><svg class="spot-lupa" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 16l4.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><input id="spot-q" type="text" placeholder="Buscar banda, vista o acción…" autocomplete="off" spellcheck="false" aria-label="Buscar"></div>
+  <div id="spot-list" class="spot-list" role="listbox"></div>
+  <div class="spot-foot"><span><kbd>↑↓</kbd> navegar</span><span><kbd>↵</kbd> seleccionar</span><span><kbd>esc</kbd> cerrar</span></div>
+</div></div>
 <div id="cfg-back" class="cfg-back" hidden></div>
 <aside id="cfg" class="cfg" aria-label="Configuración" hidden>
   <div class="cfg-h"><h2>Configuración</h2><button id="cfg-close" class="iconsq" title="Cerrar (Esc)"><svg class="ic"><use href="#i-x"/></svg></button></div>
@@ -414,18 +419,18 @@
 <datalist id="zones-dl"></datalist>
 <div id="toast" class="toast" hidden></div>
 
-<script src="core.js?v=20261070"></script>
-<script src="meteo.js?v=20261070"></script>
-<script src="datos.js?v=20261070"></script>
-<script src="importar.js?v=20261070"></script>
-<script src="xlsx.js?v=20261070"></script>
-<script src="qr.js?v=20261070"></script>
-<script src="emision.js?v=20261070"></script>
-<script src="mando.js?v=20261070"></script>
-<script src="vistas.js?v=20261070"></script>
-<script src="log.js?v=20261070"></script>
-<script src="marca.js?v=20261070"></script>
-<script src="control.js?v=20261070"></script>
-<script src="pwa.js?v=20261070"></script>
+<script src="core.js?v=20261071"></script>
+<script src="meteo.js?v=20261071"></script>
+<script src="datos.js?v=20261071"></script>
+<script src="importar.js?v=20261071"></script>
+<script src="xlsx.js?v=20261071"></script>
+<script src="qr.js?v=20261071"></script>
+<script src="emision.js?v=20261071"></script>
+<script src="mando.js?v=20261071"></script>
+<script src="vistas.js?v=20261071"></script>
+<script src="log.js?v=20261071"></script>
+<script src="marca.js?v=20261071"></script>
+<script src="control.js?v=20261071"></script>
+<script src="pwa.js?v=20261071"></script>
 </body>
 </html>

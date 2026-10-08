@@ -2638,7 +2638,7 @@
     loadState(); renderAll();
   });
 
-  // ── Atajos y ayuda («?» o ⌘/): lo que antes era texto fijo encima de la tabla ──
+  // ── Atajos y ayuda («?» o ⇧⌘7): lo que antes era texto fijo encima de la tabla ──
   function openHelp() {
     modal('Atajos y ayuda', '<dl class="keys">' +
       '<dt><kbd>Intro</kbd> o salir de la casilla</dt><dd>Aplica el cambio</dd>' +
@@ -2647,7 +2647,7 @@
       '<dt>Doble clic en la hora real</dt><dd>Corrige la hora real de inicio de una banda que ya empezó</dd>' +
       '<dt><kbd>⇧</kbd> <kbd>⌘</kbd> <kbd>F</kbd></dt><dd>Modo foco: solo lo de directo, filas y letra más grandes</dd>' +
       '<dt><kbd>⇧</kbd> <kbd>⌘</kbd> <kbd>C</kbd></dt><dd>Alterna tema Alto Contraste (Escenario / Sol) al instante</dd>' +
-      '<dt><kbd>⌘</kbd> <kbd>/</kbd></dt><dd>Abre esta ayuda</dd>' +
+      '<dt><kbd>⇧</kbd> <kbd>⌘</kbd> <kbd>7</kbd></dt><dd>Abre esta ayuda</dd>' +
       '</dl><p class="hint">Jornada = día del evento: lo que empieza antes de la hora de corte cuenta como la noche anterior. En la Pantalla Live: <kbd>F</kbd> pantalla completa · <kbd>V</kbd> cambia de vista.</p>',
       [{ label: 'Cerrar' }]);
   }
@@ -2673,7 +2673,7 @@
     toast('Estilo del Dashboard: ' + (next === 'escenario' ? 'Escenario (Alto contraste)' : next === 'raycast' ? 'Raycast' : (sel && sel.selectedOptions[0] ? sel.selectedOptions[0].textContent : next)), false, 2000);
   }
   document.addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'c' || e.key === 'C')) { e.preventDefault(); togglePanelContrast(); } });
-  document.addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && (e.key === '/' || e.key === '?')) { e.preventDefault(); openHelp(); } });
+  document.addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.code === 'Digit7' || e.key === '/' || e.key === '?')) { e.preventDefault(); openHelp(); } });
 
   // ── Pantalla siempre encendida ───────────────────────────────────────
   // Sin reposo: botón con micro-LED (verde = activo). Se puede apagar; la elección se recuerda en este equipo.
@@ -2758,5 +2758,97 @@
     if (ok) toast('Se vuelve a guardar con normalidad');
   });
 
+  // ── Paleta de comandos (⌘K / Ctrl+K o «/»): bandas, vistas y acciones; ⌘S, ⌘O y ⌘N con prioridad sobre el navegador ──
+  const SPOT = { items: [], active: 0, open: false, q: '' };
+  function spotNorm(v) { return String(v || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); }
+  function spotSetDay(d) { CONFIG = Dt.setConfig({ day: d }); compute(); renderAll(); }
+  function spotSetMode(m) { CONFIG = Dt.setConfig({ mode: m }); compute(); renderAll(); }
+  function spotBands() {
+    if (!FEST) return [];
+    return C.buildBlocks(FEST, { mode: 'all', day: 'all' }).filter(b => C.isBand(b)).map(b => ({
+      group: 'Bandas', label: b.name || '(sin nombre)', sub: fmtDay(b.jornada) + ' · ' + C.fmtHM(b.si) + ' · ' + (b.stage || 'Sin zona'),
+      badge: b.kind === 'sc' ? 'SOUNDCHECK' : 'SHOW', kbd: '', search: (b.name || '') + ' ' + (b.stage || '') + ' ' + fmtDay(b.jornada),
+      run: () => spotJump(b)
+    }));
+  }
+  function spotActions() {
+    return [
+      { group: 'Vistas', label: 'Jornada completa', sub: 'Todos los días, todo el horario', search: 'jornada completa todo dia', run: () => { spotSetDay('all'); spotSetMode('all'); } },
+      { group: 'Vistas', label: 'Shows', sub: 'Solo conciertos', search: 'shows conciertos', run: () => spotSetMode('show') },
+      { group: 'Vistas', label: 'Soundchecks', sub: 'Solo soundchecks', search: 'soundchecks pruebas', run: () => spotSetMode('sc') },
+      { group: 'Vistas', label: 'Modo Foco', kbd: '⇧⌘F', sub: focusOn() ? 'Activado · desactivar' : 'Solo lo de directo, letra grande', search: 'modo foco directo', run: () => { setFocus(!focusOn()); toast(focusOn() ? 'Modo foco activado' : 'Modo foco desactivado', false, 2000); } },
+      { group: 'Vistas', label: 'Alto Contraste (Escenario / Sol)', kbd: '⇧⌘C', sub: panelStyle() === 'escenario' ? 'Activado · volver al tema anterior' : 'Para el sol en directo', search: 'alto contraste escenario sol', run: () => togglePanelContrast() },
+      { group: 'Vistas', label: 'Standby en Confidence', sub: standbyOn() ? 'Activado · quitar' : 'Cartel y hora en las Confidence', search: 'standby confidence cartel', run: () => setStandby(!standbyOn()) },
+      { group: 'Acciones', label: 'Importar horario', sub: 'Pegar o abrir un horario', search: 'importar pegar horario excel csv pdf', run: () => openImport('') },
+      { group: 'Acciones', label: 'Guardar (exportar JSON)', kbd: '⌘S', sub: 'Copia de seguridad del evento', search: 'guardar exportar json copia', run: () => { if (!FEST) toast('No hay evento abierto', true); else exportJSON(); } },
+      { group: 'Acciones', label: 'Nuevo evento', kbd: '⌘N', sub: 'Empezar un evento vacío o desde un horario', search: 'nuevo evento crear', run: () => askNew() },
+      { group: 'Acciones', label: 'Abrir evento', kbd: '⌘O', sub: 'Abrir un .json de Showtime o Synapse', search: 'abrir evento json', run: () => $('file').click() },
+      { group: 'Acciones', label: 'Configuración', sub: 'Estilos, zonas, mensajes y más', search: 'configuracion ajustes opciones', run: () => openConfig() },
+      { group: 'Acciones', label: 'Atajos y ayuda', kbd: '⇧⌘7', sub: 'Lista de atajos', search: 'ayuda atajos teclas', run: () => openHelp() }
+    ];
+  }
+  /** Lo que coincide con lo escrito (todas las palabras). Sin texto: vistas y acciones; con texto, también bandas. */
+  function spotItems(q) {
+    const words = spotNorm(q).trim().split(/\s+/).filter(Boolean);
+    const hit = txt => words.every(w => spotNorm(txt).indexOf(w) >= 0);
+    const bands = words.length ? spotBands().filter(b => hit(b.search)).slice(0, 12) : [];
+    const acts = spotActions().filter(a => !words.length || hit(a.label + ' ' + a.search));
+    return bands.concat(acts);
+  }
+  function spotRender() {
+    SPOT.items = spotItems(SPOT.q);
+    if (SPOT.active >= SPOT.items.length) SPOT.active = 0;
+    const box = $('spot-list'); if (!box) return;
+    if (!SPOT.items.length) { box.innerHTML = '<div class="spot-empty">Nada coincide con «' + esc(SPOT.q) + '»</div>'; return; }
+    let g = null, h = '';
+    SPOT.items.forEach((it, i) => {
+      if (it.group !== g) { g = it.group; h += '<div class="spot-g">' + esc(g) + '</div>'; }
+      h += '<button type="button" class="spot-i' + (i === SPOT.active ? ' on' : '') + '" data-i="' + i + '">' +
+        '<span class="spot-t">' + esc(it.label) + '</span>' +
+        (it.badge ? '<span class="spot-badge">' + esc(it.badge) + '</span>' : '') +
+        (it.sub ? '<span class="sm">' + esc(it.sub) + '</span>' : '') +
+        (it.kbd ? '<kbd>' + esc(it.kbd) + '</kbd>' : '') + '</button>';
+    });
+    box.innerHTML = h;
+    const on = box.querySelector('.spot-i.on'); if (on && on.scrollIntoView) on.scrollIntoView({ block: 'nearest' });
+  }
+  function spotMove(d) {
+    const n = SPOT.items.length; if (!n) return;
+    SPOT.active = (SPOT.active + d + n) % n; spotRender();
+  }
+  function spotOpen() {
+    closeMenus(); closeConfig && closeConfig();
+    SPOT.open = true; SPOT.q = ''; SPOT.active = 0;
+    $('spotlight').hidden = false; $('spot-q').value = ''; spotRender(); $('spot-q').focus();
+  }
+  function spotClose() { SPOT.open = false; $('spotlight').hidden = true; }
+  function spotRun(i) { const it = SPOT.items[i]; if (!it) return; spotClose(); it.run(); }
+  /** Salta a una banda: cambia la jornada o la vista si estaba oculta, la lleva al centro y la resalta con el flash. */
+  function spotJump(b) {
+    if (CONFIG.day !== 'all' && CONFIG.day !== b.jornada) CONFIG = Dt.setConfig({ day: b.jornada });
+    if (CONFIG.mode !== 'all' && CONFIG.mode !== b.kind) CONFIG = Dt.setConfig({ mode: 'all' });
+    compute(); renderAll();
+    const row = b.key ? document.querySelector('#tbody tr[data-key="' + CSS.escape(b.key) + '"]') : null;
+    if (row) { row.classList.remove('flash'); void row.offsetWidth; row.classList.add('flash'); row.scrollIntoView({ block: 'center' }); }
+    else toast('No se ve esa banda ahora', true);
+  }
+  function typingTarget(e) { const t = e.target || {}; return /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || '') || !!t.isContentEditable; }
+  $('spot-q').addEventListener('input', () => { SPOT.q = $('spot-q').value; SPOT.active = 0; spotRender(); });
+  $('spot-q').addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); spotMove(1); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); spotMove(-1); }
+    else if (e.key === 'Enter') { e.preventDefault(); spotRun(SPOT.active); }
+  });
+  $('spot-list').addEventListener('click', e => { const b = e.target.closest && e.target.closest('[data-i]'); if (b) spotRun(+b.dataset.i); });
+  $('spotlight').addEventListener('click', e => { if (e.target === $('spotlight')) spotClose(); });
+  document.addEventListener('keydown', e => {
+    const k = String(e.key || '').toLowerCase(), mod = e.metaKey || e.ctrlKey;
+    if (e.key === 'Escape' && SPOT.open) { e.preventDefault(); spotClose(); return; }
+    if (mod && !e.shiftKey && !e.altKey && k === 'k') { e.preventDefault(); SPOT.open ? spotClose() : spotOpen(); return; }
+    if (!mod && !e.altKey && e.key === '/' && !typingTarget(e)) { e.preventDefault(); SPOT.open ? spotClose() : spotOpen(); return; }
+    if (mod && !e.shiftKey && !e.altKey && k === 's') { e.preventDefault(); if (!FEST) toast('No hay evento abierto', true); else exportJSON(); return; }
+    if (mod && !e.shiftKey && !e.altKey && k === 'o') { e.preventDefault(); $('file').click(); return; }
+    if (mod && !e.shiftKey && !e.altKey && k === 'n') { e.preventDefault(); askNew(); return; }
+  });
   window.ShowtimePanel = { reload: () => { loadState(); renderAll(); }, _test: { winState: () => Array.from(WIN.entries()).map(([id, x]) => ({ id, name: x.name, vista: x.vista, zona: x.zona, standby: !!x.standby })), setWinVista, setWinStandby, closeLive, openGestor, gestorVisible, emProdMessage, emRegenProd, hitoChips, emUrl, prodBigTitle, fileKind, handleFile, emCommand, importSummary, hidesSome, tipoPill, setWake, wakeState: () => ({ on: wakeOn, lock: !!wakeLock }), showSplash, hideSplash, setStandby, standbyOn, room: () => emRoom } };   // _test: solo para tests/control.test.js
 })();
