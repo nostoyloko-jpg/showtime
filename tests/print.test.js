@@ -81,13 +81,44 @@
     ok(doc.indexOf('.density-ultra-compact{') >= 0, 'CSS de ultra-compact presente');
   });
 
+  test('i18n: español por defecto; inglés con lang:"en"', () => {
+    const { s } = fest();
+    const rows = P.rowsOf(s, { day: 'all', content: 'all' });
+    const es = P.html({ rows, days: [J1], title: 'T', orient: 'portrait', notes: true, call: true, now: new Date(2026, 6, 10) });
+    const en = P.html({ rows, days: [J1], title: 'T', orient: 'portrait', notes: true, call: true, now: new Date(2026, 6, 10), lang: 'en' });
+    ok(es.indexOf('<html lang="es">') >= 0 && es.indexOf('>Horario<') >= 0 && es.indexOf('Pág 1/1') >= 0, 'es: cabeceras y pie');
+    ok(es.indexOf('Escenario / zona') >= 0 && es.indexOf('Artista / actividad') >= 0, 'es: columnas');
+    ok(en.indexOf('<html lang="en">') >= 0 && en.indexOf('>Time<') >= 0 && en.indexOf('>Duration<') >= 0, 'en: cabeceras');
+    ok(en.indexOf('Stage / zone') >= 0 && en.indexOf('Artist / activity') >= 0 && en.indexOf('Notes / running order') >= 0, 'en: columnas');
+    ok(en.indexOf('Printed: 10/07/2026') >= 0 && en.indexOf('Page 1/1') >= 0, 'en: pie');
+    ok(en.indexOf('Horario') < 0 && en.indexOf('Impreso') < 0, 'en: sin rastro en español');
+  });
+  test('i18n: SOUNDCHECK en ambos idiomas; TASK/MILESTONE solo en inglés', () => {
+    const rows = [G('Prueba A', 600, 630, 'Principal', 'sc'), G('Tarea B', 640, 660, 'Principal', 'tarea'), G('Hito C', 700, null, 'Principal', 'hito')];
+    const es = P.html({ rows, days: [J1], title: 'T', orient: 'portrait', now: new Date(2026, 6, 10) });
+    const en = P.html({ rows, days: [J1], title: 'T', orient: 'portrait', now: new Date(2026, 6, 10), lang: 'en' });
+    ok(es.indexOf('>SOUNDCHECK<') >= 0 && es.indexOf('>TAREA<') >= 0 && es.indexOf('>HITO<') >= 0, 'es: píldoras');
+    ok(en.indexOf('>SOUNDCHECK<') >= 0 && en.indexOf('>TASK<') >= 0 && en.indexOf('>MILESTONE<') >= 0, 'en: píldoras');
+    ok(es.indexOf('PRUEBA') < 0, 'ya no aparece PRUEBA');
+  });
+  test('i18n: fecha en inglés, separador de noche bilingüe y cronograma traducido', () => {
+    ok(P.dayLabel(J1, 'en').indexOf('2026') >= 0, 'en: lleva año');
+    ok(P.dayLabel(J1, 'en') !== P.dayLabel(J1), 'en distinto de es');
+    eq(P.dayLabel('all', 'en'), 'Whole event');
+    eq(P.dayLabel('all'), 'Todo el evento');
+    const rows = [G('Show A', 600, 660), G('Doors open', 1140, null, 'Principal', 'hito'), G('Show B', 1200, 1260)];
+    const en = P.html({ rows, days: [J1], title: 'T', orient: 'portrait', now: new Date(2026, 6, 10), lang: 'en' });
+    ok(en.indexOf('class="pr-sep') < 0 && /<tr class="sep">/.test(en), 'en: separador en «Doors open»');
+    const g = P.html({ rows, days: [J1], title: 'T', format: 'gantt', now: new Date(2026, 6, 10), lang: 'en' });
+    ok(g.indexOf('stages') >= 0 && g.indexOf('blocks') >= 0 && g.indexOf('Timeline') >= 0, 'en: cronograma traducido');
+  });
   test('html: una hoja por jornada con salto de página', () => {
     const { s } = fest();
     const rows = P.rowsOf(s, { day: 'all', content: 'all' });
     const doc = P.html({ rows, days: [J1, J2], title: 'Prueba print', orient: 'portrait', notes: true, call: true, now: new Date(2026, 6, 10, 9, 5) });
     eq((doc.match(/<section class="sheet /g) || []).length, 2, 'dos secciones');
     ok(doc.indexOf('break-before:page') >= 0 || doc.indexOf('.sheet+.sheet') >= 0, 'salto de página entre hojas');
-    ok(doc.indexOf('Impreso: 10/07/2026 09:05') >= 0, 'fecha de impresión en el pie');
+    ok(doc.indexOf('Impreso: 10/07/2026') >= 0, 'fecha de impresión en el pie');
     ok(doc.indexOf('Pág 1/2') >= 0 && doc.indexOf('Pág 2/2') >= 0, 'pie con Pág X/Y dentro de cada hoja');
     ok(doc.indexOf('<footer class="sheet-foot">') >= 0, 'pie como elemento HTML, no @page');
     ok(doc.indexOf('A4 portrait') >= 0, 'A4 vertical');
@@ -222,18 +253,60 @@
     ok(t.every(l => l.replace('…', '').split(' ').every(w => ['Montaje','suelo','flamenco','de','la','noche'].indexOf(w) >= 0)), 'ninguna palabra amputada');
     eq(P.cutWords('Apertura de puertas recinto', 20), 'Apertura de…', 'cut limpio en palabra');
   });
-  test('gantt: carriles de igual altura que llenan el alto; hitos verticales; margen derecho', () => {
+  test('gantt: carriles de igual altura (45–60 mm con 2 escenarios); hitos en pista superior; margen derecho', () => {
     const H = 164;
     const L = P.layoutGantt([G('A', 600, 660), G('B', 700, 760), G('C', 630, 700, 'Carpa', 'show', '#0284c7'),
       G('Fin de pruebas', 690, null, 'Principal', 'hito'), G('Apertura de puertas recinto', 1140, null, 'Principal', 'hito')], 273, H);
     eq(L.lanes.length, 2, 'dos carriles');
     eq(L.lanes[0].h.toFixed(2), L.lanes[1].h.toFixed(2), 'misma altura por escenario');
     const bottom = L.lanes[L.lanes.length - 1].y + L.lanes[L.lanes.length - 1].h;
-    ok(Math.abs(bottom - (H - 1)) < 1.5, 'los carriles llegan casi al pie');
+    ok(L.lanes[0].h >= 45 && L.lanes[0].h <= 60, 'cada pista entre 45 y 60 mm');
+    ok(bottom <= H - 1 && bottom > H * 0.7, 'los carriles ocupan la parte baja de la hoja');
     ok(L.lanes[0].h > 40, 'carriles altos (no tope de 22 mm)');
     const svg = P.ganttSvg(L);
-    ok(svg.indexOf('rotate(-90') >= 0, 'etiquetas de hito verticales');
+    ok(!/rotate\(-90[^>]*fill="#991b1b"/.test(svg), 'hitos sin texto vertical');
+    ok(L.LW === 14 && /rotate\(-90[^>]*>Principal</.test(svg), 'escenario en vertical en una columna de 14 mm');
+    ok(L.hitos.length === 2 && L.hitos[0].y === undefined && svg.indexOf('Apertura de puertas recinto') >= 0, 'hitos con etiqueta horizontal');
     ok(L.x1 < L.W - 5, 'margen derecho para la última hora');
+  });
+  test('gantt: ningún bloque vacío; estrechos sin sitio → llamada numerada y leyenda', () => {
+    const rows = [G('Montaje suelo escenario principal', 600, 615), G('Linecheck Lagartija Nick', 615, 640), G('Show largo con nombre', 700, 820, 'Principal', 'show', '#e11d48'),
+      G('Pruebas', 900, 960, 'Carpa', 'sc', '#0284c7'), G('Fin', 1200, null, 'Principal', 'hito')];
+    const L = P.layoutGantt(rows, 273, 164);
+    ok(L.bars.every(b => b.lines.length || b.badge > 0), 'toda barra tiene texto o llamada');
+    const called = L.bars.filter(b => b.badge > 0);
+    ok(called.length >= 1 && called.every(b => b.w < 25), 'solo llevan llamada los estrechos');
+    eq(L.legend.length, called.length, 'una entrada de leyenda por llamada');
+    eq(called.map(b => b.badge).join(','), called.map((b, i) => i + 1).join(','), 'numeradas 1, 2, 3… por hora');
+    ok(L.legend[0].text.indexOf('(10:00–10:15)') >= 0, 'leyenda con nombre y horario');
+    ok(L.lanesBottom < L.legendTop, 'la leyenda va debajo de los carriles');
+    L.bars.filter(b => b.w >= 25).forEach(b => ok(b.lines.length >= 2, 'ancho: nombre + horario'));
+    const svg = P.ganttSvg(L);
+    ok(svg.indexOf('<circle') >= 0, 'distintivo dibujado (no depende de la fuente)');
+  });
+  test('gantt: OMEGA no se trunca si cabe en 2 líneas; medida por carácter', () => {
+    eq(P.wrapLines('OMEGA 30.º Aniversario', '', 32, 3, 3).join('|'), 'OMEGA 30.º|Aniversario', 'dos líneas sin «…»');
+    ok(P.textW('iiii', 3) < P.textW('MMMM', 3), 'una i ocupa menos que una M');
+    ok(P.textW('Ab', 3, true) > P.textW('Ab', 3), 'negrita más ancha');
+  });
+  test('gantt: hitos en 2 niveles alternos, recortados hasta el siguiente de su nivel', () => {
+    const rows = [G('A', 600, 1300), G('Fin de pruebas del escenario principal', 1170, null, 'Principal', 'hito'),
+      G('Apertura puertas', 1170, null, 'Principal', 'hito'), G('Apertura de puertas auditorio', 1200, null, 'Principal', 'hito'),
+      G('Curfew de sonido', 1230, null, 'Principal', 'hito'), G('Curfew de camerinos', 1260, null, 'Principal', 'hito')];
+    const L = P.layoutGantt(rows, 273, 164);
+    eq(L.hitos.length, 4, 'agrupados por hora');
+    eq(L.hitos.map(h => h.row).join(','), '0,1,0,1', 'niveles alternos');
+    ok(L.hitos[0].label.indexOf('19:30') === 0, 'empieza por la hora');
+    [0, 1].forEach(r => { const hs = L.hitos.filter(h => h.row === r); for (let i = 1; i < hs.length; i++) ok(hs[i - 1].endX <= hs[i].x, 'sin solape en el nivel ' + r); });
+  });
+  test('gantt: carriles en el orden de la configuración, aunque el de arriba empiece más tarde', () => {
+    const z = (r, o) => Object.assign(r, { zoneOrder: o });
+    const L = P.layoutGantt([z(G('Temprano', 600, 660, 'Carpa'), 1), z(G('Tarde', 1200, 1260, 'Principal'), 0), z(G('Sin config', 500, 560, 'Otra'), 1e6)], 273, 164);
+    eq(L.lanes.map(l => l.name).join(','), 'Principal,Carpa,Otra', 'Principal arriba siempre; las desconocidas al final');
+    const { s } = fest();
+    const rows = P.rowsOf(s, { day: 'all', content: 'all' });
+    ok(rows.length && rows.every(r => r.zoneOrder === 0 || r.zoneOrder === 1), 'rowsOf trae la posición de la zona en la configuración');
+    ok(rows.some(r => r.zone === 'Principal' && r.zoneOrder === 0), 'Principal es la primera zona');
   });
   test('gantt: html con formato gantt → hojas apaisadas con SVG y pie', () => {
     const rows = [G('A', 690, 780), G('B', 900, 960, 'Carpa', 'show', '#0284c7')];
@@ -251,7 +324,7 @@
   test('dayLabel y printedAt', () => {
     ok(P.dayLabel(J1).indexOf('2026') < 0, 'no añade año');
     eq(P.dayLabel('all'), 'Todo el evento');
-    eq(P.printedAt(new Date(2026, 0, 5, 7, 3)), '05/01/2026 07:03');
+    eq(P.printedAt(new Date(2026, 0, 5, 7, 3)), '05/01/2026');
   });
 
   let fail = 0;

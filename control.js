@@ -426,8 +426,10 @@
   }
 
   /** Modo Foco: micro-píldora del tipo, legible a distancia, con color fijo por tipo (show · prueba · tarea · hito). */
-  const PILL_TXT = { show: 'SHOW', sc: 'PRUEBA', tarea: 'TAREA', hito: 'HITO' };
-  function tipoPill(k) { return '<span class="tpill tp-' + k + '" aria-hidden="true">' + (PILL_TXT[k] || '') + '</span>'; }
+  const PILL_TXT = { show: 'SHOW', sc: 'SOUNDCHECK', tarea: 'TAREA', hito: 'HITO' };   // SOUNDCHECK en toda la app (terminología internacional)
+  /** Texto de la píldora: SOUNDCHECK; en pantallas estrechas (CSS) se ve la forma corta SC. */
+  function pillTxt(k) { return k === 'sc' ? '<span class="pl-l">SOUNDCHECK</span><span class="pl-s">SC</span>' : esc(PILL_TXT[k] || ''); }
+  function tipoPill(k) { return '<span class="tpill tp-' + k + '" aria-hidden="true">' + pillTxt(k) + '</span>'; }
   // Fila editable de una entrada (con o sin horario en la vista actual). b = su bloque (o null).
   function rowHtml(a, b, mods, isNew) {
     const mode = rowModeOf(b);
@@ -1609,7 +1611,7 @@
   }
   $('btn-log').addEventListener('click', openLogExport);
   /* ── Hoja de ruta imprimible (Running Order) · Fase 1: tabla ───────────── */
-  const PR = { fmt: 'tabla', day: null, zone: 'all', kinds: { show: true, sc: true, tarea: true, hito: true }, orient: 'portrait', notes: true, call: true };
+  const PR = { fmt: 'tabla', day: null, zone: 'all', kinds: { show: true, sc: true, tarea: true, hito: true }, orient: 'portrait', notes: true, call: true, lang: 'es' };
   const prKinds = () => Object.keys(PR.kinds).filter(k => PR.kinds[k]);
   function openPrint(fmt) {
     if (!FEST || !window.ShowtimePrint) { toast('Primero crea o abre un evento', true); return; }
@@ -1621,6 +1623,7 @@
     if (PR.zone !== 'all' && !stages.some(z => z.id === PR.zone)) PR.zone = 'all';
     const html = '<div class="dw pr">' +
       '<div class="dw-row"><span class="dw-l">Formato</span><div class="dtog radio" id="pr-fmt"><button type="button" class="' + (PR.fmt === 'tabla' ? 'on' : '') + '" data-f="tabla">Tabla</button><button type="button" class="' + (PR.fmt === 'gantt' ? 'on' : '') + '" data-f="gantt" title="Cronograma de escenarios en horizontal">Cronograma</button></div></div>' +
+      '<div class="dw-row"><span class="dw-l">Idioma</span><div class="dtog radio" id="pr-lang"><button type="button" class="' + (PR.lang === 'es' ? 'on' : '') + '" data-l="es">Español</button><button type="button" class="' + (PR.lang === 'en' ? 'on' : '') + '" data-l="en">English</button></div></div>' +
       '<div class="dw-row"><span class="dw-l">Jornada</span><select id="pr-day">' + days.map(d => '<option value="' + d + '">' + esc(fmtDay(d)) + '</option>').join('') + (days.length > 1 ? '<option value="all">Todas · 1 hoja por día</option>' : '') + '</select></div>' +
       '<div class="dw-row"><span class="dw-l">Zona</span><select id="pr-zone"><option value="all">Todas las zonas</option>' + stages.map(z => '<option value="' + esc(z.id) + '">' + esc(z.nombre) + '</option>').join('') + '</select></div>' +
       '<div class="dw-row top"><span class="dw-l">Contenido</span><div class="pr-kinds" id="pr-kinds">' +
@@ -1633,7 +1636,7 @@
       const rows = P.rowsOf(FEST, { day: PR.day, zone: PR.zone, kinds: prKinds() });
       if (!rows.length) { toast('No hay bloques con estos filtros', true); return false; }
       const dl = PR.day === 'all' ? days : [PR.day];
-      const doc = P.html({ rows, days: dl, title: (FEST.event && FEST.event.nombre) || 'Evento', format: PR.fmt, orient: PR.fmt === 'gantt' ? 'landscape' : PR.orient, notes: PR.notes, call: PR.call, now: new Date() });
+      const doc = P.html({ rows, days: dl, title: (FEST.event && FEST.event.nombre) || 'Evento', format: PR.fmt, orient: PR.fmt === 'gantt' ? 'landscape' : PR.orient, notes: PR.notes, call: PR.call, now: new Date(), lang: PR.lang, full: prKinds().length === 4 });
       P.launch(doc);
       toast('Hoja lista: en la impresión, elige «Guardar como PDF»');
     } }], { wide: true });
@@ -1644,6 +1647,7 @@
       const gantt = PR.fmt === 'gantt';
       $('pr-orient').disabled = gantt; $('pr-call').disabled = gantt; $('pr-notes').disabled = gantt;
       document.querySelectorAll('#pr-fmt [data-f]').forEach(b => b.classList.toggle('on', b.dataset.f === PR.fmt));
+      document.querySelectorAll('#pr-lang [data-l]').forEach(b => b.classList.toggle('on', b.dataset.l === PR.lang));
       const rows = P.rowsOf(FEST, { day: PR.day, zone: PR.zone, kinds: prKinds() });
       const dl = PR.day === 'all' ? days : [PR.day];
       const sm = P.summary(rows, dl);
@@ -1664,6 +1668,7 @@
     $('pr-call').addEventListener('change', e => { PR.call = e.target.checked; paint(); });
     $('pr-notes').addEventListener('change', e => { PR.notes = e.target.checked; paint(); });
     $('pr-fmt').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (!b || b.disabled) return; PR.fmt = b.dataset.f; paint(); });
+    $('pr-lang').addEventListener('click', e => { const b = e.target.closest('[data-l]'); if (!b) return; PR.lang = b.dataset.l; paint(); });
     paint();
   }
   $('btn-print').addEventListener('click', () => openPrint());
@@ -2861,7 +2866,7 @@
     if (!FEST) return [];
     return C.buildBlocks(FEST, { mode: 'all', day: 'all' }).filter(b => C.isBand(b)).map(b => ({
       group: 'Bandas', label: b.name || '(sin nombre)', sub: fmtDay(b.jornada) + ' · ' + C.fmtHM(b.si) + ' · ' + (b.stage || 'Sin zona'),
-      pill: '<span class="spot-pill tp-' + b.kind + '" aria-hidden="true">' + (PILL_TXT[b.kind] || '') + '</span>', kbd: '', search: (b.name || '') + ' ' + (b.stage || '') + ' ' + fmtDay(b.jornada),
+      pill: '<span class="spot-pill tp-' + b.kind + '" aria-hidden="true">' + pillTxt(b.kind) + '</span>', kbd: '', search: (b.name || '') + ' ' + (b.stage || '') + ' ' + fmtDay(b.jornada),
       run: () => spotJump(b)
     }));
   }

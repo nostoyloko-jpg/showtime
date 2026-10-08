@@ -1023,10 +1023,10 @@
     eq(t3.read('showtime.panel.style'), 'raycast', 'si ya estaba en Escenario sin historial, vuelve a Raycast');
     ok(/<dt><kbd>⇧<\/kbd> <kbd>⌘<\/kbd> <kbd>C<\/kbd><\/dt><dd>Alterna tema Alto Contraste \(Escenario \/ Sol\) al instante<\/dd>/.test(D.src('control.js')), 'en la ayuda');
   });
-  test('Modo Foco: micro-píldora del tipo (SHOW · PRUEBA · TAREA · HITO) con color fijo, en vez del cuadradito de color', () => {
+  test('Modo Foco: micro-píldora del tipo (SHOW · SOUNDCHECK · TAREA · HITO) con color fijo, en vez del cuadradito de color', () => {
     const P = panel().T.tipoPill;
     eq(P('show'), '<span class="tpill tp-show" aria-hidden="true">SHOW</span>');
-    ok(/>PRUEBA</.test(P('sc')) && />TAREA</.test(P('tarea')) && />HITO</.test(P('hito')));
+    ok(/>SOUNDCHECK</.test(P('sc')) && />TAREA</.test(P('tarea')) && />HITO</.test(P('hito')));
     const F = fest(), t = panel({ 'showtime.festival': JSON.stringify(F.s) });
     ok(/<div class="nm"><span class="tpill tp-show"/.test(ultimo(t, 'tbody')), 'cada fila lleva su píldora');
     const css = D.src('control.css');

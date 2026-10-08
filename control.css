@@ -1071,3 +1071,6 @@ td input:focus,td select:focus,.imp-src textarea:focus,.imp-prev td input[type=t
 .pr-q{display:inline-flex;gap:6px;margin-left:8px}
 .pr-q button{font-size:12px;padding:3px 10px;border-radius:999px;border:1px solid var(--line2);background:transparent;color:var(--text);cursor:pointer}
 .pr-q button:hover{border-color:var(--text)}
+/* SOUNDCHECK → SC en pantallas estrechas (píldoras de tipo) */
+.pl-s{display:none}
+@media (max-width:1100px){.pl-l{display:none}.pl-s{display:inline}}

@@ -23,13 +23,42 @@
     { k: 'tarea', label: 'Tareas' },
     { k: 'hito', label: 'Hitos' }
   ];
-  /** Píldoras «ghost»: texto y contorno por tipo (SHOW negro · PRUEBA púrpura · TAREA azul · HITO rojo). */
+  /** Píldoras «ghost»: contorno y color por tipo (SHOW negro · SOUNDCHECK púrpura · TAREA azul · HITO rojo).
+   *  El texto sale del diccionario de idioma (I18N). */
   const TYPE = {
-    show: { txt: 'SHOW', cls: 'p-show' },
-    sc: { txt: 'PRUEBA', cls: 'p-prueba' },
-    tarea: { txt: 'TAREA', cls: 'p-tarea' },
-    hito: { txt: 'HITO', cls: 'p-hito' }
+    show: { cls: 'p-show' },
+    sc: { cls: 'p-prueba' },
+    tarea: { cls: 'p-tarea' },
+    hito: { cls: 'p-hito' }
   };
+  /** Textos de la hoja impresa en cada idioma (0 dependencias). Por defecto, español. */
+  const I18N = {
+    es: {
+      htmlLang: 'es', locale: 'es-ES',
+      cols: { time: 'Horario', dur: 'Duración', call: 'CALL', zone: 'Escenario / zona', type: 'Tipo', name: 'Artista / actividad', notes: 'Notas / operativa' },
+      pills: { show: 'SHOW', sc: 'SOUNDCHECK', tarea: 'TAREA', hito: 'HITO' },
+      brand: 'Showtime · Hoja de ruta', brandGantt: 'Showtime · Cronograma',
+      printed: 'Impreso: ', page: 'Pág ', allDays: 'Todas las jornadas', noDay: 'Todo el evento',
+      allStages: 'Todos los escenarios', full: 'Todo el horario', blocks: 'bloques', stages: 'escenarios',
+      zone: 'Zona: ', noZone: 'Sin zona', empty: 'Nada que imprimir con estos filtros.', emptyGantt: 'Nada que dibujar con estos filtros.'
+    },
+    en: {
+      htmlLang: 'en', locale: 'en-GB',
+      cols: { time: 'Time', dur: 'Duration', call: 'CALL', zone: 'Stage / zone', type: 'Type', name: 'Artist / activity', notes: 'Notes / running order' },
+      pills: { show: 'SHOW', sc: 'SOUNDCHECK', tarea: 'TASK', hito: 'MILESTONE' },
+      brand: 'Showtime · Running order', brandGantt: 'Showtime · Timeline',
+      printed: 'Printed: ', page: 'Page ', allDays: 'All days', noDay: 'Whole event',
+      allStages: 'All stages', full: 'Full schedule', blocks: 'blocks', stages: 'stages',
+      zone: 'Zone: ', noZone: 'No zone', empty: 'Nothing to print with these filters.', emptyGantt: 'Nothing to draw with these filters.'
+    }
+  };
+  /** Diccionario del idioma pedido («en»; cualquier otro valor → español). */
+  function T(lang) { return I18N[lang === 'en' ? 'en' : 'es']; }
+  /** Píldora de tipo en el idioma pedido. */
+  function pillOf(kind, lang) {
+    const t = TYPE[kind] || { cls: 'p-show' };
+    return { txt: T(lang).pills[kind] || String(kind || '').toUpperCase(), cls: t.cls };
+  }
   /** Convención de avisos: texto entre asteriscos («*** Restricciones de PA… ***») → fila de ancho completo. */
   const AVISO_RE = /\*\*\*/;
 
@@ -46,6 +75,7 @@
     const o = opts || {};
     const kinds = Array.isArray(o.kinds) ? o.kinds.slice() : (CONTENT[o.content] || CONTENT.all).kinds;
     const blocks = C.buildBlocks(state, { mode: 'all', day: o.day || 'all' });
+    const stageIds = ((state && state.escenarios) || []).map(e => e.id);   // orden de la configuración del evento
     return blocks
       .filter(b => kinds.indexOf(b.kind) >= 0)
       .filter(b => !o.zone || o.zone === 'all' || b.stageId === o.zone)
@@ -63,6 +93,7 @@
           call: b.callAbs !== null && b.callAbs !== undefined ? C.fmtHM(b.callAbs) : '',
           zone: b.stage || 'Sin zona',
           zoneColor: hexOk(b.stageColor || b.color, '#94a3b8'),
+          zoneOrder: stageIds.indexOf(b.stageId) < 0 ? 1e6 : stageIds.indexOf(b.stageId),   // posición fija del carril en el cronograma
           kind: b.kind,
           name: name,
           notes: notes,
@@ -81,15 +112,21 @@
     return { cls: 'density-ultra-compact', fs: '7.5pt', pad: '1.2mm' };
   }
 
-  function dayLabel(iso) {
-    if (!iso || iso === 'all') return 'Todo el evento';
+  function dayLabel(iso, lang) {
+    const t = T(lang);
+    if (!iso || iso === 'all') return t.noDay;
     const i = C.dayIndex(iso);
     const d = i === null ? null : new Date(Date.UTC(2000, 0, 1) + i * 864e5);
-    return d ? d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }) : iso;
+    if (!d) return iso;
+    const opts = lang === 'en'
+      ? { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }
+      : { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' };
+    return d.toLocaleDateString(t.locale, opts);
   }
+  /** Fecha de impresión: DD/MM/AAAA (igual en los dos idiomas). */
   function printedAt(d) {
     const x = d || new Date();
-    return pad2(x.getDate()) + '/' + pad2(x.getMonth() + 1) + '/' + x.getFullYear() + ' ' + pad2(x.getHours()) + ':' + pad2(x.getMinutes());
+    return pad2(x.getDate()) + '/' + pad2(x.getMonth() + 1) + '/' + x.getFullYear();
   }
 
   /** Días a imprimir: uno por hoja (o un único día). */
@@ -154,39 +191,77 @@
     return t.slice(0, sp).replace(/[\s,;:.\-–]+$/, '') + '…';
   }
 
-  /** Parte el texto en líneas que caben en maxW (mm). Nunca parte una palabra: si no cabe todo,
-   *  la última línea acaba en «…» quitando palabras enteras. Si la banda es muy estrecha, solo la hora. */
+  /** Ancho aproximado (mm) de un texto sans-serif con letra de fs mm (negrita ≈ +10 %).
+   *  Tabla por tipo de carácter: más fiel que contar caracteres (una «i» no ocupa lo que una «M»). */
+  function textW(s, fs, bold) {
+    let em = 0;
+    for (const ch of String(s == null ? '' : s)) {
+      if (ch === ' ') em += 0.28;
+      else if ('iljI.,:;!|\'·'.indexOf(ch) >= 0) em += 0.26;
+      else if ('ftr()[]/º°-'.indexOf(ch) >= 0) em += 0.35;
+      else if ('mwMW'.indexOf(ch) >= 0) em += 0.86;
+      else if (ch === '…' || ch === '—') em += 1.0;
+      else if (ch === '–') em += 0.56;
+      else if (/[A-ZÁÉÍÓÚÑÜÇ&]/.test(ch)) em += 0.70;
+      else if (/[0-9]/.test(ch)) em += 0.57;
+      else em += 0.56;
+    }
+    return em * fs * (bold ? 1.1 : 1);
+  }
+
+  /** Recorta un texto de una línea a maxW (mm) quitando palabras enteras del final y acabando en «…».
+   *  Si ni la primera palabra cabe, devuelve la primera palabra (p. ej. la hora de un hito). */
+  function fitText(s, fs, maxW, bold) {
+    s = String(s || '');
+    if (textW(s, fs, bold) <= maxW) return s;
+    const w = s.split(' ');
+    while (w.length > 1) {
+      w.pop();
+      const t = w.join(' ').replace(/[\s,;:.\/\-–]+$/, '') + '…';
+      if (textW(t, fs, bold) <= maxW) return t;
+    }
+    return w[0];
+  }
+
+  /** Parte el texto en líneas que caben en maxW (mm), medidas con textW en negrita. Nunca parte una palabra:
+   *  si no cabe todo, la última línea acaba en «…» quitando palabras enteras. Banda muy estrecha: solo la hora. */
   function wrapLines(name, time, maxW, fs, maxLines) {
     if (maxLines < 1) return [];
-    const cw = fs * 0.66, per = Math.floor(maxW / cw);   // 0.66 em: margen para negrita
-    const tOk = !!time && time.length * cw <= maxW;
-    if (per < 4) return tOk ? [time] : [];
+    const tOk = !!time && textW(time, fs) <= maxW;
+    if (maxW < fs * 2.2) return tOk ? [time] : [];
     const words = String(name || '').split(/\s+/).filter(Boolean);
     const lines = [];
     let cur = '', trunc = false;
     for (const w of words) {
-      if (w.length > per) { trunc = true; break; }          // no cabe ni sola: se corta aquí, sin partirla
+      if (textW(w, fs, true) > maxW) { trunc = true; break; }   // no cabe ni sola: se corta aquí, sin partirla
       const cand = cur ? cur + ' ' + w : w;
-      if (cand.length <= per) cur = cand;
+      if (textW(cand, fs, true) <= maxW) cur = cand;
       else { lines.push(cur); cur = w; }
     }
     if (cur) lines.push(cur);
     if (lines.length > maxLines) { lines.length = maxLines; trunc = true; }
     if (trunc && lines.length) {
       let last = lines[lines.length - 1];
-      while ((last + '…').length > per && last.indexOf(' ') > 0) last = last.slice(0, last.lastIndexOf(' '));
-      lines[lines.length - 1] = (last + '…').length <= per ? last + '…' : last;
+      while (textW(last + '…', fs, true) > maxW && last.indexOf(' ') > 0) last = last.slice(0, last.lastIndexOf(' '));
+      lines[lines.length - 1] = textW(last + '…', fs, true) <= maxW ? last + '…' : last;
     }
     if (tOk && lines.length < maxLines) lines.push(time);
     return lines;
   }
 
-  /** Texto de una barra: nombre + horario; si el nombre no cabe (bloque estrecho), solo la hora de inicio. */
-  function barLines(name, s, time, maxW, fs, maxLines) {
-    const named = wrapLines(name, '', maxW, fs, maxLines);
-    if (named.length) return wrapLines(name, time, maxW, fs, maxLines);
-    const hora = C.fmtHM(s);                          // la hora sola cabe con la letra normal (sin margen de negrita)
-    return maxLines >= 1 && hora.length * fs * 0.56 <= maxW ? [hora] : [];
+  /** Texto de una barra: nombre en negrita (hasta maxLines−1 líneas) y debajo el horario completo
+   *  («14:00–15:15») o solo la hora de inicio si no cabe. complete = el nombre sale entero, sin «…». */
+  function barText(name, time, maxW, fs, maxLines) {
+    const words = String(name || '').split(/\s+/).filter(Boolean);
+    if (maxLines < 1 || maxW < fs * 2.2) return { lines: [], complete: false };
+    const hora = time.split('–')[0];
+    const tLine = maxLines >= 2 || !words.length ? (textW(time, fs) <= maxW ? time : textW(hora, fs) <= maxW ? hora : '') : '';
+    const nameLines = words.length ? wrapLines(name, '', maxW, fs, tLine ? maxLines - 1 : maxLines) : [];
+    const last = nameLines[nameLines.length - 1] || '';
+    const shown = nameLines.join(' ').replace(/…$/, '').split(/\s+/).filter(Boolean);
+    const complete = words.length ? (shown.length === words.length && !/…$/.test(last)) : !!tLine;
+    const lines = tLine && (nameLines.length || !words.length) ? nameLines.concat([tLine]) : nameLines;
+    return { lines: lines, complete: complete };
   }
 
   /** Etiqueta que cabe en un ancho (mm): «Nombre horario» → «Nombre» → «Nomb…» → vacío. */
@@ -201,9 +276,9 @@
 
   /**
    * Cronograma (Gantt) de un día: geometría en mm dentro de un viewBox W×H.
-   * Rango dinámico: desde el primer bloque (−30 min, a hora completa) hasta el último (+30 min, a hora completa).
-   * Carriles = escenarios, todos de la misma altura que llenan el alto útil; bloques solapados en el mismo
-   * escenario van en sub-filas; hitos = líneas verticales con etiqueta vertical junto a la línea, en una banda superior.
+   * De arriba abajo: pista de hitos (2 niveles alternos; los hitos a la misma hora van juntos), eje horario,
+   * carriles (escenarios, con el nombre en vertical en una columna de 14 mm) y, si hace falta, la leyenda
+   * de llamadas ①②③ de los bloques estrechos cuyo nombre no cabe. Ningún bloque queda vacío.
    * list: filas de rowsOf (con s/e en minutos). Devuelve null si no hay nada que dibujar.
    */
   function layoutGantt(list, W, H) {
@@ -214,7 +289,7 @@
     const a = Math.floor((minS - 30) / 60) * 60;
     const b = Math.ceil((maxE + 30) / 60) * 60;
     const step = b - a <= 360 ? 30 : 60;
-    const TOP = 6, LW = 44, GAP = 1.4, x0 = LW, x1 = W - 7;   // 7 mm a la derecha: la etiqueta 01:00 no se corta
+    const TOP = 6, LW = 14, GAP = 1.4, x0 = LW, x1 = W - 7;   // 7 mm a la derecha: la etiqueta 01:00 no se corta
     const X = t => x0 + (t - a) / (b - a) * (x1 - x0);
     const laneMap = new Map();
     items.filter(r => r.kind !== 'hito').slice().sort((p, q) => p.s - q.s).forEach(r => {
@@ -222,7 +297,11 @@
       laneMap.get(r.zone).items.push(r);
     });
     const lanes = [];
-    laneMap.forEach(l => {
+    // Carriles en el orden de la configuración del evento: cada escenario, siempre en el mismo sitio
+    // (los que no están en la configuración, al final, por orden de aparición).
+    let seen = 0;
+    laneMap.forEach(l => { l.order = Number.isFinite(l.items[0].zoneOrder) ? l.items[0].zoneOrder : 1e6; l.seen = seen++; });
+    [...laneMap.values()].sort((p, q) => p.order - q.order || p.seen - q.seen).forEach(l => {
       const ends = [];
       l.items.forEach(r => {
         const e = Number.isFinite(r.e) ? r.e : r.s;
@@ -233,54 +312,111 @@
       l.rows = Math.max(1, ends.length);
       lanes.push(l);
     });
-    // Banda de hitos: etiquetas verticales (−90º). Alto de la banda = la etiqueta más larga, tope 52 mm.
-    const HFS = 2.6, HCW = HFS * 0.66;
-    const hraw = items.filter(r => r.kind === 'hito').map(r => ({ x: X(r.s), t: C.fmtHM(r.s) + ' ' + clean(r.name) }));
-    const maxLen = hraw.reduce((m, h) => Math.max(m, h.t.length), 0);
-    const HB = hraw.length ? Math.min(52, maxLen * HCW + 2) : 0;
-    const hcap = Math.max(4, Math.floor((HB - 2) / HCW));
-    const hitos = hraw.map(h => ({ x: h.x, label: cutWords(h.t, hcap) }));
-    // Carriles de igual altura que llenan el alto útil; las filas de cada carril reparten esa altura.
-    const lanesTop = TOP + (HB ? HB + 1.5 : 0);
+
+    // ── Hitos: un grupo por hora, en 2 niveles alternos; cada etiqueta se recorta hasta el siguiente de su nivel ──
+    const HFS = 2.6, HROW = 3.4;
+    const byTime = new Map();
+    items.filter(r => r.kind === 'hito').forEach(r => {
+      if (!byTime.has(r.s)) byTime.set(r.s, []);
+      const n = clean(r.name);
+      if (n && byTime.get(r.s).indexOf(n) < 0) byTime.get(r.s).push(n);
+    });
+    const hitos = [...byTime.entries()].sort((p, q) => p[0] - q[0])
+      .map(([s, names], i) => ({ x: X(s), text: (C.fmtHM(s) + ' ' + names.join(' / ')).trim(), row: i % 2 }));
+    hitos.forEach((h, i) => {
+      const next = hitos.slice(i + 1).find(o => o.row === h.row);
+      const prev = hitos.slice(0, i).reverse().find(o => o.row === h.row);
+      let anchor = 'start', tx = h.x + 0.8;
+      let avail = (next ? next.x - 1.2 : W - 0.5) - tx;
+      if (!next && textW(h.text, HFS, true) > avail) {          // el último de su nivel: si cabe mejor, a la izquierda de la línea
+        const availL = (h.x - 0.8) - (prev ? prev.endX + 1.2 : 0.5);
+        if (availL > avail) { anchor = 'end'; tx = h.x - 0.8; avail = availL; }
+      }
+      h.label = fitText(h.text, HFS, avail, true);
+      h.anchor = anchor; h.tx = tx;
+      h.endX = anchor === 'start' ? tx + textW(h.label, HFS, true) : tx;
+    });
+    const bandH = hitos.length ? Math.min(2, hitos.length) * HROW + 0.6 : 0;
+    const tickY = TOP + bandH + 2.8;                          // línea base de las horas
+    const lanesTop = tickY + 2.2;
     const nL = lanes.length;
-    const laneH = Math.max(4, (H - lanesTop - 1 - (nL - 1) * GAP) / nL);
-    let y = lanesTop;
-    lanes.forEach(l => { l.y = y; l.h = laneH; l.rowH = laneH / l.rows; y += laneH + GAP; });
-    const minRow = Math.min.apply(null, lanes.map(l => l.rowH));
-    const fs = Math.min(4.6, Math.max(3, minRow / 6));          // una sola letra para todo el cronograma
-    const bars = [];
-    lanes.forEach(l => l.items.forEach(r => {
-      const e = Number.isFinite(r.e) ? r.e : r.s;
-      const x = X(r.s), w = Math.max(0.8, X(e) - X(r.s));
-      const time = C.fmtHM(r.s) + (Number.isFinite(r.e) ? '–' + C.fmtHM(r.e) : '');
-      const h = l.rowH - 1;
-      const maxLines = Math.max(0, Math.floor(h / (fs * 1.2)));
-      bars.push({ kind: r.kind, x: x, y: l.y + r.row * l.rowH + 0.5, w: w, h: h, color: r.zoneColor,
-        strong: isStrong(r), zone: r.zone, fs: fs, lines: barLines(clean(r.name), r.s, time, w - 2.6, fs, maxLines) });
-    }));
+    const totalRows = lanes.reduce((n, l) => n + l.rows, 0);
+
+    // ── Carriles y barras; la leyenda resta alto a los carriles, así que se ajusta en unas pocas vueltas ──
+    const LROW = 3.8, NARROW = 25;
+    let legendN = 0, rowH = 0, fs = 0, bars = [], lanesBottom = 0, legendTop = 0;
+    for (let pass = 0; pass < 5; pass++) {
+      const legendH = legendN ? Math.ceil(legendN / 2) * LROW + 3 : 0;
+      lanesBottom = H - 1 - legendH;
+      legendTop = lanesBottom + 3;
+      const avail = lanesBottom - lanesTop - (nL - 1) * GAP;
+      rowH = Math.min(60, avail / totalRows);
+      fs = Math.min(3.0, Math.max(2.4, rowH / 8));            // una sola letra para todo el cronograma (≈8.5 pt)
+      let y = lanesTop;
+      lanes.forEach(l => { l.y = y; l.h = l.rows * rowH; l.rowH = rowH; y += l.h + GAP; });
+      bars = [];
+      lanes.forEach((l, li) => l.items.forEach(r => {
+        const e = Number.isFinite(r.e) ? r.e : r.s;
+        const x = X(r.s), w = Math.max(0.8, X(e) - X(r.s));
+        const time = C.fmtHM(r.s) + (Number.isFinite(r.e) ? '–' + C.fmtHM(r.e) : '');
+        const h = rowH - 1;
+        const maxLines = Math.max(0, Math.floor(h / (fs * 1.2)));
+        const name = clean(r.name);
+        const t = barText(name, time, w - (r.kind === 'show' ? 3.4 : 2.6), fs, maxLines);
+        // Ancho ≥ 25 mm: nombre + horario (aunque haya que truncar). Estrecho: solo si el nombre cabe entero.
+        const ok = t.lines.length && (w >= NARROW || t.complete);
+        bars.push({ kind: r.kind, x: x, y: l.y + r.row * rowH + 0.5, w: w, h: h, color: r.zoneColor, s: r.s, lane: li, row: r.row,
+          strong: isStrong(r), zone: r.zone, fs: fs, lines: ok ? t.lines : [], badge: ok ? 0 : -1, name: name, time: time });
+      }));
+      const n = bars.filter(bb => bb.badge < 0).length;
+      if (n <= legendN) break;
+      legendN = n;
+    }
+    // Llamadas numeradas por orden horario (y escenario), y su leyenda en 2 columnas
+    const called = bars.filter(bb => bb.badge < 0).sort((p, q) => p.s - q.s || p.lane - q.lane || p.row - q.row);
+    called.forEach((bb, i) => { bb.badge = i + 1; bb.cx = bb.x + bb.w / 2; bb.cy = bb.y + bb.h / 2; });
+    const legend = [];
+    if (called.length) {
+      const rows = Math.ceil(called.length / 2), colW = (W - LW - 1) / 2;
+      called.forEach((bb, i) => {
+        const col = Math.floor(i / rows), row = i % rows;
+        const x = LW + col * colW, y = legendTop + row * LROW;
+        const tail = ' (' + bb.time + ')';
+        const nm = bb.name ? fitText(bb.name, 2.6, colW - 6 - textW(tail, 2.6), false) : '';
+        legend.push({ num: bb.badge, x: x, y: y, text: (nm + tail).trim() });
+      });
+    }
     const ticks = [];
     for (let t = a; t <= b; t += step) ticks.push({ x: X(t), label: C.fmtHM(t) });
-    return { W: W, H: H, TOP: TOP, a: a, b: b, step: step, x0: x0, x1: x1, LW: LW, lanes: lanes, bars: bars, ticks: ticks,
-      hitos: hitos, lanesTop: lanesTop, rowH: minRow, fs: fs };
+    return { W: W, H: H, TOP: TOP, tickY: tickY, bandH: bandH, hitoRow: HROW, hitoFs: HFS, a: a, b: b, step: step,
+      x0: x0, x1: x1, LW: LW, lanes: lanes, bars: bars, ticks: ticks, hitos: hitos, lanesTop: lanesTop,
+      lanesBottom: lanesBottom, legendTop: legendTop, legend: legend, rowH: rowH, fs: fs };
   }
 
   /** SVG vectorial inline del cronograma (sin gráficos de fondo: se imprime igual con o sin esa opción). */
   function ganttSvg(L) {
     const f = (n) => Math.round(n * 100) / 100;
     const out = [];
-    const TOP = L.TOP, TICK_Y = TOP - 1.6;
+    const badge = (cx, cy, n, r) => '<circle cx="' + f(cx) + '" cy="' + f(cy) + '" r="' + r + '" fill="#fff" stroke="#0f172a" stroke-width="0.3"/>' +
+      '<text x="' + f(cx) + '" y="' + f(cy + r * 0.42) + '" text-anchor="middle" font-size="' + f(n > 9 ? r * 0.95 : r * 1.2) + '" font-weight="800" fill="#0f172a">' + n + '</text>';
     out.push('<svg class="gantt" viewBox="0 0 ' + L.W + ' ' + L.H + '" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Cronograma de escenarios">');
     L.ticks.forEach(t => {
-      out.push('<line x1="' + f(t.x) + '" x2="' + f(t.x) + '" y1="' + (TOP - 1) + '" y2="' + (L.H - 1) + '" stroke="#e2e8f0" stroke-width="0.15"/>');
-      out.push('<text x="' + f(t.x) + '" y="' + TICK_Y + '" text-anchor="middle" font-size="2.8" fill="#334155">' + esc(t.label) + '</text>');
+      out.push('<line x1="' + f(t.x) + '" x2="' + f(t.x) + '" y1="' + f(L.tickY + 0.8) + '" y2="' + f(L.lanesBottom) + '" stroke="#e2e8f0" stroke-width="0.15"/>');
+      out.push('<text x="' + f(t.x) + '" y="' + f(L.tickY) + '" text-anchor="middle" font-size="2.8" fill="#334155">' + esc(t.label) + '</text>');
     });
     L.lanes.forEach((l, i) => {
       out.push('<rect x="0" y="' + f(l.y) + '" width="1.2" height="' + f(l.h) + '" fill="' + esc(l.color) + '"/>');
-      const maxC = Math.floor((L.LW - 5) / (3.2 * 0.6));
-      const nm = l.name.length > maxC ? l.name.slice(0, maxC - 1) + '…' : l.name;
-      out.push('<text x="3" y="' + f(l.y + l.h / 2 + 1.1) + '" font-size="3.2" font-weight="700" fill="#0f172a">' + esc(nm) + '</text>');
+      // Nombre del escenario en vertical (de abajo arriba), centrado en su carril; 1 o 2 líneas
+      let nl = wrapLines(l.name, '', l.h - 3, 3.2, 2);
+      if (!nl.length) nl = [fitText(l.name, 3.2, l.h - 3, true)];
+      const cy = f(l.y + l.h / 2), xs = nl.length === 1 ? [8.4] : [6.4, 10.6];
+      nl.forEach((t, k) => {
+        out.push('<text transform="rotate(-90 ' + xs[k] + ' ' + cy + ')" x="' + xs[k] + '" y="' + cy + '" text-anchor="middle" font-size="3.2" font-weight="700" fill="#0f172a">' + esc(t) + '</text>');
+      });
       if (i < L.lanes.length - 1) out.push('<line x1="0" x2="' + L.W + '" y1="' + f(l.y + l.h + 0.7) + '" y2="' + f(l.y + l.h + 0.7) + '" stroke="#cbd5e1" stroke-width="0.2"/>');
     });
+    // Líneas de hito por detrás de los bloques: guía limpia que no tapa nombres ni llamadas
+    L.hitos.forEach(h => out.push('<line x1="' + f(h.x) + '" x2="' + f(h.x) + '" y1="' + f(L.tickY + 0.8) + '" y2="' + f(L.lanesBottom) + '" stroke="#dc2626" stroke-width="0.3" stroke-dasharray="1.1,0.8"/>'));
     L.bars.forEach(b => {
       const show = b.kind === 'show';
       const style = show ? 'fill="#fff" stroke="#0f172a" stroke-width="0.3"'
@@ -290,40 +426,55 @@
       if (show) out.push('<rect x="' + f(b.x) + '" y="' + f(b.y) + '" width="1.1" height="' + f(b.h) + '" fill="' + esc(b.color) + '"/>');
       if (b.lines.length) {
         const lh = b.fs * 1.2, top = b.y + (b.h - b.lines.length * lh) / 2 + b.fs * 0.85;
-        out.push('<text x="' + f(b.x + (show ? 2.2 : 1.4)) + '" y="' + f(top) + '" font-size="' + f(b.fs) + '" font-weight="' + (b.strong ? 800 : 500) + '" fill="#0f172a">' +
-          b.lines.map((t, i) => '<tspan x="' + f(b.x + (show ? 2.2 : 1.4)) + '" dy="' + (i ? f(lh) : 0) + '">' + esc(t) + '</tspan>').join('') + '</text>');
+        const tx = f(b.x + (show ? 2.2 : 1.4));
+        const timeLast = /^\d\d:\d\d(–\d\d:\d\d)?$/.test(b.lines[b.lines.length - 1]);   // la última línea es el horario
+        out.push('<text x="' + tx + '" y="' + f(top) + '" font-size="' + f(b.fs) + '" fill="#0f172a">' +
+          b.lines.map((t, i) => '<tspan x="' + tx + '" dy="' + (i ? f(lh) : 0) + '" font-weight="' +
+            (timeLast && i === b.lines.length - 1 ? 500 : (b.strong ? 800 : 700)) + '">' + esc(t) + '</tspan>').join('') + '</text>');
+      } else if (b.badge > 0) {
+        out.push(badge(b.cx, b.cy, b.badge, 2));
       }
     });
-    // Hitos: línea roja discontinua y etiqueta vertical (−90º) pegada a la izquierda de la línea, en la banda superior.
+    // Hitos: etiqueta horizontal en la pista superior (2 niveles).
     L.hitos.forEach(h => {
-      out.push('<line x1="' + f(h.x) + '" x2="' + f(h.x) + '" y1="' + (TOP - 1) + '" y2="' + (L.H - 1) + '" stroke="#dc2626" stroke-width="0.3" stroke-dasharray="1.1,0.8"/>');
-      if (!h.label) return;
-      const hx = f(h.x - 0.6), hy = f(TOP + 0.6);
-      out.push('<text transform="rotate(-90 ' + hx + ' ' + hy + ')" x="' + hx + '" y="' + hy + '" text-anchor="end" font-size="2.6" font-weight="700" fill="#991b1b">' + esc(h.label) + '</text>');
+      const ty = f(L.TOP + h.row * L.hitoRow + L.hitoFs * 0.9 + 0.3);
+      out.push('<text x="' + f(h.tx) + '" y="' + ty + '" text-anchor="' + h.anchor + '" font-size="' + L.hitoFs + '" font-weight="700" fill="#991b1b">' + esc(h.label) + '</text>');
     });
+    // Leyenda de llamadas (bloques estrechos)
+    if (L.legend.length) {
+      out.push('<line x1="' + L.LW + '" x2="' + (L.W - 1) + '" y1="' + f(L.legendTop - 1.6) + '" y2="' + f(L.legendTop - 1.6) + '" stroke="#cbd5e1" stroke-width="0.2"/>');
+      L.legend.forEach(it => {
+        out.push(badge(it.x + 1.8, it.y + 1.2, it.num, 1.6));
+        out.push('<text x="' + f(it.x + 4.4) + '" y="' + f(it.y + 2.1) + '" font-size="2.6" fill="#0f172a">' + esc(it.text) + '</text>');
+      });
+    }
     out.push('</svg>');
     return out.join('');
   }
 
   /** Una hoja de cronograma (apaisada) para un día. */
-  function ganttSheet(list, d, idx, total, title, printed) {
+  function ganttSheet(list, d, idx, total, title, printed, lang) {
+    const t = T(lang);
     const L = layoutGantt(list, 273, 164);
     const bloques = list.filter(r => !r.aviso).length;
-    const meta = [d ? dayLabel(d) : 'Todas las jornadas', (L ? L.lanes.length : 0) + ' escenarios', bloques + ' bloques'].join(' · ');
-    const footerLeft = 'Showtime Regiduría · ' + title + ' · ' + (d ? dayLabel(d) : 'Todas las jornadas');
+    const meta = [d ? dayLabel(d, lang) : t.allDays, (L ? L.lanes.length : 0) + ' ' + t.stages, bloques + ' ' + t.blocks].join(' · ');
+    const footerLeft = 'Showtime Regiduría · ' + title + ' · ' + (d ? dayLabel(d, lang) : t.allDays);
     return '<section class="sheet landscape">' +
-      '<div class="hd"><div class="brand">Showtime · Cronograma</div><h1>' + esc(title) + '</h1><div class="meta">' + esc(meta) + '</div></div>' +
-      (L ? '<div class="tbl">' + ganttSvg(L) + '</div>' : '<p class="empty">Nada que dibujar con estos filtros.</p>') +
-      '<footer class="sheet-foot"><span>' + esc(footerLeft) + '</span><span>Impreso: ' + esc(printed) + '</span><span>Pág ' + (idx + 1) + '/' + total + '</span></footer>' +
+      '<div class="hd"><div class="brand">' + esc(t.brandGantt) + '</div><h1>' + esc(title) + '</h1><div class="meta">' + esc(meta) + '</div></div>' +
+      (L ? '<div class="tbl">' + ganttSvg(L) + '</div>' : '<p class="empty">' + esc(t.emptyGantt) + '</p>') +
+      '<footer class="sheet-foot"><span>' + esc(footerLeft) + '</span><span>' + esc(t.printed) + esc(printed) + '</span><span>' + esc(t.page) + (idx + 1) + '/' + total + '</span></footer>' +
       '</section>';
   }
 
   /**
    * Documento HTML completo.
-   * opts: { rows: [...] (de rowsOf), days: [ISO], title, orient:'portrait'|'landscape', notes:bool, call:bool, now: Date }
+   * opts: { rows: [...] (de rowsOf), days: [ISO], title, orient:'portrait'|'landscape', notes:bool, call:bool, now: Date,
+   *         lang:'es'|'en' (por defecto español), full:bool (contenido = todo el horario) }
    */
   function html(opts) {
     const o = opts || {};
+    const lang = o.lang === 'en' ? 'en' : 'es';
+    const t = T(lang);
     const rows = o.rows || [];
     const days = o.days && o.days.length ? o.days : [null];
     const gantt = o.format === 'gantt';                    // el cronograma es siempre apaisado
@@ -332,7 +483,7 @@
     const title = o.title || 'Evento';
     const sheets = days.map((d, idx) => {
       const list = rows.filter(r => !d || r.jornada === d);
-      if (gantt) return ganttSheet(list, d, idx, days.length, title, printed);
+      if (gantt) return ganttSheet(list, d, idx, days.length, title, printed, lang);
       const dens = densityFor(list.length);
       const zones = [];
       list.forEach(r => { if (!r.aviso && zones.indexOf(r.zone) < 0) zones.push(r.zone); });
@@ -340,15 +491,15 @@
       const showZone = !zoneOne;
       const showCall = !!o.call && list.some(r => !r.aviso && r.call);  // CALL solo si alguna fila la tiene
       const showNotes = !!o.notes;
-      const cols = [{ h: 'Horario', w: 15 }, { h: 'Duración', w: 11 }]
-        .concat(showCall ? [{ h: 'CALL', w: 7 }] : [])
-        .concat(showZone ? [{ h: 'Escenario / zona', w: 19 }] : [])
-        .concat([{ h: 'Tipo', w: 9 }, { h: 'Artista / actividad', w: 0 }])
-        .concat(showNotes ? [{ h: 'Notas / operativa', w: 20 }] : []);
+      const cols = [{ h: t.cols.time, w: 15 }, { h: t.cols.dur, w: 11 }]
+        .concat(showCall ? [{ h: t.cols.call, w: 7 }] : [])
+        .concat(showZone ? [{ h: t.cols.zone, w: 19 }] : [])
+        .concat([{ h: t.cols.type, w: 15 }, { h: t.cols.name, w: 0 }])
+        .concat(showNotes ? [{ h: t.cols.notes, w: 22 }] : []);
       const fixed = cols.reduce((a, c) => a + c.w, 0);
       const cg = '<colgroup>' + cols.map(c => '<col style="width:' + (c.w ? c.w : Math.max(20, 100 - fixed)) + '%">').join('') + '</colgroup>';
       const head = '<tr>' + cols.map(c => '<th>' + esc(c.h) + '</th>').join('') + '</tr>';
-      const sepAt = list.findIndex((r, i) => i > 0 && /apertura de puertas/i.test(r.name));
+      const sepAt = list.findIndex((r, i) => i > 0 && /apertura de puertas|apertura recinto|doors|doors open|gates/i.test(r.name));
       const body = list.map((r, i) => {
         if (r.aviso) {
           const txt = clean(AVISO_RE.test(r.name) ? r.name : r.notes);
@@ -357,25 +508,27 @@
         const cells = ['<td class="t">' + esc(r.start) + (r.end ? ' – ' + esc(r.end) : '') + '</td>', '<td class="n">' + esc(r.dur) + '</td>'];
         if (showCall) cells.push('<td class="n">' + esc(r.call) + '</td>');
         if (showZone) cells.push('<td class="z"><i style="background:' + esc(r.zoneColor) + '"></i>' + esc(r.zone) + '</td>');
-        const t = TYPE[r.kind] || { txt: esc(r.kind), cls: 'p-show' };
-        cells.push('<td><span class="pill ' + t.cls + '">' + t.txt + '</span></td>');
+        const pill = pillOf(r.kind, lang);
+        cells.push('<td><span class="pill ' + pill.cls + '">' + esc(pill.txt) + '</span></td>');
         cells.push('<td class="name' + (isStrong(r) ? ' strong' : '') + '">' + esc(clean(r.name)) + '</td>');
         if (showNotes) cells.push('<td class="notes">' + esc(clean(r.notes)) + '</td>');
         return '<tr' + (i === sepAt ? ' class="sep"' : '') + '>' + cells.join('') + '</tr>';
       }).join('');
-      const metaParts = [d ? dayLabel(d) : 'Todas las jornadas', list.length + ' bloques'];
-      if (zoneOne) metaParts.push('Zona: ' + zoneOne);
-      const footerLeft = 'Showtime Regiduría · ' + title + ' · ' + (d ? dayLabel(d) : 'Todas las jornadas');
-      const footerRight = 'Pág ' + (idx + 1) + '/' + days.length;
+      const metaParts = [d ? dayLabel(d, lang) : t.allDays, list.length + ' ' + t.blocks];
+      if (zoneOne) metaParts.push(t.zone + zoneOne);
+      else if (zones.length > 1) metaParts.push(t.allStages);
+      if (o.full) metaParts.push(t.full);
+      const footerLeft = 'Showtime Regiduría · ' + title + ' · ' + (d ? dayLabel(d, lang) : t.allDays);
+      const footerRight = t.page + (idx + 1) + '/' + days.length;
       return '<section class="sheet ' + (land ? 'landscape' : 'portrait') + ' ' + dens.cls + '">' +
-        '<div class="hd"><div class="brand">Showtime · Hoja de ruta</div><h1>' + esc(title) + '</h1><div class="meta">' + esc(metaParts.join(' · ')) + '</div></div>' +
+        '<div class="hd"><div class="brand">' + esc(t.brand) + '</div><h1>' + esc(title) + '</h1><div class="meta">' + esc(metaParts.join(' · ')) + '</div></div>' +
         (list.length
           ? '<div class="tbl"><table>' + cg + '<thead>' + head + '</thead><tbody>' + body + '</tbody></table></div>'
-          : '<p class="empty">Nada que imprimir con estos filtros.</p>') +
-        '<footer class="sheet-foot"><span>' + esc(footerLeft) + '</span><span>Impreso: ' + esc(printed) + '</span><span>' + esc(footerRight) + '</span></footer>' +
+          : '<p class="empty">' + esc(t.empty) + '</p>') +
+        '<footer class="sheet-foot"><span>' + esc(footerLeft) + '</span><span>' + esc(t.printed) + esc(printed) + '</span><span>' + esc(footerRight) + '</span></footer>' +
         '</section>';
     }).join('');
-    return '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>' + esc(title) + '</title>' +
+    return '<!doctype html><html lang="' + t.htmlLang + '"><head><meta charset="utf-8"><title>' + esc(title) + '</title>' +
       '<style>@page{size:A4 ' + (land ? 'landscape' : 'portrait') + ';margin:0}\n' + PRINT_CSS + '</style></head><body>' + sheets +
       '<script>' + FIT_JS + '</script></body></html>';
   }
@@ -404,7 +557,7 @@
     return true;
   }
 
-  const API = { CONTENT, KINDS, TYPE, rowsOf, densityFor, dayLabel, printedAt, daysOf, html, summary, launch, esc, layoutGantt, ganttSvg, fitLabel, wrapLines, cutWords };
+  const API = { CONTENT, KINDS, TYPE, I18N, rowsOf, densityFor, dayLabel, printedAt, daysOf, html, summary, launch, esc, layoutGantt, ganttSvg, fitLabel, wrapLines, cutWords, textW, fitText };
   if (isNode) module.exports = API;
   else root.ShowtimePrint = API;
 })(typeof window !== 'undefined' ? window : globalThis);
