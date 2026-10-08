@@ -103,6 +103,14 @@
     if (first) first.focus(); else if (prim) prim.focus();
   }
   function closeModal() { $('modal').hidden = true; }
+  /** Cerrar al pulsar fuera de la caja. Solo si el clic empezó y acabó en el fondo (así no se cierra al seleccionar texto y soltar fuera). */
+  function backdropClose(el, fn) {
+    let down = null;
+    el.addEventListener('pointerdown', e => { down = e.target; });
+    el.addEventListener('click', e => { if (e.target === el && down === el) fn(); down = null; });
+  }
+  backdropClose($('modal'), closeModal);
+  backdropClose($('imp'), () => closeImport());
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('modal').hidden) closeModal(); });
 
   // ── Carga de estado y cálculo ────────────────────────────────────────

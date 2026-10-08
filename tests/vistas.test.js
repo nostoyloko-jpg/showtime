@@ -236,6 +236,12 @@
     const sin = fest(); eq(V.confidence(sin.s, sin.P, now, null).mode === 'show', false, 'sin nada sonando, no');
   });
 
+  test('Sobretiempo: fondo y números configurables (por defecto negro y rojo); valores no válidos vuelven al defecto', () => {
+    const d = V.normScreens();
+    eq(d.conf.overBg, '#000000'); eq(d.conf.overNum, '#ff3b30');
+    const x = V.normScreens({ conf: { overBg: '#5A0000', overNum: 'rojo' } });
+    eq(x.conf.overBg, '#5a0000'); eq(x.conf.overNum, '#ff3b30', 'texto no válido: defecto');
+  });
   test('Cinta de Backstage: la puesta de sol sale como aviso del tiempo (si hay dato) y la vista Confidence no lleva meteo', () => {
     const sun = { sunset: Date.UTC(2026, 6, 10, 20, 5), temp: 25, sky: 'Despejado', rain: null, wind: null, gustMax: null, stale: false };
     const st = { event: { nombre: 'x', fechaInicio: '2026-07-10', fechaFin: '2026-07-10', dayCutoff: '06:00' }, escenarios: [], artists: [] };

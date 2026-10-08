@@ -357,6 +357,13 @@
     ok(got.some(m => m.type === 'vistaState' && m.vista === now), 'al cambiar con V: ' + now);
     ok(got.filter(m => m.type === 'vistaState').length >= 2, 'y se repite en el latido');
   });
+  test('Confidence en sobretiempo: solo parpadean los números; el fondo y los números se configuran', () => {
+    const css = D.src('live.css'), js = D.src('live.js'), html = D.src('index.html');
+    ok(!/cfbg/.test(css), 'sin parpadeo de fondo');
+    ok(/\.conf\.lv-over\{background:var\(--ov-bg,#000\)\}/.test(css) && /\.conf\.lv-over \.cf-dig span\{color:var\(--ov-num,#ff3b30\)\}/.test(css), 'fondo y números desde las variables');
+    ok(/setProperty\('--ov-bg', screensCfg\(\)\.conf\.overBg\)/.test(js) && /setProperty\('--ov-num', screensCfg\(\)\.conf\.overNum\)/.test(js), 'la Live aplica la configuración');
+    ok(/data-sc="conf\.overBg"/.test(html) && /data-sc="conf\.overNum"/.test(html), 'Configuración tiene los dos colores');
+  });
   test('Telemetría: la Live avisa al Dashboard de su pantalla completa, y al instante al cambiar', () => {
     const got = [], opener = { closed: false, postMessage(m) { got.push(m); } };
     const t = arrancar({ search: '?vista=manager', opener });

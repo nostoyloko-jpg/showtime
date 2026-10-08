@@ -298,10 +298,10 @@ body[data-vista="confidence"] .conf{display:flex}
 .conf.lv-warn{--cf:#ffb347}
 .conf.lv-danger,.conf.lv-over{--cf:#ff3b30}
 .conf.lv-warn .cf-dig span{color:#ffb347}
-.conf.lv-danger .cf-dig span,.conf.lv-over .cf-dig span{color:#ff3b30}
-.conf.blink{animation:cfbg 1s steps(1,end) infinite}
+.conf.lv-danger .cf-dig span{color:#ff3b30}
+.conf.lv-over{background:var(--ov-bg,#000)}
+.conf.lv-over .cf-dig span{color:var(--ov-num,#ff3b30)}
 .conf.blink .cf-dig span{animation:cfdig 1s steps(1,end) infinite}
-@keyframes cfbg{50%{background:#5a0000}}
 @keyframes cfdig{50%{color:#fff}}
 .conf.nobar .cf-bar{visibility:hidden}
 .conf.end .cf-dig span{color:rgba(255,255,255,.85)}
@@ -310,7 +310,7 @@ body[data-vista="confidence"] .conf{display:flex}
 .cf-zones{display:flex;flex-wrap:wrap;gap:2vh 2vw;justify-content:center;max-width:90vw}
 .cf-zone{font:inherit;font-size:min(3.4vw,4.6vh);font-weight:900;letter-spacing:.06em;padding:2.2vh 4vw;border-radius:2vh;border:2px solid rgba(255,255,255,.3);background:rgba(255,255,255,.06);color:#fff;cursor:pointer}
 .cf-zone:hover{border-color:#fff}
-@media (prefers-reduced-motion:reduce){.conf.blink,.conf.blink .cf-dig span{animation:none}}
+@media (prefers-reduced-motion:reduce){.conf.blink .cf-dig span{animation:none}}
 
 /* Backstage: tarjetas · 2 líneas de cronograma · cinta de avisos (los bloques que se quitan dejan sitio a los demás) */
 body[data-vista="backstage"] .ticker{display:flex}

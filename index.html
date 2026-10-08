@@ -13,8 +13,8 @@
 <meta name="apple-mobile-web-app-title" content="Showtime">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
-<link rel="stylesheet" href="control.css?v=20261081">
-<link rel="stylesheet" href="marca.css?v=20261081">
+<link rel="stylesheet" href="control.css?v=20261083">
+<link rel="stylesheet" href="marca.css?v=20261083">
 </head>
 <body>
 <div id="splash" class="splash" hidden></div>
@@ -270,7 +270,9 @@
       <div class="fsub">Confidence · show</div>
       <label for="sc-sw">Ámbar a falta de</label><span class="nrow"><input id="sc-sw" type="number" min="0" max="180" data-sc="conf.showWarn"> min</span>
       <label for="sc-sd">Rojo a falta de</label><span class="nrow"><input id="sc-sd" type="number" min="0" max="180" data-sc="conf.showDanger"> min</span>
-      <span></span><label class="chk"><input id="sc-blink" type="checkbox" data-sc="conf.blink"> Parpadear en sobretiempo</label>
+      <span></span><label class="chk"><input id="sc-blink" type="checkbox" data-sc="conf.blink"> Parpadear números en sobretiempo</label>
+      <label for="sc-ob">Sobretiempo · fondo</label><input id="sc-ob" type="color" class="swatch" data-sc="conf.overBg">
+      <label for="sc-on">Sobretiempo · números</label><input id="sc-on" type="color" class="swatch" data-sc="conf.overNum">
       <div class="fsub">Confidence · changeover</div>
       <label for="sc-cw">Ámbar a falta de</label><span class="nrow"><input id="sc-cw" type="number" min="0" max="180" data-sc="conf.coWarn"> min</span>
       <label for="sc-cd">Rojo a falta de</label><span class="nrow"><input id="sc-cd" type="number" min="0" max="180" data-sc="conf.coDanger"> min</span>
@@ -419,18 +421,18 @@
 <datalist id="zones-dl"></datalist>
 <div id="toast" class="toast" hidden></div>
 
-<script src="core.js?v=20261081"></script>
-<script src="meteo.js?v=20261081"></script>
-<script src="datos.js?v=20261081"></script>
-<script src="importar.js?v=20261081"></script>
-<script src="xlsx.js?v=20261081"></script>
-<script src="qr.js?v=20261081"></script>
-<script src="emision.js?v=20261081"></script>
-<script src="mando.js?v=20261081"></script>
-<script src="vistas.js?v=20261081"></script>
-<script src="log.js?v=20261081"></script>
-<script src="marca.js?v=20261081"></script>
-<script src="control.js?v=20261081"></script>
-<script src="pwa.js?v=20261081"></script>
+<script src="core.js?v=20261083"></script>
+<script src="meteo.js?v=20261083"></script>
+<script src="datos.js?v=20261083"></script>
+<script src="importar.js?v=20261083"></script>
+<script src="xlsx.js?v=20261083"></script>
+<script src="qr.js?v=20261083"></script>
+<script src="emision.js?v=20261083"></script>
+<script src="mando.js?v=20261083"></script>
+<script src="vistas.js?v=20261083"></script>
+<script src="log.js?v=20261083"></script>
+<script src="marca.js?v=20261083"></script>
+<script src="control.js?v=20261083"></script>
+<script src="pwa.js?v=20261083"></script>
 </body>
 </html>

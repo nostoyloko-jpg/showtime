@@ -23,7 +23,7 @@
 
   // ── Ajustes de pantallas (Configuración › Pantallas Live y vistas) ────
   const DEFAULT_SCREENS = {
-    conf: { showWarn: 10, showDanger: 5, blink: true, coWarn: 5, coDanger: 1 },
+    conf: { showWarn: 10, showDanger: 5, blink: true, coWarn: 5, coDanger: 1, overBg: '#000000', overNum: '#ff3b30' },
     back: { cards: true, lines: true, ticker: true },
     ticker: { delays: true, hitos: true, meteo: true, mode: 'crawl', bg: '#000000', fg: '#ffb347' }
   };
@@ -34,7 +34,8 @@
     const D = DEFAULT_SCREENS, o = s || {}, c = o.conf || {}, b = o.back || {}, t = o.ticker || {};
     const conf = {
       showWarn: int(c.showWarn, D.conf.showWarn, 0, 180), showDanger: int(c.showDanger, D.conf.showDanger, 0, 180), blink: bool(c.blink, D.conf.blink),
-      coWarn: int(c.coWarn, D.conf.coWarn, 0, 180), coDanger: int(c.coDanger, D.conf.coDanger, 0, 180)
+      coWarn: int(c.coWarn, D.conf.coWarn, 0, 180), coDanger: int(c.coDanger, D.conf.coDanger, 0, 180),
+      overBg: hex(c.overBg, D.conf.overBg), overNum: hex(c.overNum, D.conf.overNum)   // sobretiempo: fondo y números
     };
     if (conf.showDanger > conf.showWarn) conf.showDanger = conf.showWarn;    // el rojo nunca antes que el ámbar
     if (conf.coDanger > conf.coWarn) conf.coDanger = conf.coWarn;

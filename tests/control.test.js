@@ -829,6 +829,19 @@
     ok(/id="lv-gestor"/.test(D.src('index.html')), 'el gestor está en el menú de Live');
     ok(!/data-now=|data-close=|lvnow|data-on=/.test(D.src('index.html')), 'el menú ya no lleva las marcas viejas por nombre');
   });
+  test('Modales: se cierran al pulsar fuera de la caja (también el Gestor de ventanas); dentro no', () => {
+    const t = panel();
+    const m = t.env.getEl('modal');
+    t.T.openGestor();
+    eq(m.hidden, false, 'el gestor está abierto');
+    t.env.fire('modal', 'pointerdown', { target: m });
+    t.env.fire('modal', 'click', { target: { id: 'otro' } });
+    eq(m.hidden, false, 'pulsar dentro de la caja no cierra');
+    t.env.fire('modal', 'pointerdown', { target: m });
+    t.env.fire('modal', 'click', { target: m });
+    eq(m.hidden, true, 'pulsar fuera (en el fondo) cierra el gestor');
+    ok(/backdropClose\(\$\('imp'\)/.test(D.src('control.js')), 'la importación también');
+  });
   test('Gestor: rejilla de 6 columnas, píldora con micro-LED, cabecera y pie; en móvil, tres filas; «+ Abrir» abre Manager', async () => {
     const css = D.src('control.css'), js = D.src('control.js');
     ok(/\.gv-row\{display:grid;grid-template-columns:minmax\(150px,1\.3fr\) 124px 124px 140px 112px 36px;grid-template-areas:"name vista zona fs sb x"/.test(css), 'rejilla fija: nombre, vista, zona, pantalla, standby, ✕');
