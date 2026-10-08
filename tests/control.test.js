@@ -830,12 +830,17 @@
   test('Gestor: rejilla de 5 columnas, píldora con micro-LED, cabecera y pie; en móvil, dos filas; «+ Abrir» abre Manager', async () => {
     const css = D.src('control.css'), js = D.src('control.js');
     ok(/\.gv-row\{display:grid;grid-template-columns:minmax\(160px,1\.4fr\) 140px 130px 120px 36px;/.test(css), 'rejilla fija: nombre, vista, zona, standby, ✕');
-    ok(/@media \(max-width:700px\)\{ \.gv-row\{grid-template-columns:minmax\(0,1fr\) minmax\(0,1fr\) auto;grid-template-areas:"name name x" "vista zona sb"\} \}/.test(css), 'móvil: dos filas, sin scroll');
+    ok(/@media \(max-width:700px\)\{ \.gv-row\{grid-template-columns:minmax\(0,1fr\) minmax\(0,1fr\) auto;grid-template-areas:"name name x" "vista zona sb"\}/.test(css), 'móvil: dos filas, sin scroll');
     ok(/\.gv-sb\{height:34px;[^}]*border-radius:999px/.test(css) && /\.gv-led\{/.test(css), 'standby como píldora con micro-LED');
     ok(/\.gv-sb\.on \.gv-led\{[^}]*box-shadow/.test(css), 'LED encendido con resplandor');
-    ok(/\.gv-row select:hover,\.gv-row select:focus\{background-image:url/.test(css), 'flecha solo en hover y focus');
+    ok(/\.gv-row select:hover,\.gv-row select:focus\{background-image:url/.test(css) && /background-image:url\("data:image\/svg\+xml,[^"]*6f747e/.test(css), 'flecha sutil en reposo, más brillante en hover y focus');
+    ok(/\.gv-row input,\.gv-row select\{height:32px/.test(css) && /\.gv-sb\{height:34px/.test(css) && /\.gv-x\{width:36px;height:32px/.test(css), 'altura: 32px en campos y ✕, 34px en la píldora');
+    ok(/class="gv-row gv-hd"/.test(js) && />Nombre</.test(js) && />Standby</.test(js) && /\.gv-hd\{display:none\}/.test(css), 'cabecera NOMBRE · VISTA · ZONA · STANDBY en escritorio; oculta en móvil');
+    ok(/\.gv-row select:disabled\{[^}]*border-color:transparent;background:transparent/.test(css), 'zona sin usar: «—» plano, sin caja');
+    ok(/\.gv-foot \.gv-close\{background:#1c1e26;border:1px solid var\(--hair2\);color:#fff\}/.test(css) && /class="btn gv-close" data-gv="done"/.test(js), 'Cerrar en gris Raycast, sin rojo');
+    ok(/\.gv-qr\{[^}]*border-top:1px solid/.test(css) && !/dashed/.test(css.slice(css.indexOf('.gv-qr{'), css.indexOf('.gv-qr{')+200)), 'QR: hairline continua, sin marco de puntos');
     ok(/data-gv="all" data-on="1">⏸ Todas en standby/.test(js) && /data-gv="all" data-on="0">▶ Reanudar todas/.test(js), 'cabecera: todas en standby / reanudar');
-    ok(/data-gv="new">\+ Abrir ventana Live</.test(js) && /data-gv="done">Cerrar</.test(js), 'pie: abrir a la izquierda, cerrar a la derecha');
+    ok(/data-gv="new">\+ Abrir ventana Live</.test(js) && /data-gv="done"/.test(js), 'pie: abrir a la izquierda, cerrar a la derecha');
     const t = panel(), msgs = [];
     const w = { closed: false, focus() {}, postMessage(m) { msgs.push(m); }, close() { this.closed = true; } };
     t.env.win.open = () => w;

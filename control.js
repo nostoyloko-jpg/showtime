@@ -1392,9 +1392,10 @@
     if (sig !== gvSig) {
       gvSig = sig;
       const head = '<div class="gv-top"><div class="gv-seg"><button type="button" class="gv-segb" data-gv="all" data-on="1">⏸ Todas en standby</button><button type="button" class="gv-segb" data-gv="all" data-on="0">▶ Reanudar todas</button></div></div>';
-      const rows = ids.length ? ids.map(gvRowHtml).join('') : '<p class="mnote gv-empty">No hay ventanas Live abiertas desde este Dashboard.</p>';
+      const hd = '<div class="gv-row gv-hd" aria-hidden="true"><span>Nombre</span><span>Vista</span><span>Zona</span><span>Standby</span><span></span></div>';
+      const rows = ids.length ? hd + ids.map(gvRowHtml).join('') : '<p class="mnote gv-empty">No hay ventanas Live abiertas desde este Dashboard.</p>';
       const qr = '<div class="gv-qr"><div class="gv-qrh">Pantallas QR (móviles)</div><p class="mnote">Aún vacía: aquí irán las pantallas QR con la misma rejilla.</p></div>';
-      const foot = '<div class="gv-foot"><button type="button" class="btn" data-gv="new">+ Abrir ventana Live</button><button type="button" class="btn primary" data-gv="done">Cerrar</button></div>';
+      const foot = '<div class="gv-foot"><button type="button" class="btn" data-gv="new">+ Abrir ventana Live</button><button type="button" class="btn gv-close" data-gv="done">Cerrar</button></div>';
       box.innerHTML = head + '<div class="gv-list">' + rows + '</div>' + qr + foot;
     }
     gvSync(ids);
