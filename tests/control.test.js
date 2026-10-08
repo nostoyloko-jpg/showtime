@@ -831,7 +831,8 @@
   });
   test('Gestor: rejilla de 6 columnas, píldora con micro-LED, cabecera y pie; en móvil, tres filas; «+ Abrir» abre Manager', async () => {
     const css = D.src('control.css'), js = D.src('control.js');
-    ok(/\.gv-row\{display:grid;grid-template-columns:minmax\(160px,1\.4fr\) 140px 130px 150px 120px 36px;grid-template-areas:"name vista zona fs sb x"/.test(css), 'rejilla fija: nombre, vista, zona, pantalla, standby, ✕');
+    ok(/\.gv-row\{display:grid;grid-template-columns:minmax\(150px,1\.3fr\) 124px 124px 140px 112px 36px;grid-template-areas:"name vista zona fs sb x"/.test(css), 'rejilla fija: nombre, vista, zona, pantalla, standby, ✕');
+    ok(/\.modal-box\.wide\{max-width:780px\}/.test(css), 'modal ancho: cabe la rejilla sin scroll');
     ok(/@media \(max-width:700px\)\{ \.gv-row\{grid-template-columns:minmax\(0,1fr\) minmax\(0,1fr\) auto;grid-template-areas:"name name x" "vista zona sb" "fs fs fs"\}/.test(css), 'móvil: tres filas, sin scroll');
     ok(/\.gv-sb\{height:34px;[^}]*border-radius:999px/.test(css) && /\.gv-led\{/.test(css), 'standby como píldora con micro-LED');
     ok(/\.gv-sb\.on \.gv-led\{[^}]*box-shadow/.test(css), 'LED encendido con resplandor');

@@ -201,7 +201,7 @@ tfoot input.bad,tfoot select.bad{border-color:var(--err)!important;background:rg
 .stg .use{font-size:11px;color:var(--dim);min-width:0;text-align:right;white-space:nowrap}
 .iconsq{width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;border:1px solid var(--line2);background:#16181d;color:var(--text);cursor:pointer;font-weight:900}
 .iconsq:disabled{opacity:.3;cursor:default}
-.modal-box.wide{max-width:640px}
+.modal-box.wide{max-width:780px}
 
 .list-h .hint{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .list-h{min-width:0}
@@ -978,7 +978,7 @@ main.vacia .list-empty{padding:16px 16px 9vh}
 .gv-segb+.gv-segb{border-left:1px solid var(--hair2)}
 .gv-segb:hover{color:var(--text);background:rgba(255,255,255,.04)}
 .gv-list{display:flex;flex-direction:column;gap:6px}
-.gv-row{display:grid;grid-template-columns:minmax(160px,1.4fr) 140px 130px 150px 120px 36px;grid-template-areas:"name vista zona fs sb x";gap:8px;align-items:center}
+.gv-row{display:grid;grid-template-columns:minmax(150px,1.3fr) 124px 124px 140px 112px 36px;grid-template-areas:"name vista zona fs sb x";gap:6px;align-items:center}
 .gv-row>.gv-name{grid-area:name}.gv-row>.gv-vista{grid-area:vista}.gv-row>.gv-zona{grid-area:zona}.gv-row>.gv-fs{grid-area:fs}.gv-row>.gv-sb{grid-area:sb}.gv-row>.gv-x{grid-area:x}
 .gv-row input,.gv-row select{height:32px;min-width:0;width:100%;box-sizing:border-box;border:1px solid var(--hair2);border-radius:8px;background:var(--field);color:var(--text);padding:0 10px;font:inherit;font-size:14px}
 .gv-row input:focus,.gv-row select:focus{outline:none;border-color:var(--accent)}
