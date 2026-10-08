@@ -799,6 +799,22 @@
     prodNote(r.ok ? okTxt : (r.msg || 'Sin conexión'), !r.ok);
     return !!r.ok;
   }
+  // Teclado en pantalla (o la barra de accesorios de iPadOS): el área visible se encoge y los docks de Producción
+  // (mensajes y chat, anclados abajo) subían a taparse. Se mide cuánto ocupa y se sube el dock con --kb.
+  (function initKbLift() {
+    const vv = window.visualViewport, root = document.documentElement;
+    const apply = () => {
+      const kb = vv ? Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)) : 0;
+      root.style.setProperty('--kb', kb + 'px');
+    };
+    if (vv) { vv.addEventListener('resize', apply); vv.addEventListener('scroll', apply); }
+    window.addEventListener('resize', apply);
+    document.addEventListener('focusin', e => {
+      if (!e.target || !e.target.matches || !e.target.matches('#md-text,#cd-text')) return;
+      setTimeout(() => { apply(); e.target.scrollIntoView({ block: 'nearest' }); }, 300);
+    });
+    apply();
+  })();
   /** Menú plegado a la izquierda: se abre al pasar el cursor (o al tocar el icono) y se recoge solo. Mensajes igual que los «custom» del Dashboard. */
   function initProdDock() {
     const dock = $('msgdock'), input = $('md-text'); let tOpen = 0, tClose = 0, to = [];

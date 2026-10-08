@@ -207,9 +207,17 @@
     }
   });
 
+  test('Teclado en pantalla: los docks de Producción suben con --kb (visualViewport) y el campo enfocado queda visible', () => {
+    const css = D.src('live.css'), js = D.src('live.js');
+    ok(/\.mdock\{[^}]*bottom:calc\(14px \+ var\(--kb,0px\)\)/.test(css), 'menú de mensajes sube con el teclado');
+    ok(/\.cdock\{[^}]*bottom:calc\(66px \+ var\(--sa-b\) \+ var\(--kb,0px\)\)/.test(css) || /\.cdock\{[^}]*bottom:calc\(66px \+ var\(--kb,0px\)\)/.test(css), 'chat sube con el teclado');
+    ok(/\.pnote\{bottom:calc\(76px \+ var\(--sa-b\) \+ var\(--kb,0px\)\)\}/.test(css), 'aviso sube con el teclado');
+    ok(/visualViewport/.test(js) && /setProperty\('--kb'/.test(js), 'mide el teclado con visualViewport');
+    ok(/#md-text,#cd-text/.test(js), 'al enfocar el campo, se asegura que se vea');
+  });
   test('Móvil: zonas seguras, 16 px en los campos, 44 px táctiles y contraste', () => {
     const css = D.src('live.css'), rc = D.src('remote.css');
-    ['.mdock{left:calc(14px + var(--sa-l));bottom:calc(14px + var(--sa-b))}', '#zoomctl{right:calc(14px + var(--sa-r));bottom:calc(14px + var(--sa-b))}'].forEach(x => ok(css.indexOf(x) > 0, x));
+    ['.mdock{left:calc(14px + var(--sa-l));bottom:calc(14px + var(--sa-b) + var(--kb,0px))}', '#zoomctl{right:calc(14px + var(--sa-r));bottom:calc(14px + var(--sa-b))}'].forEach(x => ok(css.indexOf(x) > 0, x));
     ok(/@media \(pointer:coarse\)\{[^@]*#md-text,#cd-text\{font-size:16px;height:44px\}/.test(css), 'campos de 16 px y 44 px');
     ok(/@media \(max-width:700px\)\{[^@]*#zoomctl\.open #dockbody\{flex-wrap:wrap/.test(css), 'el dock de la derecha no se sale en 390 px');
     ok(/--dim:rgba\(255,255,255,\.5\)/.test(css) && /--dim:rgba\(255,255,255,\.55\)/.test(rc), 'texto atenuado con contraste');
