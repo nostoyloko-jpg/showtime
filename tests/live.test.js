@@ -19,6 +19,10 @@
   /** Arranca live.js. opts: { hash, search }. El envío a Producción se intercepta (no hay red). */
   function arrancar(opts) {
     const env = D.makeEnv(Object.assign({ cripto: true }, opts));
+    if (opts && opts.rec) {   // graba las propiedades CSS que pone live.js en <html> (p. ej. --info-w)
+      const html = env.getEl('html'), st = { setProperty: (k, v) => { opts.rec[k] = v; }, removeProperty: k => { delete opts.rec[k]; }, getPropertyValue: k => opts.rec[k] || '' };
+      env.win.document.documentElement = new Proxy(html, { get(t, k) { return k === 'style' ? st : t[k]; } });
+    }
     const sent = [];
     if (opts && opts.opener) env.win.opener = opts.opener;
     env.getEl('msgdock').hidden = true; env.getEl('pmodal').hidden = true; env.getEl('chatdock').hidden = true;   // como en live.html
@@ -32,6 +36,36 @@
   }
   const clickOk = (t, key) => t.env.fire('document', 'click', { target: { closest: sel => sel === '.callok' ? { dataset: { ck: key } } : null } });
 
+  test('Ancho del panel de info: automático y estable (medida a tamaño de referencia), mínimo 280 px y máximo 45 vw', () => {
+    const src = D.src('live.js');
+    ok(/const INFO_REF_NAME = 37, INFO_REF_TIME = 20, INFO_PAD = 56, INFO_MIN = 280;/.test(src), 'tamaños de referencia y margen');
+    ok(/Math\.max\(INFO_MIN, Math\.min\(need \+ INFO_PAD, hi\)\)/.test(src) && /const hi = window\.innerWidth \* 0\.45/.test(src), 'clamp: mín. 280 px, máx. 45 vw');
+    ok(/\.toUpperCase\(\), 900, INFO_REF_NAME/.test(src) && /C\.fmtHM\(b\.si\) \+ '–' \+ C\.fmtHM\(b\.sf\)/.test(src), 'mide el nombre (900) y el horario');
+    const rec = {}, t = arrancar({ rec });
+    eq(t.env.errors.length, 0, t.env.errors.join(' | '));
+    eq(rec['--info-w'], '280px', 'sin datos: el mínimo de 280 px');
+  });
+  test('Ancho manual guardado gana al automático; doble clic en el tirador borra el manual y vuelve a automático', () => {
+    const rec = {}, t = arrancar({ rec, storage: { 'showtime.live.infoW': '410' } });
+    eq(t.env.errors.length, 0, t.env.errors.join(' | '));
+    eq(rec['--info-w'], '410px', 'el ancho manual se aplica al arrancar');
+    eq(t.env.storage.get('showtime.live.infoW'), '410', 'el manual sigue guardado al arrancar');
+    const src = D.src('live.js');
+    ok(/addEventListener\('dblclick', resetInfoAuto\)/.test(src), 'doble clic en el tirador');
+    ok(/function resetInfoAuto\(\) \{\s*try \{ localStorage\.removeItem\(P\.infoW\); \} catch \(e\) \{\}\s*applyInfoWidth\(\)/.test(src), 'borra la preferencia y recalcula al instante');
+    ok(/startInfoResize[\s\S]*pset\(P\.infoW/.test(src), 'arrastrar guarda el ancho manual');
+  });
+  test('Móvil en vertical: el ancho lo manda el CSS (36 vw), sin ancho automático en línea', () => {
+    const src = D.src('live.js'), css = D.src('live.css');
+    ok(/window\.matchMedia\('\(max-width:700px\) and \(orientation:portrait\)'\)\.matches/.test(src) && /root\.style\.removeProperty\('--info-w'\)/.test(src), 'en móvil vertical no se pone --info-w');
+    ok(/@media \(max-width:700px\) and \(orientation:portrait\)\{\s*body\{height:auto[^}]*\}\s*body\{--info-w:36vw\}/.test(css), 'el CSS fija 36 vw en móvil vertical');
+  });
+  test('Ancho automático: se recalcula al cargar la jornada y al cambiar el tamaño de la ventana', () => {
+    const src = D.src('live.js');
+    ok(/CALL_DONE = new Set\(Dt\.getCallDone\(\)\);\n    applyInfoWidth\(\);/.test(src), 'al cargar la jornada');
+    ok(/window\.addEventListener\('resize', applyInfoWidth\)/.test(src), 'al cambiar el tamaño');
+    ok(!/\(function \(\) \{ const w = parseInt\(pget\(P\.infoW, 0\)\)/.test(src), 'sustituye al arranque antiguo');
+  });
   test('live.js: la sintaxis es válida', () => { new vm.Script(D.src('live.js'), { filename: 'live.js' }); });
 
   test('Live del Dashboard: arranca sin errores y sin mandos de Producción', () => {

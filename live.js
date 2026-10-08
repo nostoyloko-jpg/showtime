@@ -72,6 +72,7 @@
     ALLB = NOFEST ? [] : C.buildBlocks(FEST, { mode: 'all', day: day });   // para desfases y márgenes (todas las categorías)
     CALL_MINS = Dt.callMinsOf(FEST, CONFIG);
     CALL_DONE = new Set(Dt.getCallDone());
+    applyInfoWidth();   // ancho del panel de info: manual si lo arrastraste; si no, según el nombre más largo del día
 
     $('evn-name').textContent = NOFEST ? 'SIN EVENTO' : (DEMO ? 'DEMO · ' : '') + ((FEST.event && FEST.event.nombre) || '');
     $('evn-mode').textContent = vt[0] + ' · ';
@@ -334,6 +335,7 @@
       s.style.flex = '0 0 ' + (STRIP_H[i] || baseH) + 'px';
       bot.appendChild(s);
       s.querySelector('.drag-handle').addEventListener('pointerdown', startInfoResize);
+      s.querySelector('.drag-handle').addEventListener('dblclick', resetInfoAuto);
       const h = s.querySelector('.striph');
       h.addEventListener('pointerdown', e => {
         e.preventDefault(); e.stopPropagation();
@@ -694,8 +696,47 @@
     });
   })();
 
-  // Ancho guardado del panel de información
-  (function () { const w = parseInt(pget(P.infoW, 0)); if (w >= 120) document.documentElement.style.setProperty('--info-w', w + 'px'); })();
+  // ── Ancho del panel de información: automático (nombre más largo del día) o manual (si lo arrastraste) ──
+  // La medida usa el tamaño de REFERENCIA de .aname/.atime (el que tienen con el ancho por defecto de 340px),
+  // no el actual: así el resultado es estable y no se persigue a sí mismo.
+  const INFO_REF_NAME = 37, INFO_REF_TIME = 20, INFO_PAD = 56, INFO_MIN = 280;
+  let INFO_CTX = null;
+  function measureTxt(txt, weight, size, fam) {
+    try {
+      if (!INFO_CTX) { const cv = document.createElement('canvas'); INFO_CTX = cv && cv.getContext ? cv.getContext('2d') : null; }
+      if (INFO_CTX) { INFO_CTX.font = weight + ' ' + size + 'px ' + fam; const w = INFO_CTX.measureText(txt).width; if (w > 0) return w; }
+    } catch (e) {}
+    return String(txt).length * size * 0.62;   // respaldo si no hay canvas
+  }
+  /** Ancho automático: el nombre (o el horario) más largo de la jornada + margen, entre 280 px y 45 vw. */
+  function autoInfoWidth() {
+    const el = document.querySelector('.aname') || document.body;
+    const fam = (getComputedStyle(el) && getComputedStyle(el).fontFamily) || 'sans-serif';
+    let need = 0;
+    (BLOCKS || []).forEach(b => {
+      need = Math.max(need, measureTxt(String(b.name || '').toUpperCase(), 900, INFO_REF_NAME, fam));
+      if (b.si !== null && b.si !== undefined && b.sf !== null && b.sf !== undefined) need = Math.max(need, measureTxt(C.fmtHM(b.si) + '–' + C.fmtHM(b.sf), 500, INFO_REF_TIME, fam));
+    });
+    const hi = window.innerWidth * 0.45;
+    return Math.round(Math.max(INFO_MIN, Math.min(need + INFO_PAD, hi)));
+  }
+  /** Aplica el ancho: el manual guardado, o el automático. En móvil vertical manda el CSS (36 vw). */
+  function applyInfoWidth() {
+    const root = document.documentElement;
+    const phonePortrait = typeof window.matchMedia === 'function' && window.matchMedia('(max-width:700px) and (orientation:portrait)').matches;
+    try {
+      if (phonePortrait) { root.style.removeProperty('--info-w'); return; }
+      const saved = parseInt(pget(P.infoW, 0), 10);
+      root.style.setProperty('--info-w', (saved >= 120 ? saved : autoInfoWidth()) + 'px');
+    } catch (e) {}
+  }
+  /** Doble clic en el tirador: borra el ancho manual y vuelve al automático al instante. */
+  function resetInfoAuto() {
+    try { localStorage.removeItem(P.infoW); } catch (e) {}
+    applyInfoWidth(); requestAnimationFrame(redraw);
+  }
+  window.addEventListener('resize', applyInfoWidth);
+  applyInfoWidth();
 
   // Botones
   $('syncbtn').addEventListener('click', () => setTimeOffset(0));
