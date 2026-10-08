@@ -59,7 +59,9 @@
           kind: b.kind,
           name: name,
           notes: notes,
-          aviso: AVISO_RE.test(name) || AVISO_RE.test(notes)
+          aviso: AVISO_RE.test(name) || AVISO_RE.test(notes),
+          s: Number.isFinite(ini) ? ini : null,      // minutos absolutos (para el cronograma)
+          e: Number.isFinite(fin) ? fin : null
         };
       });
   }
@@ -116,6 +118,7 @@
     '.sheet-foot{flex:0 0 auto;display:flex;justify-content:space-between;gap:10px;margin-top:3mm;padding-top:2mm;border-top:.5pt solid #cbd5e1;font-size:6.5pt;color:#64748b;letter-spacing:.02em}',
     '.empty{font-size:9pt;color:#334155;padding:10mm 0}',
     '.bar{position:sticky;top:0;display:flex;gap:16px;align-items:center;justify-content:space-between;padding:10px 20px;background:#14161b;color:#e5e7eb;font-size:13px;z-index:2}',
+    '.gantt{display:block;width:100%;height:100%}',
     '@media print{.bar{display:none}}'
   ].join('\n');
 
@@ -133,6 +136,147 @@
     return r.kind === 'show' || (r.kind === 'hito' && /curfew|apertura|fin de/i.test(r.name));
   }
 
+  /** Parte el texto en líneas que caben en maxW (mm). Si no caben en maxLines, la última acaba en «…».
+   *  Al final, la hora («15:20–16:10») va en su propia línea si hay sitio. */
+  function wrapLines(name, time, maxW, fs, maxLines) {
+    if (maxLines < 1) return [];
+    const cw = fs * 0.66, per = Math.max(1, Math.floor(maxW / cw));   // 0.66 em: margen para negrita
+    const words = String(name || '').split(/\s+/).filter(Boolean);
+    const lines = [];
+    let cur = '';
+    words.forEach(w => {
+      const cand = cur ? cur + ' ' + w : w;
+      if (cand.length <= per) cur = cand;
+      else { if (cur) lines.push(cur); cur = w.length > per ? w.slice(0, per) : w; }
+    });
+    if (cur) lines.push(cur);
+    if (lines.length > maxLines) {
+      const kept = lines.slice(0, maxLines);
+      const last = kept[maxLines - 1];
+      kept[maxLines - 1] = (last.length >= per ? last.slice(0, per - 1) : last) + '…';
+      return kept;
+    }
+    if (time && lines.length < maxLines && time.length * cw <= maxW) lines.push(time);
+    return lines;
+  }
+
+  /** Etiqueta que cabe en un ancho (mm): «Nombre horario» → «Nombre» → «Nomb…» → vacío. */
+  function fitLabel(name, time, maxW, fs) {
+    const cw = fs * 0.6;                       // ancho medio de carácter (mm) con negrita
+    const full = name + '  ' + time;
+    if (full.length * cw <= maxW) return full;
+    if (name.length * cw <= maxW) return name;
+    const n = Math.floor(maxW / cw) - 1;
+    return n >= 4 ? name.slice(0, n) + '…' : '';
+  }
+
+  /**
+   * Cronograma (Gantt) de un día: geometría en mm dentro de un viewBox W×H.
+   * Rango dinámico: desde el primer bloque (−30 min, a hora completa) hasta el último (+30 min, a hora completa).
+   * Carriles = escenarios; bloques solapados en el mismo escenario van en sub-filas; hitos = líneas verticales.
+   * list: filas de rowsOf (con s/e en minutos). Devuelve null si no hay nada que dibujar.
+   */
+  function layoutGantt(list, W, H) {
+    const items = (list || []).filter(r => !r.aviso && Number.isFinite(r.s));
+    if (!items.length) return null;
+    const minS = Math.min.apply(null, items.map(r => r.s));
+    const maxE = Math.max.apply(null, items.map(r => Number.isFinite(r.e) ? r.e : r.s));
+    const a = Math.floor((minS - 30) / 60) * 60;
+    const b = Math.ceil((maxE + 30) / 60) * 60;
+    const step = b - a <= 360 ? 30 : 60;
+    const LW = 44, AX = 13, GAP = 1.4, x0 = LW, x1 = W - 2;
+    const X = t => x0 + (t - a) / (b - a) * (x1 - x0);
+    const laneMap = new Map();
+    items.filter(r => r.kind !== 'hito').slice().sort((p, q) => p.s - q.s).forEach(r => {
+      if (!laneMap.has(r.zone)) laneMap.set(r.zone, { name: r.zone, color: r.zoneColor, items: [] });
+      laneMap.get(r.zone).items.push(r);
+    });
+    const lanes = [];
+    laneMap.forEach(l => {
+      const ends = [];
+      l.items.forEach(r => {
+        const e = Number.isFinite(r.e) ? r.e : r.s;
+        let row = ends.findIndex(x => x <= r.s);
+        if (row < 0) { row = ends.length; ends.push(e); } else ends[row] = e;
+        r.row = row;
+      });
+      l.rows = Math.max(1, ends.length);
+      lanes.push(l);
+    });
+    const totalRows = lanes.reduce((n, l) => n + l.rows, 0);
+    const avail = H - AX - lanes.length * GAP - 2;
+    const rowH = Math.min(22, avail / totalRows);      // pocas filas → barras altas y nombres grandes
+    const fs = Math.min(4.2, rowH * 0.36);
+    let y = AX + 0.5;
+    lanes.forEach(l => { l.y = y; l.h = l.rows * rowH; y += l.h + GAP; });
+    const bars = [];
+    lanes.forEach(l => l.items.forEach(r => {
+      const e = Number.isFinite(r.e) ? r.e : r.s;
+      const x = X(r.s), w = Math.max(0.8, X(e) - X(r.s));
+      const time = C.fmtHM(r.s) + (Number.isFinite(r.e) ? '–' + C.fmtHM(r.e) : '');
+      // Letra por barra: las barras estrechas bajan de tamaño para que las palabras no se partan
+      const bfs = Math.max(2.4, Math.min(fs, w / 9));
+      const maxLines = Math.max(0, Math.floor((rowH - 1.2) / (bfs * 1.2)));
+      bars.push({ kind: r.kind, x: x, y: l.y + r.row * rowH + 0.5, w: w, h: rowH - 1, color: r.zoneColor,
+        strong: isStrong(r), zone: r.zone, fs: bfs, lines: wrapLines(clean(r.name), time, w - 2.6, bfs, maxLines) });
+    }));
+    const ticks = [];
+    for (let t = a; t <= b; t += step) ticks.push({ x: X(t), label: C.fmtHM(t) });
+    const hitos = items.filter(r => r.kind === 'hito').map(r => ({ x: X(r.s), label: clean(r.name) }));
+    return { W: W, H: H, a: a, b: b, step: step, x0: x0, x1: x1, AX: AX, LW: LW, lanes: lanes, bars: bars, ticks: ticks, hitos: hitos, rowH: rowH, fs: fs };
+  }
+
+  /** SVG vectorial inline del cronograma (sin gráficos de fondo: se imprime igual con o sin esa opción). */
+  function ganttSvg(L) {
+    const f = (n) => Math.round(n * 100) / 100;
+    const out = [];
+    out.push('<svg class="gantt" viewBox="0 0 ' + L.W + ' ' + L.H + '" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Cronograma de escenarios">');
+    L.ticks.forEach(t => {
+      out.push('<line x1="' + f(t.x) + '" x2="' + f(t.x) + '" y1="' + L.AX + '" y2="' + (L.H - 1) + '" stroke="#e2e8f0" stroke-width="0.15"/>');
+      out.push('<text x="' + f(t.x) + '" y="' + (L.AX - 1.5) + '" text-anchor="middle" font-size="2.8" fill="#334155">' + esc(t.label) + '</text>');
+    });
+    L.lanes.forEach((l, i) => {
+      out.push('<rect x="0" y="' + f(l.y) + '" width="1.2" height="' + f(l.h) + '" fill="' + esc(l.color) + '"/>');
+      const maxC = Math.floor((L.LW - 5) / (3.2 * 0.6));
+      const nm = l.name.length > maxC ? l.name.slice(0, maxC - 1) + '…' : l.name;
+      out.push('<text x="3" y="' + f(l.y + l.h / 2 + 1.1) + '" font-size="3.2" font-weight="700" fill="#0f172a">' + esc(nm) + '</text>');
+      if (i < L.lanes.length - 1) out.push('<line x1="0" x2="' + L.W + '" y1="' + f(l.y + l.h + 0.7) + '" y2="' + f(l.y + l.h + 0.7) + '" stroke="#cbd5e1" stroke-width="0.2"/>');
+    });
+    L.bars.forEach(b => {
+      const show = b.kind === 'show';
+      const style = show ? 'fill="#fff" stroke="#0f172a" stroke-width="0.3"'
+        : b.kind === 'sc' ? 'fill="#f5f3ff" stroke="#7c3aed" stroke-width="0.3" stroke-dasharray="1,0.6"'
+        : 'fill="#e0f2fe" stroke="#0284c7" stroke-width="0.3"';
+      out.push('<rect x="' + f(b.x) + '" y="' + f(b.y) + '" width="' + f(b.w) + '" height="' + f(b.h) + '" rx="0.6" ' + style + '/>');
+      if (show) out.push('<rect x="' + f(b.x) + '" y="' + f(b.y) + '" width="1.1" height="' + f(b.h) + '" fill="' + esc(b.color) + '"/>');
+      if (b.lines.length) {
+        const lh = b.fs * 1.2, top = b.y + (b.h - b.lines.length * lh) / 2 + b.fs * 0.85;
+        out.push('<text x="' + f(b.x + (show ? 2.2 : 1.4)) + '" y="' + f(top) + '" font-size="' + f(b.fs) + '" font-weight="' + (b.strong ? 800 : 500) + '" fill="#0f172a">' +
+          b.lines.map((t, i) => '<tspan x="' + f(b.x + (show ? 2.2 : 1.4)) + '" dy="' + (i ? f(lh) : 0) + '">' + esc(t) + '</tspan>').join('') + '</text>');
+      }
+    });
+    L.hitos.forEach(h => {
+      out.push('<line x1="' + f(h.x) + '" x2="' + f(h.x) + '" y1="' + (L.AX - 6) + '" y2="' + (L.H - 1) + '" stroke="#dc2626" stroke-width="0.3" stroke-dasharray="1.1,0.8"/>');
+      const anchor = h.x > L.x1 - 30 ? 'end' : 'start';
+      out.push('<text x="' + f(h.x + (anchor === 'end' ? -0.8 : 0.8)) + '" y="' + (L.AX - 7) + '" text-anchor="' + anchor + '" font-size="2.6" font-weight="700" fill="#991b1b">' + esc(h.label) + '</text>');
+    });
+    out.push('</svg>');
+    return out.join('');
+  }
+
+  /** Una hoja de cronograma (apaisada) para un día. */
+  function ganttSheet(list, d, idx, total, title, printed) {
+    const L = layoutGantt(list, 273, 160);
+    const bloques = list.filter(r => !r.aviso).length;
+    const meta = [d ? dayLabel(d) : 'Todas las jornadas', (L ? L.lanes.length : 0) + ' escenarios', bloques + ' bloques'].join(' · ');
+    const footerLeft = 'Showtime Regiduría · ' + title + ' · ' + (d ? dayLabel(d) : 'Todas las jornadas');
+    return '<section class="sheet landscape">' +
+      '<div class="hd"><div class="brand">Showtime · Cronograma</div><h1>' + esc(title) + '</h1><div class="meta">' + esc(meta) + '</div></div>' +
+      (L ? '<div class="tbl">' + ganttSvg(L) + '</div>' : '<p class="empty">Nada que dibujar con estos filtros.</p>') +
+      '<footer class="sheet-foot"><span>' + esc(footerLeft) + '</span><span>Impreso: ' + esc(printed) + '</span><span>Pág ' + (idx + 1) + '/' + total + '</span></footer>' +
+      '</section>';
+  }
+
   /**
    * Documento HTML completo.
    * opts: { rows: [...] (de rowsOf), days: [ISO], title, orient:'portrait'|'landscape', notes:bool, call:bool, now: Date }
@@ -141,11 +285,13 @@
     const o = opts || {};
     const rows = o.rows || [];
     const days = o.days && o.days.length ? o.days : [null];
-    const land = o.orient === 'landscape';
+    const gantt = o.format === 'gantt';                    // el cronograma es siempre apaisado
+    const land = o.orient === 'landscape' || gantt;
     const printed = printedAt(o.now);
     const title = o.title || 'Evento';
     const sheets = days.map((d, idx) => {
       const list = rows.filter(r => !d || r.jornada === d);
+      if (gantt) return ganttSheet(list, d, idx, days.length, title, printed);
       const dens = densityFor(list.length);
       const zones = [];
       list.forEach(r => { if (!r.aviso && zones.indexOf(r.zone) < 0) zones.push(r.zone); });
@@ -217,7 +363,7 @@
     return true;
   }
 
-  const API = { CONTENT, TYPE, rowsOf, densityFor, dayLabel, printedAt, daysOf, html, summary, launch, esc };
+  const API = { CONTENT, TYPE, rowsOf, densityFor, dayLabel, printedAt, daysOf, html, summary, launch, esc, layoutGantt, ganttSvg, fitLabel, wrapLines };
   if (isNode) module.exports = API;
   else root.ShowtimePrint = API;
 })(typeof window !== 'undefined' ? window : globalThis);

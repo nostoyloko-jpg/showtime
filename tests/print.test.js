@@ -164,6 +164,58 @@
     eq(P.summary(rows, [J1]).hojas, 1);
   });
 
+  // ── Cronograma (Gantt) ─────────────────────────────────────────────────
+  const G = (name, s, e, zone, kind, color) => ({ jornada: J1, start: '', end: '', dur: '', call: '', zone: zone || 'Principal', zoneColor: color || '#e94560', kind: kind || 'show', name, notes: '', aviso: false, s: s, e: e === undefined ? s + 60 : e });
+  test('gantt: rango dinámico a horas completas con margen de 30 min', () => {
+    const L = P.layoutGantt([G('A', 690), G('B', 980, 1030)], 273, 160);     // 11:30 … 17:10
+    eq(L.a, 660, 'empieza 11:00 (690−30 = 660)');
+    eq(L.b, 1080, 'acaba 18:00 (1030+30 → 1060 → 18:00)');
+  });
+  test('gantt: cuadrícula de 30 min si el rango cabe en 6 h; de 60 si no', () => {
+    eq(P.layoutGantt([G('A', 600, 660), G('B', 700, 760)], 273, 160).step, 30, 'rango de 4 h');
+    eq(P.layoutGantt([G('A', 600, 660), G('B', 1100, 1160)], 273, 160).step, 60, 'rango largo');
+  });
+  test('gantt: un carril por escenario; solapes en el mismo escenario van en sub-filas', () => {
+    const L = P.layoutGantt([G('A', 700, 760), G('B', 730, 790), G('C', 800, 860, 'Carpa', 'show', '#0284c7')], 273, 160);
+    eq(L.lanes.length, 2, 'dos escenarios');
+    eq(L.lanes[0].rows, 2, 'Principal necesita 2 sub-filas (A y B se solapan)');
+    eq(L.lanes[1].rows, 1, 'Carpa 1 fila');
+  });
+  test('gantt: barras proporcionales al tiempo y hitos como líneas', () => {
+    const L = P.layoutGantt([G('A', 600, 720), G('Apertura', 780, null, 'Principal', 'hito')], 273, 160);
+    const bar = L.bars[0];
+    ok(Math.abs(bar.w / (L.x1 - L.x0) * (L.b - L.a) - 120) < 0.01, 'una hora de bloque = 120 min de eje');
+    eq(L.hitos.length, 1, 'un hito');
+    const svg = P.ganttSvg(L);
+    ok(svg.indexOf('stroke="#dc2626"') >= 0 && svg.indexOf('stroke-dasharray="1.1,0.8"') >= 0, 'hito: línea roja discontinua');
+    ok(svg.indexOf('<svg class="gantt"') === 0 && svg.indexOf('</svg>') > 0, 'SVG inline bien formado');
+  });
+  test('gantt: etiqueta que cabe o se trunca o desaparece', () => {
+    eq(P.fitLabel('Show', '15:20–16:10', 60, 3), 'Show  15:20–16:10', 'cabe con horario');
+    eq(P.fitLabel('Show', '15:20–16:10', 8, 3), 'Show', 'solo nombre');
+    ok(P.fitLabel('Nombre muy largo de banda', '15:20', 12, 3).slice(-1) === '…', 'truncado con puntos');
+    eq(P.fitLabel('Nombre', '15:20', 2, 3), '', 'no cabe nada');
+  });
+  test('gantt: el nombre se parte en líneas dentro de la barra, con «…» si no cabe', () => {
+    eq(P.wrapLines('Llegada y descarga', '', 30, 4, 3).join('|'), 'Llegada y|descarga', 'dos líneas');
+    eq(P.wrapLines('Uno dos tres cuatro cinco seis siete', '', 14, 4, 2).length, 2, 'máximo dos líneas');
+    ok(P.wrapLines('Uno dos tres cuatro cinco seis siete', '', 14, 4, 2)[1].slice(-1) === '…', 'última línea con puntos');
+    eq(P.wrapLines('Corta', '15:20', 40, 4, 3).join('|'), 'Corta|15:20', 'la hora va en su línea si cabe');
+    eq(P.wrapLines('Algo', '15:20', 40, 4, 0).length, 0, 'sin líneas si no hay alto');
+  });
+  test('gantt: html con formato gantt → hojas apaisadas con SVG y pie', () => {
+    const rows = [G('A', 690, 780), G('B', 900, 960, 'Carpa', 'show', '#0284c7')];
+    const doc = P.html({ rows, days: [J1], title: 'Prueba', format: 'gantt', orient: 'portrait', now: new Date() });
+    ok(doc.indexOf('A4 landscape') >= 0, 'apaisado aunque pidan vertical');
+    ok(doc.indexOf('<svg class="gantt"') >= 0, 'SVG inline');
+    ok(doc.indexOf('<footer class="sheet-foot">') >= 0 && doc.indexOf('Pág 1/1') >= 0, 'pie con paginación');
+    ok(doc.indexOf('<table') < 0, 'no mezcla tabla');
+  });
+  test('gantt: sin bloques con hora → mensaje y no rompe', () => {
+    const doc = P.html({ rows: [], days: [J1], title: 'X', format: 'gantt' });
+    ok(doc.indexOf('Nada que dibujar') >= 0, 'aviso de vacío');
+  });
+
   test('dayLabel y printedAt', () => {
     ok(P.dayLabel(J1).indexOf('2026') < 0, 'no añade año');
     eq(P.dayLabel('all'), 'Todo el evento');
