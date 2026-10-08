@@ -8,7 +8,7 @@
   if (typeof module === 'undefined' || !module.exports) { console.log('control.test.js: solo en Node (node tests/control.test.js)'); return; }
   const vm = require('vm');
   const D = require('./_dom.js'), C = require('../core.js'), E = require('../emision.js');
-  const MODULOS = ['core.js', 'meteo.js', 'datos.js', 'importar.js', 'xlsx.js', 'qr.js', 'emision.js', 'mando.js', 'vistas.js', 'log.js', 'marca.js', 'control.js'];
+  const MODULOS = ['i18n.js', 'core.js', 'meteo.js', 'datos.js', 'importar.js', 'xlsx.js', 'qr.js', 'emision.js', 'mando.js', 'vistas.js', 'log.js', 'marca.js', 'control.js'];
 
   const tests = [];
   function test(name, fn) { tests.push([name, fn]); }
@@ -1208,6 +1208,29 @@
     ok(r.ok); eq(t.read('showtime.flash').text, 'ÚLTIMO TEMA'); eq(t.read('showtime.flash').to.join(), 'manager');
     ok(t.log().some(e => e.type === 'msg' && e.src === 'mando'));
     ok((await t.cmd('flashOff', {})).ok); eq(t.read('showtime.flash'), null);
+  });
+
+  test('Idioma: botón ES/EN y selector de Configuración; se guarda en CONFIG.lang (viaja con la emisión)', () => {
+    const t = dashboard(), I = t.env.win.ShowtimeI18n;
+    eq(I.getLang(), 'es', 'español por defecto');
+    eq(t.env.getEl('btn-lang').textContent, 'ES');
+    t.env.fire('btn-lang', 'click', {});
+    eq(t.read('showtime.config').lang, 'en', 'guardado en la configuración (Dt.KEYS.config → emisión)');
+    eq(I.getLang(), 'en'); eq(t.env.getEl('btn-lang').textContent, 'EN');
+    t.env.fire('cfg-lang', 'click', { target: { closest: sel => sel === '[data-l]' ? { dataset: { l: 'es' } } : null } });
+    eq(t.read('showtime.config').lang, 'es'); eq(I.getLang(), 'es');
+  });
+  test('Idioma: un Panel cuya configuración está en inglés arranca en inglés', () => {
+    const t = dashboard({ 'showtime.config': JSON.stringify({ lang: 'en' }) });
+    eq(t.env.win.ShowtimeI18n.getLang(), 'en');
+    eq(t.env.getEl('btn-lang').textContent, 'EN');
+  });
+  test('Idioma: la hoja de ruta ya no tiene selector propio (usa el idioma activo)', () => {
+    const js = D.src('control.js');
+    ok(js.indexOf('pr-lang') < 0 && js.indexOf('PR.lang') < 0);
+    ok(/<script src="i18n\.js\?v=\d+"><\/script>\n<script src="core\.js/.test(D.src('index.html')), 'i18n.js se carga el primero en el Panel');
+    ['live.html', 'remote.html'].forEach(f => ok(D.src(f).indexOf('<script src="i18n.js?v=') >= 0, f + ' carga i18n.js'));
+    ok(/if \(window\.ShowtimeI18n\) window\.ShowtimeI18n\.setLang\(CONFIG\.lang\)/.test(D.src('live.js')) && /if \(window\.ShowtimeI18n\) window\.ShowtimeI18n\.setLang\(CONFIG\.lang\)/.test(D.src('remote.js')), 'Live y Mando siguen al Panel');
   });
 
   // ── Ejecutor ─────────────────────────────────────────────────────────

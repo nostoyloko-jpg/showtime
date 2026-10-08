@@ -59,6 +59,7 @@
     NOFEST = !FEST;
 
     CONFIG = Dt.getConfig();
+    if (window.ShowtimeI18n) window.ShowtimeI18n.setLang(CONFIG.lang);   // el idioma lo manda el Panel (también por la emisión)
     if (URLP.get('estilo')) CONFIG.style = Dt.normStyle(URLP.get('estilo'));
     if (URLP.get('modo')) CONFIG.mode = /^(sc|soundcheck)$/.test(URLP.get('modo')) ? 'sc' : /^(all|jornada|todo)$/.test(URLP.get('modo')) ? 'all' : 'show';
     const vt = VIEW_TXT[CONFIG.mode] || VIEW_TXT.show;

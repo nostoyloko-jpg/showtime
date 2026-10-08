@@ -9,6 +9,7 @@
   'use strict';
   const isNode = typeof module !== 'undefined' && module.exports;
   const C = isNode ? require('./core.js') : root.ShowtimeCore;
+  const I = isNode ? require('./i18n.js') : root.ShowtimeI18n;   // idioma común de la suite
 
   /** Filtros de contenido: qué tipos de bloque entran. */
   const CONTENT = {
@@ -31,29 +32,8 @@
     tarea: { cls: 'p-tarea' },
     hito: { cls: 'p-hito' }
   };
-  /** Textos de la hoja impresa en cada idioma (0 dependencias). Por defecto, español. */
-  const I18N = {
-    es: {
-      htmlLang: 'es', locale: 'es-ES',
-      cols: { time: 'Horario', dur: 'Duración', call: 'CALL', zone: 'Escenario / zona', type: 'Tipo', name: 'Artista / actividad', notes: 'Notas / operativa' },
-      pills: { show: 'SHOW', sc: 'SOUNDCHECK', tarea: 'TAREA', hito: 'HITO' },
-      brand: 'Showtime · Hoja de ruta', brandGantt: 'Showtime · Cronograma',
-      printed: 'Impreso: ', page: 'Pág ', allDays: 'Todas las jornadas', noDay: 'Todo el evento',
-      allStages: 'Todos los escenarios', full: 'Todo el horario', blocks: 'bloques', stages: 'escenarios',
-      zone: 'Zona: ', noZone: 'Sin zona', empty: 'Nada que imprimir con estos filtros.', emptyGantt: 'Nada que dibujar con estos filtros.'
-    },
-    en: {
-      htmlLang: 'en', locale: 'en-GB',
-      cols: { time: 'Time', dur: 'Duration', call: 'CALL', zone: 'Stage / zone', type: 'Type', name: 'Artist / activity', notes: 'Notes / running order' },
-      pills: { show: 'SHOW', sc: 'SOUNDCHECK', tarea: 'TASK', hito: 'MILESTONE' },
-      brand: 'Showtime · Running order', brandGantt: 'Showtime · Timeline',
-      printed: 'Printed: ', page: 'Page ', allDays: 'All days', noDay: 'Whole event',
-      allStages: 'All stages', full: 'Full schedule', blocks: 'blocks', stages: 'stages',
-      zone: 'Zone: ', noZone: 'No zone', empty: 'Nothing to print with these filters.', emptyGantt: 'Nothing to draw with these filters.'
-    }
-  };
-  /** Diccionario del idioma pedido («en»; cualquier otro valor → español). */
-  function T(lang) { return I18N[lang === 'en' ? 'en' : 'es']; }
+  /** Textos de la hoja impresa: rama «print» del diccionario común (i18n.js). Sin lang → el idioma activo de Showtime. */
+  function T(lang) { return I.group('print', lang ? I.norm(lang) : I.getLang()); }
   /** Píldora de tipo en el idioma pedido. */
   function pillOf(kind, lang) {
     const t = TYPE[kind] || { cls: 'p-show' };
@@ -118,7 +98,7 @@
     const i = C.dayIndex(iso);
     const d = i === null ? null : new Date(Date.UTC(2000, 0, 1) + i * 864e5);
     if (!d) return iso;
-    const opts = lang === 'en'
+    const opts = t.htmlLang === 'en'
       ? { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }
       : { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' };
     return d.toLocaleDateString(t.locale, opts);
@@ -524,7 +504,7 @@
     const L = layoutGantt(list, 273, 164);
     const bloques = list.filter(r => !r.aviso).length;
     const meta = [d ? dayLabel(d, lang) : t.allDays, (L ? L.lanes.length : 0) + ' ' + t.stages, bloques + ' ' + t.blocks].join(' · ');
-    const footerLeft = 'Showtime Regiduría · ' + title + ' · ' + (d ? dayLabel(d, lang) : t.allDays);
+    const footerLeft = t.footer + ' · ' + title + ' · ' + (d ? dayLabel(d, lang) : t.allDays);
     return '<section class="sheet landscape">' +
       '<div class="hd"><div class="brand">' + esc(t.brandGantt) + '</div><h1>' + esc(title) + '</h1><div class="meta">' + esc(meta) + '</div></div>' +
       (L ? '<div class="tbl">' + ganttSvg(L) + '</div>' : '<p class="empty">' + esc(t.emptyGantt) + '</p>') +
@@ -535,11 +515,11 @@
   /**
    * Documento HTML completo.
    * opts: { rows: [...] (de rowsOf), days: [ISO], title, orient:'portrait'|'landscape', notes:bool, call:bool, now: Date,
-   *         lang:'es'|'en' (por defecto español), full:bool (contenido = todo el horario) }
+   *         lang:'es'|'en' (por defecto, el idioma activo de Showtime), full:bool (contenido = todo el horario) }
    */
   function html(opts) {
     const o = opts || {};
-    const lang = o.lang === 'en' ? 'en' : 'es';
+    const lang = o.lang ? I.norm(o.lang) : I.getLang();   // sin lang: el idioma activo de Showtime
     const t = T(lang);
     const rows = o.rows || [];
     const days = o.days && o.days.length ? o.days : [null];
@@ -584,7 +564,7 @@
       if (zoneOne) metaParts.push(t.zone + zoneOne);
       else if (zones.length > 1) metaParts.push(t.allStages);
       if (o.full) metaParts.push(t.full);
-      const footerLeft = 'Showtime Regiduría · ' + title + ' · ' + (d ? dayLabel(d, lang) : t.allDays);
+      const footerLeft = t.footer + ' · ' + title + ' · ' + (d ? dayLabel(d, lang) : t.allDays);
       const footerRight = t.page + (idx + 1) + '/' + days.length;
       return '<section class="sheet ' + (land ? 'landscape' : 'portrait') + ' ' + dens.cls + '">' +
         '<div class="hd"><div class="brand">' + esc(t.brand) + '</div><h1>' + esc(title) + '</h1><div class="meta">' + esc(metaParts.join(' · ')) + '</div></div>' +
@@ -623,7 +603,7 @@
     return true;
   }
 
-  const API = { CONTENT, KINDS, TYPE, I18N, rowsOf, densityFor, dayLabel, printedAt, daysOf, html, summary, launch, esc, layoutGantt, ganttSvg, fitLabel, wrapLines, cutWords, textW, fitText, letters, hitoName };
+  const API = { CONTENT, KINDS, TYPE, rowsOf, densityFor, dayLabel, printedAt, daysOf, html, summary, launch, esc, layoutGantt, ganttSvg, fitLabel, wrapLines, cutWords, textW, fitText, letters, hitoName };
   if (isNode) module.exports = API;
   else root.ShowtimePrint = API;
 })(typeof window !== 'undefined' ? window : globalThis);

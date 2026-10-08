@@ -8,7 +8,7 @@
   if (typeof module === 'undefined' || !module.exports) { console.log('remote.test.js: solo en Node (node tests/remote.test.js)'); return; }
   const vm = require('vm');
   const D = require('./_dom.js'), E = require('../emision.js'), C = require('../core.js'), M0 = require('../mando.js');
-  const MODULOS = ['core.js', 'datos.js', 'emision.js', 'mando.js', 'vistas.js'];
+  const MODULOS = ['i18n.js', 'core.js', 'datos.js', 'emision.js', 'mando.js', 'vistas.js'];
   const tests = [];
   function test(name, fn) { tests.push([name, fn]); }
   function eq(a, b, msg) { if (a !== b) throw new Error((msg ? msg + ': ' : '') + 'esperaba ' + JSON.stringify(b) + ', salió ' + JSON.stringify(a)); }
@@ -148,6 +148,14 @@
     eq(t.sent[0].op, 'callOk'); eq(t.sent[0].args.key, 'Viene@123');
     click(t, '#flash-off', {}); await tick(); await tick();
     eq(t.sent[1].op, 'flashOff');
+  });
+  test('Idioma: el Mando sigue el idioma que manda el Panel por la emisión', async () => {
+    const t = await mando();
+    eq(t.env.win.ShowtimeI18n.getLang(), 'es');
+    t.Dt.loadSnapshot({ festival: fest(), config: { lang: 'en' }, callDone: [], flash: null, avisos: [] });
+    eq(t.env.win.ShowtimeI18n.getLang(), 'en', 'llega en el paquete de emisión');
+    t.Dt.loadSnapshot({ festival: fest(), config: { lang: 'es' }, callDone: [], flash: null, avisos: [] });
+    eq(t.env.win.ShowtimeI18n.getLang(), 'es');
   });
   test('Reconexión: al volver a la app (pantalla encendida) o recuperar la red, reconecta a fondo', async () => {
     const t = await mando();

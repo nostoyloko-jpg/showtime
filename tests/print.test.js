@@ -350,6 +350,17 @@
     ok(doc.indexOf('Nada que dibujar') >= 0, 'aviso de vacío');
   });
 
+  test('i18n: sin lang, la hoja sale en el idioma activo de Showtime', () => {
+    const I = isNode ? require('../i18n.js') : window.ShowtimeI18n;
+    const rows = [G('Show A', 600, 660)];
+    I.setLang('en');
+    try {
+      const en = P.html({ rows, days: [J1], title: 'T', orient: 'portrait', now: new Date(2026, 6, 10) });
+      ok(en.indexOf('Printed: 10/07/2026') >= 0 && en.indexOf('Showtime Stage Management') >= 0, 'inglés activo → hoja en inglés');
+      ok(P.html({ rows, days: [J1], title: 'T', now: new Date(2026, 6, 10), lang: 'es' }).indexOf('Impreso:') >= 0, 'lang explícito manda');
+    } finally { I.setLang('es'); }
+    ok(P.html({ rows, days: [J1], title: 'T', now: new Date(2026, 6, 10) }).indexOf('Showtime Regiduría') >= 0, 'español por defecto');
+  });
   test('dayLabel y printedAt', () => {
     ok(P.dayLabel(J1).indexOf('2026') < 0, 'no añade año');
     eq(P.dayLabel('all'), 'Todo el evento');

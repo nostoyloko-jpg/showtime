@@ -29,7 +29,10 @@
   }
 
   // ── Datos ────────────────────────────────────────────────────────────
-  function load() { FEST = Dt.getFestival(); CONFIG = Dt.getConfig(); }
+  function load() {
+    FEST = Dt.getFestival(); CONFIG = Dt.getConfig();
+    if (window.ShowtimeI18n) window.ShowtimeI18n.setLang(CONFIG.lang);   // el idioma lo manda el Panel (llega con la emisión)
+  }
   function now() { return C.nowAbs(); }
   function zones() {
     if (!FEST) return [];

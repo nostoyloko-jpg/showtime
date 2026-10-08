@@ -24,7 +24,7 @@
     meteo:    'showtime.meteo'         // el tiempo (2e-B): { snap, err, errAt } — lo pide el Dashboard; la Live y los dispositivos lo leen
   };
   const STYLES = ['clasico', 'escenario', 'neutro', 'raycast'];
-  const DEFAULT_CONFIG = { mode: 'show', day: 'all', style: 'clasico', callMins: null, msgBg: '#000000', msgFg: '#ffb347', msgSecs: 20, avisoSecs: 120 };
+  const DEFAULT_CONFIG = { mode: 'show', day: 'all', style: 'clasico', callMins: null, msgBg: '#000000', msgFg: '#ffb347', msgSecs: 20, avisoSecs: 120, lang: 'es' };
   const MSG_SECS = [10, 20, 30, 60, 0];   // 0 = hasta retirarlo
   const AVISO_SECS = [60, 120, 300, 600, 900];   // avisos puntuales en la cinta: la cinta tarda en dar la vuelta, necesitan más tiempo que un mensaje
 
@@ -80,6 +80,7 @@
     if (root.ShowtimeVistas) o.screens = root.ShowtimeVistas.normScreens(o.screens);
     if (root.ShowtimeMeteo) o.meteo = root.ShowtimeMeteo.normMeteo(o.meteo);   // el tiempo (2e-B): fuente, lugar y umbrales del regidor
     o.delayZone = typeof o.delayZone === 'string' ? o.delayZone : 'all';   // zona que se está editando en el menú Retrasos
+    o.lang = o.lang === 'en' ? 'en' : 'es';   // idioma de toda la suite: lo manda el Panel y viaja con la emisión
     return o;
   }
 

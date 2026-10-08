@@ -118,6 +118,7 @@
     FEST = Dt.getFestival();
     ORIG = Dt.getOriginal();
     CONFIG = Dt.getConfig();
+    if (window.ShowtimeI18n && window.ShowtimeI18n.setLang(CONFIG.lang)) paintLang();   // el idioma puede cambiar desde otra ventana
     if (FEST && !Dt.READONLY) { const f2 = M.withBlk(FEST, CONFIG); if (f2 !== FEST) { FEST = f2; Dt.setFestival(FEST); } }
     compute();
   }
@@ -1099,6 +1100,26 @@
     toast('Estilo de la Pantalla Live: ' + e.target.selectedOptions[0].textContent);
   });
   applyPanelStyle(panelStyle());
+
+  // ── Idioma (i18n): lo manda este Panel. Va en CONFIG.lang (guardada en este navegador) y viaja con la emisión,
+  //    así que las pantallas Live y el Mando lo siguen solos. Las hojas impresas salen en el idioma activo. ──
+  function paintLang() {
+    const I = window.ShowtimeI18n; if (!I) return;
+    const L = I.getLang(), b = $('btn-lang');
+    if (b) { b.textContent = I.t('lang.short'); b.title = I.t('lang.btnTitle'); b.setAttribute('aria-label', I.t('lang.btnTitle')); }
+    document.querySelectorAll('#cfg-lang [data-l]').forEach(x => { const on = x.dataset.l === L; x.classList.toggle('on', on); x.setAttribute('aria-pressed', on ? 'true' : 'false'); });
+  }
+  function setAppLang(l) {
+    const I = window.ShowtimeI18n; if (!I) return;
+    l = I.norm(l);
+    if (CONFIG.lang !== l) CONFIG = Dt.setConfig({ lang: l });
+    if (I.setLang(l)) toast(I.t('lang.changed'));
+    paintLang();
+  }
+  $('btn-lang').addEventListener('click', () => setAppLang(window.ShowtimeI18n && window.ShowtimeI18n.getLang() === 'es' ? 'en' : 'es'));
+  $('cfg-lang').addEventListener('click', e => { const b = e.target.closest('[data-l]'); if (b) setAppLang(b.dataset.l); });
+  if (window.ShowtimeI18n) window.ShowtimeI18n.setLang(CONFIG.lang);
+  paintLang();
   // Mensajes: colores y duración (se aplican al siguiente mensaje que se envíe)
   $('cfg-msg-bg').addEventListener('input', e => { CONFIG = Dt.setConfig({ msgBg: e.target.value }); fillMsgCfg(); });
   $('cfg-msg-fg').addEventListener('input', e => { CONFIG = Dt.setConfig({ msgFg: e.target.value }); fillMsgCfg(); });
@@ -1611,7 +1632,7 @@
   }
   $('btn-log').addEventListener('click', openLogExport);
   /* ── Hoja de ruta imprimible (Running Order) · Fase 1: tabla ───────────── */
-  const PR = { fmt: 'tabla', day: null, zone: 'all', kinds: { show: true, sc: true, tarea: true, hito: true }, orient: 'portrait', notes: true, call: true, lang: 'es' };
+  const PR = { fmt: 'tabla', day: null, zone: 'all', kinds: { show: true, sc: true, tarea: true, hito: true }, orient: 'portrait', notes: true, call: true };
   const prKinds = () => Object.keys(PR.kinds).filter(k => PR.kinds[k]);
   function openPrint(fmt) {
     if (!FEST || !window.ShowtimePrint) { toast('Primero crea o abre un evento', true); return; }
@@ -1623,7 +1644,6 @@
     if (PR.zone !== 'all' && !stages.some(z => z.id === PR.zone)) PR.zone = 'all';
     const html = '<div class="dw pr">' +
       '<div class="dw-row"><span class="dw-l">Formato</span><div class="dtog radio" id="pr-fmt"><button type="button" class="' + (PR.fmt === 'tabla' ? 'on' : '') + '" data-f="tabla">Tabla</button><button type="button" class="' + (PR.fmt === 'gantt' ? 'on' : '') + '" data-f="gantt" title="Cronograma de escenarios en horizontal">Cronograma</button></div></div>' +
-      '<div class="dw-row"><span class="dw-l">Idioma</span><div class="dtog radio" id="pr-lang"><button type="button" class="' + (PR.lang === 'es' ? 'on' : '') + '" data-l="es">Español</button><button type="button" class="' + (PR.lang === 'en' ? 'on' : '') + '" data-l="en">English</button></div></div>' +
       '<div class="dw-row"><span class="dw-l">Jornada</span><select id="pr-day">' + days.map(d => '<option value="' + d + '">' + esc(fmtDay(d)) + '</option>').join('') + (days.length > 1 ? '<option value="all">Todas · 1 hoja por día</option>' : '') + '</select></div>' +
       '<div class="dw-row"><span class="dw-l">Zona</span><select id="pr-zone"><option value="all">Todas las zonas</option>' + stages.map(z => '<option value="' + esc(z.id) + '">' + esc(z.nombre) + '</option>').join('') + '</select></div>' +
       '<div class="dw-row top"><span class="dw-l">Contenido</span><div class="pr-kinds" id="pr-kinds">' +
@@ -1636,7 +1656,7 @@
       const rows = P.rowsOf(FEST, { day: PR.day, zone: PR.zone, kinds: prKinds() });
       if (!rows.length) { toast('No hay bloques con estos filtros', true); return false; }
       const dl = PR.day === 'all' ? days : [PR.day];
-      const doc = P.html({ rows, days: dl, title: (FEST.event && FEST.event.nombre) || 'Evento', format: PR.fmt, orient: PR.fmt === 'gantt' ? 'landscape' : PR.orient, notes: PR.notes, call: PR.call, now: new Date(), lang: PR.lang, full: prKinds().length === 4 });
+      const doc = P.html({ rows, days: dl, title: (FEST.event && FEST.event.nombre) || 'Evento', format: PR.fmt, orient: PR.fmt === 'gantt' ? 'landscape' : PR.orient, notes: PR.notes, call: PR.call, now: new Date(), full: prKinds().length === 4 });   // idioma: el activo de Showtime
       P.launch(doc);
       toast('Hoja lista: en la impresión, elige «Guardar como PDF»');
     } }], { wide: true });
@@ -1647,7 +1667,6 @@
       const gantt = PR.fmt === 'gantt';
       $('pr-orient').disabled = gantt; $('pr-call').disabled = gantt; $('pr-notes').disabled = gantt;
       document.querySelectorAll('#pr-fmt [data-f]').forEach(b => b.classList.toggle('on', b.dataset.f === PR.fmt));
-      document.querySelectorAll('#pr-lang [data-l]').forEach(b => b.classList.toggle('on', b.dataset.l === PR.lang));
       const rows = P.rowsOf(FEST, { day: PR.day, zone: PR.zone, kinds: prKinds() });
       const dl = PR.day === 'all' ? days : [PR.day];
       const sm = P.summary(rows, dl);
@@ -1668,7 +1687,6 @@
     $('pr-call').addEventListener('change', e => { PR.call = e.target.checked; paint(); });
     $('pr-notes').addEventListener('change', e => { PR.notes = e.target.checked; paint(); });
     $('pr-fmt').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (!b || b.disabled) return; PR.fmt = b.dataset.f; paint(); });
-    $('pr-lang').addEventListener('click', e => { const b = e.target.closest('[data-l]'); if (!b) return; PR.lang = b.dataset.l; paint(); });
     paint();
   }
   $('btn-print').addEventListener('click', () => openPrint());

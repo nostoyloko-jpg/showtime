@@ -7,7 +7,7 @@
   if (typeof module === 'undefined' || !module.exports) { console.log('live.test.js: solo en Node (node tests/live.test.js)'); return; }
   const vm = require('vm');
   const D = require('./_dom.js'), E = require('../emision.js');
-  const MODULOS = ['core.js', 'meteo.js', 'datos.js', 'emision.js', 'vistas.js', 'marca.js', 'live.js'];
+  const MODULOS = ['core.js', 'meteo.js', 'datos.js', 'emision.js', 'vistas.js', 'marca.js', 'i18n.js', 'live.js'];
 
   const tests = [];
   function test(name, fn) { tests.push([name, fn]); }
@@ -34,6 +34,10 @@
     D.cargar(env, MODULOS.slice(4));
     return { env, sent, ctl, R: () => env.win._R, body: env.getEl('body'), dock: env.getEl('msgdock'), title: () => env.win.document.title };
   }
+  test('Idioma: la Live sigue el idioma de la configuración del Panel', () => {
+    eq(arrancar({ storage: { 'showtime.config': JSON.stringify({ lang: 'en' }) } }).env.win.ShowtimeI18n.getLang(), 'en');
+    eq(arrancar({}).env.win.ShowtimeI18n.getLang(), 'es', 'sin nada: español');
+  });
   const clickOk = (t, key) => t.env.fire('document', 'click', { target: { closest: sel => sel === '.callok' ? { dataset: { ck: key } } : null } });
 
   test('Ancho del panel de info: automático y estable (medida a tamaño de referencia), mínimo 280 px y máximo 45 vw', () => {

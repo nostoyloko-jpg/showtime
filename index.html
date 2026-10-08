@@ -13,8 +13,8 @@
 <meta name="apple-mobile-web-app-title" content="Showtime">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
-<link rel="stylesheet" href="control.css?v=20261103">
-<link rel="stylesheet" href="marca.css?v=20261103">
+<link rel="stylesheet" href="control.css?v=20261104">
+<link rel="stylesheet" href="marca.css?v=20261104">
 </head>
 <body>
 <div id="splash" class="splash" hidden></div>
@@ -180,6 +180,7 @@
   </div>
   <button id="wake" class="wake" type="button" aria-pressed="false" title="Sin reposo: mientras Showtime esté abierto, el equipo no apaga la pantalla ni entra en reposo. Clic: activar / desactivar" hidden><span class="wled" aria-hidden="true"></span><svg class="ic"><use href="#i-screen"/></svg><span class="wtxt">Sin reposo</span></button>
   <div id="clock" class="clock" aria-label="Hora">--:--:--</div>
+  <button id="btn-lang" class="btn ghost langbtn" type="button" title="Idioma: Español. Clic: English" aria-label="Idioma: Español. Clic: English">ES</button>
   <button id="btn-cfg" class="btn ghost icon" aria-controls="cfg" aria-expanded="false" title="Configuración" aria-label="Configuración"><svg class="ic"><use href="#i-gear"/></svg></button>
   </div>
 </header>
@@ -251,6 +252,11 @@
 <div id="cfg-back" class="cfg-back" hidden></div>
 <aside id="cfg" class="cfg" aria-label="Configuración" hidden>
   <div class="cfg-h"><h2>Configuración</h2><button id="cfg-close" class="iconsq" title="Cerrar (Esc)"><svg class="ic"><use href="#i-x"/></svg></button></div>
+  <section class="cfg-s" id="cfg-s-lang">
+    <h3 data-i18n="lang.label">Idioma</h3>
+    <div class="dtog radio" id="cfg-lang" role="group" aria-label="Idioma" data-i18n-aria="lang.label" title="Idioma de Showtime: Panel, pantallas Live, Mando y hojas impresas" data-i18n-title="lang.title"><button type="button" data-l="es">🇪🇸 Español</button><button type="button" data-l="en">🇬🇧 English</button></div>
+    <div class="note" data-i18n="lang.note">Lo manda este Panel: las pantallas Live y el Mando cambian solos (también por la emisión).</div>
+  </section>
   <section class="cfg-s" id="cfg-s-fest">
     <h3>Evento</h3>
     <div id="cfg-fest"></div>
@@ -426,19 +432,20 @@
 <datalist id="zones-dl"></datalist>
 <div id="toast" class="toast" hidden></div>
 
-<script src="core.js?v=20261103"></script>
-<script src="meteo.js?v=20261103"></script>
-<script src="datos.js?v=20261103"></script>
-<script src="importar.js?v=20261103"></script>
-<script src="xlsx.js?v=20261103"></script>
-<script src="qr.js?v=20261103"></script>
-<script src="emision.js?v=20261103"></script>
-<script src="mando.js?v=20261103"></script>
-<script src="vistas.js?v=20261103"></script>
-<script src="log.js?v=20261103"></script>
-<script src="print.js?v=20261103"></script>
-<script src="marca.js?v=20261103"></script>
-<script src="control.js?v=20261103"></script>
-<script src="pwa.js?v=20261103"></script>
+<script src="i18n.js?v=20261104"></script>
+<script src="core.js?v=20261104"></script>
+<script src="meteo.js?v=20261104"></script>
+<script src="datos.js?v=20261104"></script>
+<script src="importar.js?v=20261104"></script>
+<script src="xlsx.js?v=20261104"></script>
+<script src="qr.js?v=20261104"></script>
+<script src="emision.js?v=20261104"></script>
+<script src="mando.js?v=20261104"></script>
+<script src="vistas.js?v=20261104"></script>
+<script src="log.js?v=20261104"></script>
+<script src="print.js?v=20261104"></script>
+<script src="marca.js?v=20261104"></script>
+<script src="control.js?v=20261104"></script>
+<script src="pwa.js?v=20261104"></script>
 </body>
 </html>
