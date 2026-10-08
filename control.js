@@ -721,7 +721,7 @@
     if ($('lv-standby')) {
       const on = standbyOn();
       $('lv-standby-on').classList.toggle('on', on);
-      $('lv-standby-t').textContent = on ? 'Quitar Standby de las Confidence' : 'Standby en las Confidence · Modo Cartel';
+      $('lv-standby-t').textContent = on ? 'Quitar Standby en Confidence' : 'Standby en Confidence';
     }
     meteoTick();
     if (!FEST) return;

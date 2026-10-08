@@ -786,13 +786,13 @@
     const t = panel();
     clickStb(t);
     eq(t.read('showtime.standby').on, true, 'guardado (lo leen las Live del Mac)');
-    eq(t.T.standbyOn(), true); eq(t.env.getEl('lv-standby-t').textContent, 'Quitar Standby de las Confidence');
-    ok(/Standby: las Confidence \(también las del QR\) muestran el cartel y la hora/.test(t.env.getEl('toast').textContent));
+    eq(t.T.standbyOn(), true); eq(t.env.getEl('lv-standby-t').textContent, 'Quitar Standby en Confidence');
+    ok(/Standby en Confidence: cartel y hora \(también por QR\)/.test(t.env.getEl('toast').textContent));
     eq(t.env.win.ShowtimeDatos.getSnapshot().standby.on, true, 'va en la emisión (QR)');
     ok(/Dt\.KEYS\.meteo, Dt\.KEYS\.standby\]/.test(D.src('control.js')), 'cambiarlo vuelve a emitir');
     clickStb(t);
-    eq(t.read('showtime.standby').on, false, 'se quita con el mismo botón'); eq(t.env.getEl('lv-standby-t').textContent, 'Standby en las Confidence · Modo Cartel');
-    ok(/id="lv-standby"[\s\S]*Todas las Confidence \(también las del QR\)/.test(D.src('index.html')));
+    eq(t.read('showtime.standby').on, false, 'se quita con el mismo botón'); eq(t.env.getEl('lv-standby-t').textContent, 'Standby en Confidence');
+    ok(/id="lv-standby"[\s\S]*Cartel de Showtime y hora en cada Confidence \(también por QR\)/.test(D.src('index.html')));
   });
   test('Modo Foco: micro-píldora del tipo (SHOW · PRUEBA · TAREA · HITO) con color fijo, en vez del cuadradito de color', () => {
     const P = panel().T.tipoPill;

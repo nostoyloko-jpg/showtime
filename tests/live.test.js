@@ -293,6 +293,16 @@
     conf.env.fire('window', 'message', { data: { app: 'showtime', type: 'standby', on: true } });
     eq(conf.env.getEl('standby').hidden, true);
   });
+  test('Standby: el botón de pantalla completa es el mismo de Confidence, en el mismo sitio (abajo a la derecha) y por encima del cartel', () => {
+    const css = D.src('live.css') + D.src('marca.css');
+    const z = re => +re.exec(css)[1];
+    ok(/body\.standby-on \.cf-full\{display:flex!important;z-index:(\d+)\}/.test(css), 'se ve en el Standby');
+    ok(z(/body\.standby-on \.cf-full\{display:flex!important;z-index:(\d+)\}/) > z(/\.standby\{position:fixed;inset:0;z-index:(\d+)/), 'por encima del cartel');
+    ok(/\.cf-full\{right:calc\(14px \+ var\(--sa-r\)\);bottom:calc\(14px \+ var\(--sa-b\)\)\}/.test(css), 'abajo a la derecha, como en Confidence');
+    ok(/body\.standby-on:has\(#cf-full\) \.stb-clk\{right:/.test(css), 'el reloj se aparta para no taparlo');
+    ok(!/stb-full/.test(D.src('live.js') + css), 'sin un segundo botón en otro sitio');
+    ok(/addEventListener\('pointerdown', reveal\)/.test(D.src('live.js')), 'en el móvil, un toque enseña «Salir del Standby»');
+  });
   test('Standby: los mensajes flash siguen saliendo por encima (z-index) y hay botón en la Live', () => {
     const css = D.src('marca.css'), lcss = D.src('live.css');
     const z = re => +re.exec(css + lcss)[1];

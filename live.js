@@ -724,12 +724,14 @@
     else (d.exitFullscreen || d.webkitExitFullscreen || function () {}).call(d);
   }
   $('fullbtn').addEventListener('click', toggleFull);
+  function fullOk() { const d = document; return !!(d.fullscreenEnabled || d.webkitFullscreenEnabled); }
+  function fullIcon() { const d = document; return (d.fullscreenElement || d.webkitFullscreenElement) ? '#i-unfull' : '#i-full'; }
   // Confidence: botón propio de pantalla completa (allí no está el dock). Si el navegador no puede (iPhone), no se enseña.
   (function () {
     const b = $('cf-full'), d = document;
     if (!(d.fullscreenEnabled || d.webkitFullscreenEnabled)) { b.remove(); return; }
     b.addEventListener('click', toggleFull);
-    const upd = () => b.querySelector('use').setAttribute('href', (d.fullscreenElement || d.webkitFullscreenElement) ? '#i-unfull' : '#i-full');
+    const upd = () => { b.querySelector('use').setAttribute('href', fullIcon()); const sf = $('stb-full'); if (sf) sf.querySelector('use').setAttribute('href', fullIcon()); };
     d.addEventListener('fullscreenchange', upd); d.addEventListener('webkitfullscreenchange', upd);
   })();
   document.addEventListener('keydown', e => { if ((e.key === 'f' || e.key === 'F') && !e.metaKey && !e.ctrlKey && !(e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName))) toggleFull(); });
@@ -976,16 +978,23 @@
     document.body.classList.toggle('standby-on', STANDBY);
     if (!STANDBY) { el.hidden = true; el.innerHTML = ''; clearInterval(stbClk); stbClk = null; document.title = 'Showtime · ' + Vs.VISTA_TXT[VISTA]; return; }
     el.innerHTML = Mk.banner({ version: (window.ShowtimeEmision || {}).BUILD || '', footer: true }) +
-      '<div id="stb-clk" class="stb-clk"></div><button id="stb-x" class="stb-x" type="button">Salir del Standby (S)</button>';
+      '<div id="stb-clk" class="stb-clk"></div><div class="stb-bar">' +
+      (fullOk() ? '<button id="stb-full" class="stb-full" type="button" title="Pantalla completa (F)" aria-label="Pantalla completa"><svg class="ic"><use href="' + fullIcon() + '"/></svg></button>' : '') +
+      '<button id="stb-x" class="stb-x" type="button">Salir del Standby (S)</button></div>';
     el.hidden = false;
     document.title = 'Showtime · Standby';
     const upd = () => { const c = $('stb-clk'); const t = Mk.hhmm(new Date()); if (c && c.textContent !== t) c.textContent = t; };
     upd(); clearInterval(stbClk); stbClk = setInterval(upd, 1000);
   }
   if ($('standby')) {
-    $('standby').addEventListener('click', e => { if (e.target.closest && e.target.closest('#stb-x')) setStandby(false); });
+    $('standby').addEventListener('click', e => {
+      if (e.target.closest && e.target.closest('#stb-x')) setStandby(false);
+      else if (e.target.closest && e.target.closest('#stb-full')) toggleFull();
+    });
     // El botón de salir y el cursor solo aparecen al mover el ratón o tocar la pantalla (en escena no se ve nada más)
-    $('standby').addEventListener('pointermove', () => { $('standby').classList.add('moving'); clearTimeout(stbMove); stbMove = setTimeout(() => $('standby').classList.remove('moving'), 2500); });
+    // En el móvil (QR) no hay ratón: un toque también los enseña
+    const reveal = () => { $('standby').classList.add('moving'); clearTimeout(stbMove); stbMove = setTimeout(() => $('standby').classList.remove('moving'), 3000); };
+    $('standby').addEventListener('pointermove', reveal); $('standby').addEventListener('pointerdown', reveal);
   }
   if ($('stbbtn')) $('stbbtn').addEventListener('click', () => setStandby(!STANDBY));
 
