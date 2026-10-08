@@ -1,0 +1,124 @@
+/* Tests de print.js — sin dependencias.
+ * Ordenador:  node tests/print.test.js
+ */
+(function () {
+  'use strict';
+  const isNode = typeof module !== 'undefined' && module.exports;
+  const C = isNode ? require('../core.js') : window.ShowtimeCore;
+  const P = isNode ? require('../print.js') : window.ShowtimePrint;
+
+  const tests = [];
+  function test(name, fn) { tests.push([name, fn]); }
+  function eq(a, b, msg) { if (a !== b) throw new Error((msg ? msg + ': ' : '') + 'esperaba ' + JSON.stringify(b) + ', salió ' + JSON.stringify(a)); }
+  function ok(v, msg) { if (!v) throw new Error(msg || 'esperaba verdadero'); }
+
+  // ── Evento de prueba: dos jornadas, Principal y Carpa ─────────────────
+  const J1 = '2026-07-10', J2 = '2026-07-11';
+  function fest() {
+    let s = C.newFestival({ nombre: 'Prueba print', fechaInicio: J1, fechaFin: J2, dayCutoff: '06:00', coMin: 15 }).state;
+    s = C.addStage(s, 'Principal').state; s = C.addStage(s, 'Carpa').state;
+    const P1 = s.escenarios[0].id, K = s.escenarios[1].id, ids = {};
+    const add = (n, d) => { const r = C.addArtist(s, d.modo || 'show', Object.assign({ nombre: n }, d)); if (!r.ok) throw new Error(n + ': ' + r.error); s = r.state; ids[n] = r.id; };
+    add('Banda A', { jornada: J1, escenarioId: P1, inicio: '20:30', fin: '21:30', call: '20:00' });
+    add('Banda B', { jornada: J1, escenarioId: P1, inicio: '22:00', fin: '23:00' });
+    add('Acústico', { jornada: J1, escenarioId: K, inicio: '21:00', fin: '22:00' });
+    add('Curfew', { jornada: J1, tipo: 'hito', escenarioId: P1, inicio: '23:30' });
+    add('Banda C', { jornada: J2, escenarioId: P1, inicio: '21:00', fin: '22:00' });
+    return { s, P1, K, ids };
+  }
+
+  test('CONTENT: «Solo Shows» deja fuera pruebas, tareas e hitos', () => {
+    const { s } = fest();
+    const all = P.rowsOf(s, { day: 'all', content: 'all' });
+    const solo = P.rowsOf(s, { day: 'all', content: 'solo' });
+    ok(all.length > solo.length, 'todo debe tener más filas que solo shows');
+    ok(solo.every(r => r.kind === 'show'), 'solo shows: todas de tipo show');
+    ok(all.some(r => r.kind === 'hito'), 'todo incluye hitos');
+  });
+
+  test('rowsOf: filtra por jornada y por zona', () => {
+    const { s, K } = fest();
+    const d1 = P.rowsOf(s, { day: J1, content: 'all' });
+    ok(d1.length > 0 && d1.every(r => r.jornada === J1), 'solo filas de la jornada pedida');
+    const zk = P.rowsOf(s, { day: 'all', zone: K, content: 'all' });
+    ok(zk.length === 1 && zk[0].name === 'Acústico', 'zona Carpa → solo Acústico, salió ' + zk.map(r => r.name));
+  });
+
+  test('rowsOf: horario, duración y CALL formateados', () => {
+    const { s } = fest();
+    const a = P.rowsOf(s, { day: J1, content: 'shows' }).find(r => r.name === 'Banda A');
+    ok(a, 'Banda A presente');
+    eq(a.start, '20:30'); eq(a.end, '21:30'); eq(a.dur, '60 min'); eq(a.call, '20:00');
+    eq(a.kind, 'show');
+  });
+
+  test('densityFor: letra decreciente al crecer el número de filas', () => {
+    const sizes = [5, 12, 20, 30, 50].map(n => parseFloat(P.densityFor(n).fs));
+    for (let i = 1; i < sizes.length; i++) ok(sizes[i] < sizes[i - 1], 'fs no decrece en índice ' + i);
+  });
+
+  test('html: una hoja por jornada con salto de página', () => {
+    const { s } = fest();
+    const rows = P.rowsOf(s, { day: 'all', content: 'all' });
+    const doc = P.html({ rows, days: [J1, J2], title: 'Prueba print', orient: 'portrait', notes: true, call: true, now: new Date(2026, 6, 10, 9, 5) });
+    eq((doc.match(/<section class="sheet"/g) || []).length, 2, 'dos secciones');
+    ok(doc.indexOf('break-before:page') >= 0 || doc.indexOf('.sheet+.sheet') >= 0, 'salto de página entre hojas');
+    ok(doc.indexOf('Impreso: 10/07/2026 09:05') >= 0, 'fecha de impresión en el pie');
+    ok(doc.indexOf('counter(page) "/" counter(pages)') >= 0, 'paginación Pág X/Y');
+    ok(doc.indexOf('A4 portrait') >= 0, 'A4 vertical');
+  });
+
+  test('html: orientación horizontal y columnas opcionales', () => {
+    const { s } = fest();
+    const rows = P.rowsOf(s, { day: J1, content: 'all' });
+    const doc = P.html({ rows, days: [J1], title: 'X', orient: 'landscape', notes: false, call: false });
+    ok(doc.indexOf('A4 landscape') >= 0, 'A4 horizontal');
+    ok(doc.indexOf('<th>CALL</th>') < 0, 'sin columna CALL');
+    ok(doc.indexOf('Notas / operativa') < 0, 'sin columna notas');
+    const withAll = P.html({ rows, days: [J1], title: 'X', orient: 'portrait', notes: true, call: true });
+    ok(withAll.indexOf('<th>CALL</th>') >= 0 && withAll.indexOf('Notas / operativa') >= 0, 'con CALL y notas');
+  });
+
+  test('html: pastillas de tipo con el texto del spec', () => {
+    const { s } = fest();
+    const doc = P.html({ rows: P.rowsOf(s, { day: 'all', content: 'all' }), days: [J1, J2], title: 'X', orient: 'portrait' });
+    ok(doc.indexOf('>SHOW<') >= 0, 'SHOW');
+    ok(doc.indexOf('>HITO<') >= 0, 'HITO');
+  });
+
+  test('html: escapa el texto del usuario (sin inyección)', () => {
+    const rows = [{ jornada: J1, start: '20:00', end: '21:00', dur: '60 min', call: '', zone: '<img src=x>', zoneColor: '#000000', kind: 'show', name: '<script>alert(1)</script>', notes: '"a" & b' }];
+    const doc = P.html({ rows, days: [J1], title: '<b>T</b>', orient: 'portrait', notes: true });
+    ok(doc.indexOf('<script>alert') < 0, 'el nombre se escapa');
+    ok(doc.indexOf('&lt;script&gt;') >= 0, 'escapado presente');
+    ok(doc.indexOf('<img src=x>') < 0, 'zona escapada');
+  });
+
+  test('html: jornada sin filas muestra aviso y no rompe', () => {
+    const doc = P.html({ rows: [], days: [J1], title: 'X', orient: 'portrait' });
+    ok(doc.indexOf('Nada que imprimir') >= 0, 'aviso de vacío');
+  });
+
+  test('summary: cuenta bloques, hojas y letra según la jornada más cargada', () => {
+    const { s } = fest();
+    const rows = P.rowsOf(s, { day: 'all', content: 'all' });
+    const sm = P.summary(rows, [J1, J2]);
+    eq(sm.bloques, rows.length); eq(sm.hojas, 2);
+    eq(sm.letra, P.densityFor(rows.filter(r => r.jornada === J1).length).fs);
+    eq(P.summary(rows, [J1]).hojas, 1);
+  });
+
+  test('dayLabel y printedAt', () => {
+    ok(P.dayLabel(J1).indexOf('2026') < 0, 'no añade año');
+    eq(P.dayLabel('all'), 'Todo el evento');
+    eq(P.printedAt(new Date(2026, 0, 5, 7, 3)), '05/01/2026 07:03');
+  });
+
+  let fail = 0;
+  for (const [name, fn] of tests) {
+    try { fn(); console.log('  ✓ ' + name); }
+    catch (e) { fail++; console.log('  ✗ ' + name + '\n      ' + e.message); }
+  }
+  console.log('\n' + (tests.length - fail) + '/' + tests.length + ' tests de impresión OK');
+  if (isNode && fail) process.exitCode = 1;
+})();

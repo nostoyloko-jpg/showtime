@@ -1608,6 +1608,50 @@
     paint();
   }
   $('btn-log').addEventListener('click', openLogExport);
+  /* ── Hoja de ruta imprimible (Running Order) · Fase 1: tabla ───────────── */
+  const PR = { day: null, zone: 'all', content: 'all', orient: 'portrait', notes: true, call: true };
+  function openPrint() {
+    if (!FEST || !window.ShowtimePrint) { toast('Primero crea o abre un evento', true); return; }
+    closeMenus(); closeConfig();
+    const P = window.ShowtimePrint, days = P.daysOf(FEST, 'all');
+    if (!PR.day || (PR.day !== 'all' && days.indexOf(PR.day) < 0)) PR.day = days.length === 1 ? days[0] : (days.indexOf(CONFIG.day) >= 0 ? CONFIG.day : 'all');
+    const stages = FEST.escenarios || [];
+    if (PR.zone !== 'all' && !stages.some(z => z.id === PR.zone)) PR.zone = 'all';
+    const html = '<div class="dw pr">' +
+      '<div class="dw-row"><span class="dw-l">Formato</span><div class="dtog radio" id="pr-fmt"><button type="button" class="on" data-f="tabla">Tabla</button><button type="button" disabled title="Próximamente">Cronograma · próximamente</button></div></div>' +
+      '<div class="dw-row"><span class="dw-l">Jornada</span><select id="pr-day">' + days.map(d => '<option value="' + d + '">' + esc(fmtDay(d)) + '</option>').join('') + (days.length > 1 ? '<option value="all">Todas · 1 hoja por día</option>' : '') + '</select></div>' +
+      '<div class="dw-row"><span class="dw-l">Zona</span><select id="pr-zone"><option value="all">Todas las zonas</option>' + stages.map(z => '<option value="' + esc(z.id) + '">' + esc(z.nombre) + '</option>').join('') + '</select></div>' +
+      '<div class="dw-row"><span class="dw-l">Contenido</span><select id="pr-content">' + Object.keys(P.CONTENT).map(k => '<option value="' + k + '">' + esc(P.CONTENT[k].label) + '</option>').join('') + '</select></div>' +
+      '<div class="dw-row"><span class="dw-l">Orientación</span><select id="pr-orient"><option value="portrait">Vertical</option><option value="landscape">Horizontal</option></select></div>' +
+      '<div class="dw-row"><span class="dw-l">Columnas</span><label class="pr-ck"><input type="checkbox" id="pr-call"> Incluir hora de CALL</label><label class="pr-ck"><input type="checkbox" id="pr-notes"> Incluir notas operativas</label></div>' +
+      '<div id="pr-sum" class="lx-sum"></div></div>';
+    modal('Hoja de ruta', html, [{ label: 'Cancelar' }, { label: 'Imprimir / Guardar PDF', kind: 'primary', run: () => {
+      const rows = P.rowsOf(FEST, { day: PR.day, zone: PR.zone, content: PR.content });
+      if (!rows.length) { toast('No hay bloques con estos filtros', true); return false; }
+      const dl = PR.day === 'all' ? days : [PR.day];
+      const doc = P.html({ rows, days: dl, title: (FEST.event && FEST.event.nombre) || 'Evento', orient: PR.orient, notes: PR.notes, call: PR.call, now: new Date() });
+      P.launch(doc);
+      toast('Hoja lista: en la impresión, elige «Guardar como PDF»');
+    } }], { wide: true });
+    const paint = () => {
+      $('pr-day').value = PR.day; $('pr-zone').value = PR.zone; $('pr-content').value = PR.content; $('pr-orient').value = PR.orient;
+      $('pr-call').checked = PR.call; $('pr-notes').checked = PR.notes;
+      const rows = P.rowsOf(FEST, { day: PR.day, zone: PR.zone, content: PR.content });
+      const dl = PR.day === 'all' ? days : [PR.day];
+      const sm = P.summary(rows, dl);
+      $('pr-sum').innerHTML = '<b>' + sm.bloques + '</b> bloques · <b>' + sm.hojas + '</b> ' + (sm.hojas === 1 ? 'hoja' : 'hojas A4') + ' · letra <b>' + sm.letra + '</b>' +
+        '<div class="hint">Horarios previstos (la escaleta), no los reales. Una jornada por hoja: cada una cabe en una A4.</div>';
+      $('modal-actions').querySelector('.primary').disabled = !rows.length;
+    };
+    $('pr-day').addEventListener('change', e => { PR.day = e.target.value; paint(); });
+    $('pr-zone').addEventListener('change', e => { PR.zone = e.target.value; paint(); });
+    $('pr-content').addEventListener('change', e => { PR.content = e.target.value; paint(); });
+    $('pr-orient').addEventListener('change', e => { PR.orient = e.target.value; paint(); });
+    $('pr-call').addEventListener('change', e => { PR.call = e.target.checked; paint(); });
+    $('pr-notes').addEventListener('change', e => { PR.notes = e.target.checked; paint(); });
+    paint();
+  }
+  $('btn-print').addEventListener('click', openPrint);
 
   $('btn-import2').addEventListener('click', () => $('file').click());
   $('file').addEventListener('change', e => { readFile(e.target.files[0]); e.target.value = ''; });
