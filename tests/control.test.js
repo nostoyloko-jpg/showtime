@@ -859,6 +859,13 @@
     ok(!/label: 'Cerrar', kind: 'primary'/.test(js), 'Cerrar de los modales es secundario');
     ok(/kind: 'danger', run: \(\) => \{ const r = C\.removeArtist/.test(js), 'Borrar banda sigue siendo peligro');
   });
+  test('Botón primario: blanco sólido siempre (ninguna regla lo vuelve rojo), hover y desactivado propios', () => {
+    const css = D.src('control.css');
+    ok(/\.btn\.primary\{background:#fff;border-color:#fff;color:#000;font-weight:700/.test(css), 'blanco sólido, texto negro');
+    ok(/\.btn\.primary:hover:not\(:disabled\)\{background:#e6e6e6;border-color:#e6e6e6/.test(css), 'hover gris claro');
+    ok(/\.btn\.primary:disabled\{background:rgba\(255,255,255,\.18\);border-color:transparent;color:rgba\(255,255,255,\.35\)/.test(css), 'desactivado apagado');
+    ok(!/^\.btn\.primary,/m.test(css) && !/[,{]\s*\.btn\.primary\s*,/.test(css.replace(/\.btn\.primary\{[^}]*\}/g,'')), 'ninguna regla de acento pinta .btn.primary');
+  });
   test('QR: el título es «Pantallas QR», sin «móviles»', () => {
     const js = D.src('control.js');
     ok(/Pantallas QR<\/div>/.test(js) && !/Pantallas QR \(móviles\)/.test(js), 'sin «(móviles)»');
