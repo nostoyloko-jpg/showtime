@@ -364,6 +364,12 @@
     ok(/setProperty\('--ov-bg', screensCfg\(\)\.conf\.overBg\)/.test(js) && /setProperty\('--ov-num', screensCfg\(\)\.conf\.overNum\)/.test(js), 'la Live aplica la configuración');
     ok(/data-sc="conf\.overBg"/.test(html) && /data-sc="conf\.overNum"/.test(html), 'Configuración tiene los dos colores');
   });
+  test('Parpadeo del sobretiempo: la velocidad se configura (--blink-speed) y la usa la animación de los números', () => {
+    const css = D.src('live.css'), js = D.src('live.js'), html = D.src('index.html');
+    ok(/\.conf\.blink \.cf-dig span\{animation:cfdig var\(--blink-speed,1s\) steps\(1,end\) infinite\}/.test(css), 'la animación usa la velocidad');
+    ok(/box\.style\.setProperty\('--blink-speed', screensCfg\(\)\.conf\.blinkSpeed \+ 's'\)/.test(js), 'la Live aplica la velocidad');
+    ok(/data-sc="conf\.blinkSpeed"/.test(html), 'Configuración tiene el selector');
+  });
   test('Cinta: la velocidad viene de la configuración (--tk-speed) y la animación la usa', () => {
     const css = D.src('live.css'), js = D.src('live.js');
     ok(/\.tk-track\{display:flex;width:max-content;animation:tkrun var\(--tk-speed,30s\) linear infinite/.test(css), 'animación con la variable');

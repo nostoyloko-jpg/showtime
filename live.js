@@ -1078,7 +1078,7 @@
     const r = Vs.confidence(FEST, ZONA, C.nowAbs(), screensCfg());
     const d = new Date(), hhmm = pad2(d.getHours()) + ':' + pad2(d.getMinutes());
     const box = $('conf');
-    if (box) { box.style.setProperty('--ov-bg', screensCfg().conf.overBg); box.style.setProperty('--ov-num', screensCfg().conf.overNum); }
+    if (box) { box.style.setProperty('--ov-bg', screensCfg().conf.overBg); box.style.setProperty('--ov-num', screensCfg().conf.overNum); box.style.setProperty('--blink-speed', screensCfg().conf.blinkSpeed + 's'); }
     if (r.mode === 'pickzone' || r.mode === 'nofest') {
       const k = r.mode + JSON.stringify(r.zones || []);
       if (confKey !== k) {

@@ -13,8 +13,8 @@
 <meta name="apple-mobile-web-app-title" content="Showtime">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
-<link rel="stylesheet" href="control.css?v=20261084">
-<link rel="stylesheet" href="marca.css?v=20261084">
+<link rel="stylesheet" href="control.css?v=20261086">
+<link rel="stylesheet" href="marca.css?v=20261086">
 </head>
 <body>
 <div id="splash" class="splash" hidden></div>
@@ -272,6 +272,7 @@
       <label for="sc-sw">Ámbar a falta de</label><span class="nrow"><input id="sc-sw" type="number" min="0" max="180" data-sc="conf.showWarn"> min</span>
       <label for="sc-sd">Rojo a falta de</label><span class="nrow"><input id="sc-sd" type="number" min="0" max="180" data-sc="conf.showDanger"> min</span>
       <span></span><label class="chk"><input id="sc-blink" type="checkbox" data-sc="conf.blink"> Parpadear números en sobretiempo</label>
+      <label for="sc-bspeed">Velocidad del parpadeo</label><span class="nrow"><input id="sc-bspeed" type="number" min="0.1" max="5" step="0.1" list="dl-bspeed" data-sc="conf.blinkSpeed"> s</span><datalist id="dl-bspeed"><option value="0.5">Rápida</option><option value="1">Normal</option><option value="2">Lenta</option></datalist>
       <label for="sc-ob">Sobretiempo · fondo</label><input id="sc-ob" type="color" class="swatch" data-sc="conf.overBg">
       <label for="sc-on">Sobretiempo · números</label><input id="sc-on" type="color" class="swatch" data-sc="conf.overNum">
       <div class="fsub">Confidence · changeover</div>
@@ -291,7 +292,7 @@
         <label class="chk"><input type="checkbox" data-sc="ticker.meteo"> El tiempo</label>
       </div>
       <label for="sc-tmode">Modo</label><select id="sc-tmode" data-sc="ticker.mode"><option value="crawl">Deslizante (crawler)</option><option value="static">Estática</option></select>
-      <label for="sc-tspeed">Velocidad</label><select id="sc-tspeed" data-sc="ticker.speed" data-num><option value="45">Lenta (45 s)</option><option value="30">Normal (30 s)</option><option value="18">Rápida (18 s)</option></select>
+      <label for="sc-tspeed">Velocidad (s por vuelta)</label><span class="nrow"><input id="sc-tspeed" type="number" min="5" max="120" step="0.5" list="dl-tspeed" data-sc="ticker.speed"> s</span><datalist id="dl-tspeed"><option value="18">Rápida</option><option value="30">Normal</option><option value="45">Lenta</option></datalist>
       <label for="sc-tbg">Fondo</label><input id="sc-tbg" type="color" class="swatch" data-sc="ticker.bg">
       <label for="sc-tfg">Texto</label><input id="sc-tfg" type="color" class="swatch" data-sc="ticker.fg">
       <div id="sc-tprev" class="tkprev crawl"><div class="tkp-track"><span class="tkp-run"><span>PRINCIPAL · RETRASO +10 MIN</span><i></i><span>CURFEW 01:30</span><i></i></span><span class="tkp-run" aria-hidden="true"><span>PRINCIPAL · RETRASO +10 MIN</span><i></i><span>CURFEW 01:30</span><i></i></span></div></div>
@@ -423,18 +424,18 @@
 <datalist id="zones-dl"></datalist>
 <div id="toast" class="toast" hidden></div>
 
-<script src="core.js?v=20261084"></script>
-<script src="meteo.js?v=20261084"></script>
-<script src="datos.js?v=20261084"></script>
-<script src="importar.js?v=20261084"></script>
-<script src="xlsx.js?v=20261084"></script>
-<script src="qr.js?v=20261084"></script>
-<script src="emision.js?v=20261084"></script>
-<script src="mando.js?v=20261084"></script>
-<script src="vistas.js?v=20261084"></script>
-<script src="log.js?v=20261084"></script>
-<script src="marca.js?v=20261084"></script>
-<script src="control.js?v=20261084"></script>
-<script src="pwa.js?v=20261084"></script>
+<script src="core.js?v=20261086"></script>
+<script src="meteo.js?v=20261086"></script>
+<script src="datos.js?v=20261086"></script>
+<script src="importar.js?v=20261086"></script>
+<script src="xlsx.js?v=20261086"></script>
+<script src="qr.js?v=20261086"></script>
+<script src="emision.js?v=20261086"></script>
+<script src="mando.js?v=20261086"></script>
+<script src="vistas.js?v=20261086"></script>
+<script src="log.js?v=20261086"></script>
+<script src="marca.js?v=20261086"></script>
+<script src="control.js?v=20261086"></script>
+<script src="pwa.js?v=20261086"></script>
 </body>
 </html>

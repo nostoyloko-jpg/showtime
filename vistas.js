@@ -23,10 +23,12 @@
 
   // ── Ajustes de pantallas (Configuración › Pantallas Live y vistas) ────
   const DEFAULT_SCREENS = {
-    conf: { showWarn: 10, showDanger: 5, blink: true, coWarn: 5, coDanger: 1, overBg: '#000000', overNum: '#ff3b30' },
+    conf: { showWarn: 10, showDanger: 5, blink: true, blinkSpeed: 1, coWarn: 5, coDanger: 1, overBg: '#000000', overNum: '#ff3b30' },
     back: { cards: true, lines: true, ticker: true },
     ticker: { delays: true, hitos: true, meteo: true, mode: 'crawl', bg: '#000000', fg: '#ffb347', speed: 30 }
   };
+  /** Número con decimales (un decimal) entre lo y hi; lo que no sea número, al valor por defecto. */
+  function num(v, d, lo, hi) { const n = Number(v); return v !== '' && v !== null && Number.isFinite(n) ? Math.round(Math.min(hi, Math.max(lo, n)) * 10) / 10 : d; }
   function int(v, d, lo, hi) { const n = Math.round(Number(v)); return Number.isFinite(n) && n >= lo && n <= hi ? n : d; }
   function hex(v, d) { return typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v) ? v.toLowerCase() : d; }
   function bool(v, d) { return typeof v === 'boolean' ? v : d; }
@@ -35,7 +37,8 @@
     const conf = {
       showWarn: int(c.showWarn, D.conf.showWarn, 0, 180), showDanger: int(c.showDanger, D.conf.showDanger, 0, 180), blink: bool(c.blink, D.conf.blink),
       coWarn: int(c.coWarn, D.conf.coWarn, 0, 180), coDanger: int(c.coDanger, D.conf.coDanger, 0, 180),
-      overBg: hex(c.overBg, D.conf.overBg), overNum: hex(c.overNum, D.conf.overNum)   // sobretiempo: fondo y números
+      overBg: hex(c.overBg, D.conf.overBg), overNum: hex(c.overNum, D.conf.overNum),   // sobretiempo: fondo y números
+      blinkSpeed: num(c.blinkSpeed, D.conf.blinkSpeed, 0.1, 5)   // segundos por parpadeo (libre: 0,1 a 5)
     };
     if (conf.showDanger > conf.showWarn) conf.showDanger = conf.showWarn;    // el rojo nunca antes que el ámbar
     if (conf.coDanger > conf.coWarn) conf.coDanger = conf.coWarn;
@@ -43,7 +46,7 @@
       conf,
       back: { cards: bool(b.cards, true), lines: bool(b.lines, true), ticker: bool(b.ticker, true) },
       ticker: { delays: bool(t.delays, true), hitos: bool(t.hitos, true), meteo: bool(t.meteo, true), mode: t.mode === 'static' ? 'static' : 'crawl',
-        bg: hex(t.bg, D.ticker.bg), fg: hex(t.fg, D.ticker.fg), speed: [18, 30, 45].indexOf(Number(t.speed)) >= 0 ? Number(t.speed) : D.ticker.speed }   // segundos por vuelta: 18 rápida · 30 normal · 45 lenta
+        bg: hex(t.bg, D.ticker.bg), fg: hex(t.fg, D.ticker.fg), speed: num(t.speed, D.ticker.speed, 5, 120) }   // segundos por vuelta (libre: 5 a 120)
     };
   }
 

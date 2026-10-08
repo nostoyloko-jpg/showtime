@@ -301,7 +301,7 @@ body[data-vista="confidence"] .conf{display:flex}
 .conf.lv-danger .cf-dig span{color:#ff3b30}
 .conf.lv-over{background:var(--ov-bg,#000)}
 .conf.lv-over .cf-dig span{color:var(--ov-num,#ff3b30)}
-.conf.blink .cf-dig span{animation:cfdig 1s steps(1,end) infinite}
+.conf.blink .cf-dig span{animation:cfdig var(--blink-speed,1s) steps(1,end) infinite}
 @keyframes cfdig{50%{color:#fff}}
 .conf.nobar .cf-bar{visibility:hidden}
 .conf.end .cf-dig span{color:rgba(255,255,255,.85)}
