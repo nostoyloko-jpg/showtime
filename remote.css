@@ -165,3 +165,16 @@ body.busy .act:not(:disabled),body.busy .tbtn{opacity:.5}
 .bpos .link{padding:12px 4px;margin:-12px 0}
 .zrow button,.zchip{height:44px}
 input,select,textarea{font-size:16px}   /* en iPhone, menos de 16 px hace zoom al tocar */
+
+/* ═══ Dos columnas (tablet en horizontal) · a la izquierda, la información; a la derecha, los mandos, sin scroll ═══
+   De pie (móvil o tablet) no cambia nada: las columnas son transparentes y la botonera sigue fija abajo. */
+.col-l,.col-r{display:contents}
+@media (orientation:landscape) and (min-width:900px) and (min-height:600px){
+  body{padding-bottom:calc(16px + var(--safe-b))}
+  .rh,main{max-width:none}
+  main{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);align-items:start;gap:12px;padding:12px 16px 0}
+  .col-l,.col-r{display:flex;flex-direction:column;gap:12px;min-width:0}
+  .actbar{position:static;max-width:none;display:grid;grid-template-columns:1.25fr 1.25fr 1fr;padding:0;margin:0;background:none;border:0;-webkit-backdrop-filter:none;backdrop-filter:none}
+  .act{height:88px}
+  .foot{grid-column:1/-1}
+}

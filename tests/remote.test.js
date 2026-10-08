@@ -157,6 +157,20 @@
     eq(t.ctl.wakes, 2);
   });
 
+  test('Tablet en horizontal: dos columnas (info a la izquierda, mandos a la derecha) y la botonera dentro de la derecha, sin scroll', () => {
+    const h = D.src('remote.html').toString(), c = D.src('remote.css').toString();
+    const L = h.indexOf('class="col-l"'), R = h.indexOf('class="col-r"'), nav = h.indexOf('class="actbar"');
+    ok(L > 0 && R > L, 'columna izquierda antes que la derecha');
+    ok(h.indexOf('id="calls"') > L && h.indexOf('id="calls"') < R, 'los CALL y la banda van a la izquierda');
+    ok(h.indexOf('id="band"') > L && h.indexOf('id="band"') < R, 'la banda a la izquierda');
+    ok(h.indexOf('data-delay="5"') > R && h.indexOf('id="msg-text"') > R, 'retraso y mensaje a la derecha');
+    ok(nav > R && h.indexOf('</main>') > nav, 'la botonera dentro de la columna derecha');
+    ok(/@media \(orientation:landscape\) and \(min-width:900px\) and \(min-height:600px\)\{/.test(c), 'se activa en horizontal de tablet (no en móvil de pie ni en el móvil en horizontal)');
+    ok(/\.actbar\{position:static/.test(c), 'en horizontal la botonera deja de estar fija abajo');
+    ok(/\.col-l,\.col-r\{display:contents\}/.test(c), 'de pie no cambia la maquetación');
+    ok(/main\{display:grid;grid-template-columns:minmax\(0,1\.1fr\) minmax\(0,1fr\)/.test(c), 'dos columnas');
+  });
+
   (async () => {
     let pass = 0, fail = 0;
     for (const [name, fn] of tests) { try { await fn(); pass++; } catch (e) { fail++; console.log('  ✗ ' + name + '\n      ' + (e && e.stack || e)); } }
