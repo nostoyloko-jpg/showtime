@@ -16,12 +16,14 @@ body{background:var(--bg);color:var(--text);font:14px/1.35 -apple-system,BlinkMa
 
 /* ── Botones ── */
 .btn{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 12px;border-radius:7px;border:1px solid var(--line2);border-bottom-width:2px;
-  background:var(--btnbg);color:var(--text);font:inherit;font-weight:600;cursor:pointer;white-space:nowrap;touch-action:manipulation}
+  background:#1c1e26;color:#fff;font:inherit;font-weight:600;cursor:pointer;white-space:nowrap;touch-action:manipulation}
 .btn:hover:not(:disabled){filter:brightness(1.25)}
 .btn:disabled{opacity:.4;cursor:default}
-.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent);filter:none}
-.btn.primary:hover:not(:disabled){filter:brightness(1.12)}
-.btn.danger{background:linear-gradient(180deg,#3a1b1d,#2a1416);border-color:rgba(255,107,107,.5);color:#ffb3b3}
+/* Jerarquía de botones (Raycast/Linear): primario = blanco sólido; peligro = rojo solo para borrar; secundario = neutro oscuro */
+.btn.primary{background:#fff;border-color:#fff;color:#000;font-weight:700;filter:none}
+.btn.primary:hover:not(:disabled){filter:brightness(.92)}
+.btn.danger{background:#d9363e;border-color:#d9363e;color:#fff;font-weight:700;filter:none}
+.btn.danger:hover:not(:disabled){filter:brightness(1.08)}
 
 /* ── Barra superior ── */
 .bar{display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--bg2);border-bottom:1px solid var(--line);flex-wrap:wrap}

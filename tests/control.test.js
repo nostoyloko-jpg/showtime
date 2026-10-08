@@ -850,6 +850,19 @@
     eq(t.T.winState().length, 1, 'abre una ventana Live');
     eq(t.T.winState()[0].vista, 'manager', 'por defecto Manager');
   });
+  test('Botones: primario blanco, peligro rojo solo para borrar, secundarios neutros; Live ▾ sigue en rojo', () => {
+    const css = D.src('control.css'), js = D.src('control.js');
+    ok(/\.btn\.primary\{background:#fff;border-color:#fff;color:#000;font-weight:700/.test(css), 'primario: blanco sólido con texto negro');
+    ok(/\.btn\.danger\{background:#d9363e;border-color:#d9363e;color:#fff/.test(css), 'peligro: #d9363e con texto blanco');
+    ok(/^\.btn\{[^}]*background:#1c1e26;color:#fff/m.test(css), 'secundario: fondo #1c1e26');
+    ok(/#m-live \.mbtn\.btn\.primary\{background:var\(--live\)/.test(css), 'Live ▾ mantiene su rojo de emisión');
+    ok(!/label: 'Cerrar', kind: 'primary'/.test(js), 'Cerrar de los modales es secundario');
+    ok(/kind: 'danger', run: \(\) => \{ const r = C\.removeArtist/.test(js), 'Borrar banda sigue siendo peligro');
+  });
+  test('QR: el título es «Pantallas QR», sin «móviles»', () => {
+    const js = D.src('control.js');
+    ok(/Pantallas QR<\/div>/.test(js) && !/Pantallas QR \(móviles\)/.test(js), 'sin «(móviles)»');
+  });
   test('Modo Foco: micro-píldora del tipo (SHOW · PRUEBA · TAREA · HITO) con color fijo, en vez del cuadradito de color', () => {
     const P = panel().T.tipoPill;
     eq(P('show'), '<span class="tpill tp-show" aria-hidden="true">SHOW</span>');

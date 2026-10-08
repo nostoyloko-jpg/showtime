@@ -1394,7 +1394,7 @@
       const head = '<div class="gv-top"><div class="gv-seg"><button type="button" class="gv-segb" data-gv="all" data-on="1">⏸ Todas en standby</button><button type="button" class="gv-segb" data-gv="all" data-on="0">▶ Reanudar todas</button></div></div>';
       const hd = '<div class="gv-row gv-hd" aria-hidden="true"><span>Nombre</span><span>Vista</span><span>Zona</span><span>Standby</span><span></span></div>';
       const rows = ids.length ? hd + ids.map(gvRowHtml).join('') : '<p class="mnote gv-empty">No hay ventanas Live abiertas desde este Dashboard.</p>';
-      const qr = '<div class="gv-qr"><div class="gv-qrh">Pantallas QR (móviles)</div><p class="mnote">Aún vacía: aquí irán las pantallas QR con la misma rejilla.</p></div>';
+      const qr = '<div class="gv-qr"><div class="gv-qrh">Pantallas QR</div><p class="mnote">Aún vacía: aquí irán las pantallas QR con la misma rejilla.</p></div>';
       const foot = '<div class="gv-foot"><button type="button" class="btn" data-gv="new">+ Abrir ventana Live</button><button type="button" class="btn gv-close" data-gv="done">Cerrar</button></div>';
       box.innerHTML = head + '<div class="gv-list">' + rows + '</div>' + qr + foot;
     }
@@ -1454,7 +1454,7 @@
   function askImport(text, fname) {
     const r = C.validateProject(text);
     if (!r.ok) {
-      modal('No se puede abrir', '<div class="errbox">' + r.errors.map(esc).join('<br>') + '</div><p style="margin-top:10px">Archivo: ' + esc(fname) + '</p>', [{ label: 'Cerrar', kind: 'primary' }]);
+      modal('No se puede abrir', '<div class="errbox">' + r.errors.map(esc).join('<br>') + '</div><p style="margin-top:10px">Archivo: ' + esc(fname) + '</p>', [{ label: 'Cerrar' }]);
       return;
     }
     const s = r.state, ev = s.event || {};
@@ -2582,7 +2582,7 @@
   async function emCopy(kind) {
     const url = emUrl(kind);
     try { await navigator.clipboard.writeText(url); toast(kind === 'remote' ? 'Enlace del mando copiado (es privado)' : kind === 'produccion' ? 'Enlace de Producción copiado' : 'Enlace de Staff copiado'); }
-    catch (e) { modal(kind === 'remote' ? 'Enlace del mando (privado)' : kind === 'produccion' ? 'Enlace de Producción' : 'Enlace de Staff', '<input type="text" readonly value="' + esc(url) + '" style="width:100%" onfocus="this.select()">', [{ label: 'Cerrar', kind: 'primary' }]); }
+    catch (e) { modal(kind === 'remote' ? 'Enlace del mando (privado)' : kind === 'produccion' ? 'Enlace de Producción' : 'Enlace de Staff', '<input type="text" readonly value="' + esc(url) + '" style="width:100%" onfocus="this.select()">', [{ label: 'Cerrar' }]); }
   }
   function setCastTab(tab) {
     emTab = tab;
@@ -2648,7 +2648,7 @@
       '<dt><kbd>⇧</kbd> <kbd>⌘</kbd> <kbd>F</kbd></dt><dd>Modo foco: solo lo de directo, filas y letra más grandes</dd>' +
       '<dt><kbd>⌘</kbd> <kbd>/</kbd></dt><dd>Abre esta ayuda</dd>' +
       '</dl><p class="hint">Jornada = día del evento: lo que empieza antes de la hora de corte cuenta como la noche anterior. En la Pantalla Live: <kbd>F</kbd> pantalla completa · <kbd>V</kbd> cambia de vista.</p>',
-      [{ label: 'Cerrar', kind: 'primary' }]);
+      [{ label: 'Cerrar' }]);
   }
   $('btn-help').addEventListener('click', openHelp);
   $('btn-focus').addEventListener('click', () => { setFocus(!focusOn()); toast(focusOn() ? 'Modo foco activado' : 'Modo foco desactivado', false, 2000); });
