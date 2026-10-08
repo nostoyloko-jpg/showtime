@@ -303,6 +303,16 @@
     ok(!/stb-full/.test(D.src('live.js') + css), 'sin un segundo botón en otro sitio');
     ok(/addEventListener\('pointerdown', reveal\)/.test(D.src('live.js')), 'en el móvil, un toque enseña «Salir del Standby»');
   });
+  test('La Live avisa al Dashboard de la vista que muestra: al abrirse, al cambiar con V y en cada latido', () => {
+    const got = [], opener = { closed: false, postMessage(m) { got.push(m); } };
+    const t = arrancar({ search: '?vista=confidence&zona=z1', opener });
+    ok(got.some(m => m.app === 'showtime' && m.type === 'vistaState' && m.vista === 'confidence'), 'al abrir');
+    t.env.fire('document', 'keydown', { key: 'v', target: { tagName: 'BODY' } });
+    const now = t.body.dataset.vista;
+    ok(now !== 'confidence', 'V cambió la vista');
+    ok(got.some(m => m.type === 'vistaState' && m.vista === now), 'al cambiar con V: ' + now);
+    ok(got.filter(m => m.type === 'vistaState').length >= 2, 'y se repite en el latido');
+  });
   test('Standby: los mensajes flash siguen saliendo por encima (z-index) y hay botón en la Live', () => {
     const css = D.src('marca.css'), lcss = D.src('live.css');
     const z = re => +re.exec(css + lcss)[1];

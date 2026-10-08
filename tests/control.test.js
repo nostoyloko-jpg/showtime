@@ -794,6 +794,25 @@
     eq(t.read('showtime.standby').on, false, 'se quita con el mismo botón'); eq(t.env.getEl('lv-standby-t').textContent, 'Standby en Confidence');
     ok(/id="lv-standby"[\s\S]*Cartel de Showtime y hora en cada Confidence \(también por QR\)/.test(D.src('index.html')));
   });
+  test('Live ▾: cada ventana abierta dice qué vista muestra ahora (Manager, Confidence o Backstage), aunque la ventana se llame de otra', async () => {
+    const t = panel();
+    const w = { closed: false, focus() {}, postMessage() {} };
+    t.env.win.open = () => w;
+    t.env.fire('document', 'click', { target: { closest: q => q === '#m-live [data-vista]' ? { dataset: { vista: 'manager' } } : null } });
+    await new Promise(r => setImmediate(r));
+    eq(t.env.win.ShowtimePanel.liveNow('showtime-live-manager'), '', 'al abrir aún no ha dicho nada');
+    t.env.fire('window', 'message', { data: { app: 'showtime', type: 'vistaState', vista: 'manager' }, source: w });
+    eq(t.env.win.ShowtimePanel.liveNow('showtime-live-manager'), 'Ahora: Manager');
+    t.env.fire('window', 'message', { data: { app: 'showtime', type: 'vistaState', vista: 'backstage' }, source: w });
+    eq(t.env.win.ShowtimePanel.liveNow('showtime-live-manager'), 'Ahora: Backstage', 'si la ventana cambia con V, el menú lo sigue');
+    t.env.fire('window', 'message', { data: { app: 'showtime', type: 'vistaState', vista: 'confidence' }, source: {} });
+    eq(t.env.win.ShowtimePanel.liveNow('showtime-live-manager'), 'Ahora: Backstage', 'un mensaje de otra ventana no cuenta');
+    w.closed = true;
+    eq(t.env.win.ShowtimePanel.liveNow('showtime-live-manager'), '', 'cerrada: no muestra nada');
+    ok(/data-now="showtime-live-manager"/.test(D.src('index.html')) && /data-now="showtime-live-backstage"/.test(D.src('index.html')), 'filas de Manager y Backstage');
+    ok(/class="lvnow" data-now="' \+ esc\(liveName\('confidence', z\.id\)\)/.test(D.src('control.js')), 'filas de Confidence por zona');
+    ok(/\.lvnow\{margin-left:auto;/.test(D.src('control.css')), 'con estilo');
+  });
   test('Modo Foco: micro-píldora del tipo (SHOW · PRUEBA · TAREA · HITO) con color fijo, en vez del cuadradito de color', () => {
     const P = panel().T.tipoPill;
     eq(P('show'), '<span class="tpill tp-show" aria-hidden="true">SHOW</span>');

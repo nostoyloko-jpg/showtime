@@ -1323,7 +1323,7 @@
   function setStandby(on) {
     Dt.setStandby(!!on);
     tick();
-    toast(on ? 'Standby: las Confidence (también las del QR) muestran el cartel y la hora' : 'Standby quitado: las Confidence vuelven a la cuenta atrás');
+    toast(on ? 'Standby en Confidence: cartel y hora (también por QR)' : 'Standby en Confidence quitado: vuelve la cuenta atrás');
   }
   document.addEventListener('click', e => {
     if (e.target.closest('#lv-standby')) { e.preventDefault(); e.stopPropagation(); closeMenus(); setStandby(!standbyOn()); return; }

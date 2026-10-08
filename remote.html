@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <meta name="robots" content="noindex">
 <title>Showtime · Mando</title>
-<link rel="stylesheet" href="remote.css?v=20261057">
+<link rel="stylesheet" href="remote.css?v=20261060">
 </head>
 <body>
 
@@ -41,6 +41,7 @@
 </header>
 
 <main id="app">
+<div class="col-l">
   <!-- CALL activos (arriba: es lo urgente) -->
   <section id="calls" class="calls" hidden></section>
 
@@ -55,6 +56,8 @@
     <div id="drift" class="drift"></div>
   </section>
 
+</div>
+<div class="col-r">
   <!-- Retrasos: siempre con resumen y Confirmar -->
   <section class="card">
     <h2>Retraso</h2>
@@ -81,15 +84,17 @@
       <button class="tbtn send" type="submit">Enviar</button>
     </form>
   </section>
+</div>
   <p class="foot">Las órdenes las ejecuta el Dashboard del Mac (quedan en su Deshacer). Este enlace es privado.</p>
 </main>
 
-<!-- Botonera al pulgar -->
+<!-- Botonera al pulgar: SIEMPRE abajo, en vertical y en horizontal (así no hace falta scroll) -->
 <nav class="actbar" aria-label="Actividad">
   <button id="b-start" class="act start"><svg class="ic"><use href="#i-play"/></svg><span>EMPEZAR</span></button>
   <button id="b-stop" class="act stop"><svg class="ic"><use href="#i-stop"/></svg><span>TERMINAR</span></button>
   <button id="b-ontime" class="act ontime"><svg class="ic"><use href="#i-undo"/></svg><span>EN HORA</span></button>
 </nav>
+
 
 <!-- Hoja de confirmación (resúmenes) -->
 <div id="sheet" class="sheet" hidden>
@@ -103,11 +108,11 @@
 <div id="toast" class="toast" role="status" hidden></div>
 <div id="bad" class="badlink" hidden><svg class="ic"><use href="#i-alert"/></svg><b>Enlace no válido</b><span id="bad-t">Escanea el QR del Stage Manager (Dashboard › Emisión › Stage Manager · mando).</span></div>
 
-<script src="core.js?v=20261057"></script>
-<script src="datos.js?v=20261057"></script>
-<script src="emision.js?v=20261057"></script>
-<script src="mando.js?v=20261057"></script>
-<script src="remote.js?v=20261057"></script>
-<script src="pwa.js?v=20261057"></script>
+<script src="core.js?v=20261060"></script>
+<script src="datos.js?v=20261060"></script>
+<script src="emision.js?v=20261060"></script>
+<script src="mando.js?v=20261060"></script>
+<script src="remote.js?v=20261060"></script>
+<script src="pwa.js?v=20261060"></script>
 </body>
 </html>
