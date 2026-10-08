@@ -629,7 +629,7 @@
     const t = panel(), T = t.T, F = (name, data, type) => new File([data], name, { type: type || '' });
     eq(T.fileKind(F('a.xlsx', 'x')), 'xlsx'); eq(T.fileKind(F('a.XLS', 'x')), 'xls'); eq(T.fileKind(F('cartel.pdf', 'x')), 'pdf');
     eq(T.fileKind(F('ev.json', 'x')), 'json'); eq(T.fileKind(F('h.csv', 'x')), 'tabla'); eq(T.fileKind(F('h.tsv', 'x')), 'tabla'); eq(T.fileKind(F('notas.txt', 'x')), 'tabla');
-    eq(T.fileKind(F('foto.png', 'x', 'image/png')), '');
+    eq(T.fileKind(F('foto.png', 'x', 'image/png')), 'imagen'); eq(T.fileKind(F('musica.mp3', 'x', 'audio/mpeg')), '');
     // PDF: se abre la caja de pegar con el aviso
     T.handleFile(F('cartel.pdf', '%PDF', 'application/pdf'));
     eq(t.env.getEl('imp').hidden, false); eq(t.env.getEl('imp-notice').hidden, false);
@@ -646,7 +646,7 @@
     eq(t.env.getEl('imp-text').value, 'Banda;Inicio\nUno;21:00');
     // .xls y desconocidos: mensaje claro
     T.handleFile(F('viejo.xls', 'x')); ok(/Excel antiguo \(\.xls\)/.test(t.env.getEl('toast').textContent));
-    T.handleFile(F('foto.png', 'x', 'image/png')); ok(/No sé leer «foto\.png»/.test(t.env.getEl('toast').textContent));
+    T.handleFile(F('musica.mp3', 'x', 'audio/mpeg')); ok(/No sé leer «musica\.mp3»/.test(t.env.getEl('toast').textContent));
     eq(t.env.errors.length, 0, t.env.errors.join(' | '));
   });
   test('Soltar el .json de un evento sin nada abierto: se abre directamente; con un evento abierto, pregunta', async () => {
@@ -711,6 +711,29 @@
     c.env.fire('imp-go', 'click', {});
     eq(c.read('showtime.config').mode, 'all');
     eq(c.read('showtime.festival').artists.length, 2);
+  });
+
+  test('Imágenes (foto del cartel, captura): sin OCR — se abre «Pegar horario» con el truco de Texto en Vivo', () => {
+    const IMG = '💡 Para fotos y capturas: Selecciona el texto sobre la imagen con el ratón o el dedo (Texto en Vivo de Mac/iOS/Android), pulsa ⌘C y pégalo aquí con ⌘V.';
+    const F = (name, type) => new File(['x'], name, { type: type || '' });
+    const kinds = ['cartel.jpg', 'captura.PNG', 'foto.jpeg', 'flyer.webp', 'IMG_0001.HEIC', 'x.gif'].map(n => panel().T.fileKind(F(n)));
+    eq(kinds.join(), Array(6).fill('imagen').join(), 'por la extensión'); eq(panel().T.fileKind(F('sin-extension', 'image/png')), 'imagen', 'o por el tipo');
+    // Soltar una imagen
+    const a = panel(); a.env.fire('window', 'drop', { preventDefault() {}, dataTransfer: { files: [F('cartel.jpg', 'image/jpeg')] } });
+    eq(a.env.getEl('imp').hidden, false, 'abre la caja de pegar'); eq(a.env.getEl('imp-notice').hidden, false); eq(a.env.getEl('imp-notice').textContent, IMG);
+    // ⌘V con una imagen en el portapapeles (fuera de las casillas)
+    const b = panel(); b.env.fire('document', 'paste', pasteEv('', null, [F('image.png', 'image/png')]));
+    eq(b.env.getEl('imp').hidden, false); eq(b.env.getEl('imp-notice').textContent, IMG);
+    // Pegar una imagen DENTRO de la caja de texto: no se pega nada raro y sale el truco
+    const c = panel(); c.env.fire('document', 'paste', pasteEv('21:00 Banda'));
+    c.env.getEl('imp-notice').hidden = true; let prevented = false;
+    c.env.fire('imp-text', 'paste', { preventDefault() { prevented = true; }, clipboardData: { files: [F('captura.png', 'image/png')], getData: () => '' } });
+    ok(prevented); eq(c.env.getEl('imp-notice').hidden, false); eq(c.env.getEl('imp-notice').textContent, IMG);
+    // …pero si el portapapeles trae texto además de la imagen (p. ej. desde Word), se pega el texto normal
+    c.env.getEl('imp-notice').hidden = true; prevented = false;
+    c.env.fire('imp-text', 'paste', { preventDefault() { prevented = true; }, clipboardData: { files: [F('img.png', 'image/png')], getData: () => '21:00 Otra' } });
+    ok(!prevented); eq(c.env.getEl('imp-notice').hidden, true);
+    ok(/<input id="imp-file" type="file" accept="image\/\*,/.test(D.src('index.html')), 'el selector de archivos también deja elegir fotos');
   });
 
   // ── Tanda 4: órdenes del mando (emCommand) — reloj simulado ────────────────────────

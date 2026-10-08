@@ -921,3 +921,5 @@ body[data-ps="escenario"] .addtabs button.on{background:#FFD600;color:#000}
 .imp-prev thead th{position:sticky;top:0;z-index:10;background:#14151b;box-shadow:inset 0 -1px 0 var(--hair2,rgba(255,255,255,.14))}
 body[data-ps="escenario"] .imp-prev thead th{background:#000}
 .toast.good{border-color:color-mix(in srgb,var(--ok) 60%,transparent);color:var(--ok)}
+/* App instalada (iPad/iPhone, barra de estado translúcida): la barra superior no queda debajo del reloj del sistema */
+.bar{padding-top:max(8px,env(safe-area-inset-top,0px));padding-left:max(14px,env(safe-area-inset-left,0px));padding-right:max(14px,env(safe-area-inset-right,0px))}

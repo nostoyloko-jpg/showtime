@@ -1685,12 +1685,15 @@
   }
   const isTableFile = f => /\.(csv|tsv|txt)$/i.test(f.name || '') || /text\/(csv|tab-separated-values|plain)/.test(f.type || '');
   const PDF_NOTICE = 'Para PDFs: abre el PDF, selecciona y copia el texto (⌘A, ⌘C) y pégalo aquí.';
+  // Fotos y capturas: sin OCR (serían 5 MB de librería). El sistema ya lo hace: Texto en Vivo (Mac/iOS) o Google Lens (Android).
+  const IMG_NOTICE = '💡 Para fotos y capturas: Selecciona el texto sobre la imagen con el ratón o el dedo (Texto en Vivo de Mac/iOS/Android), pulsa ⌘C y pégalo aquí con ⌘V.';
   /** Qué es un archivo: 'xlsx' | 'xls' | 'pdf' | 'json' | 'tabla' | '' (no se sabe leer). */
   function fileKind(f) {
     const n = String(f.name || '').toLowerCase(), t = String(f.type || '');
     if (/\.xlsx$/.test(n) || /spreadsheetml/.test(t)) return 'xlsx';
     if (/\.xls$/.test(n) || t === 'application/vnd.ms-excel') return 'xls';
     if (/\.pdf$/.test(n) || t === 'application/pdf') return 'pdf';
+    if (/\.(jpe?g|png|webp|gif|heic|heif|bmp|tiff?|avif)$/.test(n) || /^image\//.test(t)) return 'imagen';
     if (/\.json$/.test(n) || t === 'application/json') return 'json';
     if (isTableFile(f)) return 'tabla';
     return '';
@@ -1701,6 +1704,7 @@
     if (k === 'tabla') { loadImportFile(f); return; }
     if (k === 'json') { readFile(f); return; }
     if (k === 'pdf') { openImport(IMP ? IMP.text : '', PDF_NOTICE); return; }
+    if (k === 'imagen') { openImport(IMP ? IMP.text : '', IMG_NOTICE); return; }
     if (k === 'xls') { toast('Es un Excel antiguo (.xls): ábrelo y guárdalo como .xlsx o CSV, o copia y pega las celdas', true); return; }
     if (k === 'xlsx') { loadXlsx(f); return; }
     toast('No sé leer «' + (f.name || 'ese archivo') + '»: usa Excel (.xlsx), CSV, TSV, texto o el .json del evento', true);
@@ -1735,6 +1739,10 @@
   $('imp-go').addEventListener('click', impDoImport);
   $('imp-pick').addEventListener('click', () => $('imp-file').click());
   $('imp-file').addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); e.target.value = ''; });
+  $('imp-text').addEventListener('paste', e => {
+    const cd = e.clipboardData, f = cd && cd.files && cd.files[0];
+    if (f && fileKind(f) === 'imagen' && !(cd.getData && cd.getData('text/plain'))) { e.preventDefault(); $('imp-notice').textContent = IMG_NOTICE; $('imp-notice').hidden = false; }
+  });
   $('imp-text').addEventListener('input', () => {
     clearTimeout(impTimer);
     impTimer = setTimeout(() => { if (!IMP) return; IMP.text = $('imp-text').value; IMP.map = null; IMP.header = undefined; impResetRows(); impRecompute(); }, 250);

@@ -37,7 +37,8 @@ Las reglas generales (idioma, tono, permisos, commits, varias IAs) están en el 
 | `referencia/` | Material de partida (código extraído de Synapse, ejemplos). **No se publica ni se toca** |
 
 - Sin npm, sin compilar: scripts clásicos. Funciona con doble clic y en GitHub Pages. **No añadas dependencias** sin preguntar.
-- **Versión anti-caché**: al cambiar cualquier `.js`/`.css`, sube el número `?v=AAAAMMNN` en `index.html`, `live.html` y `remote.html` **y** `BUILD` en `emision.js` (los cuatro iguales).
+- **Versión anti-caché**: al cambiar cualquier `.js`/`.css`, sube el número `?v=AAAAMMNN` en `index.html`, `live.html` y `remote.html`, `BUILD` en `emision.js` **y** `VERSION` en `sw.js` (todos iguales; `tests/pwa.test.js` lo comprueba).
+- **App instalable / sin conexión (PWA)**: `manifest.webmanifest` (solo lo enlaza el Dashboard: la Live y el mando se guardan con su enlace, que lleva las claves), `sw.js` (red primero con 3 s de límite y caché de respaldo; solo archivos propios) y `pwa.js` (registro, solo por http/https). Un archivo nuevo de la app → añadirlo a `PRECACHE` en `sw.js` (el test avisa si falta).
 
 ## Zonas delicadas — preguntar antes de tocar
 - **Tiempo**: todo en minutos absolutos desde 2000-01-01. Nunca «hora del día» suelta.

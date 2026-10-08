@@ -2,9 +2,18 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Showtime · Dashboard</title>
-<link rel="stylesheet" href="control.css?v=20261042">
+<!-- App instalable y sin conexión (PWA): manifest SOLO aquí — la Live y el mando se guardan con su propio enlace (lleva las claves) -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#07080a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Showtime">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="stylesheet" href="control.css?v=20261043">
 </head>
 <body>
 <div id="savewarn" class="savewarn" role="alert" hidden><b>NO SE ESTÁ GUARDANDO</b> · el navegador no tiene espacio. Lo que cambies se ve y se emite, pero se pierde si recargas: guarda el evento en un archivo (.json), exporta el log y libera espacio.</div>
@@ -336,7 +345,7 @@
 <div id="qr-big" class="qr-big" hidden><div class="qr-big-box"><div id="qr-big-svg"></div><div id="qr-big-t" class="qr-big-t">Staff · solo lectura</div><div id="qr-big-st" class="qr-big-st"></div><button id="qr-big-x" class="btn">Cerrar</button></div></div>
 
 <div id="drop" class="drop" hidden><div class="drop-box"><svg class="ic"><use href="#i-bolt"/></svg><b>Suelta para importar</b><span>Excel (.xlsx) · CSV · TSV · texto · el .json del evento · PDF: te digo cómo</span></div></div>
-<input id="ob-file" type="file" accept=".xlsx,.csv,.tsv,.txt,.json,.pdf,text/csv,text/tab-separated-values,text/plain,application/json,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
+<input id="ob-file" type="file" accept="image/*,.xlsx,.csv,.tsv,.txt,.json,.pdf,text/csv,text/tab-separated-values,text/plain,application/json,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
 
 <!-- Añadir entrada: ventana en medio de la pantalla (la fila se coloca sola por su hora) -->
 <div id="addm" class="modal" hidden>
@@ -376,7 +385,7 @@
       <textarea id="imp-text" spellcheck="false" placeholder="Pega aquí (⌘V) celdas copiadas de Excel, Numbers o Google Sheets, o texto de un PDF, WhatsApp o correo.&#10;&#10;Ejemplos:&#10;21:00-22:15 Los Ejemplos Principal&#10;VIERNES 10 JULIO · 23:30 Cabeza de Cartel (Carpa)"></textarea>
       <div class="imp-side">
         <button id="imp-pick" class="btn"><svg class="ic"><use href="#i-folder"/></svg>Subir archivo</button>
-        <input id="imp-file" type="file" accept=".xlsx,.csv,.tsv,.txt,.pdf,text/csv,text/tab-separated-values,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
+        <input id="imp-file" type="file" accept="image/*,.xlsx,.csv,.tsv,.txt,.pdf,text/csv,text/tab-separated-values,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
         <p class="hint">Excel (.xlsx), CSV, TSV o texto. O arrastra el archivo a la ventana.</p>
         <p id="imp-kind" class="imp-kind"></p>
       </div>
@@ -398,16 +407,17 @@
 <datalist id="zones-dl"></datalist>
 <div id="toast" class="toast" hidden></div>
 
-<script src="core.js?v=20261042"></script>
-<script src="meteo.js?v=20261042"></script>
-<script src="datos.js?v=20261042"></script>
-<script src="importar.js?v=20261042"></script>
-<script src="xlsx.js?v=20261042"></script>
-<script src="qr.js?v=20261042"></script>
-<script src="emision.js?v=20261042"></script>
-<script src="mando.js?v=20261042"></script>
-<script src="vistas.js?v=20261042"></script>
-<script src="log.js?v=20261042"></script>
-<script src="control.js?v=20261042"></script>
+<script src="core.js?v=20261043"></script>
+<script src="meteo.js?v=20261043"></script>
+<script src="datos.js?v=20261043"></script>
+<script src="importar.js?v=20261043"></script>
+<script src="xlsx.js?v=20261043"></script>
+<script src="qr.js?v=20261043"></script>
+<script src="emision.js?v=20261043"></script>
+<script src="mando.js?v=20261043"></script>
+<script src="vistas.js?v=20261043"></script>
+<script src="log.js?v=20261043"></script>
+<script src="control.js?v=20261043"></script>
+<script src="pwa.js?v=20261043"></script>
 </body>
 </html>
