@@ -2571,6 +2571,8 @@
     const b = $('wake'); if (!b) return;
     if (!WAKE_OK) { b.hidden = true; return; }
     b.hidden = false; b.classList.toggle('on', wakeOn); b.setAttribute('aria-pressed', String(wakeOn));
+    const led = b.querySelector('.wled');   // el LED lleva su propio estado (Safari no siempre repinta el hijo al cambiar la clase del botón)
+    if (led) { led.classList.toggle('on', wakeOn); led.style.backgroundColor = wakeOn ? 'var(--ok)' : '#5b5f67'; led.style.boxShadow = wakeOn ? '0 0 6px var(--ok)' : 'none'; }
     b.title = wakeOn ? 'Sin reposo ACTIVO: el equipo no apaga la pantalla ni entra en reposo. Clic: desactivar'
       : 'Sin reposo apagado: el equipo puede apagar la pantalla. Clic: activar';
   }

@@ -344,7 +344,7 @@
     const html = D.src('index.html'), css = D.src('control.css');
     ok(/id="wake"[^>]*><span class="wled"/.test(html), 'clase propia');
     ok(!/id="wake"[^>]*><span class="led"/.test(html), 'sin la clase .led');
-    ok(/\.wake \.wled\{[^}]*background:#5b5f67/.test(css) && /\.wake\.on \.wled\{[^}]*background:var\(--ok\)/.test(css));
+    ok(/\.wake \.wled\{[^}]*background:#5b5f67/.test(css) && /\.wake\.on \.wled[^{]*\{[^}]*background:var\(--ok\)/.test(css));
   });
   test('Estilos del Dashboard: tabla limpia en reposo, Añadir neutro, Live en rojo y números tabulares', () => {
     const css = D.src('control.css');
@@ -857,7 +857,7 @@
     await t.click();
     ok(t.led(), 'otro clic: activo (LED verde)'); eq(t.env.storage.has('showtime.wake'), false); eq(t.W.req, 2); eq(t.T.wakeState().lock, true);
     const css = D.src('control.css');
-    ok(/\.wake \.wled\{[^}]*background:#5b5f67/.test(css) && /\.wake\.on \.wled\{background:var\(--ok\)/.test(css), 'gris #5b5f67 / verde var(--ok)');
+    ok(/\.wake \.wled\{[^}]*background:#5b5f67/.test(css) && /\.wake\.on \.wled,\.wake \.wled\.on\{background:var\(--ok\)/.test(css) && /led\.classList\.toggle\('on', wakeOn\)/.test(D.src('control.js')), 'gris #5b5f67 / verde var(--ok)');
   });
   test('Sin reposo en «off»: ni tocar la app ni volver a la pestaña lo reactivan', async () => {
     const t = await panelWake({ 'showtime.wake': 'off' });

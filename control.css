@@ -759,7 +759,7 @@ body[data-ps="escenario"] .bar .clock{color:#FFD600}
 .wake .ic{width:14px;height:14px}
 .wake .wled{width:6px;height:6px;border-radius:50%;background:#5b5f67;flex:0 0 auto}
 .wake.on{color:var(--text)}
-.wake.on .wled{background:var(--ok);box-shadow:0 0 6px var(--ok)}
+.wake.on .wled,.wake .wled.on{background:var(--ok);box-shadow:0 0 6px var(--ok)}
 .wake[hidden]{display:none}
 @media (max-width:1700px){ .wake .wtxt{display:none} }
 
