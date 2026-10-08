@@ -947,7 +947,7 @@ body[data-ps="escenario"] .tpill{background:#000}
       -webkit-backdrop-filter cuando lleva var(), y por eso el menú quedaba transparente y sin desenfocar.
       Velo al 90 %: aunque un Safari no desenfoque, las letras de detrás no se leen; donde sí desenfoca, queda el cristal. ── */
 .mpanel,.cfg,.toast,.qr-big-box,.cfg-h,.morep{-webkit-backdrop-filter:blur(24px) saturate(160%);backdrop-filter:blur(24px) saturate(160%)}
-.cfg-h{background:rgba(14,16,20,.92)}
+.cfg-h{margin:0 -18px;padding:14px 18px 10px;background:var(--glass-bg)}   /* cabecera de Configuración: el mismo cristal que el panel y de borde a borde (sin franja más oscura) */
 .morep{background:var(--glass-bg)}
 .mpanel{box-shadow:0 18px 50px rgba(0,0,0,.6),0 2px 8px rgba(0,0,0,.4)}
 body[data-ps="raycast"]{--glass-bg:rgba(18,19,22,.9)}
@@ -958,3 +958,9 @@ body[data-ps="escenario"] .mpanel,body[data-ps="escenario"] .cfg,body[data-ps="e
   .mpanel,.cfg,.toast,.qr-big-box,.cfg-h,.morep{background-color:#15171d}
   body[data-ps="escenario"] .mpanel,body[data-ps="escenario"] .cfg,body[data-ps="escenario"] .toast,body[data-ps="escenario"] .qr-big-box,body[data-ps="escenario"] .cfg-h,body[data-ps="escenario"] .morep{background-color:#000}
 }
+
+/* ── Evento sin entradas: «Importar horario en 1 segundo» centrada en el área de trabajo ──
+      Sin la columna de En escena / Siguiente / CALL (vacía) y un poco por encima del centro (centro óptico). */
+main.vacia{grid-template-columns:minmax(0,1fr)}
+main.vacia>.live{display:none}
+main.vacia .list-empty{padding:16px 16px 9vh}

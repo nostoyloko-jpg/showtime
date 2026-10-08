@@ -214,6 +214,7 @@
     // Sin entradas: en vez de la tabla vacía, la tarjeta de «Importar horario en 1 segundo»
     const empty = has && !(FEST.artists || []).length;
     $('list-empty').hidden = !empty;
+    $('main').classList.toggle('vacia', empty);   // sin entradas: la columna de En escena/Siguiente/CALL (vacía) se esconde y la tarjeta queda centrada
     document.querySelector('.tblwrap').hidden = empty;
     if (has) { renderTable(); renderAddRow(); tick(); }
   }
@@ -431,7 +432,7 @@
       if (!co) gap = '<span class="dash" title="Primera actuación de su zona">—</span>';
       else if (co.mins < 0) gap = '<span class="gapbtn ovl" title="Solapa ' + (-co.mins) + ' min: empieza antes de que acabe ' + esc(co.prev.name) + '">−' + (-co.mins) + '′</span>';
       else gap = b.standby
-        ? '<button class="gapbtn sb" data-act="standby" data-on="0" title="STANDBY · ' + co.mins + ' min. Pulsa para volver a CHANGEOVER"><svg class="ic"><use href="#i-pause"/></svg>' + co.mins + '′</button>'
+        ? '<button class="gapbtn sb" data-act="standby" data-on="0" title="STANDBY · ' + co.mins + ' min. Pulsa para volver a CHANGEOVER"><svg class="ic"><use href="#i-pause"/></svg>SB</button>'
         : co.idle
         ? '<button class="gapbtn idle" data-act="standby" data-on="1" title="Sin actividad · ' + co.mins + ' min: no es un cambio (misma banda, o hay una tarea de la zona en medio). Pulsa para marcarlo como STANDBY">— ' + co.mins + '′</button>'
         : '<button class="gapbtn" data-act="standby" data-on="1" title="CHANGEOVER · ' + co.mins + ' min. Pulsa para marcarlo como STANDBY (zona cerrada o descanso)"><svg class="ic"><use href="#i-swap"/></svg>' + co.mins + '′</button>';
@@ -2552,34 +2553,45 @@
 
   // ── Pantalla siempre encendida ───────────────────────────────────────
   // Sin reposo: botón con micro-LED (verde = activo). Se puede apagar; la elección se recuerda en este equipo.
-  let wakeLock = null;
+  // El estado del botón es la ELECCIÓN del usuario (wakeOn), no si el navegador tiene el bloqueo en este instante:
+  // así el LED conmuta siempre al hacer clic. Con «off» explícito nada (ni tocar la app, ni volver a la pestaña) lo reactiva.
   const WAKE_KEY = 'showtime.wake';
+  const WAKE_OK = 'wakeLock' in navigator;
   function wakeWanted() { try { return localStorage.getItem(WAKE_KEY) !== 'off'; } catch (e) { return true; } }
+  let wakeOn = wakeWanted(), wakeLock = null, wakeBusy = false;
   function paintWake() {
     const b = $('wake'); if (!b) return;
-    if (!('wakeLock' in navigator)) { b.hidden = true; return; }
-    b.hidden = false; b.classList.toggle('on', !!wakeLock); b.setAttribute('aria-pressed', String(!!wakeLock));
+    if (!WAKE_OK) { b.hidden = true; return; }
+    b.hidden = false; b.classList.toggle('on', wakeOn); b.setAttribute('aria-pressed', String(wakeOn));
+    b.title = wakeOn ? 'Sin reposo ACTIVO: el equipo no apaga la pantalla ni entra en reposo. Clic: desactivar'
+      : 'Sin reposo apagado: el equipo puede apagar la pantalla. Clic: activar';
   }
+  /** Pide el bloqueo de pantalla si el usuario lo quiere. Devuelve true si lo tiene. */
   async function requestWake() {
-    if (!('wakeLock' in navigator) || !wakeWanted() || document.visibilityState !== 'visible' || wakeLock) { paintWake(); return; }
-    try {
-      wakeLock = await navigator.wakeLock.request('screen');
-      wakeLock.addEventListener('release', () => { wakeLock = null; paintWake(); });
-    } catch (e) { wakeLock = null; }
+    if (!WAKE_OK || !wakeOn || document.visibilityState !== 'visible' || wakeLock || wakeBusy) { paintWake(); return !!wakeLock; }
+    wakeBusy = true;
+    let l = null;
+    try { l = await navigator.wakeLock.request('screen'); } catch (e) { l = null; }
+    wakeBusy = false;
+    if (l && !wakeOn) { try { await l.release(); } catch (e) {} l = null; }   // se apagó mientras el navegador contestaba
+    if (l) { wakeLock = l; l.addEventListener('release', () => { if (wakeLock === l) wakeLock = null; }); }
     paintWake();
+    return !!l;
   }
-  $('wake').addEventListener('click', async () => {
-    if (wakeLock) {
-      try { localStorage.setItem(WAKE_KEY, 'off'); } catch (e) {}
+  async function setWake(on) {
+    wakeOn = !!on;
+    try { if (wakeOn) localStorage.removeItem(WAKE_KEY); else localStorage.setItem(WAKE_KEY, 'off'); } catch (e) {}
+    paintWake();
+    if (!wakeOn) {
       const w = wakeLock; wakeLock = null;
-      try { await w.release(); } catch (e) {}
-      paintWake(); toast('Sin reposo desactivado: el equipo puede apagar la pantalla');
-    } else {
-      try { localStorage.removeItem(WAKE_KEY); } catch (e) {}
-      await requestWake();
-      toast(wakeLock ? 'Sin reposo activado: la pantalla no se apaga' : 'Este navegador no permite mantener la pantalla encendida', !wakeLock);
+      if (w) { try { await w.release(); } catch (e) {} }
+      toast('Sin reposo desactivado: el equipo puede apagar la pantalla');
+      return;
     }
-  });
+    const got = await requestWake();
+    toast(got ? 'Sin reposo activado: la pantalla no se apaga' : 'Sin reposo activado, pero el navegador aún no lo ha concedido: se vuelve a pedir al tocar la app', !got);
+  }
+  $('wake').addEventListener('click', () => setWake(!wakeOn));
   document.addEventListener('visibilitychange', requestWake);
   document.addEventListener('pointerdown', requestWake);
 
@@ -2620,5 +2632,5 @@
     if (ok) toast('Se vuelve a guardar con normalidad');
   });
 
-  window.ShowtimePanel = { reload: () => { loadState(); renderAll(); }, _test: { emProdMessage, emRegenProd, hitoChips, emUrl, prodBigTitle, fileKind, handleFile, emCommand, importSummary, hidesSome, tipoPill, showSplash, hideSplash, setStandby, standbyOn, room: () => emRoom } };   // _test: solo para tests/control.test.js
+  window.ShowtimePanel = { reload: () => { loadState(); renderAll(); }, _test: { emProdMessage, emRegenProd, hitoChips, emUrl, prodBigTitle, fileKind, handleFile, emCommand, importSummary, hidesSome, tipoPill, setWake, wakeState: () => ({ on: wakeOn, lock: !!wakeLock }), showSplash, hideSplash, setStandby, standbyOn, room: () => emRoom } };   // _test: solo para tests/control.test.js
 })();

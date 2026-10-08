@@ -815,6 +815,72 @@
     ['#zoomctl{', '.mdock{', '.cdock{'].forEach(sel => { const b = live.slice(live.indexOf(sel), live.indexOf('}', live.indexOf(sel))); ok(/background:rgba\(10,11,14,\.88\)/.test(b) && /-webkit-backdrop-filter:blur\(20px\) saturate\(160%\)/.test(b), 'Live ' + sel); });
   });
 
+  test('Evento sin entradas: la tarjeta «Importar horario en 1 segundo» centrada en el área de trabajo (sin la columna lateral vacía)', () => {
+    const vacio = { event: { nombre: 'X', fechaInicio: '2026-07-10', fechaFin: '2026-07-10', dayCutoff: '06:00' }, escenarios: [], artists: [] };
+    const a = panel({ 'showtime.festival': JSON.stringify(vacio) });
+    eq(a.env.getEl('list-empty').hidden, false); ok(a.env.getEl('main').classList.contains('vacia'), 'main.vacia');
+    const b = panel({ 'showtime.festival': JSON.stringify(fest().s) });
+    ok(!b.env.getEl('main').classList.contains('vacia'), 'con entradas: la columna vuelve');
+    const css = D.src('control.css');
+    ok(/main\.vacia\{grid-template-columns:minmax\(0,1fr\)\}/.test(css) && /main\.vacia>\.live\{display:none\}/.test(css));
+    ok(/main\.vacia \.list-empty\{padding:16px 16px 9vh\}/.test(css), 'centro óptico: un poco por encima');
+  });
+  /** Dashboard con «Sin reposo» disponible (wakeLock de mentira que cuenta peticiones y liberaciones). */
+  async function panelWake(storage) {
+    const env = D.makeEnv({ cripto: true, storage: storage || {} });
+    const W = { req: 0, rel: 0, fail: false };
+    env.win.document.visibilityState = 'visible';
+    env.win.navigator.wakeLock = { request: async () => { if (W.fail) throw new Error('no'); W.req++; const fns = []; return { addEventListener: (t, f) => fns.push(f), release: async () => { W.rel++; fns.forEach(f => f()); } }; } };
+    D.cargar(env, MODULOS);
+    ['modal', 'addm', 'imp', 'cfg', 'drop'].forEach(id => { env.getEl(id).hidden = true; });
+    await new Promise(r => setImmediate(r));
+    const T = env.win.ShowtimePanel._test;
+    return { env, W, T, wake: env.getEl('wake'), led: () => env.getEl('wake').classList.contains('on'), click: async () => { env.fire('wake', 'click', {}); for (let i = 0; i < 4; i++) await new Promise(r => setImmediate(r)); } };
+  }
+  test('Sin reposo: el clic conmuta el LED (verde ⇄ gris), guarda la elección y pide o suelta el bloqueo de pantalla', async () => {
+    const t = await panelWake();
+    ok(t.led(), 'por defecto: activo'); eq(t.W.req, 1, 'pide el bloqueo al arrancar'); eq(t.T.wakeState().lock, true);
+    await t.click();
+    ok(!t.led(), 'clic: apagado (LED gris)'); eq(t.env.storage.get('showtime.wake'), 'off'); eq(t.W.rel, 1, 'suelta el bloqueo'); eq(t.T.wakeState().lock, false);
+    ok(/desactivado/.test(t.env.getEl('toast').textContent));
+    await t.click();
+    ok(t.led(), 'otro clic: activo (LED verde)'); eq(t.env.storage.has('showtime.wake'), false); eq(t.W.req, 2); eq(t.T.wakeState().lock, true);
+    const css = D.src('control.css');
+    ok(/\.wake \.led\{[^}]*background:#5b5f67/.test(css) && /\.wake\.on \.led\{background:var\(--ok\)/.test(css), 'gris #5b5f67 / verde var(--ok)');
+  });
+  test('Sin reposo en «off»: ni tocar la app ni volver a la pestaña lo reactivan', async () => {
+    const t = await panelWake({ 'showtime.wake': 'off' });
+    ok(!t.led()); eq(t.W.req, 0, 'al arrancar no lo pide');
+    t.env.fire('document', 'pointerdown', { target: { closest: () => null } }); t.env.fire('document', 'visibilitychange', {});
+    await new Promise(r => setImmediate(r));
+    eq(t.W.req, 0, 'pointerdown / visibilitychange no lo reactivan'); ok(!t.led());
+  });
+  test('Sin reposo: si el navegador no lo concede, el LED sigue la elección y avisa; tocar la app lo vuelve a pedir', async () => {
+    const t = await panelWake({ 'showtime.wake': 'off' });
+    t.W.fail = true; await t.click();
+    ok(t.led(), 'elegido: activo'); ok(/aún no lo ha concedido/.test(t.env.getEl('toast').textContent));
+    t.W.fail = false; t.env.fire('document', 'pointerdown', { target: { closest: () => null } }); for (let i = 0; i < 3; i++) await new Promise(r => setImmediate(r));
+    eq(t.W.req, 1); eq(t.T.wakeState().lock, true);
+  });
+
+  test('Cambio en STANDBY: el botón pone «SB» en vez de los minutos (los minutos quedan en el título)', () => {
+    const src = D.src('control.js');
+    ok(/'<button class="gapbtn sb" data-act="standby" data-on="0" title="STANDBY · ' \+ co\.mins \+ ' min\. Pulsa para volver a CHANGEOVER"><svg class="ic"><use href="#i-pause"\/><\/svg>SB<\/button>'/.test(src));
+    // Con datos: dos bandas en la misma zona, el hueco marcado como STANDBY
+    let s = C.newFestival({ nombre: 'SB', fechaInicio: '2026-07-10', fechaFin: '2026-07-10', dayCutoff: '06:00', coMin: 15 }).state;
+    s = C.addStage(s, 'Principal').state; const z = s.escenarios[0].id;
+    s = C.addArtist(s, 'show', { jornada: '2026-07-10', nombre: 'Uno', escenarioId: z, inicio: '20:00', fin: '21:00' }).state;
+    s = C.addArtist(s, 'show', { jornada: '2026-07-10', nombre: 'Dos', escenarioId: z, inicio: '21:15', fin: '22:00' }).state;
+    s.artists[1].showtimeStandby = true;
+    const t = panel({ 'showtime.festival': JSON.stringify(s) }), h = ultimo(t, 'tbody');
+    ok(/<button class="gapbtn sb"[^>]*><svg class="ic"><use href="#i-pause"\/><\/svg>SB<\/button>/.test(h), 'SB en la fila');
+  });
+  test('Configuración: la cabecera usa el mismo cristal que el panel, de borde a borde (sin franja más oscura)', () => {
+    const css = D.src('control.css');
+    ok(/\.cfg-h\{margin:0 -18px;padding:14px 18px 10px;background:var\(--glass-bg\)\}/.test(css));
+    ok(css.indexOf('.cfg-h{background:rgba(14,16,20') < 0);
+  });
+
   test('Imágenes (foto del cartel, captura): sin OCR — se abre «Pegar horario» con el truco de Texto en Vivo', () => {
     const IMG = '💡 Para fotos y capturas: Selecciona el texto sobre la imagen con el ratón o el dedo (Texto en Vivo de Mac/iOS/Android), pulsa ⌘C y pégalo aquí con ⌘V.';
     const F = (name, type) => new File(['x'], name, { type: type || '' });
