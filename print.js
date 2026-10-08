@@ -16,6 +16,13 @@
     shows: { label: 'Shows y Pruebas', kinds: ['show', 'sc'] },
     solo: { label: 'Solo Shows', kinds: ['show'] }
   };
+  /** Casillas de tipo del modal (independientes: se pueden combinar). */
+  const KINDS = [
+    { k: 'show', label: 'Shows' },
+    { k: 'sc', label: 'Pruebas (SC)' },
+    { k: 'tarea', label: 'Tareas' },
+    { k: 'hito', label: 'Hitos' }
+  ];
   /** Píldoras «ghost»: texto y contorno por tipo (SHOW negro · PRUEBA púrpura · TAREA azul · HITO rojo). */
   const TYPE = {
     show: { txt: 'SHOW', cls: 'p-show' },
@@ -33,11 +40,11 @@
 
   /**
    * Filas de la tabla para una jornada (o todas).
-   * opts: { day: ISO|'all', zone: id|'all', content: 'all'|'shows'|'solo' }
+   * opts: { day: ISO|'all', zone: id|'all', kinds: ['show','sc','tarea','hito'] (o content: 'all'|'shows'|'solo') }
    */
   function rowsOf(state, opts) {
     const o = opts || {};
-    const kinds = (CONTENT[o.content] || CONTENT.all).kinds;
+    const kinds = Array.isArray(o.kinds) ? o.kinds.slice() : (CONTENT[o.content] || CONTENT.all).kinds;
     const blocks = C.buildBlocks(state, { mode: 'all', day: o.day || 'all' });
     return blocks
       .filter(b => kinds.indexOf(b.kind) >= 0)
@@ -363,7 +370,7 @@
     return true;
   }
 
-  const API = { CONTENT, TYPE, rowsOf, densityFor, dayLabel, printedAt, daysOf, html, summary, launch, esc, layoutGantt, ganttSvg, fitLabel, wrapLines };
+  const API = { CONTENT, KINDS, TYPE, rowsOf, densityFor, dayLabel, printedAt, daysOf, html, summary, launch, esc, layoutGantt, ganttSvg, fitLabel, wrapLines };
   if (isNode) module.exports = API;
   else root.ShowtimePrint = API;
 })(typeof window !== 'undefined' ? window : globalThis);

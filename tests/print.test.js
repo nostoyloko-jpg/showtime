@@ -29,6 +29,18 @@
     return { s, P1, K, ids };
   }
 
+  test('kinds: casillas independientes (quitar tareas deja shows, pruebas e hitos)', () => {
+    let { s, P: Pz } = (() => { const f = fest(); return { s: f.s, P: f.P1 }; })();
+    const r = C.addArtist(s, 'show', { tipo: 'tarea', jornada: J1, nombre: 'Montaje backline', escenarioId: Pz, inicio: '16:00', fin: '17:00' });
+    s = r.state;
+    ok(P.rowsOf(s, { day: 'all', kinds: ['show', 'sc', 'tarea', 'hito'] }).some(x => x.kind === 'tarea'), 'la tarea entra con todo marcado');
+    const sinTareas = P.rowsOf(s, { day: 'all', kinds: ['show', 'sc', 'hito'] });
+    ok(sinTareas.length > 0 && sinTareas.every(x => x.kind !== 'tarea'), 'sin tareas: ninguna tarea');
+    const soloShows = P.rowsOf(s, { day: 'all', kinds: ['show'] });
+    eq(JSON.stringify(soloShows.map(r => r.name)), JSON.stringify(P.rowsOf(s, { day: 'all', content: 'solo' }).map(r => r.name)), 'kinds [show] = Solo Shows');
+    eq(P.rowsOf(s, { day: 'all', kinds: [] }).length, 0, 'sin tipos → nada');
+    eq(P.KINDS.map(k => k.k).join(','), 'show,sc,tarea,hito', 'cuatro casillas');
+  });
   test('CONTENT: «Solo Shows» deja fuera pruebas, tareas e hitos', () => {
     const { s } = fest();
     const all = P.rowsOf(s, { day: 'all', content: 'all' });

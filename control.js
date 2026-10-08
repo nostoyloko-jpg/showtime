@@ -1609,7 +1609,8 @@
   }
   $('btn-log').addEventListener('click', openLogExport);
   /* ── Hoja de ruta imprimible (Running Order) · Fase 1: tabla ───────────── */
-  const PR = { fmt: 'tabla', day: null, zone: 'all', content: 'all', orient: 'portrait', notes: true, call: true };
+  const PR = { fmt: 'tabla', day: null, zone: 'all', kinds: { show: true, sc: true, tarea: true, hito: true }, orient: 'portrait', notes: true, call: true };
+  const prKinds = () => Object.keys(PR.kinds).filter(k => PR.kinds[k]);
   function openPrint(fmt) {
     if (!FEST || !window.ShowtimePrint) { toast('Primero crea o abre un evento', true); return; }
     closeMenus(); closeConfig();
@@ -1622,12 +1623,14 @@
       '<div class="dw-row"><span class="dw-l">Formato</span><div class="dtog radio" id="pr-fmt"><button type="button" class="' + (PR.fmt === 'tabla' ? 'on' : '') + '" data-f="tabla">Tabla</button><button type="button" class="' + (PR.fmt === 'gantt' ? 'on' : '') + '" data-f="gantt" title="Cronograma de escenarios en horizontal">Cronograma</button></div></div>' +
       '<div class="dw-row"><span class="dw-l">Jornada</span><select id="pr-day">' + days.map(d => '<option value="' + d + '">' + esc(fmtDay(d)) + '</option>').join('') + (days.length > 1 ? '<option value="all">Todas · 1 hoja por día</option>' : '') + '</select></div>' +
       '<div class="dw-row"><span class="dw-l">Zona</span><select id="pr-zone"><option value="all">Todas las zonas</option>' + stages.map(z => '<option value="' + esc(z.id) + '">' + esc(z.nombre) + '</option>').join('') + '</select></div>' +
-      '<div class="dw-row"><span class="dw-l">Contenido</span><select id="pr-content">' + Object.keys(P.CONTENT).map(k => '<option value="' + k + '">' + esc(P.CONTENT[k].label) + '</option>').join('') + '</select></div>' +
+      '<div class="dw-row top"><span class="dw-l">Contenido</span><div class="pr-kinds" id="pr-kinds">' +
+        P.KINDS.map(k => '<label class="pr-ck"><input type="checkbox" data-k="' + k.k + '"> ' + esc(k.label) + '</label>').join('') +
+        '<span class="pr-q"><button type="button" data-q="all">Todos</button><button type="button" data-q="show">Solo Shows</button></span></div></div>' +
       '<div class="dw-row"><span class="dw-l">Orientación</span><select id="pr-orient"' + (PR.fmt === 'gantt' ? ' disabled title="El cronograma es siempre horizontal"' : '') + '><option value="portrait">Vertical</option><option value="landscape">Horizontal</option></select></div>' +
       '<div class="dw-row"><span class="dw-l">Columnas</span><label class="pr-ck"><input type="checkbox" id="pr-call"' + (PR.fmt === 'gantt' ? ' disabled' : '') + '> Incluir hora de CALL</label><label class="pr-ck"><input type="checkbox" id="pr-notes"' + (PR.fmt === 'gantt' ? ' disabled' : '') + '> Incluir notas operativas</label></div>' +
       '<div id="pr-sum" class="lx-sum"></div></div>';
     modal('Hoja de ruta', html, [{ label: 'Cancelar' }, { label: 'Imprimir / Guardar PDF', kind: 'primary', run: () => {
-      const rows = P.rowsOf(FEST, { day: PR.day, zone: PR.zone, content: PR.content });
+      const rows = P.rowsOf(FEST, { day: PR.day, zone: PR.zone, kinds: prKinds() });
       if (!rows.length) { toast('No hay bloques con estos filtros', true); return false; }
       const dl = PR.day === 'all' ? days : [PR.day];
       const doc = P.html({ rows, days: dl, title: (FEST.event && FEST.event.nombre) || 'Evento', format: PR.fmt, orient: PR.fmt === 'gantt' ? 'landscape' : PR.orient, notes: PR.notes, call: PR.call, now: new Date() });
@@ -1635,21 +1638,28 @@
       toast('Hoja lista: en la impresión, elige «Guardar como PDF»');
     } }], { wide: true });
     const paint = () => {
-      $('pr-day').value = PR.day; $('pr-zone').value = PR.zone; $('pr-content').value = PR.content; $('pr-orient').value = PR.orient;
+      $('pr-day').value = PR.day; $('pr-zone').value = PR.zone; $('pr-orient').value = PR.orient;
+      document.querySelectorAll('#pr-kinds [data-k]').forEach(c => { c.checked = !!PR.kinds[c.dataset.k]; });
       $('pr-call').checked = PR.call; $('pr-notes').checked = PR.notes;
       const gantt = PR.fmt === 'gantt';
       $('pr-orient').disabled = gantt; $('pr-call').disabled = gantt; $('pr-notes').disabled = gantt;
       document.querySelectorAll('#pr-fmt [data-f]').forEach(b => b.classList.toggle('on', b.dataset.f === PR.fmt));
-      const rows = P.rowsOf(FEST, { day: PR.day, zone: PR.zone, content: PR.content });
+      const rows = P.rowsOf(FEST, { day: PR.day, zone: PR.zone, kinds: prKinds() });
       const dl = PR.day === 'all' ? days : [PR.day];
       const sm = P.summary(rows, dl);
+      if (!prKinds().length) { $('pr-sum').innerHTML = '<span class="hint">Marca al menos un tipo de bloque.</span>'; $('modal-actions').querySelector('.primary').disabled = true; return; }
       $('pr-sum').innerHTML = '<b>' + sm.bloques + '</b> bloques · <b>' + sm.hojas + '</b> ' + (sm.hojas === 1 ? 'hoja' : 'hojas A4') + (gantt ? ' horizontales' : ' · letra <b>' + sm.letra + '</b>') +
         '<div class="hint">' + (gantt ? 'Un carril por escenario, rango horario de cada jornada y hitos en rojo. Horarios previstos.' : 'Horarios previstos (la escaleta), no los reales. Una jornada por hoja: cada una cabe en una A4.') + '</div>';
       $('modal-actions').querySelector('.primary').disabled = !rows.length;
     };
     $('pr-day').addEventListener('change', e => { PR.day = e.target.value; paint(); });
     $('pr-zone').addEventListener('change', e => { PR.zone = e.target.value; paint(); });
-    $('pr-content').addEventListener('change', e => { PR.content = e.target.value; paint(); });
+    $('pr-kinds').addEventListener('change', e => { const k = e.target.dataset.k; if (!k) return; PR.kinds[k] = e.target.checked; paint(); });
+    $('pr-kinds').addEventListener('click', e => {
+      const b = e.target.closest('[data-q]'); if (!b) return;
+      Object.keys(PR.kinds).forEach(k => { PR.kinds[k] = b.dataset.q === 'all' ? true : k === 'show'; });
+      paint();
+    });
     $('pr-orient').addEventListener('change', e => { PR.orient = e.target.value; paint(); });
     $('pr-call').addEventListener('change', e => { PR.call = e.target.checked; paint(); });
     $('pr-notes').addEventListener('change', e => { PR.notes = e.target.checked; paint(); });

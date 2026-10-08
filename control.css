@@ -1067,3 +1067,7 @@ td input:focus,td select:focus,.imp-src textarea:focus,.imp-prev td input[type=t
 /* Hoja de ruta (modal Imprimir): casillas en línea */
 .pr-ck{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--text);cursor:pointer;margin-right:14px}
 .pr-ck input{margin:0}
+.pr-kinds{display:flex;flex-wrap:wrap;align-items:center;gap:6px 0}
+.pr-q{display:inline-flex;gap:6px;margin-left:8px}
+.pr-q button{font-size:12px;padding:3px 10px;border-radius:999px;border:1px solid var(--line2);background:transparent;color:var(--text);cursor:pointer}
+.pr-q button:hover{border-color:var(--text)}
