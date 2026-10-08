@@ -997,7 +997,7 @@ main.vacia .list-empty{padding:16px 16px 9vh}
 .gv-fs{justify-self:start;display:inline-flex;align-items:center;gap:7px;height:34px;font-size:12px;font-weight:600;color:var(--dim,#6f747e);white-space:nowrap}
 .gv-fs::before{content:"";width:7px;height:7px;border-radius:50%;background:#3a3d46;flex:0 0 auto}
 .gv-fs.on{color:var(--text)}
-.gv-fs.on::before{background:#fff;box-shadow:0 0 6px #fff,0 0 12px rgba(255,255,255,.45)}
+.gv-fs.on::before{background:var(--ok);box-shadow:0 0 6px var(--ok),0 0 12px rgba(61,220,151,.5)}
 .gv-empty{margin:4px 0}
 .gv-qr{margin-top:8px;padding-top:12px;border-top:1px solid var(--hair)}
 .gv-qrh{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
