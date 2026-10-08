@@ -757,9 +757,9 @@ body[data-ps="escenario"] .bar .clock{color:#FFD600}
 .wake{height:28px;padding:0 10px 0 9px;gap:6px;border:1px solid var(--hair2);border-radius:999px;background:transparent;color:var(--muted);font:inherit;font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center}
 .wake:hover{background:rgba(255,255,255,.05)}
 .wake .ic{width:14px;height:14px}
-.wake .led{width:6px;height:6px;border-radius:50%;background:#5b5f67;flex:0 0 auto}
+.wake .wled{width:6px;height:6px;border-radius:50%;background:#5b5f67;flex:0 0 auto}
 .wake.on{color:var(--text)}
-.wake.on .led{background:var(--ok);box-shadow:0 0 6px var(--ok)}
+.wake.on .wled{background:var(--ok);box-shadow:0 0 6px var(--ok)}
 .wake[hidden]{display:none}
 @media (max-width:1700px){ .wake .wtxt{display:none} }
 

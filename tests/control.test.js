@@ -38,6 +38,11 @@
 
   // ── Arranque ─────────────────────────────────────────────────────────
   test('control.js: la sintaxis es válida', () => { new vm.Script(D.src('control.js'), { filename: 'control.js' }); });
+  test('Modal: si una acción falla, el botón no se queda mudo (aviso en el modal y el modal sigue abierto)', () => {
+    const s = D.src('control.js');
+    ok(/try \{ res = a\.run \? a\.run\(\) : undefined; \}\s*catch \(err\) \{/.test(s), 'la acción va protegida');
+    ok(/m\.id = 'modal-fail'/.test(s) && /'No se pudo completar: '/.test(s), 'el fallo se ve en el propio modal');
+  });
 
   test('control.js: arranca sin errores (navegador sin cifrado)', () => {
     const env = D.makeEnv(); D.cargar(env, MODULOS);
@@ -334,6 +339,12 @@
     ok(!w.classList.contains('on'), 'apagado'); eq(rel, 1); eq(env.storage.get('showtime.wake'), 'off', 'se recuerda');
     env.fire('wake', 'click', {}); await new Promise(r => setTimeout(r, 0));
     ok(w.classList.contains('on'), 'encendido otra vez'); eq(env.storage.has('showtime.wake'), false);
+  });
+  test('Sin reposo: el LED es suyo (no hereda el punto verde fijo de los LEDs de retraso), gris apagado y verde encendido', () => {
+    const html = D.src('index.html'), css = D.src('control.css');
+    ok(/id="wake"[^>]*><span class="wled"/.test(html), 'clase propia');
+    ok(!/id="wake"[^>]*><span class="led"/.test(html), 'sin la clase .led');
+    ok(/\.wake \.wled\{[^}]*background:#5b5f67/.test(css) && /\.wake\.on \.wled\{[^}]*background:var\(--ok\)/.test(css));
   });
   test('Estilos del Dashboard: tabla limpia en reposo, Añadir neutro, Live en rojo y números tabulares', () => {
     const css = D.src('control.css');
@@ -846,7 +857,7 @@
     await t.click();
     ok(t.led(), 'otro clic: activo (LED verde)'); eq(t.env.storage.has('showtime.wake'), false); eq(t.W.req, 2); eq(t.T.wakeState().lock, true);
     const css = D.src('control.css');
-    ok(/\.wake \.led\{[^}]*background:#5b5f67/.test(css) && /\.wake\.on \.led\{background:var\(--ok\)/.test(css), 'gris #5b5f67 / verde var(--ok)');
+    ok(/\.wake \.wled\{[^}]*background:#5b5f67/.test(css) && /\.wake\.on \.wled\{background:var\(--ok\)/.test(css), 'gris #5b5f67 / verde var(--ok)');
   });
   test('Sin reposo en «off»: ni tocar la app ni volver a la pestaña lo reactivan', async () => {
     const t = await panelWake({ 'showtime.wake': 'off' });

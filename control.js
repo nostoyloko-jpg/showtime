@@ -82,7 +82,15 @@
       b.className = 'btn' + (a.kind ? ' ' + a.kind : '');
       b.textContent = a.label;
       b.addEventListener('click', () => {
-        const res = a.run ? a.run() : undefined;
+        let res;
+        try { res = a.run ? a.run() : undefined; }
+        catch (err) {   // un fallo no deja el botón «muerto»: se ve en el propio modal (y en la consola)
+          console.error(err);
+          let m = $('modal-fail');
+          if (!m) { m = document.createElement('div'); m.id = 'modal-fail'; m.className = 'warnbox'; m.style.marginTop = '12px'; $('modal-body').appendChild(m); }
+          m.textContent = 'No se pudo completar: ' + ((err && err.message) || err) + '. Mándame una captura de este aviso.';
+          return;
+        }
         if (res !== false) closeModal();
       });
       box.appendChild(b);
