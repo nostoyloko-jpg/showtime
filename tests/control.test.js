@@ -829,6 +829,26 @@
     ok(/id="lv-gestor"/.test(D.src('index.html')), 'el gestor está en el menú de Live');
     ok(!/data-now=|data-close=|lvnow|data-on=/.test(D.src('index.html')), 'el menú ya no lleva las marcas viejas por nombre');
   });
+  test('Chat: ventana flotante con botón ⤢ Ventana; lista con scroll y formulario abajo; Esc, ✕ o clic fuera la cierran', () => {
+    const html = D.src('index.html'), css = D.src('control.css'), js = D.src('control.js');
+    ok(/id="chat-pop" class="chatpop"[^>]*>⤢ Ventana</.test(html), 'botón ⤢ Ventana en la cabecera del chat');
+    ok(/id="chat-modal" class="modal chat-modal" hidden/.test(html) && /id="chat-list2" class="chat-list chat-list-pop"/.test(html) && /id="chat-form2"/.test(html), 'ventana con lista y formulario');
+    ok(/\.chat-modal \.chat-box\{width:480px;max-width:calc\(100vw - 32px\);max-height:65vh;min-height:340px;/.test(css), 'ancho 480, máx. 65vh, mín. 340');
+    ok(/\.chat-box \.chat-list-pop\{flex:1 1 auto;min-height:0;max-height:none;overflow-y:auto;/.test(css) && /\.chat-box \.chat-form,\.chat-box \.mnote\{flex:0 0 auto\}/.test(css), 'lista con scroll y formulario fijo abajo');
+    ok(/box\.scrollTop = box\.scrollHeight;/.test(js), 'la lista baja siempre al último mensaje');
+    const t = panel(), m = t.env.getEl('chat-modal');
+    t.env.fire('chat-pop', 'click', { target: { id: 'chat-pop' }, stopPropagation() {}, stopImmediatePropagation() {}, preventDefault() {} });
+    eq(m.hidden, false, 'se abre con ⤢ Ventana');
+    t.env.fire('document', 'keydown', { key: 'Escape', target: { tagName: 'BODY' }, stopPropagation() {}, stopImmediatePropagation() {}, preventDefault() {} });
+    eq(m.hidden, true, 'Esc la cierra');
+    t.env.fire('chat-pop', 'click', { target: { id: 'chat-pop' }, stopPropagation() {}, stopImmediatePropagation() {}, preventDefault() {} });
+    t.env.fire('chat-x', 'click', { target: { id: 'chat-x' }, stopPropagation() {}, stopImmediatePropagation() {}, preventDefault() {} });
+    eq(m.hidden, true, 'la ✕ la cierra');
+    t.env.fire('chat-pop', 'click', { target: { id: 'chat-pop' }, stopPropagation() {}, stopImmediatePropagation() {}, preventDefault() {} });
+    t.env.fire('chat-modal', 'pointerdown', { target: m, stopPropagation() {}, stopImmediatePropagation() {}, preventDefault() {} });
+    t.env.fire('chat-modal', 'click', { target: m, stopPropagation() {}, stopImmediatePropagation() {}, preventDefault() {} });
+    eq(m.hidden, true, 'clic fuera la cierra');
+  });
   test('Modales: se cierran al pulsar fuera de la caja (también el Gestor de ventanas); dentro no', () => {
     const t = panel();
     const m = t.env.getEl('modal');

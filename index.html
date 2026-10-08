@@ -13,8 +13,8 @@
 <meta name="apple-mobile-web-app-title" content="Showtime">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
-<link rel="stylesheet" href="control.css?v=20261083">
-<link rel="stylesheet" href="marca.css?v=20261083">
+<link rel="stylesheet" href="control.css?v=20261084">
+<link rel="stylesheet" href="marca.css?v=20261084">
 </head>
 <body>
 <div id="splash" class="splash" hidden></div>
@@ -149,7 +149,7 @@
     <div class="menu" id="m-chat">
       <button class="mbtn" aria-haspopup="true" aria-expanded="false" title="Chat con Producción"><svg class="ic"><use href="#i-msg"/></svg><span class="mtxt">Chat</span><span id="chat-on" class="mdot" hidden></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
       <div class="mpanel wide" role="menu">
-        <div class="mhead">Chat con Producción</div>
+        <div class="mhead chat-head"><span>Chat con Producción</span><button id="chat-pop" class="chatpop" type="button" title="Abrir el chat en una ventana">⤢ Ventana</button></div>
         <div id="chat-list" class="chat-list"></div>
         <div id="chat-empty" class="mnote">Sin mensajes todavía</div>
         <form id="chat-form" class="chat-form" autocomplete="off"><input id="chat-text" type="text" maxlength="300" placeholder="Responder a Producción…" spellcheck="false" enterkeyhint="send"><button class="btn primary" type="submit">Enviar</button></form>
@@ -245,6 +245,7 @@
   <div id="spot-list" class="spot-list" role="listbox"></div>
   <div class="spot-foot"><span><kbd>↑↓</kbd> navegar</span><span><kbd>↵</kbd> seleccionar</span><span><kbd>esc</kbd> cerrar</span></div>
 </div></div>
+<div id="chat-modal" class="modal chat-modal" hidden><div class="modal-box chat-box" role="dialog" aria-modal="true" aria-label="Chat con Producción"><div class="mhead chat-head"><span>Chat con Producción</span><button id="chat-x" class="gv-x" type="button" title="Cerrar (Esc)" aria-label="Cerrar el chat"><svg class="ic"><use href="#i-x"/></svg></button></div><div id="chat-list2" class="chat-list chat-list-pop"></div><div id="chat-empty2" class="mnote" hidden>Sin mensajes todavía</div><form id="chat-form2" class="chat-form" autocomplete="off"><input id="chat-text2" type="text" maxlength="300" placeholder="Responder a Producción…" spellcheck="false" enterkeyhint="send"><button class="btn primary" type="submit">Enviar</button></form><p id="chat-off2" class="mnote" hidden>Producción solo recibe el chat con la emisión activa.</p></div></div>
 <div id="cfg-back" class="cfg-back" hidden></div>
 <aside id="cfg" class="cfg" aria-label="Configuración" hidden>
   <div class="cfg-h"><h2>Configuración</h2><button id="cfg-close" class="iconsq" title="Cerrar (Esc)"><svg class="ic"><use href="#i-x"/></svg></button></div>
@@ -290,6 +291,7 @@
         <label class="chk"><input type="checkbox" data-sc="ticker.meteo"> El tiempo</label>
       </div>
       <label for="sc-tmode">Modo</label><select id="sc-tmode" data-sc="ticker.mode"><option value="crawl">Deslizante (crawler)</option><option value="static">Estática</option></select>
+      <label for="sc-tspeed">Velocidad</label><select id="sc-tspeed" data-sc="ticker.speed" data-num><option value="45">Lenta (45 s)</option><option value="30">Normal (30 s)</option><option value="18">Rápida (18 s)</option></select>
       <label for="sc-tbg">Fondo</label><input id="sc-tbg" type="color" class="swatch" data-sc="ticker.bg">
       <label for="sc-tfg">Texto</label><input id="sc-tfg" type="color" class="swatch" data-sc="ticker.fg">
       <div id="sc-tprev" class="tkprev crawl"><div class="tkp-track"><span class="tkp-run"><span>PRINCIPAL · RETRASO +10 MIN</span><i></i><span>CURFEW 01:30</span><i></i></span><span class="tkp-run" aria-hidden="true"><span>PRINCIPAL · RETRASO +10 MIN</span><i></i><span>CURFEW 01:30</span><i></i></span></div></div>
@@ -421,18 +423,18 @@
 <datalist id="zones-dl"></datalist>
 <div id="toast" class="toast" hidden></div>
 
-<script src="core.js?v=20261083"></script>
-<script src="meteo.js?v=20261083"></script>
-<script src="datos.js?v=20261083"></script>
-<script src="importar.js?v=20261083"></script>
-<script src="xlsx.js?v=20261083"></script>
-<script src="qr.js?v=20261083"></script>
-<script src="emision.js?v=20261083"></script>
-<script src="mando.js?v=20261083"></script>
-<script src="vistas.js?v=20261083"></script>
-<script src="log.js?v=20261083"></script>
-<script src="marca.js?v=20261083"></script>
-<script src="control.js?v=20261083"></script>
-<script src="pwa.js?v=20261083"></script>
+<script src="core.js?v=20261084"></script>
+<script src="meteo.js?v=20261084"></script>
+<script src="datos.js?v=20261084"></script>
+<script src="importar.js?v=20261084"></script>
+<script src="xlsx.js?v=20261084"></script>
+<script src="qr.js?v=20261084"></script>
+<script src="emision.js?v=20261084"></script>
+<script src="mando.js?v=20261084"></script>
+<script src="vistas.js?v=20261084"></script>
+<script src="log.js?v=20261084"></script>
+<script src="marca.js?v=20261084"></script>
+<script src="control.js?v=20261084"></script>
+<script src="pwa.js?v=20261084"></script>
 </body>
 </html>

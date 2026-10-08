@@ -584,7 +584,7 @@ body[data-ps="escenario"] .qr-big-box{background:#000;border-color:rgba(255,214,
 /* Muestra de la cinta en Configuración: se desliza si el modo es «Deslizante» */
 .tkprev{position:relative}
 .tkprev .tkp-run{display:inline-flex;align-items:center;gap:14px;flex:0 0 auto;padding-right:14px}
-.tkprev.crawl .tkp-track{display:flex;width:max-content;animation:tkp 9s linear infinite}
+.tkprev.crawl .tkp-track{display:flex;width:max-content;animation:tkp var(--tk-speed,9s) linear infinite}
 @keyframes tkp{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 .tkprev.static .tkp-track{display:flex;width:100%;justify-content:center}
 .tkprev.static .tkp-run+.tkp-run{display:none}
@@ -1049,3 +1049,12 @@ td input:focus,td select:focus,.imp-src textarea:focus,.imp-prev td input[type=t
 .spot-foot{display:flex;flex-wrap:wrap;gap:14px;padding:9px 14px;border-top:1px solid var(--hair);font-size:12px;color:var(--muted)}
 .spot-empty{padding:18px 10px;color:var(--muted);font-size:13px}
 @media (max-width:700px){ .spot{padding-top:8vh} .spot-i .sm{display:none} }
+
+/* Chat con Producción: ventana flotante (botón ⤢ Ventana) */
+.chat-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.chatpop{height:26px;padding:0 10px;border-radius:7px;border:1px solid var(--hair2);background:transparent;color:var(--muted);font:inherit;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;white-space:nowrap}
+.chatpop:hover{color:var(--text);background:rgba(255,255,255,.05)}
+.chat-modal .chat-box{width:480px;max-width:calc(100vw - 32px);max-height:65vh;min-height:340px;display:flex;flex-direction:column;overflow:hidden;padding:16px}
+.chat-box .chat-head{padding:0 0 10px;margin-bottom:8px;border-bottom:1px solid var(--hair)}
+.chat-box .chat-list-pop{flex:1 1 auto;min-height:0;max-height:none;overflow-y:auto;margin:0 0 10px}
+.chat-box .chat-form,.chat-box .mnote{flex:0 0 auto}

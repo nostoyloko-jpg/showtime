@@ -25,7 +25,7 @@
   const DEFAULT_SCREENS = {
     conf: { showWarn: 10, showDanger: 5, blink: true, coWarn: 5, coDanger: 1, overBg: '#000000', overNum: '#ff3b30' },
     back: { cards: true, lines: true, ticker: true },
-    ticker: { delays: true, hitos: true, meteo: true, mode: 'crawl', bg: '#000000', fg: '#ffb347' }
+    ticker: { delays: true, hitos: true, meteo: true, mode: 'crawl', bg: '#000000', fg: '#ffb347', speed: 30 }
   };
   function int(v, d, lo, hi) { const n = Math.round(Number(v)); return Number.isFinite(n) && n >= lo && n <= hi ? n : d; }
   function hex(v, d) { return typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v) ? v.toLowerCase() : d; }
@@ -43,7 +43,7 @@
       conf,
       back: { cards: bool(b.cards, true), lines: bool(b.lines, true), ticker: bool(b.ticker, true) },
       ticker: { delays: bool(t.delays, true), hitos: bool(t.hitos, true), meteo: bool(t.meteo, true), mode: t.mode === 'static' ? 'static' : 'crawl',
-        bg: hex(t.bg, D.ticker.bg), fg: hex(t.fg, D.ticker.fg) }
+        bg: hex(t.bg, D.ticker.bg), fg: hex(t.fg, D.ticker.fg), speed: [18, 30, 45].indexOf(Number(t.speed)) >= 0 ? Number(t.speed) : D.ticker.speed }   // segundos por vuelta: 18 rápida · 30 normal · 45 lenta
     };
   }
 

@@ -997,11 +997,12 @@
       if (el.type === 'checkbox') el.checked = !!v; else if (document.activeElement !== el) el.value = v;
     });
     const pv = $('sc-tprev'); pv.style.background = sc.ticker.bg; pv.style.color = sc.ticker.fg; pv.className = 'tkprev ' + sc.ticker.mode;
+    pv.style.setProperty('--tk-speed', (sc.ticker.speed * 0.3) + 's');   // la vista previa va proporcional (más corta)
   }
   function saveScreens(el) {
     const sc = JSON.parse(JSON.stringify(CONFIG.screens || Vs.normScreens()));
     const [g, k] = el.dataset.sc.split('.');
-    const v = el.type === 'checkbox' ? el.checked : el.type === 'number' ? Number(el.value) : el.value;
+    const v = el.type === 'checkbox' ? el.checked : (el.type === 'number' || el.dataset.num !== undefined) ? Number(el.value) : el.value;
     if (k === 'all') { sc.ticker.delays = sc.ticker.hitos = sc.ticker.meteo = v; } else sc[g][k] = v;
     if (g === 'back' && !sc.back.cards && !sc.back.lines && !sc.back.ticker) { el.checked = true; toast('Backstage necesita al menos un bloque', true); return; }
     CONFIG = Dt.setConfig({ screens: sc }); fillScreensCfg();
@@ -1637,7 +1638,7 @@
   // Con un modal, el panel de Configuración o un menú abiertos no hace nada (cada uno pega donde toca).
   function pasteShortcutOk(t) {
     if (t && t.closest && t.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"]')) return false;
-    if (!$('modal').hidden || !$('addm').hidden || !$('imp').hidden || !$('cfg').hidden) return false;
+    if (!$('modal').hidden || !$('addm').hidden || !$('imp').hidden || !$('cfg').hidden || chatPopOn) return false;
     if (document.querySelector('.menu.open')) return false;
     return true;
   }
@@ -2349,24 +2350,35 @@
   // ── Chat Producción ↔ Stage Manager: un canal común; cada mensaje con su autor. Se guarda aquí y se manda entero a Producción ──
   function hhmmOf(ms) { const d = new Date(ms); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
   function renderChat() {
-    const list = Dt.getChat(), box = $('chat-list'); if (!box) return;
-    box.innerHTML = list.slice(-100).map(m => '<div class="chat-list-item' + (m.sm ? ' sm' : '') + '"><div class="chat-list-item-from">' + esc(m.sm ? 'Stage Manager' : m.from) +
+    const list = Dt.getChat();
+    const html = list.slice(-100).map(m => '<div class="chat-list-item' + (m.sm ? ' sm' : '') + '"><div class="chat-list-item-from">' + esc(m.sm ? 'Stage Manager' : m.from) +
       '<small>' + hhmmOf(m.at) + '</small></div><div class="chat-list-item-text">' + esc(m.text) + '</div></div>').join('');
-    $('chat-empty').hidden = list.length > 0;
-    $('chat-off').hidden = !!EM;
-    box.scrollTop = box.scrollHeight;
+    // la lista del menú y la de la ventana (si existe) muestran lo mismo
+    [['chat-list', 'chat-empty', 'chat-off'], ['chat-list2', 'chat-empty2', 'chat-off2']].forEach(([l, e, o]) => {
+      const box = $(l); if (!box || !$(e) || !$(o)) return;
+      box.innerHTML = html; $(e).hidden = list.length > 0; $(o).hidden = !!EM;
+      box.scrollTop = box.scrollHeight;   // siempre abajo, con el último mensaje
+    });
   }
   /** Manda el chat (últimos mensajes) a los enlaces de Producción. Solo con la emisión activa. */
   function emPushChat() {
     if (!EM || !EM.sendProd) return;
     EM.sendProd({ type: 'chatlog', list: Dt.getChat().slice(-Em.CHAT_SEND) }).catch(e => console.error(e));
   }
-  $('chat-form').addEventListener('submit', e => {
-    e.preventDefault();
-    const inp = $('chat-text');
+  function sendChat(inp) {
     if (!Dt.addChat(inp.value, 'Stage Manager', '', true)) return;
     inp.value = ''; renderChat(); emPushChat();
-  });
+  }
+  $('chat-form').addEventListener('submit', e => { e.preventDefault(); sendChat($('chat-text')); });
+  $('chat-form2').addEventListener('submit', e => { e.preventDefault(); sendChat($('chat-text2')); });
+  /** Ventana flotante del chat: se abre centrada; Esc, ✕ o clic fuera la cierran. */
+  let chatPopOn = false;   // estado propio (no depende del atributo hidden)
+  function openChatPop() { closeMenus(); $('chat-on').hidden = true; chatPopOn = true; $('chat-modal').hidden = false; renderChat(); $('chat-text2').focus(); }
+  function closeChatPop() { chatPopOn = false; $('chat-modal').hidden = true; }
+  $('chat-pop').addEventListener('click', e => { e.stopPropagation(); openChatPop(); });
+  $('chat-x').addEventListener('click', closeChatPop);
+  backdropClose($('chat-modal'), closeChatPop);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && chatPopOn) closeChatPop(); });
   $('m-chat').querySelector('.mbtn').addEventListener('click', () => { $('chat-on').hidden = true; renderChat(); });
   setInterval(() => { if (Dt.getChat().length) emPushChat(); }, 20000);   // quien se conecta tarde lo recibe en poco tiempo
 
@@ -2395,7 +2407,7 @@
     } else if (msg.type === 'chat') {
       Dt.addChat(msg.text, prodName(msg.from), msg.from, false);
       renderChat();
-      if (!$('m-chat').classList.contains('open')) $('chat-on').hidden = false;   // sin leer
+      if (!$('m-chat').classList.contains('open') && !chatPopOn) $('chat-on').hidden = false;   // sin leer
       if (CONFIG && CONFIG.prodChatPopup !== false) toast('Chat · ' + prodName(msg.from) + ': ' + msg.text.slice(0, 100));
       emPushChat();
     } else if (msg.type === 'chatsync') {

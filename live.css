@@ -324,7 +324,7 @@ body[data-vista="backstage"] #bot{overflow:hidden}
 .ticker{flex:0 0 auto;height:clamp(48px,9vh,120px);align-items:center;overflow:hidden;background:var(--tbg,#000);color:var(--tfg,#ffb347);
   border-top:2px solid color-mix(in srgb,var(--tfg,#ffb347) 45%,transparent);font-weight:900;letter-spacing:.05em;font-size:clamp(20px,4.4vh,56px);white-space:nowrap}
 body.bs-nocards.bs-nolines .ticker{flex:1 1 auto;height:auto;font-size:clamp(28px,9vh,150px)}
-.tk-track{display:flex;width:max-content;animation:tkrun 30s linear infinite;will-change:transform}
+.tk-track{display:flex;width:max-content;animation:tkrun var(--tk-speed,30s) linear infinite;will-change:transform}
 .tk-run{display:flex;align-items:center;flex:0 0 auto;padding-left:2vw}
 @keyframes tkrun{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 .tk-it{display:inline-flex;align-items:center;gap:.45em}

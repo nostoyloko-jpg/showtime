@@ -1146,11 +1146,11 @@
     const t = screensCfg().ticker;
     if (!screensCfg().back.ticker) return;
     const items = Vs.tickerItems(FEST, screensCfg(), nowMins, mt && Wm ? Wm.tickerList(mt.sum, mt.list) : null, Dt.getAvisos ? Dt.getAvisos() : []);
-    const k = t.mode + t.bg + t.fg + JSON.stringify(items);
+    const k = t.mode + t.bg + t.fg + t.speed + JSON.stringify(items);
     if (k === tickerKey) return;
     tickerKey = k;
     const tk = $('ticker');
-    tk.style.setProperty('--tbg', t.bg); tk.style.setProperty('--tfg', t.fg);
+    tk.style.setProperty('--tbg', t.bg); tk.style.setProperty('--tfg', t.fg); tk.style.setProperty('--tk-speed', t.speed + 's');
     tk.className = 'ticker ' + t.mode;
     const ic = { aviso: '#i-msg', delay: '#i-clock', hito: '#i-flag', meteo: '#i-sun' };
     const html = items.length ? items.map(x => '<span class="tk-it ' + x.kind + ' ' + x.level + '"><svg class="ic"><use href="' + ic[x.kind] + '"/></svg>' + esc(x.text) + '</span>').join('<span class="tk-sep"></span>')

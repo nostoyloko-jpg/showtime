@@ -242,6 +242,12 @@
     const x = V.normScreens({ conf: { overBg: '#5A0000', overNum: 'rojo' } });
     eq(x.conf.overBg, '#5a0000'); eq(x.conf.overNum, '#ff3b30', 'texto no válido: defecto');
   });
+  test('Velocidad de la cinta: 18 rápida, 30 normal (por defecto), 45 lenta; otro valor vuelve a 30', () => {
+    eq(V.normScreens().ticker.speed, 30, 'por defecto 30 s');
+    eq(V.normScreens({ ticker: { speed: 45 } }).ticker.speed, 45);
+    eq(V.normScreens({ ticker: { speed: '18' } }).ticker.speed, 18, 'también como texto');
+    eq(V.normScreens({ ticker: { speed: 7 } }).ticker.speed, 30, 'valor no válido: normal');
+  });
   test('Cinta de Backstage: la puesta de sol sale como aviso del tiempo (si hay dato) y la vista Confidence no lleva meteo', () => {
     const sun = { sunset: Date.UTC(2026, 6, 10, 20, 5), temp: 25, sky: 'Despejado', rain: null, wind: null, gustMax: null, stale: false };
     const st = { event: { nombre: 'x', fechaInicio: '2026-07-10', fechaFin: '2026-07-10', dayCutoff: '06:00' }, escenarios: [], artists: [] };

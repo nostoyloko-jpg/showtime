@@ -364,6 +364,11 @@
     ok(/setProperty\('--ov-bg', screensCfg\(\)\.conf\.overBg\)/.test(js) && /setProperty\('--ov-num', screensCfg\(\)\.conf\.overNum\)/.test(js), 'la Live aplica la configuración');
     ok(/data-sc="conf\.overBg"/.test(html) && /data-sc="conf\.overNum"/.test(html), 'Configuración tiene los dos colores');
   });
+  test('Cinta: la velocidad viene de la configuración (--tk-speed) y la animación la usa', () => {
+    const css = D.src('live.css'), js = D.src('live.js');
+    ok(/\.tk-track\{display:flex;width:max-content;animation:tkrun var\(--tk-speed,30s\) linear infinite/.test(css), 'animación con la variable');
+    ok(/tk\.style\.setProperty\('--tk-speed', t\.speed \+ 's'\)/.test(js) && /t\.speed \+ JSON\.stringify/.test(js), 'la Live aplica la velocidad y la recalcula al cambiarla');
+  });
   test('Telemetría: la Live avisa al Dashboard de su pantalla completa, y al instante al cambiar', () => {
     const got = [], opener = { closed: false, postMessage(m) { got.push(m); } };
     const t = arrancar({ search: '?vista=manager', opener });
