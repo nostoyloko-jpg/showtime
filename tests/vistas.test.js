@@ -76,7 +76,7 @@
   test('cuenta atrás: MM:SS, horas, negativo y 00:00 justo al final', () => {
     eq(V.fmtClock(590), '09:50'); eq(V.fmtClock(0.2), '00:00', 'redondeo al segundo más cercano'); eq(V.fmtClock(0), '00:00');
     eq(V.fmtClock(5.00000000022), '00:05', 'flotantes: no se cuela un segundo de más'); eq(V.fmtClock(null), '--:--'); eq(V.fmtClock(NaN), '--:--');
-    eq(V.fmtClock(-135), '-02:15'); eq(V.fmtClock(-0.4), '-00:00'); eq(V.fmtClock(3700), '1:01:40');
+    eq(V.fmtClock(-135), '+02:15', 'sobretiempo: +'); eq(V.fmtClock(-0.4), '+00:00'); eq(V.fmtClock(3700), '1:01:40');
   });
 
   // ── Confidence ────────────────────────────────────────────────────────
@@ -101,7 +101,7 @@
     const F = fest();
     const st = C.setAlargar(F.s, F.ids['Banda A'], 'show', true).state;
     let r = V.confidence(st, F.P, at('21:35'));
-    eq(r.mode, 'show'); eq(r.band.name, 'Banda A'); eq(r.level, 'over'); eq(V.fmtClock(r.remSec), '-05:00');
+    eq(r.mode, 'show'); eq(r.band.name, 'Banda A'); eq(r.level, 'over'); eq(V.fmtClock(r.remSec), '+05:00');
     eq(V.confidence(F.s, F.P, at('21:35')).mode, 'changeover', 'sin Alargar: pasivo, acabó a su hora');
     r = V.confidence(C.setReal(st, F.ids['Banda A'], 'show', 'f', at('21:40')).state, F.P, at('21:41'));
     eq(r.mode, 'changeover'); eq(C.fmtHM(r.next.si), '22:00', '+10 cabe en el colchón');
@@ -117,7 +117,7 @@
     const F = fest();
     const s = M.realPlan(M.stretchPlan(F.s, key(F.s, 'Banda A'), true, at('20:00')).state, {}, key(F.s, 'Banda A'), 'i', at('20:30')).state;
     const r = V.confidence(s, F.P, atS('21:32', 15));
-    eq(r.mode, 'show'); eq(V.fmtClock(r.remSec), '-02:15'); eq(r.level, 'over'); eq(r.blink, true); eq(r.frac, 0);
+    eq(r.mode, 'show'); eq(V.fmtClock(r.remSec), '+02:15'); eq(r.level, 'over'); eq(r.blink, true); eq(r.frac, 0);
     eq(V.confidence(s, F.P, atS('21:32', 15), { conf: { blink: false } }).blink, false, 'parpadeo apagado en Configuración');
   });
 

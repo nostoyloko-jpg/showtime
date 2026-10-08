@@ -94,7 +94,7 @@
     let s = Math.round(Math.abs(sec));
     const h = Math.floor(s / 3600); s -= h * 3600;
     const m = Math.floor(s / 60), r = s - m * 60, p = n => (n < 10 ? '0' : '') + n;
-    return (neg ? '-' : '') + (h ? h + ':' + p(m) : p(m)) + ':' + p(r);
+    return (neg ? '+' : '') + (h ? h + ':' + p(m) : p(m)) + ':' + p(r);   // sobretiempo: «+» = tiempo extra acumulado
   }
 
   function zonesWithBands(state, jor) {
