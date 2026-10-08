@@ -1033,7 +1033,10 @@
     if (g.on !== STANDBY) setStandby(g.on);
   }
   /** Dice al Dashboard qué vista muestra ESTA ventana (puede haber cambiado con la tecla V). Lo usa el desplegable de Live. */
-  function reportVista() { try { if (window.opener && !Dt.READONLY) window.opener.postMessage({ app: 'showtime', type: 'vistaState', vista: VISTA, zona: ZONA == null ? null : String(ZONA), standby: STANDBY }, '*'); } catch (e) {} }
+  function reportVista() { try { if (window.opener && !Dt.READONLY) window.opener.postMessage({ app: 'showtime', type: 'vistaState', vista: VISTA, zona: ZONA == null ? null : String(ZONA), standby: STANDBY, fs: !!(document.fullscreenElement || document.webkitFullscreenElement) }, '*'); } catch (e) {} }
+  // Al entrar o salir de pantalla completa, el Dashboard se entera al momento (no espera al latido)
+  document.addEventListener('fullscreenchange', reportVista);
+  document.addEventListener('webkitfullscreenchange', reportVista);
   function renderStandby() {
     const el = $('standby'); if (!el || !Mk) return;
     if ($('stbbtn')) $('stbbtn').setAttribute('aria-pressed', String(STANDBY));

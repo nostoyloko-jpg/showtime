@@ -356,6 +356,16 @@
     ok(got.some(m => m.type === 'vistaState' && m.vista === now), 'al cambiar con V: ' + now);
     ok(got.filter(m => m.type === 'vistaState').length >= 2, 'y se repite en el latido');
   });
+  test('Telemetría: la Live avisa al Dashboard de su pantalla completa, y al instante al cambiar', () => {
+    const got = [], opener = { closed: false, postMessage(m) { got.push(m); } };
+    const t = arrancar({ search: '?vista=manager', opener });
+    ok(got.some(m => m.type === 'vistaState' && m.fs === false), 'al abrir manda fs: false');
+    const n = got.length;
+    t.env.fire('document', 'fullscreenchange', {});
+    ok(got.length > n && got[got.length - 1].type === 'vistaState', 'fullscreenchange: avisa al momento, sin esperar al latido');
+    const src = D.src('live.js');
+    ok(/addEventListener\('webkitfullscreenchange', reportVista\)/.test(src), 'también el evento de WebKit');
+  });
   test('Gestor del Dashboard: la Live cambia de vista, de zona y de standby solo si se lo pide quien la abrió, y se lo confirma', () => {
     const got = [], opener = { closed: false, postMessage(m) { got.push(m); } };
     const t = arrancar({ search: '?vista=manager', opener });

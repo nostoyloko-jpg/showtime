@@ -829,10 +829,10 @@
     ok(/id="lv-gestor"/.test(D.src('index.html')), 'el gestor está en el menú de Live');
     ok(!/data-now=|data-close=|lvnow|data-on=/.test(D.src('index.html')), 'el menú ya no lleva las marcas viejas por nombre');
   });
-  test('Gestor: rejilla de 5 columnas, píldora con micro-LED, cabecera y pie; en móvil, dos filas; «+ Abrir» abre Manager', async () => {
+  test('Gestor: rejilla de 6 columnas, píldora con micro-LED, cabecera y pie; en móvil, tres filas; «+ Abrir» abre Manager', async () => {
     const css = D.src('control.css'), js = D.src('control.js');
-    ok(/\.gv-row\{display:grid;grid-template-columns:minmax\(160px,1\.4fr\) 140px 130px 120px 36px;/.test(css), 'rejilla fija: nombre, vista, zona, standby, ✕');
-    ok(/@media \(max-width:700px\)\{ \.gv-row\{grid-template-columns:minmax\(0,1fr\) minmax\(0,1fr\) auto;grid-template-areas:"name name x" "vista zona sb"\}/.test(css), 'móvil: dos filas, sin scroll');
+    ok(/\.gv-row\{display:grid;grid-template-columns:minmax\(160px,1\.4fr\) 140px 130px 150px 120px 36px;grid-template-areas:"name vista zona fs sb x"/.test(css), 'rejilla fija: nombre, vista, zona, pantalla, standby, ✕');
+    ok(/@media \(max-width:700px\)\{ \.gv-row\{grid-template-columns:minmax\(0,1fr\) minmax\(0,1fr\) auto;grid-template-areas:"name name x" "vista zona sb" "fs fs fs"\}/.test(css), 'móvil: tres filas, sin scroll');
     ok(/\.gv-sb\{height:34px;[^}]*border-radius:999px/.test(css) && /\.gv-led\{/.test(css), 'standby como píldora con micro-LED');
     ok(/\.gv-sb\.on \.gv-led\{[^}]*box-shadow/.test(css), 'LED encendido con resplandor');
     ok(/\.gv-row select:hover,\.gv-row select:focus\{background-image:url/.test(css) && /background-image:url\("data:image\/svg\+xml,[^"]*6f747e/.test(css), 'flecha sutil en reposo, más brillante en hover y focus');
@@ -851,6 +851,23 @@
     await new Promise(r => setImmediate(r));
     eq(t.T.winState().length, 1, 'abre una ventana Live');
     eq(t.T.winState()[0].vista, 'manager', 'por defecto Manager');
+  });
+  test('Telemetría de pantalla completa: la Live manda fs y el Gestor lo guarda y lo pinta como Pantalla completa o Ventana', async () => {
+    const t = panel(), js = D.src('control.js'), css = D.src('control.css'), live = D.src('live.js');
+    const w = { closed: false, focus() {}, postMessage() {}, close() { this.closed = true; } };
+    t.env.win.open = () => w;
+    t.env.fire('document', 'click', { target: { closest: q => q === '#m-live [data-vista]' ? { dataset: { vista: 'manager' } } : null } });
+    await new Promise(r => setImmediate(r));
+    eq(t.T.winState()[0].fs, undefined, 'sin dato hasta que la ventana avisa (se ve como Ventana)');
+    t.env.fire('window', 'message', { data: { app: 'showtime', type: 'vistaState', vista: 'manager', zona: null, standby: false, fs: true }, source: w });
+    eq(t.T.winState()[0].fs, true, 'la ventana dice que está en pantalla completa');
+    t.env.fire('window', 'message', { data: { app: 'showtime', type: 'vistaState', vista: 'manager', zona: null, standby: false, fs: false }, source: w });
+    eq(t.T.winState()[0].fs, false, 'y que ya no');
+    ok(/x\.fs = !!m\.fs/.test(js), 'el Dashboard guarda fs al recibir vistaState');
+    ok(/<span class="gv-fs" aria-live="polite"><\/span>/.test(js) && /'⛶ Pantalla completa' : 'Ventana'/.test(js), 'la fila muestra ⛶ Pantalla completa o Ventana');
+    ok(/<span>Pantalla<\/span>/.test(js), 'cabecera con la columna PANTALLA');
+    ok(/\.gv-fs\.on::before\{[^}]*box-shadow/.test(css) && /\.gv-fs\{[^}]*color:var\(--dim/.test(css), 'iluminado si está en completa; atenuado si es Ventana');
+    ok(/fs: !!\(document\.fullscreenElement \|\| document\.webkitFullscreenElement\)/.test(live), 'la Live lee su estado de pantalla completa en reportVista');
   });
   test('Botones: primario blanco, peligro rojo solo para borrar, secundarios neutros; Live ▾ sigue en rojo', () => {
     const css = D.src('control.css'), js = D.src('control.js');

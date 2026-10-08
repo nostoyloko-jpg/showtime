@@ -1364,6 +1364,7 @@
       '<input class="gv-name" type="text" maxlength="40" value="' + esc(x.name) + '" aria-label="Nombre de la ventana">' +
       '<select class="gv-vista" aria-label="Vista">' + VISTA_OPCIONES.map(o => '<option value="' + o[0] + '">' + o[1] + '</option>').join('') + '</select>' +
       '<select class="gv-zona" aria-label="Zona"></select>' +
+      '<span class="gv-fs" aria-live="polite"></span>' +
       '<button class="gv-sb" type="button" data-gv="standby" aria-pressed="false"><i class="gv-led" aria-hidden="true"></i><span>Standby</span></button>' +
       '<button class="gv-x" type="button" data-gv="close" title="Cerrar esta ventana" aria-label="Cerrar esta ventana"><svg class="ic"><use href="#i-x"/></svg></button>' +
       '</div>';
@@ -1382,6 +1383,8 @@
         zs.disabled = !conf;
         const z = conf && x.zona != null ? x.zona : ''; if (zs.value !== z) zs.value = z;
       }
+      const fe = row.querySelector('.gv-fs');
+      if (fe) { const full = !!x.fs; fe.classList.toggle('on', full); fe.textContent = full ? '⛶ Pantalla completa' : 'Ventana'; }
       if (sb) { const on = !!x.standby; sb.setAttribute('aria-pressed', String(on)); sb.classList.toggle('on', on); const t = sb.querySelector('span'); if (t) t.textContent = on ? 'STANDBY' : 'Standby'; }
     });
   }
@@ -1392,7 +1395,7 @@
     if (sig !== gvSig) {
       gvSig = sig;
       const head = '<div class="gv-top"><div class="gv-seg"><button type="button" class="gv-segb" data-gv="all" data-on="1">⏸ Todas en standby</button><button type="button" class="gv-segb" data-gv="all" data-on="0">▶ Reanudar todas</button></div></div>';
-      const hd = '<div class="gv-row gv-hd" aria-hidden="true"><span>Nombre</span><span>Vista</span><span>Zona</span><span>Standby</span><span></span></div>';
+      const hd = '<div class="gv-row gv-hd" aria-hidden="true"><span>Nombre</span><span>Vista</span><span>Zona</span><span>Pantalla</span><span>Standby</span><span></span></div>';
       const rows = ids.length ? hd + ids.map(gvRowHtml).join('') : '<p class="mnote gv-empty">No hay ventanas Live abiertas desde este Dashboard.</p>';
       const qr = '<div class="gv-qr"><div class="gv-qrh">Pantallas QR</div><p class="mnote">Aún vacía: aquí irán las pantallas QR con la misma rejilla.</p></div>';
       const foot = '<div class="gv-foot"><button type="button" class="btn" data-gv="new">+ Abrir ventana Live</button><button type="button" class="btn gv-close" data-gv="done">Cerrar</button></div>';
@@ -1429,7 +1432,7 @@
   // Cada Live dice qué vista muestra, si está en standby y qué zona (al abrirse, al cambiar con la V y en el latido)
   window.addEventListener('message', e => {
     const m = e.data; if (!m || m.app !== 'showtime' || m.type !== 'vistaState') return;
-    for (const x of WIN.values()) if (x.w === e.source) { x.vista = String(m.vista || x.vista || ''); x.zona = m.zona == null ? null : String(m.zona); x.standby = !!m.standby; }
+    for (const x of WIN.values()) if (x.w === e.source) { x.vista = String(m.vista || x.vista || ''); x.zona = m.zona == null ? null : String(m.zona); x.standby = !!m.standby; x.fs = !!m.fs; }
     tick();
   });
   // Las ventanas que se abrieron antes de recargar el Dashboard se vuelven a presentar solas: se recuperan con su nombre.
@@ -2850,5 +2853,5 @@
     if (mod && !e.shiftKey && !e.altKey && k === 'o') { e.preventDefault(); $('file').click(); return; }
     if (mod && !e.shiftKey && !e.altKey && k === 'n') { e.preventDefault(); askNew(); return; }
   });
-  window.ShowtimePanel = { reload: () => { loadState(); renderAll(); }, _test: { winState: () => Array.from(WIN.entries()).map(([id, x]) => ({ id, name: x.name, vista: x.vista, zona: x.zona, standby: !!x.standby })), setWinVista, setWinStandby, closeLive, openGestor, gestorVisible, emProdMessage, emRegenProd, hitoChips, emUrl, prodBigTitle, fileKind, handleFile, emCommand, importSummary, hidesSome, tipoPill, setWake, wakeState: () => ({ on: wakeOn, lock: !!wakeLock }), showSplash, hideSplash, setStandby, standbyOn, room: () => emRoom } };   // _test: solo para tests/control.test.js
+  window.ShowtimePanel = { reload: () => { loadState(); renderAll(); }, _test: { winState: () => Array.from(WIN.entries()).map(([id, x]) => ({ id, name: x.name, vista: x.vista, zona: x.zona, standby: !!x.standby, fs: x.fs })), setWinVista, setWinStandby, closeLive, openGestor, gestorVisible, emProdMessage, emRegenProd, hitoChips, emUrl, prodBigTitle, fileKind, handleFile, emCommand, importSummary, hidesSome, tipoPill, setWake, wakeState: () => ({ on: wakeOn, lock: !!wakeLock }), showSplash, hideSplash, setStandby, standbyOn, room: () => emRoom } };   // _test: solo para tests/control.test.js
 })();
