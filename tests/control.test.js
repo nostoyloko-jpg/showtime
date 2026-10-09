@@ -1172,7 +1172,7 @@
     ok(/data-vista="manager"/.test(loc) && /id="lv-zone"/.test(loc) && /data-vista="confidence"/.test(loc) && /data-vista="backstage"/.test(loc), 'Manager · Confidence con zona · Backstage, cada una con Abrir');
     ok(/id="lv-standby"/.test(loc) && /id="lv-gestor"/.test(loc), 'Standby y gestor');
     const em = hub.slice(b2);
-    ok(/id="cast-bar"/.test(em) && /Camerinos \/ Staff/.test(em) && /data-tab="remote"/.test(em) && /data-tab="produccion"/.test(em) && /id="cast-sec"/.test(em), 'barra de emisión, 3 pestañas y seguridad');
+    ok(/id="cast-bar"/.test(em) && />Backstage \/ Staff</.test(em) && /data-tab="remote"/.test(em) && /data-tab="produccion"/.test(em) && /id="cast-sec"/.test(em), 'barra de emisión, 3 pestañas y seguridad');
     ok(/\.mpanel\.hub\{[^}]*width:480px/.test(D.src('control.css')), 'panel de 480 px');
     const t = dashboard();
     eq(t.env.getEl('hub-led').classList.contains('on'), false, 'sin emisión ni Live: gris');
