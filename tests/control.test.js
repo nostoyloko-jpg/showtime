@@ -547,7 +547,7 @@
   test('CSS consolidado: el cristal se define una vez y todo lo de ≤1600 px va en un solo bloque', () => {
     const css = D.src('control.css').replace(/\/\*[\s\S]*?\*\//g, '');
     eq((css.match(/:root\{--glass-bg:/g) || []).length, 1, 'una sola definición del cristal');
-    eq((css.match(/body\[data-ps="escenario"\]\{--glass-bg:/g) || []).length, 1, 'una sola versión de Escenario');
+    eq((css.match(/body\[data-ps="stage"\]\{--glass-bg:/g) || []).length, 1, 'una sola versión de Stage');
     eq((css.match(/[;{]backdrop-filter:var\(--glass-blur\)/g) || []).length, 2, 'cristal en un solo sitio (más la cabecera del panel)');
     eq((css.match(/@media \(max-width:1600px\)/g) || []).length, 1, 'un solo bloque de 1600 px');
     eq((css.match(/\.mbtn \.mlbl\{display:/g) || []).length, 1, 'las etiquetas de los menús se ocultan en un solo sitio (sin reglas que se contradicen)');
@@ -818,14 +818,11 @@
     eq(s.escenarios.map(e => e.nombre).join(), 'principal');
     ok(s.artists.length === 2 && s.artists.every(a => a.escenarioId === s.escenarios[0].id));
   });
-  test('Modales sólidos (Safari): fondo oscurecido con desenfoque y caja opaca sin cristal, en los 4 estilos', () => {
+  test('Modales sólidos (Safari): fondo oscurecido con desenfoque y caja opaca sin cristal, en Studio y en Stage', () => {
     const css = D.src('control.css'), tail = css.slice(css.lastIndexOf('/* ── Modales sólidos'));
     ok(/\.modal\{background:rgba\(0,0,0,\.75\);-webkit-backdrop-filter:blur\(8px\);backdrop-filter:blur\(8px\)\}/.test(tail));
-    ok(/\.modal-box,\.imp-box\{--modal-bg:#0d0f15;background:var\(--modal-bg\);-webkit-backdrop-filter:none;backdrop-filter:none;border:1px solid rgba\(255,255,255,\.1\);box-shadow:0 24px 64px rgba\(0,0,0,\.8\),0 2px 8px rgba\(0,0,0,\.5\)\}/.test(tail));
-    ['raycast', 'neutro', 'escenario'].forEach(ps => {
-      const m = new RegExp('body\\[data-ps="' + ps + '"\\] \\.modal-box,body\\[data-ps="' + ps + '"\\] \\.imp-box\\{--modal-bg:(#[0-9a-f]{3,6})').exec(tail);
-      ok(m, ps + ': color propio y opaco');
-    });
+    ok(/\.modal-box,\.imp-box\{--modal-bg:#0d0e11;background:var\(--modal-bg\);-webkit-backdrop-filter:none;backdrop-filter:none;border:1px solid rgba\(255,255,255,\.1\);box-shadow:0 24px 64px rgba\(0,0,0,\.8\),0 2px 8px rgba\(0,0,0,\.5\)\}/.test(tail), 'Studio (base): opaco');
+    ok(/body\[data-ps="stage"\] \.modal-box,body\[data-ps="stage"\] \.imp-box\{--modal-bg:#000/.test(tail), 'Stage: negro');
     ok(css.indexOf('/* ── Modales sólidos') > css.indexOf('/* ── Cristal'), 'va después del cristal (gana)');
   });
 
@@ -1213,24 +1210,69 @@
     ok(/En directo/.test(bar) && /Sala ABCD/.test(bar) && /2 dispositivos conectados/.test(bar) && /data-act="cast-stop"/.test(bar), bar);
     t.T.fakeEm(null, null);
   });
-  test('⇧⌘C: alterna Escenario (alto contraste) y vuelve al tema anterior; queda en Configuración y en la ayuda', () => {
-    const t = dashboard({ 'showtime.panel.style': '"neutro"' });
+  test('⇧⌘C: alterna Studio ↔ Stage (Modo Stage · Alto Contraste); queda en Configuración, en la ayuda y en ⌘K', () => {
+    const t = dashboard();
+    ok(/if \(Dt\.normStyle\(v\) === 'stage'\) document\.body\.setAttribute\('data-ps', 'stage'\); else document\.body\.removeAttribute\('data-ps'\)/.test(D.src('control.js')), 'Studio = sin atributo (es la base del CSS)');
     t.env.fire('document', 'keydown', { key: 'C', metaKey: true, shiftKey: true, preventDefault() {} });
-    eq(t.read('showtime.panel.style'), 'escenario', 'pasa a Escenario');
-    eq(t.read('showtime.panel.style.prev'), 'neutro', 'recuerda el tema anterior');
-    eq(t.env.getEl('toast').textContent, 'Estilo del Dashboard: Escenario (Alto contraste)', 'avisa');
-    eq(t.env.getEl('cfg-style-panel').value, 'escenario', 'Configuración muestra Escenario');
+    eq(t.read('showtime.panel.style'), 'stage', 'pasa a Stage');
+    eq(t.env.getEl('toast').textContent, 'Modo Stage (Alto Contraste)', 'avisa');
+    eq(t.env.getEl('cfg-style-panel').value, 'stage');
     t.env.fire('document', 'keydown', { key: 'c', ctrlKey: true, shiftKey: true, preventDefault() {} });
-    eq(t.read('showtime.panel.style'), 'neutro', 'otra vez: vuelve a Neutro');
-    eq(t.env.getEl('cfg-style-panel').value, 'neutro');
-    const t2 = dashboard();
-    t2.env.fire('document', 'keydown', { key: 'C', metaKey: true, shiftKey: true, preventDefault() {} });
-    t2.env.fire('document', 'keydown', { key: 'C', metaKey: true, shiftKey: true, preventDefault() {} });
-    eq(t2.read('showtime.panel.style'), 'clasico', 'sin tema previo, vuelve al Clásico de partida');
-    const t3 = dashboard({ 'showtime.panel.style': '"escenario"' });
-    t3.env.fire('document', 'keydown', { key: 'C', metaKey: true, shiftKey: true, preventDefault() {} });
-    eq(t3.read('showtime.panel.style'), 'raycast', 'si ya estaba en Escenario sin historial, vuelve a Raycast');
-    ok(/<dt><kbd>⇧<\/kbd> <kbd>⌘<\/kbd> <kbd>C<\/kbd><\/dt><dd>' \+ tx\('Alterna tema Alto Contraste \(Escenario \/ Sol\) al instante'\) \+ '<\/dd>/.test(D.src('control.js')), 'en la ayuda');
+    eq(t.read('showtime.panel.style'), 'studio', 'otra vez: Studio'); eq(t.env.getEl('cfg-style-panel').value, 'studio');
+    eq(t.env.getEl('toast').textContent, 'Modo Studio');
+    // Migración automática de lo guardado con la versión anterior
+    [['"clasico"', 'studio'], ['"neutro"', 'studio'], ['"raycast"', 'studio'], ['"escenario"', 'stage'], ['"basura"', 'studio']].forEach(([v, want]) => {
+      const m = dashboard({ 'showtime.panel.style': v });
+      m.env.fire('document', 'keydown', { key: 'C', metaKey: true, shiftKey: true, preventDefault() {} });
+      eq(m.read('showtime.panel.style'), want === 'stage' ? 'studio' : 'stage', v + ' se lee como ' + want);
+    });
+    const js = D.src('control.js');
+    ok(/<dt><kbd>⇧<\/kbd> <kbd>⌘<\/kbd> <kbd>C<\/kbd><\/dt><dd>' \+ tx\('Modo Stage \(Alto Contraste\): alterna Studio y Stage al instante'\) \+ '<\/dd>/.test(js), 'en la ayuda');
+    ok(/label: 'Modo Stage \(Alto Contraste\)', ic: 'i-sun', kbd: '⇧⌘C'/.test(js), 'en ⌘K');
+    ok(js.indexOf('panel.style.prev') < 0 || /removeItem\('showtime\.panel\.style\.prev'\)/.test(js), 'sin «tema anterior» (solo hay dos)');
+    const en = dashboard({ 'showtime.config': JSON.stringify({ lang: 'en' }) });
+    en.env.fire('document', 'keydown', { key: 'C', metaKey: true, shiftKey: true, preventDefault() {} });
+    eq(en.env.getEl('toast').textContent, 'Stage Mode (High Contrast)');
+  });
+  test('Modales en tarjetas (dec. 111): Evento (2), Hoja de ruta (3) y Pegar horario (opciones y columnas), sin tocar ningún id', () => {
+    const css = D.src('control.css'), js = D.src('control.js'), html = D.src('index.html');
+    ok(/\.mcard\{background:rgba\(255,255,255,\.025\);border:1px solid var\(--hair2\);border-radius:10px;padding:12px;margin-bottom:12px\}/.test(css), 'tarjeta');
+    ok(/\.mcard-h\{font-size:11px;letter-spacing:\.12em;text-transform:uppercase;font-weight:700;color:#8a8f98/.test(css), 'cabecera gris pizarra');
+    // Evento: Datos generales (nombre, jornadas, corte) y Tiempos de escenario (CALL y changeover con sus notas)
+    const ff = js.slice(js.indexOf('function festForm('), js.indexOf('function readFestForm('));
+    const a = ff.indexOf("tx('Datos generales')"), b = ff.indexOf("tx('Tiempos de escenario')");
+    ok(a > 0 && b > a, 'dos tarjetas en orden');
+    ['f-nombre', 'f-ini', 'f-fin', 'f-cut'].forEach(id => ok(ff.indexOf('id="' + id + '"') > a && ff.indexOf('id="' + id + '"') < b, id + ' en Datos generales'));
+    ['f-call', 'f-comin'].forEach(id => ok(ff.indexOf('id="' + id + '"') > b, id + ' en Tiempos de escenario'));
+    ok(ff.indexOf('Lo mínimo para cambiar de banda') > b, 'las notas dentro de su tarjeta');
+    const t = panel(); t.env.fire('btn-new2', 'click', {});
+    ok(/class="mcard"[\s\S]*Datos generales[\s\S]*id="f-nombre"[\s\S]*Tiempos de escenario[\s\S]*id="f-call"/.test(ultimo(t, 'modal-body')), 'Nuevo evento con las dos tarjetas');
+    // Hoja de ruta: Formato y ámbito · Contenido · Opciones de salida
+    const pr = js.slice(js.indexOf("const html = '<div class=\"dw pr\">'"), js.indexOf("modal('Hoja de ruta'"));
+    const p1 = pr.indexOf("tx('Formato y ámbito')"), p2 = pr.indexOf("tx('Contenido')"), p3 = pr.indexOf("tx('Opciones de salida')");
+    ok(p1 > 0 && p2 > p1 && p3 > p2, 'tres tarjetas en orden');
+    ok(pr.indexOf('id="pr-fmt"') > p1 && pr.indexOf('id="pr-day"') < p2 && pr.indexOf('id="pr-zone"') < p2, 'formato, jornada y zona');
+    ok(pr.indexOf('id="pr-kinds"') > p2 && pr.indexOf('id="pr-kinds"') < p3 && pr.indexOf('data-q="show"') < p3, 'tipos y Todos / Solo Shows');
+    ok(pr.indexOf('id="pr-orient"') > p3 && pr.indexOf('id="pr-call"') > p3 && pr.indexOf('id="pr-notes"') > p3, 'orientación, CALL y notas');
+    // Pegar horario
+    ok(/class="mcard imp-card"><div class="mcard-h">Opciones de importación<\/div>\s*<div class="imp-opts">[\s\S]*id="imp-new"[\s\S]*class="mcard imp-card imp-mapcard"><div class="mcard-h">Columnas del archivo<\/div><div id="imp-map"/.test(html), 'opciones y columnas en tarjetas');
+    ok(/\.imp-mapcard:has\(\.imp-map:empty\)\{display:none\}/.test(css), 'sin tabla, la tarjeta de columnas no sale');
+  });
+  test('Studio y Stage: dos modos, nada más (sin rastro de clasico, neutro, raycast ni escenario en el motor)', () => {
+    const html = D.src('index.html');
+    eq((html.match(/<option value="studio">Studio<\/option><option value="stage">Stage<\/option>/g) || []).length, 2, 'Dashboard y Live: solo Studio y Stage');
+    ['control.css', 'live.css', 'control.js', 'live.js', 'datos.js', 'index.html'].forEach(f => {
+      const s = D.src(f).replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+      ok(!/data-(ps|lv)="(clasico|neutro|raycast|escenario)"|'(clasico|neutro|raycast)'|"(clasico|neutro|raycast)"/.test(s), f + ': queda un tema antiguo');
+    });
+    const css = D.src('control.css'), live = D.src('live.css');
+    ok(/:root\{[^}]*--bg:#000; --bg2:#08090b; --panel:#0d0e11/.test(css), 'Dashboard: la base (:root) es Studio');
+    ok(/:root\{[^}]*--bg:#000; --bg2:#000; --panel:#0d0e11/.test(live), 'Live: la base (:root) es Studio');
+    ok(/--dim:#8a8f98/.test(css) && /--dim:#8a8f98/.test(live), 'gris pizarra en los dos');
+    ok(!/#m-live/.test(css), 'sin reglas del botón Live antiguo');
+    const sel = (s, a) => (s.match(new RegExp('\\[data-' + a + '="([a-z]+)"\\]', 'g')) || []).map(x => x.replace(/.*="|"\]/g, ''));
+    eq([...new Set(sel(css, 'ps'))].join(), 'stage', 'Dashboard: el único modificador es Stage');
+    eq([...new Set(sel(live, 'lv'))].join(), 'stage', 'Live: el único modificador es Stage');
   });
   test('Modo Foco: micro-píldora del tipo (SHOW · SOUNDCHECK · TAREA · MARCADOR) con color fijo, en vez del cuadradito de color', () => {
     const P = panel().T.tipoPill;
@@ -1249,9 +1291,8 @@
     ok(css.indexOf('/* ── Cristal esmerilado') > css.indexOf('/* ── Cristal: UNA'), 'va después del cristal');
     ok(/\.mpanel,\.cfg,\.toast,\.qr-big-box,\.cfg-h,\.morep\{-webkit-backdrop-filter:blur\(24px\) saturate\(160%\);backdrop-filter:blur\(24px\) saturate\(160%\)\}/.test(tail), 'sin var(): Safari lo aplica');
     const alpha = re => +re.exec(css)[1];
-    ok(alpha(/:root\{--glass-bg:rgba\(\d+,\d+,\d+,(\.\d+)\)/) >= 0.88, 'velo denso (clásico): sin desenfoque tampoco se leen las letras de detrás');
-    ok(alpha(/body\[data-ps="raycast"\]\{--glass-bg:rgba\(\d+,\d+,\d+,(\.\d+)\)\}/) >= 0.88 && alpha(/body\[data-ps="neutro"\]\{--glass-bg:rgba\(\d+,\d+,\d+,(\.\d+)\)\}/) >= 0.88);
-    ok(/body\[data-ps="escenario"\]\{--glass-bg:#000;/.test(css), 'escenario: negro');
+    ok(alpha(/:root\{--glass-bg:rgba\(\d+,\d+,\d+,(\.\d+)\)/) >= 0.88, 'velo denso (Studio): sin desenfoque tampoco se leen las letras de detrás');
+    ok(/body\[data-ps="stage"\]\{--glass-bg:#000;/.test(css), 'Stage: negro');
     ok(/@supports not \(\(-webkit-backdrop-filter:blur\(1px\)\) or \(backdrop-filter:blur\(1px\)\)\)\{\s*\.mpanel,\.cfg,\.toast,\.qr-big-box,\.cfg-h,\.morep\{background-color:#[0-9a-f]{6}\}/.test(tail), 'sin desenfoque: opaco');
     const live = D.src('live.css');
     ['#zoomctl{', '.mdock{', '.cdock{'].forEach(sel => { const b = live.slice(live.indexOf(sel), live.indexOf('}', live.indexOf(sel))); ok(/background:rgba\(10,11,14,\.88\)/.test(b) && /-webkit-backdrop-filter:blur\(20px\) saturate\(160%\)/.test(b), 'Live ' + sel); });

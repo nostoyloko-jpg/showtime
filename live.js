@@ -115,8 +115,7 @@
   }
 
   function applyStyle(v) {
-    v = Dt.normStyle(v);
-    if (v === 'clasico') document.body.removeAttribute('data-lv'); else document.body.setAttribute('data-lv', v);
+    if (Dt.normStyle(v) === 'stage') document.body.setAttribute('data-lv', 'stage'); else document.body.removeAttribute('data-lv');   // Studio = base del CSS
     ACCENT = cssVar('--accent') || '#e94560';
     CALLC = cssVar('--call') || '#ffb347';
   }

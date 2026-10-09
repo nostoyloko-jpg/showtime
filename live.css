@@ -4,9 +4,10 @@
    Los colores de artista y escenario son datos: no se tocan. */
 
 :root{
-  --bg:#0d0f14; --bg2:#0a0c10; --panel:rgba(255,255,255,.03); --panel-line:rgba(255,255,255,.08);
-  --accent:#e94560; --text:#fff; --muted:rgba(255,255,255,.62); --dim:rgba(255,255,255,.5);   /* ≥ 4,5:1 sobre el panel (WCAG) */
-  --call:#ffb347; --line:rgba(255,255,255,.08); --hover:rgba(233,69,96,.5);
+  /* Studio (dec. 111): la base ES el diseño Studio. Stage (body[data-lv="stage"]) es el único modificador. */
+  --bg:#000; --bg2:#000; --panel:#0d0e11; --panel-line:rgba(255,255,255,.12);
+  --accent:#ff6363; --text:#fff; --muted:#b4b5b7; --dim:#8a8f98;   /* gris pizarra · ≥ 4,5:1 sobre negro (WCAG) */
+  --call:#ffc533; --line:rgba(255,255,255,.1); --hover:rgba(255,99,99,.5);
   --btn-bg:rgba(255,255,255,.08); --btn-line:rgba(255,255,255,.18); --btn-text:#fff;
   --info-w:340px; --top-h:50vh;
   --num:'tnum' 1;
@@ -72,7 +73,7 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 #banner{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:150;max-width:80vw;background:var(--call);color:#000;
   font-weight:900;letter-spacing:.06em;padding:8px 18px;border-radius:8px;font-size:clamp(12px,1.5vw,20px);text-align:center;box-shadow:0 4px 18px rgba(0,0,0,.5)}
 #banner[hidden]{display:none}
-body[data-lv="escenario"] .tbadge{color:#fff;border-color:rgba(255,214,0,.6)}
+body[data-lv="stage"] .tbadge{color:#fff;border-color:rgba(255,214,0,.6)}
 .trem{font-size:calc(min(5.5cqw,2.1vh) * var(--ps,1));font-weight:800;margin-top:3px}
 .tbar{height:4px;background:rgba(255,255,255,.1);border-radius:2px;margin-top:6px;overflow:hidden}
 .tbar>div{height:100%;border-radius:2px;transition:width 1s linear}
@@ -159,49 +160,49 @@ canvas{position:absolute;inset:0;width:100%;height:100%}
   .striph{height:16px;bottom:-8px}
 }
 
-/* ── Estilo Raycast ──────────────────────────────────────────────── */
-body[data-lv="raycast"]{--bg:#000;--bg2:#000;--panel:#0d0e11;--panel-line:rgba(255,255,255,.12);--accent:#ff6363;--muted:#b4b5b7;--dim:#8e8f92;--call:#ffc533;
-  --line:rgba(255,255,255,.1);--hover:rgba(255,99,99,.5)}
-body[data-lv="raycast"] #top{border-bottom:1px solid rgba(255,255,255,.14)}
-body[data-lv="raycast"] .tpanel{box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
-body[data-lv="raycast"] #panel-next .tpanel-h{color:var(--muted)}
-body[data-lv="raycast"] .tpanel-h{display:flex;align-items:center;gap:10px;letter-spacing:.18em;position:relative}
-body[data-lv="raycast"] .tpanel-h::before{content:"";flex:0 0 auto;width:min(9cqw,3.4vh);height:min(9cqw,3.4vh);border-radius:24%;background:linear-gradient(145deg,var(--t1),var(--t2));box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 1px 2px rgba(0,0,0,.4)}
-body[data-lv="raycast"] .tpanel-h::after{content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);width:min(9cqw,3.4vh);height:min(9cqw,3.4vh);background:#fff;-webkit-mask:var(--m) center/58% no-repeat;mask:var(--m) center/58% no-repeat}
-body[data-lv="raycast"] #panel-now .tpanel-h{--t1:#ff7a7a;--t2:#e5484d;--m:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='7' y='2' width='6' height='10' rx='3'/%3E%3Cpath d='M4 8.5v1a6 6 0 0 0 12 0v-1'/%3E%3Cpath d='M10 15.5v3M7 18.5h6'/%3E%3C/svg%3E")}
-body[data-lv="raycast"] #panel-next .tpanel-h{--t1:#60a5fa;--t2:#2563eb;--m:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 10h11M11 6l4 4-4 4'/%3E%3C/svg%3E")}
-body[data-lv="raycast"] #panel-call .tpanel-h{--t1:#fbbf24;--t2:#d97706;--m:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5.5 13.5V9a4.5 4.5 0 0 1 9 0v4.5l1.5 2h-12z'/%3E%3Cpath d='M8.5 17.5a1.6 1.6 0 0 0 3 0'/%3E%3C/svg%3E")}
-body[data-lv="raycast"] .trem{display:inline-block;padding:1px 8px;border-radius:6px;background:color-mix(in srgb,currentColor 14%,transparent);border:1px solid color-mix(in srgb,currentColor 32%,transparent)}
-body[data-lv="raycast"] .tbar{background:rgba(255,255,255,.08);height:3px}
-body[data-lv="raycast"] .iconbtn{background:linear-gradient(180deg,#1b1c20,#121316);border:1px solid rgba(255,255,255,.14);border-bottom-width:2px;border-radius:7px;box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 1px 2px rgba(0,0,0,.4)}
-body[data-lv="raycast"] #zoomctl{background:rgba(0,0,0,.8);border-color:rgba(255,255,255,.14);border-radius:10px}
-body[data-lv="raycast"] .callok{border-radius:7px}
+/* ── Studio: acabado de la base (iconos de cabecera, pastillas, controles) ── */
+#top{border-bottom:1px solid rgba(255,255,255,.14)}
+.tpanel{box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+#panel-next .tpanel-h{color:var(--muted)}
+.tpanel-h{display:flex;align-items:center;gap:10px;letter-spacing:.18em;position:relative}
+.tpanel-h::before{content:"";flex:0 0 auto;width:min(9cqw,3.4vh);height:min(9cqw,3.4vh);border-radius:24%;background:linear-gradient(145deg,var(--t1),var(--t2));box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 1px 2px rgba(0,0,0,.4)}
+.tpanel-h::after{content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);width:min(9cqw,3.4vh);height:min(9cqw,3.4vh);background:#fff;-webkit-mask:var(--m) center/58% no-repeat;mask:var(--m) center/58% no-repeat}
+#panel-now .tpanel-h{--t1:#ff7a7a;--t2:#e5484d;--m:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='7' y='2' width='6' height='10' rx='3'/%3E%3Cpath d='M4 8.5v1a6 6 0 0 0 12 0v-1'/%3E%3Cpath d='M10 15.5v3M7 18.5h6'/%3E%3C/svg%3E")}
+#panel-next .tpanel-h{--t1:#60a5fa;--t2:#2563eb;--m:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 10h11M11 6l4 4-4 4'/%3E%3C/svg%3E")}
+#panel-call .tpanel-h{--t1:#fbbf24;--t2:#d97706;--m:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5.5 13.5V9a4.5 4.5 0 0 1 9 0v4.5l1.5 2h-12z'/%3E%3Cpath d='M8.5 17.5a1.6 1.6 0 0 0 3 0'/%3E%3C/svg%3E")}
+.trem{display:inline-block;padding:1px 8px;border-radius:6px;background:color-mix(in srgb,currentColor 14%,transparent);border:1px solid color-mix(in srgb,currentColor 32%,transparent)}
+.tbar{background:rgba(255,255,255,.08);height:3px}
+.iconbtn{background:linear-gradient(180deg,#1b1c20,#121316);border:1px solid rgba(255,255,255,.14);border-bottom-width:2px;border-radius:7px;box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 1px 2px rgba(0,0,0,.4)}
+#zoomctl{background:rgba(0,0,0,.8);border-color:rgba(255,255,255,.14);border-radius:10px}
+.callok{border-radius:7px}
 
-/* ── Estilo Neutro ───────────────────────────────────────────────── */
-body[data-lv="neutro"]{--bg:#121213;--bg2:#121213;--panel:#1a1a1c;--panel-line:rgba(255,255,255,.08);--accent:#8ab4f8;--text:#e6e7e9;--muted:#9ea2aa;--dim:#8a8f98;
-  --line:rgba(255,255,255,.07);--hover:rgba(138,180,248,.5);--btn-bg:#232326;--btn-line:rgba(255,255,255,.12);--btn-text:#e6e7e9}
-body[data-lv="neutro"] #top{border-bottom:1px solid rgba(255,255,255,.08)}
-body[data-lv="neutro"] .tpanel{border-radius:8px}
-body[data-lv="neutro"] #zoomctl{background:rgba(26,26,28,.9);border-color:rgba(255,255,255,.1);border-radius:8px}
 
-/* ── Estilo Escenario (alto contraste, para el sol) ──────────────── */
-body[data-lv="escenario"]{--bg:#000;--bg2:#000;--panel:#000;--panel-line:rgba(255,214,0,.45);--accent:#FFD600;--muted:#fff;--dim:rgba(255,255,255,.75);--call:#FFC107;
+/* ── Stage (alto contraste, para el sol): único modificador de la base Studio ── */
+/* En Stage, el acabado de Studio se retira donde resta legibilidad al sol: sin iconos de color en las cabeceras,
+   tiempos sin pastilla, barra de progreso de 4 px y botones planos sobre negro */
+body[data-lv="stage"] .tpanel-h::before,body[data-lv="stage"] .tpanel-h::after{display:none}
+body[data-lv="stage"] .trem{padding:0;background:none;border:0}
+body[data-lv="stage"] .tbar{height:4px}
+body[data-lv="stage"] .iconbtn{background:var(--btn-bg);border:1px solid var(--btn-line);box-shadow:none}
+body[data-lv="stage"] .tpanel{box-shadow:none}
+body[data-lv="stage"] #top{border-bottom:2px solid var(--accent)}
+body[data-lv="stage"]{--bg:#000;--bg2:#000;--panel:#000;--panel-line:rgba(255,214,0,.45);--accent:#FFD600;--muted:#fff;--dim:rgba(255,255,255,.75);--call:#FFC107;
   --line:rgba(255,214,0,.3);--hover:rgba(255,214,0,.6);--btn-bg:#000;--btn-line:rgba(255,214,0,.6);--btn-text:#FFD600;font-weight:700}
-body[data-lv="escenario"] #clk{color:#FFD600}
-body[data-lv="escenario"] #dat{color:#fff;font-weight:800}
-body[data-lv="escenario"] #evn{color:#FFC107}
-body[data-lv="escenario"] .tpanel{border-radius:8px}
-body[data-lv="escenario"] .tpanel-h,body[data-lv="escenario"] .lbl{color:#FFD600}
-body[data-lv="escenario"] .tempty{color:rgba(255,255,255,.5)}
-body[data-lv="escenario"] .tmeta,body[data-lv="escenario"] .atime{color:#fff;font-weight:800}
-body[data-lv="escenario"] .anotes{color:rgba(255,255,255,.8);font-weight:700}
-body[data-lv="escenario"] .trem{color:#FFD600!important;font-weight:900}
-body[data-lv="escenario"] .tbar{background:rgba(255,214,0,.2)}
-body[data-lv="escenario"] .tbar>div{background:#FFD600!important}
-body[data-lv="escenario"] #hsplit{background:rgba(255,214,0,.15)}
-body[data-lv="escenario"] #zoomctl{background:#000;border-color:#FFD600}
-body[data-lv="escenario"] #zlbl{color:#fff}
-body[data-lv="escenario"] .callok:hover,body[data-lv="escenario"] .callok:active{background:#FFD600;color:#000}
+body[data-lv="stage"] #clk{color:#FFD600}
+body[data-lv="stage"] #dat{color:#fff;font-weight:800}
+body[data-lv="stage"] #evn{color:#FFC107}
+body[data-lv="stage"] .tpanel{border-radius:8px}
+body[data-lv="stage"] .tpanel-h,body[data-lv="stage"] .lbl{color:#FFD600}
+body[data-lv="stage"] .tempty{color:rgba(255,255,255,.5)}
+body[data-lv="stage"] .tmeta,body[data-lv="stage"] .atime{color:#fff;font-weight:800}
+body[data-lv="stage"] .anotes{color:rgba(255,255,255,.8);font-weight:700}
+body[data-lv="stage"] .trem{color:#FFD600!important;font-weight:900}
+body[data-lv="stage"] .tbar{background:rgba(255,214,0,.2)}
+body[data-lv="stage"] .tbar>div{background:#FFD600!important}
+body[data-lv="stage"] #hsplit{background:rgba(255,214,0,.15)}
+body[data-lv="stage"] #zoomctl{background:#000;border-color:#FFD600}
+body[data-lv="stage"] #zlbl{color:#fff}
+body[data-lv="stage"] .callok:hover,body[data-lv="stage"] .callok:active{background:#FFD600;color:#000}
 /* Tareas (operativa del día) y soundchecks en Jornada completa */
 .strip.task .lbl{color:#7dd3fc}
 .strip.task .aname{color:#7dd3fc;font-weight:700}
@@ -218,7 +219,7 @@ body[data-lv="escenario"] .callok:hover,body[data-lv="escenario"] .callok:active
 .txtbtn{height:28px;min-width:56px;padding:0 8px;border:0;border-radius:6px;background:transparent;color:rgba(255,255,255,.75);font:inherit;font-size:11px;font-variant-numeric:tabular-nums;cursor:pointer;white-space:nowrap}
 .txtbtn:hover{background:rgba(255,255,255,.08);color:#fff}
 .zsep{width:1px;height:20px;background:rgba(255,255,255,.15);margin:0 2px}
-body[data-lv="escenario"] .txtbtn{color:#fff}
+body[data-lv="stage"] .txtbtn{color:#fff}
 .trow.tarea{border-left-style:dashed;border-left-color:#7dd3fc}
 .trow.tarea .tname{color:#7dd3fc}
 /* Desfase por zona (2c-B) */
@@ -445,10 +446,9 @@ body.ro #banner{top:calc(50px + var(--sa-t))}   /* debajo de la píldora de cone
 #zoomctl.dock:has(#docktag:not(:empty)){opacity:1}
 /* Docks: los mismos bordes finos y radios en los cuatro estilos */
 .mdock,.cdock,#zoomctl{border-color:var(--hair2)}
-body[data-lv="raycast"] .mdock,body[data-lv="raycast"] .cdock{background:rgba(0,0,0,.8);border-color:rgba(255,255,255,.14);border-radius:10px}
-body[data-lv="neutro"] .mdock,body[data-lv="neutro"] .cdock{background:rgba(26,26,28,.9);border-color:rgba(255,255,255,.1);border-radius:8px}
-body[data-lv="escenario"] .mdock,body[data-lv="escenario"] .cdock{background:#000;border-color:#FFD600}
-body[data-lv="escenario"] .md-send{background:#FFD600;color:#000}
+.mdock,.cdock{background:rgba(0,0,0,.8);border-color:rgba(255,255,255,.14);border-radius:10px}
+body[data-lv="stage"] .mdock,body[data-lv="stage"] .cdock{background:#000;border-color:#FFD600}
+body[data-lv="stage"] .md-send{background:#FFD600;color:#000}
 /* Móvil en vertical: el dock de la derecha abierto no se sale de la pantalla ni tapa los de la izquierda */
 @media (max-width:700px){
   #zoomctl.open{left:calc(14px + var(--sa-l));z-index:210}

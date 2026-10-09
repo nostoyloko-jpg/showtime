@@ -24,8 +24,8 @@
     scope:    'showtime.scope',        // «Solo hoy» (dec. 105), SOLO en los QR: { day, closed } — la jornada que emite el Panel y si la ha cerrado
     meteo:    'showtime.meteo'         // el tiempo (2e-B): { snap, err, errAt } — lo pide el Dashboard; la Live y los dispositivos lo leen
   };
-  const STYLES = ['clasico', 'escenario', 'neutro', 'raycast'];
-  const DEFAULT_CONFIG = { mode: 'show', day: 'all', style: 'clasico', callMins: null, msgBg: '#000000', msgFg: '#ffb347', msgSecs: 20, avisoSecs: 120, lang: 'es', bisWindow: 10 };
+  const STYLES = ['studio', 'stage'];   // dec. 111: Studio (base, oscuro) y Stage (alto contraste, ⇧⌘C)
+  const DEFAULT_CONFIG = { mode: 'show', day: 'all', style: 'studio', callMins: null, msgBg: '#000000', msgFg: '#ffb347', msgSecs: 20, avisoSecs: 120, lang: 'es', bisWindow: 10 };
   const MSG_SECS = [10, 20, 30, 60, 0];   // 0 = hasta retirarlo
   const AVISO_SECS = [60, 120, 300, 600, 900];   // avisos puntuales en la cinta: la cinta tarda en dar la vuelta, necesitan más tiempo que un mensaje
 
@@ -53,11 +53,9 @@
     return okw;
   }
 
-  function normStyle(v) {
-    if (v === 'oled') v = 'raycast';          // nombres antiguos de Stage Master
-    if (v === 'ambar') v = 'escenario';
-    return STYLES.indexOf(v) >= 0 ? v : 'clasico';
-  }
+  /** Dos modos (dec. 111). Migración automática: el alto contraste de antes («escenario», y «ambar» de Stage Master)
+   *  sigue siendo Stage; todo lo demás (clasico, neutro, raycast, oled, basura) pasa a Studio. */
+  function normStyle(v) { return v === 'stage' || v === 'escenario' || v === 'ambar' ? 'stage' : 'studio'; }
   function normConfig(c) {
     const o = Object.assign({}, DEFAULT_CONFIG, c || {});
     o.mode = (o.mode === 'sc' || o.mode === 'soundcheck') ? 'sc' : o.mode === 'all' ? 'all' : 'show';

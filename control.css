@@ -1,7 +1,8 @@
 /* Showtime — control.css · Panel de Control (portátil / tablet del regidor). Siempre oscuro. */
 :root{
-  --bg:#0b0c0f; --bg2:#111317; --panel:#15171c; --line:rgba(255,255,255,.09); --line2:rgba(255,255,255,.16);
-  --text:#eceef2; --muted:#a3a7b0; --dim:#6f747e; --accent:#e94560; --on-accent:#fff; --field:#0f1115; --foot:#12151a; --head:#1a1d23; --btnbg:linear-gradient(180deg,#1d1f25,#16181d); --call:#ffc533; --ok:#3ddc97; --err:#ff6b6b; --mod:#ffc533;
+  /* Studio (dec. 111): la base ES el diseño Studio — negro profundo, hairlines de 1 px, gris pizarra. Stage es el único modificador. */
+  --bg:#000; --bg2:#08090b; --panel:#0d0e11; --line:rgba(255,255,255,.1); --line2:rgba(255,255,255,.16);
+  --text:#eceef2; --muted:#b4b5b7; --dim:#8a8f98; --accent:#ff6363; --on-accent:#fff; --field:#050506; --foot:#0a0b0d; --head:#111216; --btnbg:linear-gradient(180deg,#1d1f25,#16181d); --call:#ffc533; --ok:#3ddc97; --err:#ff6b6b; --mod:#ffc533;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
@@ -235,21 +236,19 @@ tfoot input.bad,tfoot select.bad{border-color:var(--err)!important;background:rg
 .cfg-files{display:flex;flex-wrap:wrap;gap:8px}
 .cfg .form{grid-template-columns:auto 1fr}
 
-/* ── Estilos del Panel (mismos nombres que la Pantalla Live) ── */
-body[data-ps="raycast"]{--field:#050506;--foot:#0a0b0d;--head:#111216;--bg:#000;--bg2:#08090b;--panel:#0d0e11;--line:rgba(255,255,255,.1);--line2:rgba(255,255,255,.16);--accent:#ff6363;--on-accent:#fff;--muted:#b4b5b7;--dim:#8e8f92}
-body[data-ps="neutro"]{--field:#111112;--foot:#18181a;--head:#202023;--btnbg:#232326;--bg:#121213;--bg2:#161618;--panel:#1a1a1c;--line:rgba(255,255,255,.08);--line2:rgba(255,255,255,.14);--text:#e6e7e9;--accent:#8ab4f8;--on-accent:#0b1220;--muted:#9ea2aa;--dim:#8a8f98}
-body[data-ps="escenario"]{--field:#000;--foot:#0a0a00;--head:#0a0a00;--btnbg:#000;--bg:#000;--bg2:#000;--panel:#000;--line:rgba(255,214,0,.25);--line2:rgba(255,214,0,.5);--text:#fff;--accent:#FFD600;--on-accent:#000;--muted:#fff;--dim:rgba(255,255,255,.75);--call:#FFC107;font-weight:600}
-body[data-ps="escenario"] .clock{color:#FFD600}
-body[data-ps="escenario"] .btn{background:#000;border-color:rgba(255,214,0,.55);color:#FFD600}
-body[data-ps="escenario"] .btn.primary{background:#FFD600;color:#000}
-body[data-ps="escenario"] select,body[data-ps="escenario"] input[type=text],body[data-ps="escenario"] input[type=number],body[data-ps="escenario"] .form input[type=date]{background:#000;border-color:rgba(255,214,0,.45);color:#fff}
-body[data-ps="escenario"] thead th,body[data-ps="escenario"] tfoot tr.add td,body[data-ps="escenario"] tfoot tr.add-msg td,body[data-ps="escenario"] tr.sec td{background:#0a0a00}
+/* ── Stage (dec. 111): único modificador de la base Studio — negro y amarillo #FFD600 para el sol ── */
+body[data-ps="stage"]{--field:#000;--foot:#0a0a00;--head:#0a0a00;--btnbg:#000;--bg:#000;--bg2:#000;--panel:#000;--line:rgba(255,214,0,.25);--line2:rgba(255,214,0,.5);--text:#fff;--accent:#FFD600;--on-accent:#000;--muted:#fff;--dim:rgba(255,255,255,.75);--call:#FFC107;font-weight:600}
+body[data-ps="stage"] .clock{color:#FFD600}
+body[data-ps="stage"] .btn{background:#000;border-color:rgba(255,214,0,.55);color:#FFD600}
+body[data-ps="stage"] .btn.primary{background:#FFD600;color:#000}
+body[data-ps="stage"] select,body[data-ps="stage"] input[type=text],body[data-ps="stage"] input[type=number],body[data-ps="stage"] .form input[type=date]{background:#000;border-color:rgba(255,214,0,.45);color:#fff}
+body[data-ps="stage"] thead th,body[data-ps="stage"] tfoot tr.add td,body[data-ps="stage"] tfoot tr.add-msg td,body[data-ps="stage"] tr.sec td{background:#0a0a00}
 
 /* ── Archivo en la barra superior ── */
 .filebar{display:flex;gap:6px}
 
 /* ── Cristal: UNA sola definición (menús, panel lateral, modales, avisos y QR grande) ── */
-:root{--glass-bg:rgba(22,24,30,.9);--glass-line:rgba(255,255,255,.16);--glass-blur:blur(24px) saturate(160%)}   /* cristal esmerilado (ver «Cristal esmerilado» al final: Safari) */
+:root{--glass-bg:rgba(18,19,22,.9);--glass-line:rgba(255,255,255,.16);--glass-blur:blur(24px) saturate(160%)}   /* cristal esmerilado (ver «Cristal esmerilado» al final: Safari) */
 .mpanel,.cfg,.modal-box,.toast,.qr-big-box{background:var(--glass-bg);-webkit-backdrop-filter:var(--glass-blur);backdrop-filter:var(--glass-blur);border:1px solid var(--glass-line)}
 .mpanel,.cfg,.modal-box,.qr-big-box{background-image:linear-gradient(180deg,rgba(255,255,255,.09),rgba(255,255,255,.02) 40%,rgba(255,255,255,0))}
 .cfg{border-width:0 0 0 1px}
@@ -260,9 +259,9 @@ body[data-ps="escenario"] thead th,body[data-ps="escenario"] tfoot tr.add td,bod
 .modal{background:rgba(0,0,0,.18)}
 .toast.bad{border-color:var(--err)}
 /* Escenario (alto contraste, para el sol): sin transparencias ni brillos */
-body[data-ps="escenario"]{--glass-bg:#000;--glass-line:rgba(255,214,0,.55);--glass-blur:none}
-body[data-ps="escenario"] .cfg-h{background:#000}
-body[data-ps="escenario"] .mpanel,body[data-ps="escenario"] .cfg,body[data-ps="escenario"] .modal-box,body[data-ps="escenario"] .qr-big-box{background-image:none}
+body[data-ps="stage"]{--glass-bg:#000;--glass-line:rgba(255,214,0,.55);--glass-blur:none}
+body[data-ps="stage"] .cfg-h{background:#000}
+body[data-ps="stage"] .mpanel,body[data-ps="stage"] .cfg,body[data-ps="stage"] .modal-box,body[data-ps="stage"] .qr-big-box{background-image:none}
 
 /* ── Pegar horario ── */
 .imp-box{max-width:min(1240px,96vw);width:100%;max-height:94vh;display:flex;flex-direction:column;gap:10px;overflow:hidden}
@@ -366,7 +365,7 @@ th.dl,td.dl{width:44px;text-align:center;padding-left:4px!important;padding-righ
 .dtog button.on::before{background:#10b981;border-color:#10b981;box-shadow:inset 0 0 0 2px #0c0e12}
 /* barra de estado (desfases) */
 .drift{display:flex;flex-wrap:wrap;gap:8px;align-items:center;min-height:28px}
-body[data-ps="escenario"] .mpanel{box-shadow:none}
+body[data-ps="stage"] .mpanel{box-shadow:none}
 /* ── 2c-B · Regiduría en vivo ────────────────────────────────────────── */
 .dchip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:999px;font-size:12px;font-weight:800;border:1px solid var(--line2);color:var(--muted);white-space:nowrap}
 .dchip .ic{width:14px;height:14px}
@@ -438,9 +437,6 @@ td.est.live .estt b:last-child{animation:estlive 1.2s ease-in-out infinite}
 .bar{flex-wrap:nowrap}
 #fest-name{max-width:22vw}
 .fest{flex:0 1 auto;min-width:60px}
-#btn-live .state{margin-left:2px;gap:0}
-#btn-live .state::before{width:8px;height:8px;background:rgba(255,255,255,.45)}
-#btn-live .state.on::before{background:#10b981;box-shadow:0 0 6px #10b981}
 @media (max-width:1380px){ .mbtn .mtxt{display:none} }
 @media (max-width:1180px){ #btn-undo span{display:none} .menus{margin-left:0} .mbtn .mlbl{display:none} }
 .rowbtns .delbtn{width:28px}
@@ -532,7 +528,7 @@ td.stage input[type=text]{width:var(--escw,140px);min-width:120px;max-width:260p
 #qr-big-svg{width:min(70vh,80vw);height:min(70vh,80vw);border-radius:10px;overflow:hidden;background:#fff}
 .qr-big-t{font-size:15px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
 .qr-big-st{display:flex;flex-direction:column;align-items:center;gap:4px}
-body[data-ps="escenario"] .qr-big-box{background:#000;border-color:rgba(255,214,0,.45)}
+body[data-ps="stage"] .qr-big-box{background:#000;border-color:rgba(255,214,0,.45)}
 /* Mando del regidor (2d-B) */
 .cwarn{display:flex;gap:8px;align-items:flex-start;margin:8px 6px 2px;padding:8px 10px;border-radius:8px;font-size:12px;line-height:1.4;white-space:normal;
   color:#ffd6d3;background:rgba(255,59,48,.10);border:1px solid rgba(255,59,48,.45)}
@@ -542,10 +538,6 @@ body[data-ps="escenario"] .qr-big-box{background:#000;border-color:rgba(255,214,
 .qr-big.remote .qr-big-box{border-color:rgba(255,59,48,.6)}
 .qr-big.remote .qr-big-t{color:#ff6b61}
 /* Live ▾ (2e-A) */
-#m-live .mbtn.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
-#m-live .mbtn.btn.primary:hover,#m-live.open .mbtn.btn.primary{filter:brightness(1.12)}
-#m-live .mpanel{left:auto;right:0}
-#btn-live .state{margin-left:2px;gap:0}
 .lvpanel{width:380px}
 .lvpanel .mitem{height:auto;min-height:44px;padding:7px 10px;white-space:normal;align-items:center}
 .lvt{display:flex;flex-direction:column;gap:1px;flex:1;min-width:0}
@@ -731,9 +723,7 @@ td.est small{white-space:normal;max-width:96px;line-height:1.2}
 .savewarn[hidden]{display:none}
 
 /* ═══ Tanda 2 · Raycast / Linear Pro ═══════════════════════════════════════════════════════════════ */
-:root{--dim:#8a8f98;--hair:rgba(255,255,255,.07);--hair2:rgba(255,255,255,.13);--accent-fill:#d6334f;--live:#d9363e;--chip:rgba(255,255,255,.04)}
-body[data-ps="raycast"]{--accent-fill:#d9363e}
-body[data-ps="neutro"]{--accent-fill:var(--accent)}
+:root{--dim:#8a8f98;--hair:rgba(255,255,255,.07);--hair2:rgba(255,255,255,.13);--accent-fill:#d9363e;--live:#d9363e;--chip:rgba(255,255,255,.04)}
 .sr-only{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
 /* Color de relleno con texto blanco legible (≥ 4,5:1) */
 .seg button.on,.days button.on,.dtb.on{background:var(--accent-fill,var(--accent));border-color:var(--accent-fill,var(--accent))}
@@ -755,10 +745,8 @@ body[data-ps="neutro"]{--accent-fill:var(--accent)}
 #btn-undo.btn.ghost:not(:disabled){color:var(--text)}
 #btn-undo.btn.ghost:hover:not(:disabled){border-color:var(--hair2)}
 .chip.mods{height:22px;padding:0 8px;font-size:11px;font-weight:600;color:var(--muted);border:1px solid var(--hair2);background:var(--chip);border-radius:999px;display:inline-flex;align-items:center;white-space:nowrap}
-#m-live .mbtn.btn.primary{background:var(--live);border-color:var(--live);color:#fff}
-body[data-ps="escenario"] #m-live .mbtn.btn.primary{background:#FFD600;border-color:#FFD600;color:#000}
 .bar .clock{font-size:18px;font-weight:800;color:#fff;font-variant-numeric:tabular-nums;letter-spacing:.02em;min-width:88px;text-align:right}
-body[data-ps="escenario"] .bar .clock{color:#FFD600}
+body[data-ps="stage"] .bar .clock{color:#FFD600}
 /* Sin reposo: interruptor con micro-LED */
 .wake{height:28px;padding:0 10px 0 9px;gap:6px;border:1px solid var(--hair2);border-radius:999px;background:transparent;color:var(--muted);font:inherit;font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center}
 .wake:hover{background:rgba(255,255,255,.05)}
@@ -781,7 +769,7 @@ body[data-ps="escenario"] .bar .clock{color:#FFD600}
 .helpbtn{font-weight:800;color:var(--muted)}
 .btn.addnew{background:#14151b;border:1px solid var(--hair2);border-bottom-width:1px;color:var(--text);margin-left:0}
 .btn.addnew:hover:not(:disabled){background:#1b1d24;filter:none}
-body[data-ps="escenario"] .btn.addnew{background:#000;border-color:rgba(255,214,0,.55);color:#FFD600}
+body[data-ps="stage"] .btn.addnew{background:#000;border-color:rgba(255,214,0,.55);color:#FFD600}
 dl.keys{display:grid;grid-template-columns:auto 1fr;gap:8px 16px;margin-bottom:12px}
 dl.keys dt{color:var(--text);font-weight:600;white-space:nowrap}
 dl.keys dd{color:var(--muted)}
@@ -920,12 +908,12 @@ body.focus #tbl .gapbtn{font-size:14px}
 .drop-box .ic{width:30px;height:30px;color:var(--accent-fill,var(--accent))}
 .drop-box b{font-size:20px;letter-spacing:.02em}
 .drop-box span{font-size:13px;color:var(--muted);font-weight:500}
-body[data-ps="escenario"] .onb{background:#000;border-color:rgba(255,214,0,.55)}
-body[data-ps="escenario"] .addtabs button.on{background:#FFD600;color:#000}
+body[data-ps="stage"] .onb{background:#000;border-color:rgba(255,214,0,.55)}
+body[data-ps="stage"] .addtabs button.on{background:#FFD600;color:#000}
 
 /* Vista previa de «Pegar horario»: cabecera fija al hacer scroll (con su raya), y aviso de éxito en verde */
 .imp-prev thead th{position:sticky;top:0;z-index:10;background:#14151b;box-shadow:inset 0 -1px 0 var(--hair2,rgba(255,255,255,.14))}
-body[data-ps="escenario"] .imp-prev thead th{background:#000}
+body[data-ps="stage"] .imp-prev thead th{background:#000}
 .toast.good{border-color:color-mix(in srgb,var(--ok) 60%,transparent);color:var(--ok)}
 /* App instalada (iPad/iPhone, barra de estado translúcida): la barra superior no queda debajo del reloj del sistema */
 .bar{padding-top:max(8px,env(safe-area-inset-top,0px));padding-left:max(14px,env(safe-area-inset-left,0px));padding-right:max(14px,env(safe-area-inset-right,0px))}
@@ -933,11 +921,9 @@ body[data-ps="escenario"] .imp-prev thead th{background:#000}
 /* ── Modales sólidos (patrón Raycast Pro): en Safari/WebKit el cristal translúcido dejaba ver la tabla de detrás.
       Fondo de pantalla oscurecido y desenfocado; la caja, opaca y sin backdrop-filter propio. ── */
 .modal{background:rgba(0,0,0,.75);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
-.modal-box,.imp-box{--modal-bg:#0d0f15;background:var(--modal-bg);-webkit-backdrop-filter:none;backdrop-filter:none;border:1px solid rgba(255,255,255,.1);box-shadow:0 24px 64px rgba(0,0,0,.8),0 2px 8px rgba(0,0,0,.5)}
-body[data-ps="raycast"] .modal-box,body[data-ps="raycast"] .imp-box{--modal-bg:#0d0e11}
-body[data-ps="neutro"] .modal-box,body[data-ps="neutro"] .imp-box{--modal-bg:#1a1a1c}
-body[data-ps="escenario"] .modal{background:rgba(0,0,0,.85)}
-body[data-ps="escenario"] .modal-box,body[data-ps="escenario"] .imp-box{--modal-bg:#000;border-color:rgba(255,214,0,.55)}
+.modal-box,.imp-box{--modal-bg:#0d0e11;background:var(--modal-bg);-webkit-backdrop-filter:none;backdrop-filter:none;border:1px solid rgba(255,255,255,.1);box-shadow:0 24px 64px rgba(0,0,0,.8),0 2px 8px rgba(0,0,0,.5)}
+body[data-ps="stage"] .modal{background:rgba(0,0,0,.85)}
+body[data-ps="stage"] .modal-box,body[data-ps="stage"] .imp-box{--modal-bg:#000;border-color:rgba(255,214,0,.55)}
 
 /* ── Modo Foco: micro-píldora del tipo (en vez del cuadradito de color, ambiguo a distancia) ── */
 .tpill{display:none;flex:0 0 auto;align-items:center;justify-content:center;min-width:62px;height:22px;padding:0 7px;border-radius:6px;font:800 11px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;letter-spacing:.1em;color:var(--pc);background:rgba(255,255,255,.05);border:1px solid var(--pc);background:color-mix(in srgb,var(--pc) 16%,transparent);border:1px solid color-mix(in srgb,var(--pc) 55%,transparent)}
@@ -947,7 +933,7 @@ body[data-ps="escenario"] .modal-box,body[data-ps="escenario"] .imp-box{--modal-
 .tpill.tp-hito{--pc:#ffc533}
 body.focus #tbl .tpill{display:inline-flex}
 body.focus #tbl td.name input[type=color]{display:none}
-body[data-ps="escenario"] .tpill{background:#000}
+body[data-ps="stage"] .tpill{background:#000}
 
 /* ── Cristal esmerilado (Safari): el desenfoque se escribe con valores LITERALES — Safari ignora
       -webkit-backdrop-filter cuando lleva var(), y por eso el menú quedaba transparente y sin desenfocar.
@@ -956,13 +942,11 @@ body[data-ps="escenario"] .tpill{background:#000}
 .cfg-h{margin:0 -18px;padding:14px 18px 10px;background:var(--glass-bg)}   /* cabecera de Configuración: el mismo cristal que el panel y de borde a borde (sin franja más oscura) */
 .morep{background:var(--glass-bg)}
 .mpanel{box-shadow:0 18px 50px rgba(0,0,0,.6),0 2px 8px rgba(0,0,0,.4)}
-body[data-ps="raycast"]{--glass-bg:rgba(18,19,22,.9)}
-body[data-ps="neutro"]{--glass-bg:rgba(31,31,34,.92)}
-body[data-ps="escenario"] .mpanel,body[data-ps="escenario"] .cfg,body[data-ps="escenario"] .toast,body[data-ps="escenario"] .qr-big-box,body[data-ps="escenario"] .cfg-h,body[data-ps="escenario"] .morep{-webkit-backdrop-filter:none;backdrop-filter:none}
+body[data-ps="stage"] .mpanel,body[data-ps="stage"] .cfg,body[data-ps="stage"] .toast,body[data-ps="stage"] .qr-big-box,body[data-ps="stage"] .cfg-h,body[data-ps="stage"] .morep{-webkit-backdrop-filter:none;backdrop-filter:none}
 /* Navegador sin desenfoque: fondo opaco (nunca letras superpuestas) */
 @supports not ((-webkit-backdrop-filter:blur(1px)) or (backdrop-filter:blur(1px))){
   .mpanel,.cfg,.toast,.qr-big-box,.cfg-h,.morep{background-color:#15171d}
-  body[data-ps="escenario"] .mpanel,body[data-ps="escenario"] .cfg,body[data-ps="escenario"] .toast,body[data-ps="escenario"] .qr-big-box,body[data-ps="escenario"] .cfg-h,body[data-ps="escenario"] .morep{background-color:#000}
+  body[data-ps="stage"] .mpanel,body[data-ps="stage"] .cfg,body[data-ps="stage"] .toast,body[data-ps="stage"] .qr-big-box,body[data-ps="stage"] .cfg-h,body[data-ps="stage"] .morep{background-color:#000}
 }
 
 /* ── Evento sin entradas: «Importar horario en 1 segundo» centrada en el área de trabajo ──
@@ -1185,3 +1169,15 @@ td input:focus,td select:focus,.imp-src textarea:focus,.imp-prev td input[type=t
 .gv-qr{margin-top:0;padding-top:0;border-top:0}
 .gv-card .gv-top{padding:4px 2px 6px}
 .gv-card .gv-qrl{padding:2px 0}
+
+/* ═══ Tarjetas de los modales (dec. 111): Evento, Hoja de ruta y Pegar horario — mismo acabado que el resto ═══ */
+.mcard{background:rgba(255,255,255,.025);border:1px solid var(--hair2);border-radius:10px;padding:12px;margin-bottom:12px}
+.mcard-h{font-size:11px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:#8a8f98;margin:0 0 10px}
+.mcard .form{margin:0}
+.mcard .dw-row:last-child{margin-bottom:0}
+.mcard .note:last-child{margin-bottom:0}
+.imp-card{margin-bottom:10px;padding:10px 12px}
+.imp-card .imp-new:not(:empty){margin-top:10px;padding-top:10px;border-top:1px solid var(--hair)}
+.imp-mapcard:has(.imp-map:empty){display:none}   /* sin tabla (texto libre) no hay columnas que elegir */
+body[data-ps="stage"] .mcard{background:#000;border-color:rgba(255,214,0,.4)}
+body[data-ps="stage"] .mcard-h{color:#FFD600}

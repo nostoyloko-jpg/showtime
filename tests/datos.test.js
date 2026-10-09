@@ -54,7 +54,7 @@
     const r = red({ bc: true }), dash = r.ventana('dash'), live = r.ventana('live');
     dash.Dt.setFestival(FEST(1));
     eq(live.Dt.getFestival().event.nombre, 'Evento 1'); ok(live.cambios.indexOf('festival') >= 0);
-    dash.Dt.setConfig({ style: 'escenario' }); eq(live.Dt.getConfig().style, 'escenario');
+    dash.Dt.setConfig({ style: 'stage' }); eq(live.Dt.getConfig().style, 'stage');
     dash.Dt.markCallDone('Banda@1', 100); eq(live.Dt.getCallDone().join(), 'Banda@1');
     dash.Dt.setFlash('ÚLTIMO TEMA'); eq(live.Dt.getFlash().text, 'ÚLTIMO TEMA');
     dash.Dt.addAviso('Curfew 23:00', true, 'Producción'); eq(live.Dt.getAvisos()[0].text, 'Curfew 23:00');
@@ -70,8 +70,16 @@
     eq(live.Dt.getConfig().meteo.units, 'imperial', 'la Live vieja no borra lo que no conoce');
     eq(JSON.parse(live.mem.get('showtime.config')).meteo.units, 'imperial', 'ni al guardarlo');
     // y si la Live reenvía la configuración, el Dashboard la sigue teniendo en imperial
-    live.Dt.setConfig({ style: 'neutro' });
-    eq(dash.Dt.getConfig().meteo.units, 'imperial'); eq(dash.Dt.getConfig().style, 'neutro');
+    live.Dt.setConfig({ style: 'stage' });
+    eq(dash.Dt.getConfig().meteo.units, 'imperial'); eq(dash.Dt.getConfig().style, 'stage');
+  });
+  test('Estilos (dec. 111): solo «studio» y «stage»; lo guardado con versiones anteriores se migra solo', () => {
+    const r = red({ bc: false }), w = r.ventana('w');
+    eq(w.Dt.STYLES.join(), 'studio,stage');
+    eq(w.Dt.getConfig().style, 'studio', 'por defecto, Studio');
+    [['studio', 'studio'], ['stage', 'stage'], ['clasico', 'studio'], ['neutro', 'studio'], ['raycast', 'studio'], ['oled', 'studio'], ['escenario', 'stage'], ['ambar', 'stage'], [undefined, 'studio'], ['<x>', 'studio']]
+      .forEach(([v, want]) => eq(w.Dt.normStyle(v), want, String(v)));
+    eq(w.Dt.normConfig({ style: 'neutro' }).style, 'studio', 'en la configuración también');
   });
   test('Firefox con doble clic (sin BroadcastChannel ni almacenamiento compartido): la Live abierta recibe por mensaje directo', () => {
     const r = red({ bc: false }), dash = r.ventana('dash'), live = r.ventana('live');
@@ -132,8 +140,8 @@
     eq(staff.mem.size, 0, 'nada se guarda en el almacenamiento del móvil');
     dash.Dt.setFestival(FEST(8));
     eq(staff.Dt.getFestival(), null, 'ni escucha el canal local: sus datos son los de la emisión');
-    staff.Dt.loadSnapshot({ festival: FEST(10), config: { style: 'neutro' }, callDone: ['Q@1'], flash: null, avisos: [] });
-    eq(staff.Dt.getFestival().event.nombre, 'Evento 10'); eq(staff.Dt.getConfig().style, 'neutro'); eq(staff.Dt.getCallDone().join(), 'Q@1');
+    staff.Dt.loadSnapshot({ festival: FEST(10), config: { style: 'stage' }, callDone: ['Q@1'], flash: null, avisos: [] });
+    eq(staff.Dt.getFestival().event.nombre, 'Evento 10'); eq(staff.Dt.getConfig().style, 'stage'); eq(staff.Dt.getCallDone().join(), 'Q@1');
     eq(staff.cambios.join(), 'snapshot');
   });
   test('Almacenamiento lleno: avisa al dejar de guardar y otra vez al recuperarse (los datos siguen saliendo a la Live)', () => {

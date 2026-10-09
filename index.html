@@ -13,8 +13,8 @@
 <meta name="apple-mobile-web-app-title" content="Showtime">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
-<link rel="stylesheet" href="control.css?v=20261120">
-<link rel="stylesheet" href="marca.css?v=20261120">
+<link rel="stylesheet" href="control.css?v=20261121">
+<link rel="stylesheet" href="marca.css?v=20261121">
 </head>
 <body>
 <div id="splash" class="splash" hidden></div>
@@ -281,8 +281,8 @@
   <section class="cfg-s" id="cfg-s-styles">
     <h3 data-i18n>Estilos</h3>
     <div class="form">
-      <label for="cfg-style-panel" data-i18n>Este Dashboard</label><select id="cfg-style-panel"><option value="clasico" data-i18n>Clásico</option><option value="escenario" data-i18n>Escenario (alto contraste)</option><option value="neutro" data-i18n>Neutro</option><option value="raycast" data-i18n>Raycast</option></select>
-      <label for="cfg-style-live" data-i18n>Pantalla Live</label><select id="cfg-style-live"><option value="clasico" data-i18n>Clásico</option><option value="escenario" data-i18n>Escenario (alto contraste)</option><option value="neutro" data-i18n>Neutro</option><option value="raycast" data-i18n>Raycast</option></select>
+      <label for="cfg-style-panel" data-i18n>Este Dashboard</label><select id="cfg-style-panel"><option value="studio">Studio</option><option value="stage">Stage</option></select>
+      <label for="cfg-style-live" data-i18n>Pantalla Live</label><select id="cfg-style-live"><option value="studio">Studio</option><option value="stage">Stage</option></select>
       <div class="note" data-i18n>Van por separado: el portátil y el monitor de escenario suelen tener luz distinta.</div>
     </div>
   </section>
@@ -442,14 +442,17 @@
         <p id="imp-kind" class="imp-kind"></p>
       </div>
     </div>
+    <!-- Tarjetas (dec. 111): opciones de importación y, si es una tabla, la columna de cada dato. Los id no cambian. -->
+    <div class="mcard imp-card"><div class="mcard-h" data-i18n>Opciones de importación</div>
     <div class="imp-opts">
       <span class="imp-lbl" data-i18n>Bandas como</span><div class="seg" role="group" aria-label="Bandas como" data-i18n-aria><button data-imode="show" data-i18n>Show</button><button data-imode="sc" data-i18n>Soundcheck</button></div>
       <label data-i18n>Jornada por defecto <select id="imp-jor"></select></label>
       <label data-i18n>Zona por defecto <input id="imp-esc" type="text" list="imp-zones-dl" placeholder="— ninguna — (o escribe una nueva)" title="Elige una zona o escribe una nueva: se crea al importar y se pone en todas las filas sin zona" autocomplete="off" spellcheck="false" data-i18n-title data-i18n-placeholder></label><datalist id="imp-zones-dl"></datalist>
       <label id="imp-head-l" data-i18n><input id="imp-head" type="checkbox"> La primera fila es cabecera</label>
     </div>
-    <div id="imp-map" class="imp-map"></div>
     <div id="imp-new" class="imp-new"></div>
+    </div>
+    <div class="mcard imp-card imp-mapcard"><div class="mcard-h" data-i18n>Columnas del archivo</div><div id="imp-map" class="imp-map"></div></div>
     <div class="imp-prevwrap"><table id="imp-prev" class="imp-prev"></table></div>
     <details id="imp-ign" class="imp-ign" hidden><summary></summary><ul></ul></details>
     <div class="imp-foot"><span id="imp-sum" class="imp-sum"></span><div class="grow"></div><button id="imp-cancel" class="btn" data-i18n>Cancelar</button><button id="imp-go" class="btn primary">Importar</button></div>
@@ -459,20 +462,20 @@
 <datalist id="zones-dl"></datalist>
 <div id="toast" class="toast" hidden></div>
 
-<script src="i18n.js?v=20261120"></script>
-<script src="core.js?v=20261120"></script>
-<script src="meteo.js?v=20261120"></script>
-<script src="datos.js?v=20261120"></script>
-<script src="importar.js?v=20261120"></script>
-<script src="xlsx.js?v=20261120"></script>
-<script src="qr.js?v=20261120"></script>
-<script src="emision.js?v=20261120"></script>
-<script src="mando.js?v=20261120"></script>
-<script src="vistas.js?v=20261120"></script>
-<script src="log.js?v=20261120"></script>
-<script src="print.js?v=20261120"></script>
-<script src="marca.js?v=20261120"></script>
-<script src="control.js?v=20261120"></script>
-<script src="pwa.js?v=20261120"></script>
+<script src="i18n.js?v=20261121"></script>
+<script src="core.js?v=20261121"></script>
+<script src="meteo.js?v=20261121"></script>
+<script src="datos.js?v=20261121"></script>
+<script src="importar.js?v=20261121"></script>
+<script src="xlsx.js?v=20261121"></script>
+<script src="qr.js?v=20261121"></script>
+<script src="emision.js?v=20261121"></script>
+<script src="mando.js?v=20261121"></script>
+<script src="vistas.js?v=20261121"></script>
+<script src="log.js?v=20261121"></script>
+<script src="print.js?v=20261121"></script>
+<script src="marca.js?v=20261121"></script>
+<script src="control.js?v=20261121"></script>
+<script src="pwa.js?v=20261121"></script>
 </body>
 </html>

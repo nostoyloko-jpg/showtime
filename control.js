@@ -932,18 +932,20 @@
   // ── Festival: nuevo y datos generales ────────────────────────────────
   function festForm(ev) {
     ev = ev || {};
-    return '<div class="form">' +
+    // Dos tarjetas (dec. 111): Datos generales · Tiempos de escenario (con sus notas dentro). Los id no cambian.
+    return '<div class="mcard"><div class="mcard-h">' + tx('Datos generales') + '</div><div class="form">' +
       // Evento sin nombre: la casilla sale vacía con «Evento sin nombre» de fondo (en el idioma activo), no con el texto guardado
       '<label for="f-nombre">' + tx('Nombre') + '</label><input id="f-nombre" type="text" value="' + esc(C.isUnnamed(ev.nombre) ? '' : ev.nombre) + '"' + (ev.nombre && C.isUnnamed(ev.nombre) ? ' placeholder="' + esc(tx('Evento sin nombre')) + '"' : '') + ' autocomplete="off">' +
       '<label for="f-ini">' + tx('Primera jornada') + '</label><input id="f-ini" type="date" value="' + esc(ev.fechaInicio || '') + '">' +
       '<label for="f-fin">' + tx('Última jornada') + '</label><input id="f-fin" type="date" value="' + esc(ev.fechaFin || '') + '">' +
       '<label for="f-cut">' + tx('Hora de corte') + '</label><input id="f-cut" type="text" value="' + esc(ev.dayCutoff || C.DEFAULT_CUTOFF) + '" style="width:90px">' +
       '<div class="note">' + tx('Lo que empieza antes de esta hora cuenta como la jornada anterior (un DJ a las 02:00 del sábado es del viernes).') + '</div>' +
+      '</div></div><div class="mcard"><div class="mcard-h">' + tx('Tiempos de escenario') + '</div><div class="form">' +
       '<label for="f-call">' + tx('Aviso CALL') + '</label><div><input id="f-call" type="number" min="1" max="180" value="' + esc(ev.callMins || C.DEFAULT_CALL_MINS) + '" style="width:90px"> ' + tx('min antes del inicio') + '</div>' +
       '<div class="note">' + tx('Se usa cuando una banda no tiene hora de CALL escrita.') + '</div>' +
       '<label for="f-comin">' + tx('Changeover mínimo') + '</label><div><input id="f-comin" type="number" min="0" max="180" value="' + esc(ev.coMin == null ? C.DEFAULT_CO_MIN : ev.coMin) + '" style="width:90px"> min</div>' +
       '<div class="note">' + tx('Lo mínimo para cambiar de banda. Con retraso, lo que sobra del cambio por encima de este mínimo es el colchón. Se puede personalizar por zona.') + '</div>' +
-      '<div id="f-err" class="err" style="grid-column:1/-1;margin:0"></div></div>';
+      '</div></div><div id="f-err" class="err" style="margin:0"></div>';
   }
   function readFestForm() {
     const n = String($('f-nombre').value || '').trim();   // vacío en un evento sin nombre: sigue sin nombre (se guarda el texto de siempre)
@@ -1130,15 +1132,16 @@
 
   // ── Estilos: Panel (preferencia de este equipo) y Pantalla Live (se envía a la Live) ──
   const PS_KEY = 'showtime.panel.style';
-  function panelStyle() { try { return Dt.normStyle(JSON.parse(localStorage.getItem(PS_KEY) || '"clasico"')); } catch (e) { return 'clasico'; } }
+  function panelStyle() { try { return Dt.normStyle(JSON.parse(localStorage.getItem(PS_KEY) || '"studio"')); } catch (e) { return 'studio'; } }
+  /** Studio es la base del CSS (:root): sin atributo. Stage es el único modificador: body[data-ps="stage"]. */
   function applyPanelStyle(v) {
-    v = Dt.normStyle(v);
-    if (v === 'clasico') document.body.removeAttribute('data-ps'); else document.body.setAttribute('data-ps', v);
+    if (Dt.normStyle(v) === 'stage') document.body.setAttribute('data-ps', 'stage'); else document.body.removeAttribute('data-ps');
   }
+  const STYLE_TXT = { studio: 'Studio', stage: 'Stage' };
   $('cfg-style-panel').addEventListener('change', e => {
     try { localStorage.setItem(PS_KEY, JSON.stringify(e.target.value)); } catch (err) {}
     applyPanelStyle(e.target.value);
-    toast(tx('Estilo del Dashboard: {s}', { s: e.target.selectedOptions[0].textContent }));
+    toast(tx('Estilo del Dashboard: {s}', { s: STYLE_TXT[Dt.normStyle(e.target.value)] }));
   });
   // Ventana de Bis / Extender prueba (5 · 10 · 15 min): viaja con la configuración al Mando
   $('cfg-bis-win').addEventListener('change', e => {
@@ -1148,7 +1151,7 @@
   });
   $('cfg-style-live').addEventListener('change', e => {
     CONFIG = Dt.setConfig({ style: e.target.value });
-    toast(tx('Estilo de la Pantalla Live: {s}', { s: e.target.selectedOptions[0].textContent }));
+    toast(tx('Estilo de la Pantalla Live: {s}', { s: STYLE_TXT[Dt.normStyle(e.target.value)] }));
   });
   applyPanelStyle(panelStyle());
 
@@ -1766,14 +1769,20 @@
     const stages = FEST.escenarios || [];
     if (PR.zone !== 'all' && !stages.some(z => z.id === PR.zone)) PR.zone = 'all';
     const html = '<div class="dw pr">' +
+      '<div class="mcard"><div class="mcard-h">' + tx('Formato y ámbito') + '</div>' +
       '<div class="dw-row"><span class="dw-l">' + tx('Formato') + '</span><div class="dtog radio" id="pr-fmt"><button type="button" class="' + (PR.fmt === 'tabla' ? 'on' : '') + '" data-f="tabla">' + tx('Tabla') + '</button><button type="button" class="' + (PR.fmt === 'gantt' ? 'on' : '') + '" data-f="gantt" title="' + tx('Cronograma de escenarios en horizontal') + '">' + tx('Cronograma') + '</button></div></div>' +
       '<div class="dw-row"><span class="dw-l">' + tx('Jornada') + '</span><select id="pr-day">' + days.map(d => '<option value="' + d + '">' + esc(fmtDay(d)) + '</option>').join('') + (days.length > 1 ? '<option value="all">' + tx('Todas · 1 hoja por día') + '</option>' : '') + '</select></div>' +
       '<div class="dw-row"><span class="dw-l">' + tx('Zona') + '</span><select id="pr-zone"><option value="all">' + tx('Todas las zonas') + '</option>' + stages.map(z => '<option value="' + esc(z.id) + '">' + esc(z.nombre) + '</option>').join('') + '</select></div>' +
-      '<div class="dw-row top"><span class="dw-l">' + tx('Contenido') + '</span><div class="pr-kinds" id="pr-kinds">' +
+      '</div>' +
+      '<div class="mcard"><div class="mcard-h">' + tx('Contenido') + '</div>' +
+      '<div class="dw-row top"><span class="dw-l">' + tx('Incluir') + '</span><div class="pr-kinds" id="pr-kinds">' +
         P.KINDS.map(k => '<label class="pr-ck"><input type="checkbox" data-k="' + k.k + '"> ' + esc(tx(k.label)) + '</label>').join('') +
         '<span class="pr-q"><button type="button" data-q="all">' + tx('Todos') + '</button><button type="button" data-q="show">' + tx('Solo Shows') + '</button></span></div></div>' +
+      '</div>' +
+      '<div class="mcard"><div class="mcard-h">' + tx('Opciones de salida') + '</div>' +
       '<div class="dw-row"><span class="dw-l">' + tx('Orientación') + '</span><select id="pr-orient"' + (PR.fmt === 'gantt' ? ' disabled title="' + tx('El cronograma es siempre horizontal') + '"' : '') + '><option value="portrait">' + tx('Vertical') + '</option><option value="landscape">' + tx('Horizontal') + '</option></select></div>' +
       '<div class="dw-row"><span class="dw-l">' + tx('Columnas') + '</span><label class="pr-ck"><input type="checkbox" id="pr-call"' + (PR.fmt === 'gantt' ? ' disabled' : '') + '> ' + tx('Incluir hora de CALL') + '</label><label class="pr-ck"><input type="checkbox" id="pr-notes"' + (PR.fmt === 'gantt' ? ' disabled' : '') + '> ' + tx('Incluir notas operativas') + '</label></div>' +
+      '</div>' +
       '<div id="pr-sum" class="lx-sum"></div></div>';
     modal('Hoja de ruta', html, [{ label: 'Cancelar' }, { label: 'Imprimir / Guardar PDF', kind: 'primary', run: () => {
       const rows = P.rowsOf(FEST, { day: PR.day, zone: PR.zone, kinds: prKinds() });
@@ -3023,7 +3032,7 @@
       '<dt><kbd>Tab</kbd></dt><dd>' + tx('Pasa a la casilla siguiente') + '</dd>' +
       '<dt>' + tx('Doble clic en la hora real') + '</dt><dd>' + tx('Corrige la hora real de inicio de una banda que ya empezó') + '</dd>' +
       '<dt><kbd>⇧</kbd> <kbd>⌘</kbd> <kbd>F</kbd></dt><dd>' + tx('Modo foco: solo lo de directo, filas y letra más grandes') + '</dd>' +
-      '<dt><kbd>⇧</kbd> <kbd>⌘</kbd> <kbd>C</kbd></dt><dd>' + tx('Alterna tema Alto Contraste (Escenario / Sol) al instante') + '</dd>' +
+      '<dt><kbd>⇧</kbd> <kbd>⌘</kbd> <kbd>C</kbd></dt><dd>' + tx('Modo Stage (Alto Contraste): alterna Studio y Stage al instante') + '</dd>' +
       '<dt><kbd>⇧</kbd> <kbd>⌘</kbd> <kbd>7</kbd></dt><dd>' + tx('Abre esta ayuda') + '</dd>' +
       '</dl><p class="hint">' + tx('Jornada = día del evento: lo que empieza antes de la hora de corte cuenta como la noche anterior. En la Pantalla Live: <kbd>F</kbd> pantalla completa · <kbd>V</kbd> cambia de vista.') + '</p>',
       [{ label: 'Cerrar' }]);
@@ -3032,22 +3041,13 @@
   $('btn-focus').addEventListener('click', () => { setFocus(!focusOn()); toast(focusOn() ? 'Modo foco activado' : 'Modo foco desactivado', false, 2000); });
   document.addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'f' || e.key === 'F')) { e.preventDefault(); setFocus(!focusOn()); toast(focusOn() ? 'Modo foco activado' : 'Modo foco desactivado', false, 2000); } });
   applyFocus();
-  // ⇧⌘C: alterna el tema del Dashboard entre el normal y Escenario (alto contraste, para el sol). Recuerda el anterior.
-  const PS_PREV_KEY = 'showtime.panel.style.prev';
+  // ⇧⌘C: alterna el Dashboard entre Studio y Stage (alto contraste, para el sol). Con dos modos no hace falta recordar el anterior.
   function togglePanelContrast() {
-    const cur = panelStyle();
-    let next;
-    if (cur === 'escenario') {
-      let prev = null; try { prev = JSON.parse(localStorage.getItem(PS_PREV_KEY) || 'null'); } catch (e) {}
-      next = Dt.normStyle(prev && prev !== 'escenario' ? prev : 'raycast');
-    } else {
-      next = 'escenario';
-      try { localStorage.setItem(PS_PREV_KEY, JSON.stringify(cur)); } catch (e) {}
-    }
-    try { localStorage.setItem(PS_KEY, JSON.stringify(next)); } catch (e) {}
+    const next = panelStyle() === 'stage' ? 'studio' : 'stage';
+    try { localStorage.setItem(PS_KEY, JSON.stringify(next)); localStorage.removeItem('showtime.panel.style.prev'); } catch (e) {}
     applyPanelStyle(next);
     const sel = $('cfg-style-panel'); if (sel) sel.value = next;
-    toast(tx('Estilo del Dashboard: {s}', { s: next === 'escenario' ? tx('Escenario (Alto contraste)') : next === 'raycast' ? 'Raycast' : (sel && sel.selectedOptions[0] ? sel.selectedOptions[0].textContent : next) }), false, 2000);
+    toast(next === 'stage' ? tx('Modo Stage (Alto Contraste)') : tx('Modo Studio'), false, 2000);
   }
   document.addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'c' || e.key === 'C')) { e.preventDefault(); togglePanelContrast(); } });
   document.addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.code === 'Digit7' || e.key === '/' || e.key === '?')) { e.preventDefault(); openHelp(); } });
@@ -3159,7 +3159,7 @@
       { group: 'Vistas', label: 'Shows', ic: 'i-stage', sub: 'Solo conciertos', search: 'shows conciertos', run: () => spotSetMode('show') },
       { group: 'Vistas', label: 'Soundchecks', ic: 'i-stage', sub: 'Solo soundchecks', search: 'soundchecks pruebas', run: () => spotSetMode('sc') },
       { group: 'Vistas', label: 'Modo Foco', ic: 'i-expand', kbd: '⇧⌘F', sub: focusOn() ? 'Activado · desactivar' : 'Solo lo de directo, letra grande', search: 'modo foco directo', run: () => { setFocus(!focusOn()); toast(focusOn() ? 'Modo foco activado' : 'Modo foco desactivado', false, 2000); } },
-      { group: 'Vistas', label: 'Alto Contraste (Escenario / Sol)', ic: 'i-sun', kbd: '⇧⌘C', sub: panelStyle() === 'escenario' ? 'Activado · volver al tema anterior' : 'Para el sol en directo', search: 'alto contraste escenario sol', run: () => togglePanelContrast() },
+      { group: 'Vistas', label: 'Modo Stage (Alto Contraste)', ic: 'i-sun', kbd: '⇧⌘C', sub: panelStyle() === 'stage' ? 'Activado · volver a Studio' : 'Negro y amarillo para el sol en directo', search: 'stage alto contraste high contrast sol escenario studio', run: () => togglePanelContrast() },
       { group: 'Vistas', label: 'Standby en Confidence', ic: 'i-pause', sub: standbyOn() ? 'Activado · quitar' : 'Cartel y hora en las Confidence', search: 'standby confidence cartel', run: () => setStandby(!standbyOn()) },
       { group: 'Acciones', label: 'Imprimir hoja de ruta…', ic: 'i-print', kbd: '⌘P', sub: 'Tabla o cronograma, una hoja por jornada', search: 'imprimir hoja ruta pdf running order cronograma gantt daysheet', run: () => openPrint() },
       { group: 'Acciones', label: 'Exportar PDF', ic: 'i-print', sub: 'Hoja de ruta en tabla, lista para Guardar como PDF', search: 'exportar pdf hoja ruta tabla', run: () => openPrint('tabla') },
