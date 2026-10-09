@@ -21,8 +21,14 @@
   'use strict';
 
   const isNode = typeof module !== 'undefined' && module.exports;
-  const cryptoObj = root.crypto && root.crypto.subtle ? root.crypto : (isNode ? require('crypto').webcrypto : null);
+  // Cifrado: el del navegador (WebCrypto). En una página servida por la red local (http://192.168.x.x, sin «contexto seguro»)
+  // el navegador no lo da: entonces, el de reserva en JS puro (cripto.js, dec. 115), mismos algoritmos y mismos bytes.
+  const JSC = root.ShowtimeCripto;
+  const cryptoObj = root.crypto && root.crypto.subtle ? root.crypto
+    : isNode ? require('crypto').webcrypto
+    : JSC && root.crypto && root.crypto.getRandomValues ? { subtle: JSC.subtle, getRandomValues: a => root.crypto.getRandomValues(a) } : null;
   const subtle = cryptoObj && cryptoObj.subtle;
+  const CRYPTO = !cryptoObj ? null : cryptoObj.subtle === (JSC && JSC.subtle) ? 'js' : 'native';
 
   const PROTO = 'showtime/v1';
   const BROKERS = [
@@ -30,9 +36,11 @@
     { id: 'hivemq', name: 'HiveMQ', url: 'wss://broker.hivemq.com:8884/mqtt' }
   ];
   const PUBLIC_BASE = 'https://nostoyloko-jpg.github.io/showtime/';
+  // Red local sin internet (2d-C, dec. 115): el servidor de Showtime en el Mac (servidor.js) sirve la app y hace de repetidor
+  const LOCAL_PORT = 8765;
   // Versión publicada: va en los enlaces de los QR para que el móvil no abra una copia vieja guardada en su caché
   // (súbela junto con los ?v= de index.html / live.html / remote.html).
-  const BUILD = '20261124';
+  const BUILD = '20261126';
   const CHUNK = 24000;           // bytes por trozo (los repetidores públicos limitan el tamaño de mensaje)
   const BEAT_MS = 10000;         // latido del Mac
   const PRESENCE_MS = 20000;     // latido de cada dispositivo (vista, zona, tipo): telemetría del gestor de pantallas
@@ -327,6 +335,45 @@
     }
     return null;
   }
+  // ── Red local (2d-C, dec. 115) ────────────────────────────────────────
+  /** IP privada (10/8 · 172.16/12 · 192.168/16 · 169.254/16) o nombre «.local»: la página viene de la red local. */
+  function isLocalHost(h) {
+    const s = String(h || '').toLowerCase();
+    if (/\.local$/.test(s) && /^[a-z0-9.-]+$/.test(s)) return true;
+    const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(s); if (!m) return false;
+    const a = +m[1], b = +m[2];
+    if ([m[1], m[2], m[3], m[4]].some(x => +x > 255)) return false;
+    return a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 169 && b === 254);
+  }
+  /** «host:puerto» válido (IP o nombre, puerto 1–65535) → { host, port } · null. */
+  function hostPort(s) {
+    const m = /^([A-Za-z0-9.-]{1,253}):(\d{1,5})$/.exec(String(s || '').trim());
+    if (!m || +m[2] < 1 || +m[2] > 65535 || /^[.-]|[.-]$/.test(m[1])) return null;
+    return { host: m[1].toLowerCase(), port: +m[2] };
+  }
+  /** Repetidor local: el servidor de Showtime del Mac (MQTT por WebSocket, sin cifrado de transporte: los datos ya van cifrados). */
+  function localBroker(host, port) { return { id: 'local', name: 'Red local', url: 'ws://' + host + ':' + (port || LOCAL_PORT) + '/mqtt' }; }
+  /** Base de la app servida por el Mac en la red local. */
+  function localBase(host, port) { return 'http://' + host + ':' + (port || LOCAL_PORT) + '/'; }
+  /** Enlace de un QR para la red local: la app del Mac + «&l=host:puerto» en el # (el móvil sabe a qué repetidor ir). */
+  function localUrl(url, host, port) {
+    const hp = hostPort(host + ':' + (port || LOCAL_PORT)); if (!hp) return url;
+    const i = url.indexOf('/live.html') >= 0 ? url.indexOf('/live.html') : url.indexOf('/remote.html');
+    return localBase(hp.host, hp.port) + url.slice(i + 1) + '&l=' + hp.host + ':' + hp.port;
+  }
+  /** Móvil: ¿a qué repetidores conecta? «l» en el # → el local · página servida desde la red local (http + IP privada) → ese
+   *  mismo servidor · si no, los públicos de siempre (nube). */
+  function brokersFor(params, loc) {
+    const hp = params && params.l ? hostPort(params.l) : null;
+    if (hp) return [localBroker(hp.host, hp.port)];
+    const l = loc || (typeof location !== 'undefined' ? location : null);
+    if (l && l.protocol === 'http:' && isLocalHost(l.hostname)) return [localBroker(l.hostname, +l.port || 80)];
+    return BROKERS;
+  }
+  /** El Dashboard (quien EMITE) necesita el cifrado del navegador: crea y firma con ECDSA (el de reserva solo comprueba). */
+  function canEmit() { return CRYPTO === 'native'; }
+  /** Un dispositivo puede LEER (Live, mando, Producción): con el cifrado del navegador o con el de reserva. */
+  function canView() { return !!CRYPTO; }
   /** Lee «#sala=…&k=…&p=…». null si falta algo o no tiene el formato esperado. */
   function parseHash(hash) {
     const h = String(hash || '').replace(/^#/, ''), o = {};
@@ -339,6 +386,7 @@
     if (o.q !== undefined) { if (!key16(o.q)) return null; r.q = o.q; }
     if (o.id !== undefined) { if (!/^[A-Za-z0-9_-]{1,40}$/.test(o.id) || !r.q) return null; r.id = o.id; }   // enlace de Producción: siempre con su clave propia
     if (o.z !== undefined) { if (!r.c || !o.z || o.z.length > 80) return null; r.z = o.z; }   // mando de una zona: siempre con su clave
+    if (o.l !== undefined) { const hp = hostPort(o.l); if (!hp) return null; r.l = hp.host + ':' + hp.port; }   // red local: a qué repetidor ir
     return r;
   }
 
@@ -559,7 +607,7 @@
   }
   Receptor.prototype.start = async function () {
     this.V = await viewerKeys(this.o.params);
-    const brokers = this.o.brokers || BROKERS;
+    const brokers = this.o.brokers || brokersFor(this.o.params);   // red local (dec. 115) o nube
     const topics = [topic(this.V.sala, 's')];
     // Producción (con su clave propia): escucha lo que el Mac le manda por su canal
     if ((this.o.params.id || this.o.params.c) && this.V.prod) { topics.push(topic(this.V.sala, 'prodx')); this.VP = Object.assign({}, this.V, { aes: this.V.prod, verify: null, pubRaw: null }); }
@@ -653,7 +701,7 @@
 
   const API = {
     BROKERS, PUBLIC_BASE, BUILD, PROTO, STALE_MS, DEAD_MS, VIEWER_TTL, CMD_WINDOW, K_STATE, K_BEAT, K_END, K_ACK, K_HELLO, K_CMD, K_PROD_MSG,
-    PRESENCE_MS, newRoom, validRoom, withCmdKey, newCmdKey, withZoneKeys, newZoneKey, devClass, cleanHello, withProdKey, newProdKey, staffUrl, remoteUrl, productionUrl, parseHash, cleanProdMsg, cleanChatLog, CHAT_SEND, publicBase, Emisor, Receptor, CmdGuard,
+    PRESENCE_MS, LOCAL_PORT, CRYPTO, canEmit, canView, isLocalHost, hostPort, localBroker, localBase, localUrl, brokersFor, newRoom, validRoom, withCmdKey, newCmdKey, withZoneKeys, newZoneKey, devClass, cleanHello, withProdKey, newProdKey, staffUrl, remoteUrl, productionUrl, parseHash, cleanProdMsg, cleanChatLog, CHAT_SEND, publicBase, Emisor, Receptor, CmdGuard,
     // internos (para los tests)
     _: { b64u, unb64u, concat, MQ, varLen, pack, unpack, splitChunks, Assembler, macKeys, viewerKeys, seal, openFrame, sealHello, openHello, sealCmd, openCmd, fingerprint, topic, Link }
   };

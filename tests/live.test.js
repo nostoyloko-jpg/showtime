@@ -402,7 +402,7 @@
     eq(t.env.errors.length, 0, t.env.errors.join(' | '));
     const sb = t.env.getEl('standby'), h = t.env.innerLog.filter(x => x[0] === 'standby').map(x => x[1]).pop() || '';
     eq(sb.hidden, false); ok(t.body.classList.contains('standby-on'));
-    ok(/class="stm-name">SHOWTIME</.test(h) && /by Synapse Live/.test(h) && /Real-Time Show Control/.test(h) && /BUILT FOR LIFE ON STAGE/.test(h), 'el mismo cartel que el inicio');
+    ok(/class="stm-name">SHOWTIME</.test(h) && /by Synapse Live/.test(h) && /Real-Time Show Control/.test(h) && /ENGINEERED FOR LIVE PRODUCTION/.test(h), 'el mismo cartel que el inicio');
     ok(/id="stb-clk" class="stb-clk"/.test(h)); ok(/^\d\d:\d\d$/.test(t.env.getEl('stb-clk').textContent), 'HH:MM sin segundos: ' + t.env.getEl('stb-clk').textContent);
     eq(t.title(), 'Showtime · Standby'); eq(t.body.dataset.vista, 'backstage', 'debajo sigue Backstage');
   });

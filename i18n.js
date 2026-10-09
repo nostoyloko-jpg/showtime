@@ -88,6 +88,21 @@
   const UI_EN = {
     /*UI-EN-BEGIN*/
     panel: {
+      "Transporte": "Transport",
+      "Nube (Internet · por defecto)": "Cloud (Internet · default)",
+      "Red Local Wi-Fi (0 internet)": "Local Wi-Fi network (no internet)",
+      "IP del Mac": "Mac IP",
+      "Puerto": "Port",
+      "Detectar": "Detect",
+      "Servidor local activo": "Local server running",
+      "Servidor local no encontrado en este Mac. En Terminal: cd ~/Claude/SHOWTIME && node servidor.js": "Local server not found on this Mac. In Terminal: cd ~/Claude/SHOWTIME && node servidor.js",
+      "Buscando el servidor local…": "Looking for the local server…",
+      "Los QR abren http://{h}:{p}/ · los dispositivos deben estar en la misma Wi-Fi que el Mac.": "QR codes open http://{h}:{p}/ · devices must be on the same Wi-Fi as the Mac.",
+      "Escribe la IP del Mac en la Wi-Fi (Ajustes del Sistema › Wi-Fi › Detalles) o pulsa Detectar.": "Type the Mac's Wi-Fi IP (System Settings › Wi-Fi › Details) or press Detect.",
+      "Puerto no válido (1–65535)": "Invalid port (1–65535)",
+      "IP o nombre no válido: {v}": "Invalid IP or name: {v}",
+      "Red local: sin internet. El Mac y los dispositivos, en la misma Wi-Fi; el servidor local del Mac, abierto. Todo va cifrado igual que por la nube.": "Local network: no internet. Mac and devices on the same Wi-Fi, with the Mac's local server running. Everything is encrypted just like over the cloud.",
+      "Red local: falta la IP del Mac para los QR. Escríbela arriba o pulsa Detectar (con el servidor local abierto).": "Local network: the Mac's IP is missing for the QR codes. Type it above or press Detect (with the local server running).",
       "Datos generales": "General details",
       "Tiempos de escenario": "Stage timings",
       "Formato y ámbito": "Format and scope",

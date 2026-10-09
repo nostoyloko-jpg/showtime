@@ -830,7 +830,7 @@
     const t = panel(), sp = t.env.getEl('splash'), h = ultimo(t, 'splash');
     eq(sp.hidden, false, 'se ve al arrancar'); eq(sp.className, 'splash', 'inicio (no «Acerca de»)');
     ok(/class="stm-name">SHOWTIME</.test(h) && /by Synapse Live/.test(h) && /Real-Time Show Control/.test(h));
-    ok(h.indexOf('v' + t.env.win.ShowtimeEmision.BUILD) > 0, 'versión activa'); ok(h.indexOf('BUILT FOR LIFE ON STAGE · © 2026 Synapse Live') > 0);
+    ok(h.indexOf('v' + t.env.win.ShowtimeEmision.BUILD) > 0, 'versión activa'); ok(h.indexOf('ENGINEERED FOR LIVE PRODUCTION · © 2026 Synapse Live') > 0);
     ok(/const SPLASH_MS = 2500;/.test(D.src('control.js')) && /if \(!about\) splashT = setTimeout\(hideSplash, SPLASH_MS\)/.test(D.src('control.js')), '2,5 s');
     t.env.fire('splash', 'click', {});
     ok(sp.classList.contains('out'), 'clic: se desvanece');
@@ -1715,6 +1715,34 @@ const miss = [...found].filter(k => !I.txHas(k) && !/^(OK|CALL|SC|Live|Raycast|S
     ok(/tbody tr\.done td\.est>small\.clash,tbody tr\.done td\.est>\.estt:has\(\.clash\)\{opacity:1\}/.test(css), 'aviso y horas en choque al 100 %');
     ok(/td\.est small\.clash,body\[data-ps="stage"\] td\.est small\.clash\{color:#ff5252;font-weight:800\}/.test(css), 'rojo brillante también en Stage (gana al amarillo de td.est small)');
     ok(/'<small class="clash">' \+ tx\('pisada por \{who\}'/.test(js), 'el aviso sigue en small.clash');
+  });
+
+  test('Dec. 115: transporte de la emisión — nube por defecto (sin cambios) o red local Wi-Fi (QR con la IP del Mac y repetidor en localhost)', () => {
+    const t = dashboard(), T = t.env.win.ShowtimePanel._test;
+    const room = { sala: 'ABCDEFGHIJKLMNOP', k: 'AAAAAAAAAAAAAAAAAAAAAA', p: 'BBBBBBBBBBBBBBBBBBBBBB', c: 'CCCCCCCCCCCCCCCCCCCCCC', q: 'DDDDDDDDDDDDDDDDDDDDDD' };
+    T.setRoom(room);
+    eq(T.net().mode, 'cloud', 'por defecto, nube'); eq(T.emBrokers(), undefined, 'nube: los repetidores de siempre');
+    const nube = T.emUrl('staff'); ok(!/&l=/.test(nube) && !/192\.168/.test(nube), 'nube: QR de siempre ' + nube);
+    eq(T.emLink('https://x/live.html#a'), 'https://x/live.html#a');
+    ok(/data-net="mode"/.test(T.netHtml()) && !/data-net="host"/.test(T.netHtml()), 'nube: solo el selector');
+    ok(/Nube \(Internet · por defecto\)/.test(T.netHtml()) && /Red Local Wi-Fi \(0 internet\)/.test(T.netHtml()));
+    T.setNet({ mode: 'local', host: '192.168.1.45', port: 8765 });
+    eq(T.emBrokers()[0].url, 'ws://localhost:8765/mqtt', 'el Dashboard habla con el servidor de su Mac');
+    ['staff', 'remote', 'produccion'].forEach(k => { const u = T.emUrl(k); ok(u.indexOf('http://192.168.1.45:8765/') === 0 && /&l=192\.168\.1\.45:8765$/.test(u), k + ': ' + u); });
+    ok(/data-net="host"[^>]*value="192\.168\.1\.45"/.test(T.netHtml()) && /data-net="port"/.test(T.netHtml()) && /data-net="detect"/.test(T.netHtml()), 'local: IP, puerto y Detectar');
+    const bad = T.netNorm({ mode: 'local', host: 'mal host', port: 99999 }); eq(bad.host, ''); eq(bad.port, 8765, 'valores raros → por defecto');
+    eq(T.netNorm({ mode: 'xx' }).mode, 'cloud');
+    // Red local sin IP: no se enseña un QR que no lleva a ningún sitio
+    T.setNet({ mode: 'local', host: '', port: 8765 }); T.fakeEm({ push() {}, setZoneKeys: async () => {} }, { links: [{ name: 'Red local', state: 'on' }], viewers: 0, remotes: 0, devices: [] });
+    T.renderCast();
+    ok(/falta la IP del Mac/.test(t.env.getEl('cast-staff').innerHTML), 'aviso en vez de QR');
+    T.fakeEm(null, null);
+    const html = D.src('index.html');
+    ok(/<div class="hub-card hub-cast">\s*<div id="cast-net"/.test(html), 'selector en el Hub'); ok(/id="cfg-s-net"[\s\S]*?id="cfg-net"/.test(html), 'y en Configuración › Emisión');
+    const js = D.src('control.js');
+    ok(/brokers: emBrokers\(\)/.test(js), 'el Emisor usa el transporte elegido');
+    ok((js.match(/emLink\(Em\.(staff|remote|production)Url\(/g) || []).length === 5 && !/[^(]Em\.(staff|remote|production)Url\(/.test(js.replace(/emLink\(Em\./g, '')), 'todos los QR pasan por emLink');
+    ok(/fetch\('http:\/\/localhost:' \+ NET\.port \+ '\/showtime-local\.json'/.test(js), 'detecta el servidor y su IP');
   });
 
   // ── Ejecutor ─────────────────────────────────────────────────────────

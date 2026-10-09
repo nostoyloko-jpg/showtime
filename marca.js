@@ -11,7 +11,7 @@
   'use strict';
 
   const NAME = 'SHOWTIME', BY = 'by Synapse Live', DESC = 'Real-Time Show Control';
-  const FOOT = 'BUILT FOR LIFE ON STAGE · © 2026 Synapse Live';
+  const FOOT = 'ENGINEERED FOR LIVE PRODUCTION · © 2026 Synapse Live';
   // Isotipo ST (S maciza), trazado del máster de 2048 px. Caja 1545 × 1094.
   const ST_VIEWBOX = '0 0 1545 1094';
   const ST_PATH = 'M234 0L0 215L0 337L535 784L401 898L195 724L0 724L0 866L219 1094L545 1094L784 864L784 702L265 276L393 168L596 342L784 342L784 225L535 0Z' +

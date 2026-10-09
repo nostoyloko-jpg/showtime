@@ -472,6 +472,123 @@
     v.rx.stop(); await tx.stop();
   });
 
+  // ── Red local sin internet (2d-C, dec. 115) ──────────────────────────
+  test('Red local: QR de Staff, Stage Manager (general y por zona) y Producción con la URL del Mac y «l=host:puerto»', async () => {
+    const room = E.withZoneKeys(await E.newRoom(), ['z1']), H = '192.168.1.45', P = 8765;
+    const urls = {
+      staff: E.localUrl(E.staffUrl(room, undefined, { vista: 'backstage' }), H, P),
+      conf: E.localUrl(E.staffUrl(room, undefined, { vista: 'confidence', zona: 'z1' }), H, P),
+      mando: E.localUrl(E.remoteUrl(room), H, P),
+      mandoZona: E.localUrl(E.remoteUrl(room, undefined, 'z1'), H, P),
+      prod: E.localUrl(E.productionUrl(room, undefined, 'prod_001'), H, P)
+    };
+    ok(urls.staff.indexOf('http://192.168.1.45:8765/live.html?vista=backstage&b=' + E.BUILD + '#sala=' + room.sala) === 0, urls.staff);
+    ok(urls.conf.indexOf('http://192.168.1.45:8765/live.html?vista=confidence&zona=z1&') === 0, urls.conf);
+    ok(urls.mando.indexOf('http://192.168.1.45:8765/remote.html?b=') === 0, urls.mando);
+    ok(urls.mandoZona.indexOf('http://192.168.1.45:8765/remote.html?stage=z1&') === 0, urls.mandoZona);
+    ok(urls.prod.indexOf('http://192.168.1.45:8765/live.html?vista=manager&') === 0, urls.prod);
+    Object.keys(urls).forEach(k => {
+      ok(!/github\.io|https:/.test(urls[k]), k + ': nada de la nube');
+      const pr = paramsOf(urls[k]); ok(pr, k + ': el # se sigue leyendo');
+      eq(pr.l, '192.168.1.45:8765', k + ': repetidor local en el #'); eq(pr.sala, room.sala); eq(pr.k, room.k); eq(pr.p, room.p);
+    });
+    eq(paramsOf(urls.mandoZona).c, room.cz.z1, 'el mando de zona lleva SU clave'); eq(paramsOf(urls.mandoZona).z, 'z1');
+    eq(paramsOf(urls.prod).id, 'prod_001'); eq(paramsOf(urls.prod).q, room.q);
+    ok(E.localUrl(E.staffUrl(room, undefined), 'mac-de-la.local', 9000).indexOf('http://mac-de-la.local:9000/live.html') === 0, 'nombre .local y otro puerto');
+    // Nube: los enlaces de siempre, sin «l»
+    const nube = E.staffUrl(room, 'https://nostoyloko-jpg.github.io/showtime/');
+    eq(paramsOf(nube).l, undefined, 'nube: sin repetidor local'); ok(nube.indexOf('https://nostoyloko-jpg.github.io/showtime/live.html') === 0);
+  });
+
+  test('Red local: «l» y host inválidos se rechazan; IP privadas reconocidas', async () => {
+    const room = await E.newRoom(), base = '#sala=' + room.sala + '&k=' + room.k + '&p=' + room.p;
+    ['192.168.1.5', 'x:0', 'x:70000', 'a b:80', '-x:80', 'x.:80', 'http://x:80', '1.2.3.4:80/ruta', ''].forEach(l => eq(E.parseHash(base + '&l=' + encodeURIComponent(l)), null, 'rechaza «' + l + '»'));
+    eq(E.parseHash(base + '&l=192.168.1.5:8765').l, '192.168.1.5:8765');
+    eq(E.parseHash(base + '&l=MAC.LOCAL:80').l, 'mac.local:80', 'en minúsculas');
+    ['10.0.0.2', '172.16.5.4', '172.31.255.1', '192.168.0.10', '169.254.3.3', 'mac-de-la.local'].forEach(h => ok(E.isLocalHost(h), h));
+    ['8.8.8.8', '172.32.0.1', '172.15.0.1', 'localhost', '127.0.0.1', 'nostoyloko-jpg.github.io', '192.168.1.300', 'evil.local.com'].forEach(h => ok(!E.isLocalHost(h), 'no local: ' + h));
+    eq(E.localUrl('https://x/live.html#a', 'bad host', 1), 'https://x/live.html#a', 'host inválido: enlace intacto');
+  });
+
+  test('Red local: el dispositivo elige solo el repetidor (l en el # → local · página de la red local → ese servidor · si no → nube)', async () => {
+    const r1 = E.brokersFor({ l: '192.168.1.45:8765' });
+    eq(r1.length, 1); eq(r1[0].id, 'local'); eq(r1[0].url, 'ws://192.168.1.45:8765/mqtt');
+    eq(E.brokersFor({}, { protocol: 'http:', hostname: '10.0.0.7', port: '9000' })[0].url, 'ws://10.0.0.7:9000/mqtt', 'cargada desde la IP del Mac');
+    eq(E.brokersFor({}, { protocol: 'http:', hostname: '192.168.1.45', port: '' })[0].url, 'ws://192.168.1.45:80/mqtt', 'puerto 80 por defecto');
+    eq(E.brokersFor({}, { protocol: 'https:', hostname: 'nostoyloko-jpg.github.io', port: '' }), E.BROKERS, 'GitHub Pages: nube (sin regresión)');
+    eq(E.brokersFor({}, { protocol: 'http:', hostname: 'localhost', port: '8765' }), E.BROKERS, 'localhost no es un móvil de la red');
+    eq(E.brokersFor(null), E.BROKERS, 'sin nada: nube');
+    eq(E.BROKERS.map(b => b.url).join(' '), 'wss://broker.emqx.io:8084/mqtt wss://broker.hivemq.com:8884/mqtt', 'la nube no cambia');
+    eq(E.LOCAL_PORT, 8765);
+  });
+
+  /** Una copia de emision.js como la vería un móvil en http://192.168.x.x: SIN crypto.subtle, con el cifrado de reserva (cripto.js). */
+  function insecureCopy(WS) {
+    const fs = require('fs'), path = require('path');
+    const win = { crypto: { getRandomValues: a => require('crypto').webcrypto.getRandomValues(a) }, ShowtimeCripto: require('../cripto.js'), WebSocket: WS };
+    new Function('window', 'module', 'require', fs.readFileSync(path.join(__dirname, '..', 'emision.js'), 'utf8'))(win, undefined, undefined);
+    return win.ShowtimeEmision;
+  }
+
+  if (isNode) test('Red local: un móvil SIN crypto.subtle (http local) lee, manda órdenes y saluda con el cifrado de reserva, contra el Mac con WebCrypto', async () => {
+    const EJ = insecureCopy(null);
+    eq(EJ.CRYPTO, 'js', 'cifrado de reserva'); eq(EJ.canView(), true); eq(EJ.canEmit(), false, 'un móvil no puede emitir');
+    eq(E.CRYPTO, 'native'); eq(E.canEmit(), true);
+    const R = rig(), room = E.withZoneKeys(await E.newRoom(), ['z1']), got = [];
+    let snap = { festival: { event: { nombre: 'Búnker' }, artists: [] }, n: 1 }, est = null;
+    const tx = new E.Emisor({ room, brokers: R.brokers, WebSocket: R.WS, getSnapshot: () => snap, onStatus: s => { est = s; },
+      onCommand: async c => { got.push(c); return { ok: true, msg: 'hecho' }; } });
+    await tx.start();
+    const snaps = [];
+    const v = new EJ.Receptor({ params: E.parseHash(E.remoteUrl(room, undefined, 'z1').split('#')[1]), brokers: R.brokers, WebSocket: R.WS, onSnapshot: s => snaps.push(s), onStatus() {} });
+    await v.start();
+    await until(() => snaps.length, 5000, 'estado firmado con ECDSA y cifrado con AES-GCM, abierto en JS puro');
+    eq(snaps[0].festival.event.nombre, 'Búnker');
+    await until(() => est && est.remotes >= 1, 4000, 'el «hola» cifrado en JS llega al Mac (como mando)');
+    const r = await v.command('delay', { mins: 5 });
+    ok(r.ok, 'orden firmada con HMAC en JS y aceptada por el Mac: ' + r.msg);
+    eq(got.length, 1); eq(got[0].op, 'delay'); eq(got[0]._z, 'z1', 'la zona la dice la clave que firma');
+    snap = Object.assign({}, snap, { n: 2 }); tx.push(0);
+    await until(() => snaps.some(s => s.n === 2), 4000, 'cambios');
+    // Un estado alterado por el camino se descarta igual que con WebCrypto
+    const K = await _.macKeys(room), f = await _.seal(K, E.K_STATE, enc.encode('{}')); f[f.length - 1] ^= 1;
+    eq(await EJ._.openFrame(await EJ._.viewerKeys(E.parseHash(E.staffUrl(room).split('#')[1])), f), null, 'alterado → nada');
+    v.stop(); await tx.stop();
+  });
+
+  if (isNode) test('Red local: de punta a punta por el servidor del Mac (servidor.js, WebSocket real): Staff, mando por zona y Producción', async () => {
+    if (typeof WebSocket === 'undefined') { console.log('  (sin WebSocket en este Node: prueba omitida)'); return; }
+    const S = require('../servidor.js').createServer({ port: 0, host: '127.0.0.1' }), port = await S.listen();
+    try {
+      const room = E.withZoneKeys(await E.newRoom(), ['z1']), got = [], prodGot = [];
+      let snap = { festival: { event: { nombre: 'Sin internet' } }, n: 1 }, est = null;
+      const tx = new E.Emisor({ room, brokers: [E.localBroker('127.0.0.1', port)], getSnapshot: () => snap, onStatus: s => { est = s; },
+        onCommand: async c => { got.push(c); return { ok: true, msg: 'hecho' }; }, onProdMessage: m => prodGot.push(m) });
+      await tx.start();
+      await until(() => est && est.links[0].state === 'on', 4000, 'Dashboard conectado al servidor local');
+      eq(est.links.length, 1, 'solo el repetidor local: no depende de internet'); eq(est.links[0].name, 'Red local');
+      const EJ = insecureCopy(WebSocket), loc = { l: '127.0.0.1:' + port };
+      const staffS = [], mandoS = [];
+      const staff = new EJ.Receptor({ params: EJ.parseHash(E.localUrl(E.staffUrl(room), '127.0.0.1', port).split('#')[1]), onSnapshot: s => staffS.push(s), onStatus() {} });
+      const mando = new EJ.Receptor({ params: EJ.parseHash(E.localUrl(E.remoteUrl(room, undefined, 'z1'), '127.0.0.1', port).split('#')[1]), onSnapshot: s => mandoS.push(s), onStatus() {} });
+      const prod = new E.Receptor({ params: Object.assign(E.parseHash(E.localUrl(E.productionUrl(room, undefined, 'prod_001'), '127.0.0.1', port).split('#')[1]), loc), onSnapshot() {}, onStatus() {} });
+      eq(staff.o.brokers, undefined, 'el dispositivo elige el repetidor por el «l» del QR');
+      await staff.start(); await mando.start(); await prod.start();
+      await until(() => staffS.length && mandoS.length, 6000, 'ráfagas por el socket local');
+      eq(staff.links[0].b.url, 'ws://127.0.0.1:' + port + '/mqtt');
+      eq(staffS[0].festival.event.nombre, 'Sin internet');
+      await until(() => est.devices && est.devices.length >= 3, 5000, 'presencia de los tres (telemetría del gestor)');
+      const r = await mando.command('call', { key: 'x@1' });
+      ok(r.ok, 'orden del mando → Mac → respuesta, todo en local: ' + r.msg); eq(got[0]._z, 'z1');
+      const pr = await prod.sendProdMessage({ type: 'chat', from: 'prod_001', text: 'Puertas en 5' });
+      ok(pr.ok); await until(() => prodGot.length, 4000, 'chat de Producción por el socket local');
+      snap = { festival: { event: { nombre: 'Sin internet' } }, n: 2 }; tx.push(0);
+      await until(() => staffS.some(s => s.n === 2) && mandoS.some(s => s.n === 2), 4000, 'cambios a todos');
+      ok(S.broker.stats.delivered > 0 && S.broker.clients.size === 4, 'el servidor reparte a 4 clientes');
+      staff.stop(); mando.stop(); prod.stop(); await tx.stop();
+    } finally { await S.close(); }
+  });
+
   // ── Ejecutor asíncrono ────────────────────────────────────────────────
   (async () => {
     let pass = 0; const fails = [];

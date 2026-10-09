@@ -19,7 +19,7 @@
     ok(h.indexOf('<path d="' + M.ST_PATH + '"/>') > 0, 'el isotipo ST');
     ok(/class="stm-name">SHOWTIME</.test(h)); ok(/class="stm-by">by Synapse Live</.test(h)); ok(/class="stm-desc">Real-Time Show Control</.test(h));
     ok(/class="stm-ver">v20261045</.test(h), 'versión activa');
-    ok(h.indexOf('BUILT FOR LIFE ON STAGE · © 2026 Synapse Live') > 0, 'pie');
+    ok(h.indexOf('ENGINEERED FOR LIVE PRODUCTION · © 2026 Synapse Live') > 0, 'pie');
     ok(/class="stm-lines"/.test(h) && /class="stm-p"/.test(h), 'líneas de tiempo con pulsos');
     const solo = M.banner();
     ok(solo.indexOf('stm-ver') < 0 && solo.indexOf('stm-foot') < 0);

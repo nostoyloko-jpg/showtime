@@ -2505,14 +2505,96 @@
     emRoom = next; emSave(!!EM);
     if (EM) EM.setZoneKeys(emRoom.cz).catch(e => console.error(e));
   }
-  function emCan() { return !!(Em && QR && M && window.crypto && crypto.subtle && 'WebSocket' in window); }
+  function emCan() { return !!(Em && QR && M && (Em.canEmit ? Em.canEmit() : window.crypto && crypto.subtle) && 'WebSocket' in window); }
+  // ── Transporte: nube (repetidores públicos) o red local Wi-Fi sin internet (2d-C, dec. 115) ──
+  // El Dashboard se queda donde está (GitHub Pages / app instalada) y habla con el servidor del Mac por ws://localhost:<puerto>.
+  // Los QR apuntan a http://<IP del Mac>:<puerto>/…, que sirve la app a los dispositivos de la misma Wi-Fi.
+  const NET_KEY = 'showtime.red';
+  let NET = netLoad(), NET_ST = { ok: null, ips: [], at: 0, busy: false };
+  function netNorm(v) {
+    const o = v && typeof v === 'object' ? v : {};
+    const port = Number.isInteger(+o.port) && +o.port >= 1 && +o.port <= 65535 ? +o.port : (Em && Em.LOCAL_PORT) || 8765;
+    const host = typeof o.host === 'string' && Em && Em.hostPort && Em.hostPort(o.host.trim() + ':' + port) ? o.host.trim().toLowerCase() : '';
+    return { mode: o.mode === 'local' ? 'local' : 'cloud', host, port };
+  }
+  function netLoad() { try { return netNorm(JSON.parse(localStorage.getItem(NET_KEY) || 'null')); } catch (e) { return netNorm(null); } }
+  function netSave() { try { localStorage.setItem(NET_KEY, JSON.stringify(NET)); } catch (e) {} }
+  function netLocal() { return NET.mode === 'local'; }
+  /** IP del Mac para los QR: la escrita; si no, la del navegador (si el Dashboard se abrió desde la red local); si no, la que diga el servidor. */
+  function netHost() {
+    if (NET.host) return NET.host;
+    if (typeof location !== 'undefined' && Em.isLocalHost && Em.isLocalHost(location.hostname)) return location.hostname.toLowerCase();
+    return NET_ST.ips && NET_ST.ips[0] ? NET_ST.ips[0] : '';
+  }
+  /** Enlace de un QR con el transporte elegido (nube: el de siempre, sin tocar). */
+  function emLink(url) { return netLocal() && netHost() ? Em.localUrl(url, netHost(), NET.port) : url; }
+  /** Repetidores del Dashboard: nube (los de emision.js) o solo el servidor local del Mac. */
+  function emBrokers() { return netLocal() ? [Em.localBroker('localhost', NET.port)] : undefined; }
+  /** ¿Está el servidor local abierto en este Mac? (y sus IP de la Wi-Fi). */
+  async function netDetect(force) {
+    if (!netLocal() || NET_ST.busy || (!force && Date.now() - NET_ST.at < 15000) || typeof fetch !== 'function') return;
+    NET_ST.busy = true;
+    try {
+      const ctl = typeof AbortController === 'function' ? new AbortController() : null, to = setTimeout(() => ctl && ctl.abort(), 2000);
+      const r = await fetch('http://localhost:' + NET.port + '/showtime-local.json', { cache: 'no-store', signal: ctl ? ctl.signal : undefined });
+      clearTimeout(to);
+      const j = await r.json();
+      NET_ST = { ok: !!(j && j.app === 'showtime'), ips: Array.isArray(j && j.ips) ? j.ips.filter(ip => Em.isLocalHost(ip)).slice(0, 4) : [], at: Date.now(), busy: false };
+      if (NET_ST.ok && !NET.host && !netHost() && NET_ST.ips[0]) { NET.host = NET_ST.ips[0]; netSave(); }
+    } catch (e) { NET_ST = { ok: false, ips: [], at: Date.now(), busy: false }; }
+    renderNet(true); if (EM) renderCast();
+  }
+  /** Selector de transporte (en el Hub y en Configuración › Emisión): el mismo bloque en los dos sitios. */
+  function netHtml() {
+    const loc = netLocal(), h = netHost(), st = NET_ST.ok === true ? 'ok' : NET_ST.ok === false ? 'off' : 'wait';
+    return '<div class="net-row"><label class="net-l">' + tx('Transporte') + '</label><select data-net="mode" aria-label="' + esc(tx('Transporte')) + '">'
+      + '<option value="cloud"' + (loc ? '' : ' selected') + '>' + tx('Nube (Internet · por defecto)') + '</option>'
+      + '<option value="local"' + (loc ? ' selected' : '') + '>' + tx('Red Local Wi-Fi (0 internet)') + '</option></select></div>'
+      + (loc ? '<div class="net-row net-hp"><label class="net-l">' + tx('IP del Mac') + '</label><input type="text" data-net="host" inputmode="decimal" spellcheck="false" autocomplete="off" placeholder="192.168.1.45" value="' + esc(NET.host || '') + '">'
+        + '<label class="net-l net-pl">' + tx('Puerto') + '</label><input type="number" data-net="port" min="1" max="65535" value="' + NET.port + '">'
+        + '<button class="btn" type="button" data-net="detect">' + tx('Detectar') + '</button></div>'
+        + '<div class="net-st ' + st + '"><i></i><span>' + (st === 'ok' ? tx('Servidor local activo') + (NET_ST.ips.length ? ' · ' + esc(NET_ST.ips.join(' · ')) : '')
+          : st === 'off' ? tx('Servidor local no encontrado en este Mac. En Terminal: cd ~/Claude/SHOWTIME && node servidor.js') : tx('Buscando el servidor local…')) + '</span></div>'
+        + '<p class="mnote">' + (h ? tx('Los QR abren http://{h}:{p}/ · los dispositivos deben estar en la misma Wi-Fi que el Mac.', { h: esc(h), p: NET.port })
+          : tx('Escribe la IP del Mac en la Wi-Fi (Ajustes del Sistema › Wi-Fi › Detalles) o pulsa Detectar.')) + '</p>'
+      : '');
+  }
+  function renderNet(force) {
+    ['cast-net', 'cfg-net'].forEach(id => {
+      const box = $(id); if (!box) return;
+      if (!force && box.contains(document.activeElement) && document.activeElement && document.activeElement.tagName === 'INPUT') return;   // no pisar lo que se escribe
+      const h = netHtml(); if (box.dataset.h !== h) { box.innerHTML = h; box.dataset.h = h; }
+    });
+  }
+  /** Cambiar el transporte con la emisión en marcha: se reconecta por el nuevo (las claves y los QR de nube siguen siendo los mismos). */
+  async function netApply(prev) {
+    netSave(); renderNet(true);
+    if (netLocal()) netDetect(true);
+    if (EM && prev !== JSON.stringify(NET)) { await emStop(true); await emStart(); }
+    renderCast();
+  }
+  document.addEventListener('change', e => {
+    const t = e.target.closest && e.target.closest('[data-net]'); if (!t) return;
+    const prev = JSON.stringify(NET), k = t.dataset.net;
+    if (k === 'mode') NET = netNorm(Object.assign({}, NET, { mode: t.value }));
+    else if (k === 'port') { const p = +t.value; if (Number.isInteger(p) && p >= 1 && p <= 65535) { NET = netNorm(Object.assign({}, NET, { port: p })); NET_ST.at = 0; } else { toast(tx('Puerto no válido (1–65535)'), true); renderNet(true); return; } }
+    else if (k === 'host') {
+      const v = t.value.trim();
+      if (v && !Em.hostPort(v + ':' + NET.port)) { toast(tx('IP o nombre no válido: {v}', { v: v }), true); renderNet(true); return; }
+      NET = netNorm(Object.assign({}, NET, { host: v }));
+    } else return;
+    if (k === 'mode') logEvent('msg', 'Transporte de la emisión: ' + (netLocal() ? 'red local Wi-Fi' : 'nube'), { src: 'panel' });
+    netApply(prev);
+  });
+  document.addEventListener('click', e => { const t = e.target.closest && e.target.closest('[data-net="detect"]'); if (t) { NET_ST.at = 0; netDetect(true); } });
+  renderNet(true);
   async function emStart(resumed) {
     if (!emCan()) { toast('Este navegador no permite la emisión cifrada', true); return; }
     if (EM) return;
     try {
       if (!emRoom) { const saved = emLoad(); emRoom = saved ? saved.room : await Em.newRoom(); }
       emZoneKeys();
-      EM = new Em.Emisor({ room: emRoom, getSnapshot: emSnapshot, onCommand: emCommand, onStatus: st => { EMST = st; renderCast(); }, onProdMessage: emProdMessage });
+      EM = new Em.Emisor({ room: emRoom, brokers: emBrokers(), getSnapshot: emSnapshot, onCommand: emCommand, onStatus: st => { EMST = st; renderCast(); }, onProdMessage: emProdMessage });
       await EM.start(); emSave(true); renderCast(); renderChat(); emPushChat();
       toast(resumed ? 'Emisión reanudada (estaba activa antes de recargar el Dashboard)' : 'Emitiendo: escanea el QR con el dispositivo');
     } catch (e) { console.error(e); EM = null; renderCast(); toast(tx('No se pudo empezar la emisión: {e}', { e: e && e.message || e }), true); }
@@ -2746,7 +2828,7 @@
     const n = emLinksOn(), tot = EMST ? EMST.links.length : 2;
     const cls = n ? 'ok' : 'warn';
     const txt = n === 0 ? tx('Conectando con los repetidores…') : n < tot ? tx('En directo ({n} de {t} repetidores)', { n: n, t: tot }) : tx('En directo');
-    const links = (EMST ? EMST.links : Em.BROKERS.map(b => ({ name: b.name, state: 'connecting' })))
+    const links = (EMST ? EMST.links : (emBrokers() || Em.BROKERS).map(b => ({ name: b.name, state: 'connecting' })))
       .map(l => '<span class="clink ' + (l.state === 'on' ? 'on' : '') + '" title="' + esc(l.state === 'on' ? tx('Conectado') : l.err ? tx('Sin conexión: {e}', { e: l.err }) : tx('Conectando…')) + '">' + esc(l.name) + '</span>').join('');
     const v = EMST ? EMST.viewers : 0, r = kind === 'remote' ? qrDevices().filter(d => d.r && (RM_ZONE ? d.s === RM_ZONE : !d.s)).length : 0;
     const who = kind === 'remote' ? (r ? '<b class="cok">' + tx('Stage Manager conectado') + '</b>' : tx('Sin Stage Manager conectado')) : kind === 'produccion' ? '<span>' + tx('{n} persona(s) de Producción', { n: PRODUCERS.length }) + '</span>' : tx(v === 1 ? '1 dispositivo conectado' : '{n} dispositivos conectados', { n: v });
@@ -2813,14 +2895,14 @@
     return zs;
   }
   function emUrl(kind) {
-    if (kind === 'remote') { if (RM_ZONE && !rmZones().some(z => z.id === RM_ZONE)) RM_ZONE = null; return Em.remoteUrl(emRoom, undefined, RM_ZONE); }
+    if (kind === 'remote') { if (RM_ZONE && !rmZones().some(z => z.id === RM_ZONE)) RM_ZONE = null; return emLink(Em.remoteUrl(emRoom, undefined, RM_ZONE)); }
     if (kind === 'produccion') {
       if (!PROD_DEFAULT_ID && PRODUCERS.length) PROD_DEFAULT_ID = PRODUCERS[0].id;
       const sel = PRODUCERS.some(p => p.id === PROD_SEL) ? PROD_SEL : PROD_DEFAULT_ID;
-      return Em.productionUrl(emRoom, undefined, sel || 'Producción');
+      return emLink(Em.productionUrl(emRoom, undefined, sel || 'Producción'));
     }
     if (CAST_VISTA === 'confidence') { const zs = castZones(); if (!zs.some(z => z.id === CAST_ZONA)) CAST_ZONA = zs.length ? zs[0].id : ''; }
-    return Em.staffUrl(emRoom, undefined, { vista: CAST_VISTA, zona: CAST_ZONA });
+    return emLink(Em.staffUrl(emRoom, undefined, { vista: CAST_VISTA, zona: CAST_ZONA }));
   }
   function renderProducerList() {
     const box = $('prod-list');
@@ -2885,7 +2967,7 @@
     if (!side) return;
     let qr = '';
     if (Em && emRoom && window.ShowtimeQR) {
-      const url = Em.productionUrl(emRoom, undefined, p.id);
+      const url = emLink(Em.productionUrl(emRoom, undefined, p.id));
       qr = window.ShowtimeQR.svg(url, { ecl: 'M', margin: 3 });
     }
     PROD_SEL = p.id;
@@ -2931,7 +3013,9 @@
     if (!$('cast-staff')) return;
     const on = !!EM;
     if (on) emZoneKeys();
-    renderHubLed(); renderCastBar();
+    renderHubLed(); renderCastBar(); renderNet();
+    if (netLocal()) netDetect();
+    const noHost = netLocal() && !netHost();   // red local sin IP del Mac: un QR así no llevaría a ningún sitio
     ['staff', 'remote', 'produccion'].forEach(kind => {
       const box = $('cast-' + kind);
       if (!emCan()) { box.innerHTML = '<p class="cintro">' + tx('Este navegador no permite la emisión cifrada.') + '</p>'; return; }
@@ -2942,16 +3026,18 @@
           : kind === 'produccion'
           ? '<p class="cintro">' + tx('Acceso para <b>Producción</b>: ver la Live de Manager, confirmar CALL, enviar mensajes y avisos y chatear con el Stage Manager. Necesita que la emisión esté activa.') + '</p>'
           : '<p class="cintro">' + tx('Emite el horario en directo a los dispositivos del equipo (técnicos, producción, managers…). Lo ven <b>solo en lectura</b>: nadie puede cambiar nada desde ellos.') + '</p>')
-          + '<p class="mnote">' + tx('Necesita internet en el Mac y en los dispositivos (4G o Wi-Fi con salida). Todo va cifrado: los repetidores públicos solo ven datos ilegibles y no guardan nada.') + '</p>';
+          + '<p class="mnote">' + (netLocal() ? tx('Red local: sin internet. El Mac y los dispositivos, en la misma Wi-Fi; el servidor local del Mac, abierto. Todo va cifrado igual que por la nube.')
+            : tx('Necesita internet en el Mac y en los dispositivos (4G o Wi-Fi con salida). Todo va cifrado: los repetidores públicos solo ven datos ilegibles y no guardan nada.')) + '</p>';
         return;
       }
+      if (noHost) { box.dataset.url = ''; box.innerHTML = '<p class="cwarn"><svg class="ic"><use href="#i-alert"/></svg><span>' + tx('Red local: falta la IP del Mac para los QR. Escríbela arriba o pulsa Detectar (con el servidor local abierto).') + '</span></p>'; return; }
       // Producción: el panel solo se rehace si cambia la sala o su clave (no al elegir persona, que borraría su QR)
-      const url = kind === 'produccion' ? Em.productionUrl(emRoom, undefined, '') : emUrl(kind);
+      const url = kind === 'produccion' ? emLink(Em.productionUrl(emRoom, undefined, '')) : emUrl(kind);
       if (box.dataset.url !== url) { box.dataset.url = url; box.innerHTML = paneHtml(kind); if (kind === 'produccion') PROD_SEL = null; }
       if (kind === 'produccion') renderProducerList();
       else { const cst = box.querySelector('.cst'); if (cst) cst.innerHTML = emStateHtml(kind); }
     });
-    if (!on) $('qr-big').hidden = true;
+    if (!on || noHost) $('qr-big').hidden = true;
     else {
       const url = emUrl(bigTab);
       if ($('qr-big-svg').dataset.url !== url) { $('qr-big-svg').dataset.url = url; $('qr-big-svg').innerHTML = QR.svg(url, { ecl: 'M', margin: 4 }); }
@@ -3236,5 +3322,6 @@
     if (mod && !e.shiftKey && !e.altKey && k === 'n') { e.preventDefault(); askNew(); return; }
   });
   window.ShowtimePanel = { reload: () => { loadState(); renderAll(); }, _test: { winState: () => Array.from(WIN.entries()).map(([id, x]) => ({ id, name: x.name, vista: x.vista, zona: x.zona, standby: !!x.standby, fs: x.fs })), setWinVista, setWinStandby, closeLive, openGestor, gestorVisible, emProdMessage, emRegenProd, hitoChips, emUrl, prodBigTitle, fileKind, handleFile, emCommand, importSummary, hidesSome, tipoPill, setWake, wakeState: () => ({ on: wakeOn, lock: !!wakeLock }), showSplash, hideSplash, setStandby, standbyOn, room: () => emRoom,
-    emSnapshot, emCloseDay, emDay, qrDevices, rmZones, setRmZone: z => { RM_ZONE = z; renderCast(); }, setRoom: r => { emRoom = r; }, fakeEm: (em, st) => { EM = em; EMST = st; }, emStateHtml, renderCastBar, renderHubLed, mtIn, mtOut, cfSimState, renderCfSim, cfSim: () => CFSIM } };   // _test: solo para tests/control.test.js
+    emSnapshot, emCloseDay, emDay, qrDevices, rmZones, setRmZone: z => { RM_ZONE = z; renderCast(); }, setRoom: r => { emRoom = r; }, fakeEm: (em, st) => { EM = em; EMST = st; }, emStateHtml, renderCastBar, renderHubLed, mtIn, mtOut, cfSimState, renderCfSim, cfSim: () => CFSIM,
+    net: () => NET, setNet: o => { NET = netNorm(o); }, netNorm, emLink, emBrokers, emUrl, netHtml, renderCast } };   // _test: solo para tests/control.test.js
 })();

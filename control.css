@@ -1206,3 +1206,21 @@ body[data-ps="stage"] #tbl tbody tr:hover td input[type=text],body[data-ps="stag
 body[data-ps="stage"] #tbl tbody td.stage input[type=text]{border-left-color:var(--sc,#555)}
 body[data-ps="stage"] .gv-row select,body[data-ps="stage"] #tbl tbody tr:hover td select,body[data-ps="stage"] #tbl tbody td select:focus{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23FFD600' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")}
 body[data-ps="stage"] .tpill{background:#000;border:1.5px solid var(--pc);color:var(--pc);filter:brightness(1.25)}
+
+/* ── Dec. 115 · Transporte de la emisión: nube o red local Wi-Fi ── */
+.cast-net{display:flex;flex-direction:column;gap:8px;padding:8px 6px 10px}
+.hub-cast .cast-net{border-bottom:1px solid var(--hair);margin-bottom:6px}
+.net-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.net-l{font-size:12px;font-weight:600;color:var(--muted);min-width:78px}
+.net-row select{flex:1;min-width:200px}
+.net-hp input[type=text]{flex:1;min-width:130px;font-variant-numeric:tabular-nums}
+.net-hp input[type=number]{width:84px}
+.net-hp .net-pl{min-width:0}
+.net-st{display:flex;align-items:flex-start;gap:8px;font-size:12px;color:var(--muted);line-height:1.35}
+.net-st i{flex:0 0 auto;width:8px;height:8px;border-radius:50%;margin-top:4px;background:var(--dim)}
+.net-st.ok i{background:var(--ok)}
+.net-st.off i{background:var(--err,#ff6b6b)}
+.net-st.off{color:var(--text)}
+.cast-net .mnote{margin:0}
+body[data-ps="stage"] .net-l{color:#fff}
+body[data-ps="stage"] .net-st.ok i{background:#3ddc97}

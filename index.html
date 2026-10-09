@@ -13,8 +13,8 @@
 <meta name="apple-mobile-web-app-title" content="Showtime">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
-<link rel="stylesheet" href="control.css?v=20261124">
-<link rel="stylesheet" href="marca.css?v=20261124">
+<link rel="stylesheet" href="control.css?v=20261126">
+<link rel="stylesheet" href="marca.css?v=20261126">
 </head>
 <body>
 <div id="splash" class="splash" hidden></div>
@@ -169,6 +169,7 @@
       <!-- Bloque 2 · Emisión inalámbrica (QR) -->
       <div class="hub-h"><svg class="ic"><use href="#i-phone"/></svg><b data-i18n>Emisión inalámbrica</b><small data-i18n>Accesos por código QR</small></div>
       <div class="hub-card hub-cast">
+      <div id="cast-net" class="cast-net"></div>
       <div id="cast-bar" class="cast-bar"></div>
       <div class="cast">
         <div class="ctabs" role="tablist">
@@ -277,6 +278,10 @@
       <label for="cfg-bis-win" data-i18n="bis.cfgLabel">Ventana de Bis / Extender prueba</label><select id="cfg-bis-win"><option value="5" data-i18n>5 min</option><option value="10" data-i18n>10 min</option><option value="15" data-i18n>15 min</option></select>
       <div class="note" data-i18n="bis.cfgNote">Minutos tras el fin de un show (Bis) o de una prueba de sonido (Extender prueba) en los que se puede rescatar. Nunca más que el cambio hasta la siguiente de su zona; si la siguiente da ▶, se acaba.</div>
     </div>
+  </section>
+  <section class="cfg-s" id="cfg-s-net">
+    <h3 data-i18n>Emisión</h3>
+    <div id="cfg-net" class="cast-net"></div>
   </section>
   <section class="cfg-s" id="cfg-s-styles">
     <h3 data-i18n>Estilos</h3>
@@ -462,20 +467,20 @@
 <datalist id="zones-dl"></datalist>
 <div id="toast" class="toast" hidden></div>
 
-<script src="i18n.js?v=20261124"></script>
-<script src="core.js?v=20261124"></script>
-<script src="meteo.js?v=20261124"></script>
-<script src="datos.js?v=20261124"></script>
-<script src="importar.js?v=20261124"></script>
-<script src="xlsx.js?v=20261124"></script>
-<script src="qr.js?v=20261124"></script>
-<script src="emision.js?v=20261124"></script>
-<script src="mando.js?v=20261124"></script>
-<script src="vistas.js?v=20261124"></script>
-<script src="log.js?v=20261124"></script>
-<script src="print.js?v=20261124"></script>
-<script src="marca.js?v=20261124"></script>
-<script src="control.js?v=20261124"></script>
-<script src="pwa.js?v=20261124"></script>
+<script src="i18n.js?v=20261126"></script>
+<script src="core.js?v=20261126"></script>
+<script src="meteo.js?v=20261126"></script>
+<script src="datos.js?v=20261126"></script>
+<script src="importar.js?v=20261126"></script>
+<script src="xlsx.js?v=20261126"></script>
+<script src="qr.js?v=20261126"></script>
+<script src="emision.js?v=20261126"></script>
+<script src="mando.js?v=20261126"></script>
+<script src="vistas.js?v=20261126"></script>
+<script src="log.js?v=20261126"></script>
+<script src="print.js?v=20261126"></script>
+<script src="marca.js?v=20261126"></script>
+<script src="control.js?v=20261126"></script>
+<script src="pwa.js?v=20261126"></script>
 </body>
 </html>

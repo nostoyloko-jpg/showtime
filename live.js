@@ -1002,7 +1002,8 @@
         : tx('ENLACE NO VÁLIDO · vuelve a escanear el QR');
       rx.title = st ? st.links.map(l => l.name + ': ' + tx(l.state === 'on' ? 'conectado' : 'sin conexión')).join(' · ') : '';
     }
-    if (!params || !(window.crypto && crypto.subtle) || !('WebSocket' in window)) { render(null); return; }
+    // Cifrado del navegador o, por la red local sin «contexto seguro», el de reserva (cripto.js, dec. 115); repetidor: lo elige emision.js
+    if (!params || !(Em.canView ? Em.canView() : window.crypto && crypto.subtle) || !('WebSocket' in window)) { render(null); return; }
     // Telemetría (dec. 103): cada latido dice qué enseña esta pantalla (vista, zona), qué es (móvil, tablet…) y si es de Producción
     const info = () => ({ v: VISTA, z: VISTA === 'confidence' && ZONA !== null ? String(ZONA) : null, d: Em.devClass(navigator.userAgent, window.screen && window.screen.width), p: PRODID || null });
     const R = new Em.Receptor({ params, info, onSnapshot: snap => Dt.loadSnapshot(snap), onStatus: st => { render(st); if (PRODID) chatOnStatus(st); }, onProdMessage: m => { if (PRODID) chatIn(m); } });
