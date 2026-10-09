@@ -1521,10 +1521,11 @@
       const head = '<div class="gv-top"><div class="gv-seg"><button type="button" class="gv-segb" data-gv="all" data-on="1">' + tx('⏸ Todas en standby') + '</button><button type="button" class="gv-segb" data-gv="all" data-on="0">' + tx('▶ Reanudar todas') + '</button></div></div>';
       const hd = '<div class="gv-row gv-hd" aria-hidden="true"><span>' + tx('Nombre') + '</span><span>' + tx('Vista') + '</span><span>' + tx('Zona') + '</span><span>' + tx('Pantalla') + '</span><span>' + tx('Standby') + '</span><span></span></div>';
       const rows = ids.length ? hd + ids.map(gvRowHtml).join('') : '<p class="mnote gv-empty">' + tx('No hay ventanas Live abiertas desde este Dashboard.') + '</p>';
+      // Mismo acabado que el panel de Pantallas y Emisión: cabecera en gris pizarra y cada bloque en su tarjeta
       const loc = '<div class="gv-sec"><svg class="ic"><use href="#i-screen"/></svg><b>' + tx('Monitores locales (HDMI / Mac)') + '</b></div>';
-      const qr = '<div class="gv-qr"><div class="gv-sec"><svg class="ic"><use href="#i-cast"/></svg><b>' + tx('Dispositivos remotos por QR (en vivo)') + '</b><span id="gv-qrn" class="gv-qrn"></span></div><div id="gv-qrl" class="gv-qrl"></div></div>';
+      const qr = '<div class="gv-qr"><div class="gv-sec"><svg class="ic"><use href="#i-cast"/></svg><b>' + tx('Dispositivos remotos por QR (en vivo)') + '</b><span id="gv-qrn" class="gv-qrn"></span></div><div class="gv-card"><div id="gv-qrl" class="gv-qrl"></div></div></div>';
       const foot = '<div class="gv-foot"><button type="button" class="btn" data-gv="new">' + tx('+ Abrir ventana Live') + '</button><button type="button" class="btn gv-close" data-gv="done">' + tx('Cerrar') + '</button></div>';
-      box.innerHTML = loc + head + '<div class="gv-list">' + rows + '</div>' + qr + foot;
+      box.innerHTML = loc + '<div class="gv-card">' + head + '<div class="gv-list">' + rows + '</div></div>' + qr + foot;
     }
     gvSync(ids);
     renderGestorQr();

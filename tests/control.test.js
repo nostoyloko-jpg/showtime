@@ -1181,6 +1181,20 @@
     t.env.win.ShowtimePanel._test.fakeEm(null, null); t.env.win.ShowtimePanel._test.renderHubLed(1);
     eq(t.env.getEl('hub-led').classList.contains('on'), true, 'una Live abierta: verde');
   });
+  test('Acabado: cabeceras en gris pizarra (sin rojo) y bloques en tarjetas, igual en Configuración, Pantallas y Emisión y el gestor', () => {
+    const css = D.src('control.css'), html = D.src('index.html'), js = D.src('control.js');
+    ok(/\.cfg-s h3\{font-size:11px;letter-spacing:\.12em;text-transform:uppercase;font-weight:700;color:#8a8f98;margin-bottom:8px\}/.test(css), 'Configuración: eyebrow gris pizarra');
+    ok(!/\.cfg-s h3\{[^}]*var\(--accent\)/.test(css), 'sin el rojo del acento');
+    ok(/\.hub-h,\.gv-sec\{font-size:11px;letter-spacing:\.12em;text-transform:uppercase;font-weight:700;color:#8a8f98/.test(css), 'misma cabecera en el panel y en el gestor');
+    ok(/\.hub-card,\.gv-card\{background:rgba\(255,255,255,\.025\);border:1px solid var\(--hair2\);border-radius:10px;padding:4px 6px;margin-bottom:12px\}/.test(css), 'tarjeta común');
+    ok(/\.hub-list>\*\+\*\{border-top:1px solid var\(--hair\)\}/.test(css), 'separadores de 1 px entre filas');
+    const hub = html.slice(html.indexOf('id="m-hub"'), html.indexOf('<button id="wake"'));
+    eq((hub.match(/class="hub-card/g) || []).length, 3, 'tres tarjetas: señales locales, acciones locales y emisión');
+    const c1 = hub.indexOf('hub-card hub-list"'), c2 = hub.indexOf('hub-card hub-list hub-acts"'), c3 = hub.indexOf('hub-card hub-cast"');
+    ok(c1 > 0 && c2 > c1 && c3 > c2, 'en ese orden');
+    ok(/data-vista="manager"[\s\S]*data-vista="backstage"/.test(hub.slice(c1, c2)) && /id="lv-standby"[\s\S]*id="lv-gestor"/.test(hub.slice(c2, c3)) && /id="cast-bar"[\s\S]*class="ctabs"[\s\S]*id="cast-sec"/.test(hub.slice(c3)), 'cada cosa en su tarjeta');
+    ok(/box\.innerHTML = loc \+ '<div class="gv-card">' \+ head/.test(js) && /<div class="gv-card"><div id="gv-qrl"/.test(js), 'gestor: Monitores locales y Dispositivos QR en tarjetas');
+  });
   test('Pantallas y Emisión: Confidence se abre con la zona del selector; la barra de emisión dice sala y dispositivos', async () => {
     const t = panel({ 'showtime.festival': JSON.stringify(festDosDias()) }, NOWc), urls = [];
     const w = { closed: false, focus() {}, postMessage() {}, close() {} };

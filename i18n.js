@@ -88,6 +88,7 @@
   const UI_EN = {
     /*UI-EN-BEGIN*/
     panel: {
+      "Acciones locales": "Local actions",
       "Pantallas Live del Mac y emisión a dispositivos por QR": "Live screens on this Mac and QR broadcast to devices",
       "Pantallas y Emisión": "Displays & Broadcast",
       "Señales locales": "Local outputs",
