@@ -961,7 +961,7 @@
     ok(/\.gv-row select:hover,\.gv-row select:focus\{background-image:url/.test(css) && /background-image:url\("data:image\/svg\+xml,[^"]*6f747e/.test(css), 'flecha sutil en reposo, más brillante en hover y focus');
     ok(/\.gv-row input,\.gv-row select\{height:32px/.test(css) && /\.gv-sb\{height:34px/.test(css) && /\.gv-x\{width:36px;height:32px/.test(css), 'altura: 32px en campos y ✕, 34px en la píldora');
     ok(/class="gv-row gv-hd"/.test(js) && /tx\('Nombre'\)/.test(js) && /tx\('Standby'\)/.test(js) && /\.gv-hd\{display:none\}/.test(css), 'cabecera NOMBRE · VISTA · ZONA · STANDBY en escritorio; oculta en móvil');
-    ok(/\.gv-row select:disabled\{[^}]*border-color:transparent;background:transparent/.test(css), 'zona sin usar: «—» plano, sin caja');
+    ok(/\.gv-row select:disabled\{[^}]*border-color:transparent;background-color:transparent/.test(css), 'zona sin usar: «—» plano, sin caja');
     ok(/\.gv-foot \.gv-close\{background:#1c1e26;border:1px solid var\(--hair2\);color:#fff\}/.test(css) && /class="btn gv-close" data-gv="done"/.test(js), 'Cerrar en gris Raycast, sin rojo');
     ok(/\.gv-qr\{[^}]*border-top:1px solid/.test(css) && !/dashed/.test(css.slice(css.indexOf('.gv-qr{'), css.indexOf('.gv-qr{')+200)), 'QR: hairline continua, sin marco de puntos');
     ok(/data-gv="all" data-on="1">' \+ tx\('⏸ Todas en standby'\)/.test(js) && /data-gv="all" data-on="0">' \+ tx\('▶ Reanudar todas'\)/.test(js), 'cabecera: todas en standby / reanudar');
@@ -1685,6 +1685,36 @@ const miss = [...found].filter(k => !I.txHas(k) && !/^(OK|CALL|SC|Live|Raycast|S
     const t = dashboard({ 'showtime.config': JSON.stringify({ lang: 'en' }) });
     t.env.fire('btn-paste', 'click', {});
     eq(t.env.getEl('imp-go').textContent, 'Import 0 entries');
+  });
+
+  test('Dec. 112: inputs/selects sin shorthand «background:» (no resetea repeat/size → sin mosaico de flechas); flechas blindadas', () => {
+    const css = D.src('control.css');
+    const bad = css.split('\n').filter(l => { const m = l.match(/^\s*([^{@]*)\{(.*)$/); return m && /\b(select|input)\b/.test(m[1]) && /(^|[;{])background:/.test(m[2]); });
+    eq(bad.length, 0, 'reglas con background: en controles → ' + bad.join(' | ').slice(0, 300));
+    ok(/\.gv-row select,#modal-body select,\.modal-box select,\.cfg select,\.imp-box select\{background-repeat:no-repeat!important;background-position:right 9px center!important;background-size:9px 6px!important\}/.test(css), 'gestor y modales: right 9px');
+    ok(/#tbl tbody td select,td select\{background-repeat:no-repeat!important;[^}]*background-size:9px 6px!important\}/.test(css), 'tabla: no-repeat y 9×6');
+    ok(/body\[data-ps="stage"\] \.gv-row select:disabled\{[^}]*background-image:none/.test(css), 'select deshabilitado sin flecha');
+  });
+
+  test('Dec. 112: Stage de alto contraste — tarjetas, textos críticos, controles y píldoras', () => {
+    const css = D.src('control.css');
+    ok(/body\[data-ps="stage"\] \.mcard,body\[data-ps="stage"\] \.hub-card,body\[data-ps="stage"\] \.gv-card,body\[data-ps="stage"\] \.imp-card,body\[data-ps="stage"\] \.card\{background-color:#0d0c04;border:1\.5px solid #FFD600;border-radius:10px\}/.test(css), 'tarjetas');
+    ok(/body\[data-ps="stage"\] td\.name,[^{]*td\.t input,[^{]*td\.est \.estt[^{]*\{color:#fff;font-weight:700\}/.test(css), 'nombres y horas en blanco 700');
+    ok(/body\[data-ps="stage"\] thead th\{color:#fff;font-weight:700\}/.test(css) && /body\[data-ps="stage"\] thead th\.est-h\{color:#FFD600\}/.test(css), 'cabeceras blancas, REAL amarilla');
+    ok(/body\[data-ps="stage"\] select,[^{]*\.gv-row select\{background-color:#000;border:1\.5px solid rgba\(255,214,0,\.7\);color:#fff;font-weight:600\}/.test(css), 'controles');
+    ok(/body\[data-ps="stage"\] \.tpill\{background:#000;border:1\.5px solid var\(--pc\)/.test(css), 'píldoras');
+    const tail = css.slice(css.indexOf('Dec. 112 · Modo Stage'));
+    ok(!/#8a8f98/i.test(tail), 'sin gris apagado en el bloque Stage');
+    ok(!/body\[data-ps="stage"\] \.mcard\{background:#000/.test(css), 'regla antigua de .mcard eliminada');
+  });
+
+  test('Dec. 113: filas pasadas atenuadas, pero el aviso «pisada por» queda al 100 % en rojo #ff5252 y negrita (Studio y Stage)', () => {
+    const css = D.src('control.css'), js = D.src('control.js');
+    ok(/tbody tr\.done td:not\(\.gap\):not\(\.est\)\{opacity:\.5\}/.test(css), 'la celda REAL no se atenúa entera (la opacidad del padre no se deshace en el hijo)');
+    ok(/tbody tr\.done td\.est>\*\{opacity:\.5\}/.test(css), 'el resto de REAL sí se atenúa');
+    ok(/tbody tr\.done td\.est>small\.clash,tbody tr\.done td\.est>\.estt:has\(\.clash\)\{opacity:1\}/.test(css), 'aviso y horas en choque al 100 %');
+    ok(/td\.est small\.clash,body\[data-ps="stage"\] td\.est small\.clash\{color:#ff5252;font-weight:800\}/.test(css), 'rojo brillante también en Stage (gana al amarillo de td.est small)');
+    ok(/'<small class="clash">' \+ tx\('pisada por \{who\}'/.test(js), 'el aviso sigue en small.clash');
   });
 
   // ── Ejecutor ─────────────────────────────────────────────────────────
