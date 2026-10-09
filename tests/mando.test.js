@@ -463,6 +463,8 @@
     const tarde2 = M.stretchPlan(bEmpezada, k, true, at('21:36'));
     ok(!tarde2.ok && /Banda B ya ha empezado/.test(tarde2.error), tarde2.error);
     eq(M.bisState(bEmpezada, blk(bEmpezada, 'Banda A'), at('21:36')).reason, 'next', 'el botón se desactiva');
+    eq(M.bisState(bEmpezada, blk(bEmpezada, 'Banda A'), at('21:41')).reason, 'expired', 'dec. 114: pasada la ventana desaparece aunque la siguiente ya diera ▶ (no queda «ACABÓ» toda la noche)');
+    eq(M.bisState(bEmpezada, blk(bEmpezada, 'Banda A'), at('23:59')).reason, 'expired', 'ni horas después');
     const kA = key(F.s, 'Acústico');   // sin siguiente en su zona: la ventana del ajuste
     ok(M.stretchPlan(F.s, kA, true, at('22:10')).ok, 'a los 10 min, sí');
     ok(!M.stretchPlan(F.s, kA, true, at('22:11')).ok, 'a los 11, no');

@@ -157,7 +157,9 @@
   function bisState(state, b, now, cfg) {
     if (!b || !C.isBand(b) || b.rf !== null || b.alargar || b.nf === null || b.nf === undefined || !(now >= b.nf)) return { ok: false, reason: 'no' };
     const w = bisWindow(state, b, now, cfg), late = Math.floor(now - b.nf), kind = b.kind === 'sc' ? 'sc' : 'show';
-    if (w.next && w.next.ri !== null) return { ok: false, reason: 'next', kind, late, max: w.max, next: w.next };
+    // Si la siguiente ya dio ▶, el botón sale desactivado como aviso, pero solo durante el ajuste (5·10·15 min) y después
+    // caduca (dec. 114): antes quedaba en «next» para toda la noche y la tarjeta «ACABÓ» no se iba nunca.
+    if (w.next && w.next.ri !== null) return late > w.cap ? { ok: false, reason: 'expired', kind, late, max: w.max } : { ok: false, reason: 'next', kind, late, max: w.max, next: w.next };
     if (late > w.max) return { ok: false, reason: 'expired', kind, late, max: w.max };
     return { ok: true, kind, late, max: w.max, left: w.max - late, next: w.next };
   }
