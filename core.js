@@ -101,6 +101,11 @@
   function isSC(mode) { return mode === 'sc' || mode === 'soundcheck'; }
   /** Vista «Jornada completa»: shows, soundchecks, tareas e hitos juntos. */
   function isAll(mode) { return mode === 'all'; }
+  /** Vistas «Tareas» y «Marcadores» (dec. 116): filtran la TABLA del Dashboard por tipo de entrada. */
+  function isKindMode(mode) { return mode === 'tarea' || mode === 'hito'; }
+  /** Vista con la que trabaja el directo (En escena, CALL, cambios, pantallas Live, QR): Tareas y Marcadores no dejan sin
+   *  bandas al directo → jornada completa. Shows, Soundchecks y Todo, igual que siempre. */
+  function engineMode(mode) { return isKindMode(mode) ? 'all' : mode; }
 
   // ── Tipos de entrada (los elige el regidor; nunca se deducen solos) ────
   // banda: show y/o soundcheck, con changeover, CALL y solapes.
@@ -117,10 +122,11 @@
   function isBand(b) { return !!b && (!b.kind || b.kind === 'show' || b.kind === 'sc'); }
 
   /** ¿Entra el artista en esta vista? Show: inicio o fin. Soundcheck: inicio o CALL.
-   *  Jornada completa: cualquier horario (y tareas/hitos con inicio). Tareas e hitos solo salen en Jornada completa. */
+   *  Jornada completa: cualquier horario (y tareas/hitos con inicio). Tareas e hitos: en Jornada completa y en su propia vista. */
   function entersMode(artist, mode) {
     const t = tipoOf(artist);
     if (isAll(mode)) return t === 'banda' ? !!(artist.inicio || artist.fin || artist.soundcheckInicio || artist.soundcheckCall) : !!artist.inicio;
+    if (isKindMode(mode)) return t === mode && !!artist.inicio;
     if (t !== 'banda') return false;
     return isSC(mode) ? !!(artist.soundcheckInicio || artist.soundcheckCall) : !!(artist.inicio || artist.fin);
   }
@@ -130,7 +136,8 @@
     const out = [];
     ((state && state.artists) || []).forEach(a => {
       const t = tipoOf(a);
-      if (t !== 'banda') { if (isAll(mode) && a.inicio) out.push({ a, sc: false, kind: t }); return; }
+      if (t !== 'banda') { if ((isAll(mode) || t === mode) && a.inicio) out.push({ a, sc: false, kind: t }); return; }
+      if (isKindMode(mode)) return;   // vista Tareas / Marcadores: ninguna banda
       const show = !!(a.inicio || a.fin), sc = !!(a.soundcheckInicio || a.soundcheckCall);
       if (show && !isSC(mode)) out.push({ a, sc: false, kind: 'show' });
       if (sc && (isSC(mode) || isAll(mode))) out.push({ a, sc: true, kind: 'sc' });
@@ -233,7 +240,7 @@
     const o = opts || {};
     const day = o.day || 'all';
     const all = projectAll(state, rawBlocks(state), Number.isFinite(o.now) ? o.now : nowAbs());
-    let blocks = all.filter(b => isAll(o.mode) ? true : isSC(o.mode) ? b.kind === 'sc' : b.kind === 'show');
+    let blocks = all.filter(b => isAll(o.mode) ? true : isSC(o.mode) ? b.kind === 'sc' : isKindMode(o.mode) ? b.kind === o.mode : b.kind === 'show');
     if (day !== 'all') blocks = blocks.filter(b => b.jornada === day);
     blocks.sort((a, b) => {
       const an = a.si === null, bn = b.si === null;
@@ -1169,7 +1176,7 @@
     DEFAULT_CUTOFF, DEFAULT_CALL_MINS, DEFAULT_DURATION, DEFAULT_CO_MIN, isFija, setFija, coMinFor,
     MARGIN_WARN, UNNAMED, isUnnamed, eventName, scopeToJornada, jornadaOver, isLibre, setDelayFlag, movesWithDelay, setReal, jornadaOfAbs, activeJornada, legacyCallKey, callIsDone, callKeyName, driftByZone, delayByZone, addRetraso, retrasosOf, blockedIn, movesBy, setAlargar, hitoMargins, MAX_NEXT, ARTIST_COLORS, TIPO_COLORS,
     pad2, parseHM, fmtHM, dayIndex, isoOfDay, shiftDate, toAbs, adjustEnd, nowAbs,
-    cutoffMins, festivalDateOf, entersMode, festivalDays, TIPOS, tipoOf, isBand, isAll, entriesOf, tasksNow, hitosOf,
+    cutoffMins, festivalDateOf, entersMode, festivalDays, TIPOS, tipoOf, isBand, isAll, isKindMode, engineMode, entriesOf, tasksNow, hitosOf,
     getEscenario, artistColor, callAbsFor, buildBlocks,
     blockEnd, isPlaying, playingNow, nextPerStage, progress, changeoverBefore, changeoversNow, gapIdle, nextBandIn, callKey, callAt, callList,
     pickBlocks, stripLabel, stripLabels, validateProject,

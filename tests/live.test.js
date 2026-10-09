@@ -570,6 +570,14 @@
     eq(mac.env.getEl('jfin').hidden, true, 'la Live del Mac no se cierra');
   });
 
+  test('Dec. 116: con el Panel en «Tareas» o «Marcadores», la Live sigue enseñando la banda en escena (no se queda vacía)', async () => {
+    const { s, jor } = festHoy(-10, 60);
+    const vista = mode => { const t = arrancar({ storage: { 'showtime.festival': JSON.stringify(s), 'showtime.config': JSON.stringify({ day: jor, mode }) } }); return t.env.innerLog.map(x => x[1]).join(' ') + ' ' + JSON.stringify(t.env.getEl('cur-name') || {}); };
+    const todo = vista('all');
+    ok(/Banda|BANDA/.test(todo), 'en Todo se ve la banda');
+    ['tarea', 'hito'].forEach(m => ok(/Banda|BANDA/.test(vista(m)), m + ': la Live no filtra por tipo'));
+  });
+
   (async () => {
     let pass = 0, fail = 0;
     for (const [name, fn] of tests) { try { await fn(); pass++; } catch (e) { fail++; console.log('  ✗ ' + name + '\n      ' + (e && e.message || e)); } }

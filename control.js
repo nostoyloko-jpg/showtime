@@ -19,6 +19,9 @@
   // ── Estado (declarado antes de usarse) ───────────────────────────────
   let FEST = null, ORIG = null, CONFIG = Dt.getConfig();
   let BLOCKS = [], ALL_MODE = [], TAREAS = [], DAY_MISSING = '';
+  // LIVE: bloques del DIRECTO (En escena, Siguiente, CALL, cambios, Bis). Con Shows / Soundchecks / Todo es lo mismo que BLOCKS;
+  // con Tareas / Marcadores (que filtran solo la tabla) es la jornada completa: nunca se pierde un CALL ni un show en escena (dec. 116).
+  let LIVE = [], LIVE_MISSING = '';
   const UNDO = [];                 // festivales anteriores (JSON), para «Deshacer»
   const UNDO_MAX = 30;
   // Ventanas Live de este Dashboard: id (= nombre técnico de la ventana) → { w, name, vista, zona, standby }. Lo que dice cada ventana se actualiza en vivo.
@@ -34,7 +37,8 @@
   const KEY_LABEL = { nombre: 'nombre', escenario: 'zona', color: 'color', tipo: 'tipo', jornada: 'jornada', fecha: 'fecha', inicio: 'inicio', fin: 'fin', call: 'CALL', notas: 'notas' };
   const TIPO_TXT = { banda: 'banda', tarea: 'tarea', hito: 'marcador' };
   // Vistas: Jornada completa (todo) · Shows · Soundchecks
-  const VIEW = { all: { title: 'Jornada completa', short: 'Todo', what: 'entradas' }, show: { title: 'Shows', what: 'shows' }, sc: { title: 'Soundchecks', what: 'soundchecks' } };
+  const VIEW = { all: { title: 'Jornada completa', short: 'Todo', what: 'entradas' }, show: { title: 'Shows', what: 'shows' }, sc: { title: 'Soundchecks', what: 'soundchecks' },
+    tarea: { title: 'Tareas', what: 'tareas' }, hito: { title: 'Marcadores', what: 'marcadores' } };   // tarea / hito: dec. 116
 
   // ── Utilidades ────────────────────────────────────────────────────────
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
@@ -130,11 +134,13 @@
   }
 
   function compute() {
-    if (!FEST) { BLOCKS = []; ALL_MODE = []; TAREAS = []; DAY_MISSING = ''; MARGINS = []; return; }
-    const day = CONFIG.day || 'all';
+    if (!FEST) { BLOCKS = []; LIVE = []; LIVE_MISSING = ''; ALL_MODE = []; TAREAS = []; DAY_MISSING = ''; MARGINS = []; return; }
+    const day = CONFIG.day || 'all', em = C.engineMode(CONFIG.mode);
     DAY_MISSING = (day !== 'all' && C.festivalDays(FEST, CONFIG.mode).indexOf(day) < 0) ? day : '';
     BLOCKS = DAY_MISSING ? [] : C.buildBlocks(FEST, { mode: CONFIG.mode, day: day });
-    ALL_MODE = C.buildBlocks(FEST, { mode: CONFIG.mode, day: 'all' });
+    LIVE_MISSING = em === CONFIG.mode ? DAY_MISSING : (day !== 'all' && C.festivalDays(FEST, em).indexOf(day) < 0) ? day : '';
+    LIVE = em === CONFIG.mode ? BLOCKS : LIVE_MISSING ? [] : C.buildBlocks(FEST, { mode: em, day: day });
+    ALL_MODE = C.buildBlocks(FEST, { mode: em, day: 'all' });
     const allB = C.buildBlocks(FEST, { mode: 'all', day: 'all' });
     TAREAS = allB.filter(b => b.kind === 'tarea');   // para «Sin actividad» aunque la vista no pinte tareas (decisión 76)
     MARGINS = C.hitoMargins(FEST, allB, Math.floor(C.nowAbs()));
@@ -267,6 +273,7 @@
     const w = $('warn');
     let msg = '';
     if (FEST && !(FEST.escenarios || []).length) msg = tx('Este evento no tiene zonas. Créalas en Configuración › Zonas o desde la columna Zona de cualquier fila.');
+    else if (DAY_MISSING && C.isKindMode(CONFIG.mode)) msg = tx('El {dia} no tiene {what}.', { dia: fmtDay(DAY_MISSING), what: tx(viewOf().what) });   // la Live no filtra por tareas / marcadores
     else if (DAY_MISSING) msg = tx('El {dia} todavía no tiene {what}. La Pantalla Live lo está avisando.', { dia: fmtDay(DAY_MISSING), what: tx(viewOf().what) });
     w.textContent = msg; w.hidden = !msg;
   }
@@ -640,8 +647,8 @@
 
   // Filas que suenan / siguientes / pasadas (solo clases: no rehace las casillas)
   function markRows(nowInt) {
-    const playing = new Set(C.playingNow(BLOCKS, nowInt).concat(C.tasksNow(BLOCKS, nowInt)).map(b => b.key));
-    const next = new Set(C.nextPerStage(BLOCKS, nowInt).map(b => b.key));
+    const playing = new Set(C.playingNow(LIVE, nowInt).concat(C.tasksNow(LIVE, nowInt)).map(b => b.key));
+    const next = new Set(C.nextPerStage(LIVE, nowInt).map(b => b.key));
     document.querySelectorAll('#tbody tr[data-key]').forEach(tr => {
       const key = tr.dataset.key, b = BLOCKS.find(x => x.key === key);
       tr.classList.toggle('playing', playing.has(key));
@@ -681,16 +688,16 @@
   function renderLive(nowMins, nowInt) {
     const order = id => { const i = ((FEST && FEST.escenarios) || []).findIndex(e => e.id === id); return i < 0 ? 999 : i; };
     const rows = [];
-    const kindTag = b => CONFIG.mode === 'all' && b.kind === 'sc' ? tx('Soundcheck') + ' · ' : '';
-    C.playingNow(BLOCKS, nowInt).forEach(b => {
+    const kindTag = b => C.engineMode(CONFIG.mode) === 'all' && b.kind === 'sc' ? tx('Soundcheck') + ' · ' : '';
+    C.playingNow(LIVE, nowInt).forEach(b => {
       const col = safeColor(b.stageColor || b.color, '#888'), p = C.progress(b, nowInt);
       rows.push({ o: order(b.stageId), h: '<div class="v-row" style="--c:' + col + '"><div class="v-name">' + esc(b.name) + '</div>' +
         '<div class="v-meta">' + kindTag(b) + C.fmtHM(b.si) + '–' + C.fmtHM(b.sf) + (b.stage ? ' · ' + esc(b.stage) : '') + '</div>' +
         '<div class="v-rem" style="color:' + col + '">' + (xtraOver(b, nowInt) !== null ? tx('TIEMPO EXTRA · +{n} min', { n: xtraOver(b, nowInt) }) : tx('{n} min restantes', { n: p.remaining }) + (b.alargar && b.rf === null ? ' · ' + tx('tiempo extra') : '')) + '</div>' + (b.rf === null ? xtraBtn(b) : '') + '</div>' });
     });
     const bis = bisCands(nowInt), bisShown = new Set(), bisFor = z => { z = z || ''; if (!bis[z]) return ''; bisShown.add(z); return bisBtnHtml(bis[z]); };
-    C.playingNow(BLOCKS, nowInt).forEach(b => bisShown.add(b.stageId || ''));   // la zona ya suena: ahí no se ofrece el bis
-    C.changeoversNow(BLOCKS, nowMins, TAREAS).forEach(co => {
+    C.playingNow(LIVE, nowInt).forEach(b => bisShown.add(b.stageId || ''));   // la zona ya suena: ahí no se ofrece el bis
+    C.changeoversNow(LIVE, nowMins, TAREAS).forEach(co => {
       const col = safeColor(co.stageColor || co.next.color, '#888');
       if (!co.standby && co.kind === 'idle') {      // hueco sin cambio real (decisión 76)
         rows.push({ o: order(co.stageId), h: '<div class="v-row co idle" style="--c:' + col + '"><div class="v-name" style="color:var(--muted)">' + tx('— SIN ACTIVIDAD —') + (co.stage ? ' · ' + esc(co.stage) : '') + '</div>' +
@@ -709,26 +716,26 @@
         '<div class="v-meta">' + tx('a las {h} · hace {n} min', { h: C.fmtHM(c.b.nf), n: c.late }) + '</div>' + bisBtnHtml(c) + '</div>' });
     });
     // Tareas en curso (operativa del día): debajo de los escenarios, sin cuenta de cambio
-    C.tasksNow(BLOCKS, nowInt).forEach(b => {
-      const p = C.progress(b, nowInt), nb = C.nextBandIn(BLOCKS, b.stageId, nowInt);
+    C.tasksNow(LIVE, nowInt).forEach(b => {
+      const p = C.progress(b, nowInt), nb = C.nextBandIn(LIVE, b.stageId, nowInt);
       rows.push({ o: b.stageId ? order(b.stageId) : 1000, h: '<div class="v-row tarea"><div class="v-name">' + tx('Tarea') + ' · ' + esc(b.name) + '</div>' +
         '<div class="v-meta">' + C.fmtHM(b.si) + '–' + C.fmtHM(C.blockEnd(b)) + (b.stage ? ' · ' + esc(b.stage) : '') + ' · ' + tx('quedan {n} min', { n: p.remaining }) + '</div>' +
         (nb ? '<div class="v-meta">' + tx('después') + ' <b>' + esc(nb.name) + '</b> · ' + C.fmtHM(nb.si) + '</div>' : '') + '</div>' });
     });
     rows.sort((a, b) => a.o - b.o);
-    const r = C.pickBlocks(BLOCKS, nowInt, 1);
-    $('v-now').innerHTML = rows.length ? rows.map(x => x.h).join('') : '<div class="v-empty">' + (DAY_MISSING ? tx('Jornada sin datos') : r.ended ? tx('FIN DE JORNADA') : '—') + '</div>';
+    const r = C.pickBlocks(LIVE, nowInt, 1);
+    $('v-now').innerHTML = rows.length ? rows.map(x => x.h).join('') : '<div class="v-empty">' + (LIVE_MISSING ? tx('Jornada sin datos') : r.ended ? tx('FIN DE JORNADA') : '—') + '</div>';
 
-    const next = C.nextPerStage(BLOCKS, nowInt);
+    const next = C.nextPerStage(LIVE, nowInt);
     $('v-next').innerHTML = next.length ? next.map(b => {
-      const col = safeColor(b.stageColor || b.color, '#888'), co = C.changeoverBefore(BLOCKS, b, TAREAS);
+      const col = safeColor(b.stageColor || b.color, '#888'), co = C.changeoverBefore(LIVE, b, TAREAS);
       const badge = co ? (co.mins < 0 ? tx('Solapa {n} min', { n: -co.mins }) : b.standby ? tx('Standby {n} min', { n: co.mins }) : co.idle ? '' : tx('Cambio {n} min', { n: co.mins })) : '';
       return '<div class="v-row" style="--c:' + col + '"><div class="v-name">' + esc(b.name) + '</div>' +
         '<div class="v-meta">' + kindTag(b) + C.fmtHM(b.si) + '–' + C.fmtHM(b.sf) + (b.stage ? ' · ' + esc(b.stage) : '') + (badge ? ' · ' + badge : '') + '</div></div>';   // sin Tiempo extra: solo tiene sentido para la que suena (o el bis)
     }).join('') : '<div class="v-empty">—</div>';
 
     const done = new Set(Dt.getCallDone());
-    const calls = C.callList(BLOCKS, nowInt, Dt.callMinsOf(FEST, CONFIG), done);
+    const calls = C.callList(LIVE, nowInt, Dt.callMinsOf(FEST, CONFIG), done);
     $('v-call').innerHTML = calls.length ? calls.map(b => {
       const col = safeColor(b.stageColor || b.color, '#ffc533');
       return '<div class="v-row v-call" style="--c:' + col + '"><div><div class="v-name" style="color:' + col + '">' + esc(b.name) + '</div>' +
@@ -754,7 +761,7 @@
     if (!FEST) return;
     logFoto();
     const mNow = Math.floor(C.nowAbs(d));
-    if (LAST_MIN !== null && mNow !== LAST_MIN) { compute(); if (BLOCKS.some(b => b.alargar && b.rf === null)) renderTable(); }   // el estimado en directo (Alargar)
+    if (LAST_MIN !== null && mNow !== LAST_MIN) { compute(); if (LIVE.some(b => b.alargar && b.rf === null)) renderTable(); }   // el estimado en directo (Alargar)
     LAST_MIN = mNow;
     renderMeteo();
     const nowMins = C.nowAbs(d), nowInt = Math.floor(nowMins);
@@ -796,7 +803,7 @@
     if (k === 'jornada') shown = fmtDay(r.value);
     else if (k === 'escenario') { const e = C.getEscenario(r.state, r.value); shown = e ? e.nombre : 'sin zona'; trv = !e; }
     else if (k === 'tipo') { shown = TIPO_TXT[r.value]; trv = true; }
-    const fuera = k === 'tipo' && CONFIG.mode !== 'all' && r.value !== 'banda';
+    const fuera = k === 'tipo' && CONFIG.mode !== 'all' && (C.isKindMode(CONFIG.mode) ? r.value !== CONFIG.mode : r.value !== 'banda');
     commitFestival(r.state, [fuera ? '{name}: {campo} → {valor} (se ve en Jornada completa)' : '{name}: {campo} → {valor}', { name, campo: KEY_LABEL[k], valor: shown, tr: trv ? ['campo', 'valor'] : ['campo'] }]);
     const row = document.querySelector('#tbody tr[data-id="' + CSS.escape(String(id)) + '"], #tbody-sin tr[data-id="' + CSS.escape(String(id)) + '"]');
     if (row) { row.classList.add('flash'); row.scrollIntoView({ block: 'nearest' }); }
@@ -894,7 +901,7 @@
   // Aviso de fin de jornada: propone pasar a la siguiente, pero el cambio lo hace el regidor.
   let daybarKey = '';
   function renderDaybar(nowInt) {
-    const r = FEST ? C.nextJornadaAfter(FEST, CONFIG.mode, CONFIG.day, nowInt) : null;
+    const r = FEST ? C.nextJornadaAfter(FEST, C.engineMode(CONFIG.mode), CONFIG.day, nowInt) : null;   // la jornada acaba cuando acaba TODO, no solo las tareas
     const key = r ? r.done + '>' + r.next + '@' + CONFIG.mode : '';
     if (key === daybarKey) return;
     daybarKey = key;
@@ -3244,6 +3251,8 @@
       { group: 'Vistas', label: 'Jornada completa', ic: 'i-clock', sub: 'Todos los días, todo el horario', search: 'jornada completa todo dia', run: () => { spotSetDay('all'); spotSetMode('all'); } },
       { group: 'Vistas', label: 'Shows', ic: 'i-stage', sub: 'Solo conciertos', search: 'shows conciertos', run: () => spotSetMode('show') },
       { group: 'Vistas', label: 'Soundchecks', ic: 'i-stage', sub: 'Solo soundchecks', search: 'soundchecks pruebas', run: () => spotSetMode('sc') },
+      { group: 'Vistas', label: 'Tareas', ic: 'i-check', sub: 'Solo las tareas técnicas y de producción', search: 'ver tareas tasks operativa montaje comidas', run: () => spotSetMode('tarea') },
+      { group: 'Vistas', label: 'Marcadores', ic: 'i-clock', sub: 'Solo los marcadores temporales y toques de queda', search: 'ver marcadores hitos key times puertas curfew toque de queda', run: () => spotSetMode('hito') },
       { group: 'Vistas', label: 'Modo Foco', ic: 'i-expand', kbd: '⇧⌘F', sub: focusOn() ? 'Activado · desactivar' : 'Solo lo de directo, letra grande', search: 'modo foco directo', run: () => { setFocus(!focusOn()); toast(focusOn() ? 'Modo foco activado' : 'Modo foco desactivado', false, 2000); } },
       { group: 'Vistas', label: 'Modo Stage (Alto Contraste)', ic: 'i-sun', kbd: '⇧⌘C', sub: panelStyle() === 'stage' ? 'Activado · volver a Studio' : 'Negro y amarillo para el sol en directo', search: 'stage alto contraste high contrast sol escenario studio', run: () => togglePanelContrast() },
       { group: 'Vistas', label: 'Standby en Confidence', ic: 'i-pause', sub: standbyOn() ? 'Activado · quitar' : 'Cartel y hora en las Confidence', search: 'standby confidence cartel', run: () => setStandby(!standbyOn()) },

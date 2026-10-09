@@ -88,6 +88,11 @@
   const UI_EN = {
     /*UI-EN-BEGIN*/
     panel: {
+      "El {dia} no tiene {what}.": "{dia} has no {what}.",
+      "tareas": "tasks",
+      "marcadores": "key times",
+      "Solo las tareas técnicas y de producción": "Technical and production tasks only",
+      "Solo los marcadores temporales y toques de queda": "Key times and curfews only",
       "Transporte": "Transport",
       "Nube (Internet · por defecto)": "Cloud (Internet · default)",
       "Red Local Wi-Fi (0 internet)": "Local Wi-Fi network (no internet)",

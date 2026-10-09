@@ -71,6 +71,7 @@
     if (window.ShowtimeI18n) window.ShowtimeI18n.setLang(CONFIG.lang);   // el idioma lo manda el Panel (también por la emisión)
     if (URLP.get('estilo')) CONFIG.style = Dt.normStyle(URLP.get('estilo'));
     if (URLP.get('modo')) CONFIG.mode = /^(sc|soundcheck)$/.test(URLP.get('modo')) ? 'sc' : /^(all|jornada|todo)$/.test(URLP.get('modo')) ? 'all' : 'show';
+    if (C.engineMode) CONFIG.mode = C.engineMode(CONFIG.mode);   // Tareas / Marcadores filtran solo la tabla del Panel: la Live sigue con la jornada completa (dec. 116)
     const vt = VIEW_TXT[CONFIG.mode] || VIEW_TXT.show;
 
     // Día elegido sin datos: se AVISA; no se cambia de día por cuenta propia.

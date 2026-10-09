@@ -1745,6 +1745,40 @@ const miss = [...found].filter(k => !I.txHas(k) && !/^(OK|CALL|SC|Live|Raycast|S
     ok(/fetch\('http:\/\/localhost:' \+ NET\.port \+ '\/showtime-local\.json'/.test(js), 'detecta el servidor y su IP');
   });
 
+  test('Dec. 116: Ver ▾ Tareas y Marcadores filtran SOLO la tabla; En escena, Siguiente y CALL siguen con la jornada completa', () => {
+    let s = festEn(NOWc, add => { add('Suena', -30, 30); add('Viene', 10, 80); });   // CALL de Viene ya activo
+    const j = C.jornadaOfAbs(s, nAbs), P = s.escenarios[0].id, hm = x => C.fmtHM(((x % 1440) + 1440) % 1440);
+    s = C.addArtist(s, 'all', { tipo: 'tarea', jornada: j, nombre: 'Carga camión', escenarioId: P, inicio: hm(nAbs - 10), fin: hm(nAbs + 50) }).state;
+    s = C.addArtist(s, 'all', { tipo: 'hito', jornada: j, nombre: 'Curfew', escenarioId: '', inicio: hm(nAbs + 120) }).state;
+    const ver = mode => {
+      const t = panel({ 'showtime.festival': JSON.stringify(s), 'showtime.config': JSON.stringify({ mode, day: 'all' }) }, NOWc);
+      return { t, tbody: ultimo(t, 'tbody'), now: ultimo(t, 'v-now'), next: ultimo(t, 'v-next'), call: ultimo(t, 'v-call'), cfg: t.read('showtime.config') || {} };
+    };
+    const base = ver('all'), ta = ver('tarea'), hi = ver('hito');
+    ok(/Carga camión/.test(ta.tbody) && !/Suena|Viene|Curfew/.test(ta.tbody), 'Tareas: solo la tarea en la tabla');
+    const filas = h => (h.match(/<tr data-id=/g) || []).length;
+    eq(filas(ta.tbody), 1, 'Tareas: una fila'); eq(filas(hi.tbody), 1, 'Marcadores: una fila'); eq(filas(base.tbody), 4, 'Todo: las cuatro');
+    ok(/Curfew/.test(hi.tbody) && /data-mode="show"[^>]*data-key="\d+:hito"/.test(hi.tbody), 'Marcadores: solo el marcador (su margen sí cita a la banda)');
+    ok(/Suena/.test(ta.now) && /Suena/.test(hi.now), 'En escena sigue mostrando la banda que suena');
+    eq(ta.now, base.now, 'En escena idéntico a Todo'); eq(hi.now, base.now);
+    eq(ta.next, base.next, 'Siguiente idéntico a Todo'); eq(ta.call, base.call, 'CALL idéntico a Todo: no se pierde ningún aviso'); eq(hi.call, base.call);
+    ok(/Viene/.test(base.call), 'el CALL de Viene está ahí: ' + base.call.slice(0, 200));
+    eq(ta.t.env.getEl('view-lbl').textContent, 'Tareas'); eq(hi.t.env.getEl('view-lbl').textContent, 'Marcadores');
+    ok(/Tareas/.test(ta.t.env.getEl('list-title').textContent) && /Marcadores/.test(hi.t.env.getEl('list-title').textContent), 'título de la lista');
+    // datos.js acepta los modos; los raros siguen siendo Shows
+    const Dt = ta.t.env.win.ShowtimeDatos;
+    eq(Dt.normConfig({ mode: 'tarea' }).mode, 'tarea'); eq(Dt.normConfig({ mode: 'hito' }).mode, 'hito'); eq(Dt.normConfig({ mode: 'otra' }).mode, 'show');
+    // Menú y paleta ⌘K
+    const html = D.src('index.html'), js = D.src('control.js');
+    ok(/data-mode="sc"[^\n]*Soundchecks<\/button>\s*<button class="mitem" data-mode="tarea" role="menuitemradio" title="Solo las tareas técnicas y de producción"[^>]*>Tareas<\/button>\s*<button class="mitem" data-mode="hito" role="menuitemradio" title="Solo los marcadores temporales y toques de queda"[^>]*>Marcadores<\/button>/.test(html), 'Ver ▾ con las 5 vistas');
+    ok(/label: 'Tareas'[^\n]*spotSetMode\('tarea'\)/.test(js) && /label: 'Marcadores'[^\n]*spotSetMode\('hito'\)/.test(js), '⌘K: Tareas y Marcadores');
+    ok(/tarea: \{ title: 'Tareas', what: 'tareas' \}, hito: \{ title: 'Marcadores', what: 'marcadores' \}/.test(js), 'VIEW ampliado');
+    // La Live no se queda sin bandas aunque el Panel esté en Tareas / Marcadores
+    ok(/if \(C\.engineMode\) CONFIG\.mode = C\.engineMode\(CONFIG\.mode\);/.test(D.src('live.js')), 'la Live usa la jornada completa');
+    const I = ta.t.env.win.ShowtimeI18n;
+    ['Tareas', 'Marcadores', 'Solo las tareas técnicas y de producción', 'Solo los marcadores temporales y toques de queda'].forEach(k => ok(I.txHas(k), 'EN: ' + k));
+  });
+
   // ── Ejecutor ─────────────────────────────────────────────────────────
   (async () => {
     let pass = 0, fail = 0;

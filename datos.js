@@ -14,7 +14,7 @@
   const APP = 'showtime';
   const K = {
     festival: 'showtime.festival',     // proyecto Stage Master importado (con ajustes)
-    config:   'showtime.config',       // { mode: show|sc|all, day, style, callMins }
+    config:   'showtime.config',       // { mode: show|sc|all|tarea|hito, day, style, callMins }
     callDone: 'showtime.callDone',     // [callKey, ...] avisos marcados con OK
     original: 'showtime.original',     // copia del festival tal como se importó (para marcar cambios)
     flash:    'showtime.flash',        // mensaje flash activo en la Pantalla Live: { id, text, at (ms) } o null
@@ -58,7 +58,7 @@
   function normStyle(v) { return v === 'stage' || v === 'escenario' || v === 'ambar' ? 'stage' : 'studio'; }
   function normConfig(c) {
     const o = Object.assign({}, DEFAULT_CONFIG, c || {});
-    o.mode = (o.mode === 'sc' || o.mode === 'soundcheck') ? 'sc' : o.mode === 'all' ? 'all' : 'show';
+    o.mode = (o.mode === 'sc' || o.mode === 'soundcheck') ? 'sc' : o.mode === 'all' || o.mode === 'tarea' || o.mode === 'hito' ? o.mode : 'show';   // tarea / hito: dec. 116
     o.style = normStyle(o.style);
     o.day = o.day || 'all';
     o.callMins = Number.isFinite(o.callMins) && o.callMins > 0 ? o.callMins : null;

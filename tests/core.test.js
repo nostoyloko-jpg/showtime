@@ -574,6 +574,24 @@
     eq(C.buildBlocks(DIA, { mode: 'show', day: 'all' }).length, 4, 'Shows: solo conciertos');
     eq(C.buildBlocks(DIA, { mode: 'sc', day: 'all' }).length, 3, 'Soundchecks: solo pruebas');
   });
+  test('Vistas Tareas y Marcadores (dec. 116): filtros puros por tipo; nunca una banda; el directo sigue con la jornada completa', () => {
+    const T = C.buildBlocks(DIA, { mode: 'tarea', day: 'all' }), H = C.buildBlocks(DIA, { mode: 'hito', day: 'all' });
+    deq(T.map(b => b.name), ['Comida técnicos'], 'Tareas: solo tareas'); ok(T.every(b => b.kind === 'tarea'));
+    deq(H.map(b => b.name), ['Puertas', 'Curfew'], 'Marcadores: solo hitos, en orden'); ok(H.every(b => b.kind === 'hito'));
+    deq(C.entriesOf(DIA, 'tarea').map(e => e.kind), ['tarea']); deq(C.entriesOf(DIA, 'hito').map(e => e.kind), ['hito', 'hito']);
+    ok(C.entriesOf(DIA, 'tarea').concat(C.entriesOf(DIA, 'hito')).every(e => !e.sc), 'ningún soundcheck ni show');
+    ok(C.entersMode(DIA.artists[6], 'tarea') && !C.entersMode(DIA.artists[6], 'hito'), 'la tarea entra solo en su vista');
+    ok(C.entersMode(DIA.artists[4], 'hito') && !C.entersMode(DIA.artists[4], 'tarea'), 'el hito, en la suya');
+    ok(!C.entersMode(DIA.artists[0], 'tarea') && !C.entersMode(DIA.artists[0], 'hito'), 'una banda no entra en ninguna');
+    ok(!C.entersMode({ showtimeTipo: 'tarea', nombre: 'Sin hora' }, 'tarea'), 'sin inicio no entra (sale en Sin horario de Todo)');
+    deq(C.festivalDays(DIA, 'tarea'), ['2026-07-10']); deq(C.festivalDays(DIA, 'hito'), ['2026-07-10'], 'el curfew de las 04:30 es de la jornada del 10');
+    eq(C.buildBlocks(DIA, { mode: 'hito', day: '2026-07-10' }).length, 2);
+    // Sin regresión en las vistas de siempre
+    eq(C.buildBlocks(DIA, { mode: 'show', day: 'all' }).length, 4); eq(C.buildBlocks(DIA, { mode: 'sc', day: 'all' }).length, 3); eq(C.buildBlocks(DIA, { mode: 'all', day: 'all' }).length, 10);
+    // El directo nunca filtra por tareas / marcadores
+    eq(C.engineMode('tarea'), 'all'); eq(C.engineMode('hito'), 'all'); eq(C.engineMode('show'), 'show'); eq(C.engineMode('sc'), 'sc'); eq(C.engineMode('all'), 'all');
+    ok(C.isKindMode('tarea') && C.isKindMode('hito') && !C.isKindMode('show') && !C.isKindMode('all'));
+  });
   test('Jornada completa: shows + soundchecks + tareas + hitos, en orden y con kind/key', () => {
     eq(ALL.length, 4 + 3 + 1 + 2, 'el curfew de las 04:30 es de la jornada del 10');
     deq(ALL.slice(0, 3).map(b => b.kind), ['tarea', 'sc', 'sc']);
