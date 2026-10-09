@@ -110,7 +110,13 @@
     if (!Array.isArray(list)) return [];
     return list.filter(a => a && typeof a.id === 'string' && typeof a.text === 'string' && a.text.trim() && Number.isFinite(a.at) && Number.isFinite(a.ms) && a.ms >= 0
       && (a.ms === 0 || now - a.at < a.ms)).slice(-AVISOS_MAX)
-      .map(a => ({ id: a.id, text: a.text.slice(0, 140), at: a.at, ms: a.ms, from: typeof a.from === 'string' ? a.from.slice(0, 80) : '' }));
+      .map(a => ({ id: a.id, text: a.text.slice(0, 140), at: a.at, ms: a.ms, from: typeof a.from === 'string' ? a.from.slice(0, 80) : '', by: normBy(a.by) }));
+  }
+  /** Etiqueta pública del origen de un mensaje o aviso (dec. 106): { k:'prod' } = «[Producción]» · { k:'zone', n } = «[Zona]» · null = sin etiqueta (Dashboard o mando general). */
+  function normBy(b) {
+    if (b && b.k === 'prod') return { k: 'prod' };
+    if (b && b.k === 'zone' && typeof b.n === 'string' && b.n.trim()) return { k: 'zone', n: b.n.trim().slice(0, 40) };
+    return null;
   }
   function getAvisos() { return normAvisos(read(K.avisos, []), Date.now()); }
   const CHAT_MAX = 300;
@@ -238,12 +244,12 @@
     write(K.callDone, list); send({ type: 'callDone', callDone: list }); return list;
   }
   /** Mensaje flash a la Pantalla Live (texto) o retirarlo (null). `to`: vistas de destino (null = todas). */
-  function setFlash(text, to, zones) {
+  function setFlash(text, to, zones, by) {
     if (READONLY) return getFlash();
     const c = getConfig();   // colores y duración: los de este momento; si luego se cambian, este mensaje no cambia
     const Vv = root.ShowtimeVistas, tg = Vv ? Vv.normTargets(to) : null;
     const zs = Vv && (!tg || tg.indexOf('confidence') >= 0) ? Vv.normZones(zones) : null;   // zonas: solo cuentan para Confidence
-    const f = text ? { id: Date.now().toString(36), text: String(text).slice(0, 140), at: Date.now(), ms: c.msgSecs * 1000, bg: c.msgBg, fg: c.msgFg, to: tg, zones: zs } : null;
+    const f = text ? { id: Date.now().toString(36), text: String(text).slice(0, 140), at: Date.now(), ms: c.msgSecs * 1000, bg: c.msgBg, fg: c.msgFg, to: tg, zones: zs, by: normBy(by) } : null;
     write(K.flash, f); send({ type: 'flash', flash: f });
     listeners.forEach(fn => { try { fn('flash'); } catch (e) { console.error(e); } });
     return f;
@@ -259,12 +265,12 @@
   /** El tiempo: guarda el dato (o el error) y lo manda a las Live abiertas. Solo el Dashboard lo pide. */
   function setMeteo(m) { if (READONLY) return; write(K.meteo, m || null); send({ type: 'meteo', meteo: m || null }); }
   /** Aviso nuevo (puntual: dura lo de Configuración › Mensajes › Avisos puntuales, 2 min por defecto; permanente: hasta que lo quite el Stage Manager). Se suma a los que haya. */
-  function addAviso(text, perm, from) {
+  function addAviso(text, perm, from, by) {
     if (READONLY) return null;
     const t = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 140);
     if (!t) return null;
     const c = getConfig(), now = Date.now();
-    const a = { id: now.toString(36) + Math.random().toString(36).slice(2, 6), text: t, at: now, ms: perm ? 0 : c.avisoSecs * 1000, from: String(from || '').slice(0, 80) };
+    const a = { id: now.toString(36) + Math.random().toString(36).slice(2, 6), text: t, at: now, ms: perm ? 0 : c.avisoSecs * 1000, from: String(from || '').slice(0, 80), by: normBy(by) };
     const list = getAvisos().concat([a]).slice(-AVISOS_MAX);
     write(K.avisos, list); send({ type: 'avisos', avisos: list });
     listeners.forEach(fn => { try { fn('avisos'); } catch (e) { console.error(e); } });
@@ -297,6 +303,6 @@
     getFestival, getConfig, getCallDone, getFlash, setFlash, getAvisos, addAviso, removeAviso, normAvisos, getChat, addChat, getMeteo, setMeteo, getStandby, setStandby, normStandby, FLASH_MS, MSG_SECS, AVISO_SECS, flashMs, flashLeft, callMinsOf, getOriginal, setOriginal,
     setFestival, setConfig, markCallDone, pruneCallDone,
     onChange, onPeer, addPeer, send, hello, ping,
-    READONLY, onWrite, onSaveState, getSnapshot, loadSnapshot, getScope, normScope
+    READONLY, onWrite, onSaveState, getSnapshot, loadSnapshot, getScope, normScope, normBy
   };
 })(window);

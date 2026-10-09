@@ -153,7 +153,7 @@
   function tickerItems(state, screens, now, meteo, avisos) {
     const t = normScreens(screens).ticker, out = [];
     // Avisos escritos a mano (Producción / Stage Manager): siempre delante, en ámbar
-    (Array.isArray(avisos) ? avisos : []).forEach(a => { if (a && a.text) out.push({ kind: 'aviso', level: 'warn', text: String(a.text).toUpperCase() }); });
+    (Array.isArray(avisos) ? avisos : []).forEach(a => { if (a && a.text) { const l = byLabel(a.by); out.push({ kind: 'aviso', level: 'warn', text: ((l ? l + ' ' : '') + String(a.text)).toUpperCase() }); } });
     if (!state) return out;
     const n = Math.floor(now), jor = C.activeJornada(state, n);
     if (t.delays && C.delayByZone) {
@@ -202,7 +202,14 @@
     return list.find(s => !s.isInternal && !s.isPrimary) || list.find(s => !s.isInternal) || list.find(s => !s.isPrimary) || list[0];
   }
 
-  const API = { VISTAS, VISTA_TXT, VISTA_SUB, DEFAULT_SCREENS, normVista, nextVista, normProdVista, nextProdVista, normScreens, normTargets, normZones, flashFor, targetsTxt,
+  /** «[Producción]» / «[Production]» o «[Zona]»: etiqueta pública del origen (dec. 106). '' sin etiqueta. */
+  function byLabel(by) {
+    if (!by) return '';
+    if (by.k === 'prod') return '[' + tx('Producción') + ']';
+    if (by.k === 'zone' && by.n) return '[' + String(by.n) + ']';
+    return '';
+  }
+  const API = { byLabel, VISTAS, VISTA_TXT, VISTA_SUB, DEFAULT_SCREENS, normVista, nextVista, normProdVista, nextProdVista, normScreens, normTargets, normZones, flashFor, targetsTxt,
     level, fmtClock, confidence, tickerItems, backstageCalls, liveUrl, parseLive, pickScreen };
   if (isNode) module.exports = API;
   else root.ShowtimeVistas = API;

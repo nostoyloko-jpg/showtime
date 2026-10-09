@@ -232,7 +232,7 @@
     $('btn-undo').disabled = !UNDO.length;
     $('btn-undo').querySelector('span').textContent = UNDO.length ? tx('Deshacer ({n})', { n: UNDO.length }) : tx('Deshacer');
     $('btn-undo').title = UNDO.length ? tx('Deshacer ({n}): {what} (⌘Z)', { n: UNDO.length, what: UNDO[UNDO.length - 1].m }) : tx('Nada que deshacer');
-    $('fest-name').textContent = has ? ((FEST.event && FEST.event.nombre) || tx('Evento sin nombre')) : tx('Sin evento');
+    $('fest-name').textContent = has ? C.eventName(FEST, tx) : tx('Sin evento');
     const d = has && ORIG ? C.diffSummary(ORIG, FEST) : { total: 0 };
     $('mods').hidden = !d.total;
     $('mods').textContent = tx('{n} sin exportar', { n: d.total });
@@ -420,7 +420,7 @@
     const tight = hitoChips(nowInt);
     // Avisos escritos a mano (Producción): delante; la ✕ es solo del Stage Manager
     const av = (Dt.getAvisos ? Dt.getAvisos() : []).map(a => '<span class="dchip absorb aviso" title="' + esc((a.from ? a.from + ' · ' : '') + tx(a.ms ? 'aviso puntual' : 'aviso permanente: solo se quita con la ✕')) + '"><svg class="ic"><use href="#i-msg"/></svg>' +
-      esc(a.text) + '<button class="avx" type="button" data-aviso-x="' + esc(a.id) + '" title="' + tx('Quitar aviso') + '" aria-label="' + tx('Quitar aviso') + '"><svg class="ic"><use href="#i-x"/></svg></button></span>').join('');
+      (a.by ? '<b class="byl">' + esc(Vs.byLabel(a.by)) + '</b> ' : '') + esc(a.text) + '<button class="avx" type="button" data-aviso-x="' + esc(a.id) + '" title="' + tx('Quitar aviso') + '" aria-label="' + tx('Quitar aviso') + '"><svg class="ic"><use href="#i-x"/></svg></button></span>').join('');
     const h = av + html + tight + meteoChips(meteoState());
     if ($('drift').innerHTML !== h) $('drift').innerHTML = h;
   }
@@ -935,7 +935,8 @@
   function festForm(ev) {
     ev = ev || {};
     return '<div class="form">' +
-      '<label for="f-nombre">' + tx('Nombre') + '</label><input id="f-nombre" type="text" value="' + esc(ev.nombre || '') + '" autocomplete="off">' +
+      // Evento sin nombre: la casilla sale vacía con «Evento sin nombre» de fondo (en el idioma activo), no con el texto guardado
+      '<label for="f-nombre">' + tx('Nombre') + '</label><input id="f-nombre" type="text" value="' + esc(C.isUnnamed(ev.nombre) ? '' : ev.nombre) + '"' + (ev.nombre && C.isUnnamed(ev.nombre) ? ' placeholder="' + esc(tx('Evento sin nombre')) + '"' : '') + ' autocomplete="off">' +
       '<label for="f-ini">' + tx('Primera jornada') + '</label><input id="f-ini" type="date" value="' + esc(ev.fechaInicio || '') + '">' +
       '<label for="f-fin">' + tx('Última jornada') + '</label><input id="f-fin" type="date" value="' + esc(ev.fechaFin || '') + '">' +
       '<label for="f-cut">' + tx('Hora de corte') + '</label><input id="f-cut" type="text" value="' + esc(ev.dayCutoff || C.DEFAULT_CUTOFF) + '" style="width:90px">' +
@@ -947,14 +948,15 @@
       '<div id="f-err" class="err" style="grid-column:1/-1;margin:0"></div></div>';
   }
   function readFestForm() {
-    return { nombre: $('f-nombre').value, fechaInicio: $('f-ini').value, fechaFin: $('f-fin').value || $('f-ini').value, dayCutoff: $('f-cut').value, callMins: $('f-call').value, coMin: $('f-comin').value };
+    const n = String($('f-nombre').value || '').trim();   // vacío en un evento sin nombre: sigue sin nombre (se guarda el texto de siempre)
+    return { nombre: n || (FEST && C.isUnnamed(FEST.event && FEST.event.nombre) && $('f-nombre').placeholder ? C.UNNAMED : ''), fechaInicio: $('f-ini').value, fechaFin: $('f-fin').value || $('f-ini').value, dayCutoff: $('f-cut').value, callMins: $('f-call').value, coMin: $('f-comin').value };
   }
 
   function askNew() {
     const d = FEST && ORIG ? C.diffSummary(ORIG, FEST) : { total: 0 };
     let html = festForm({});
     if (d.total) html += '<div class="warnbox" style="margin-top:12px">' + tx('El evento actual tiene {n} cambio(s) sin exportar y se sustituirá. Exporta antes si los quieres guardar.', { n: d.total }) + '</div>';
-    else if (FEST) html += '<p style="margin-top:12px">' + tx('El evento actual («{name}») se sustituirá. Está guardado si lo exportaste.', { name: esc(FEST.event && FEST.event.nombre) }) + '</p>';
+    else if (FEST) html += '<p style="margin-top:12px">' + tx('El evento actual («{name}») se sustituirá. Está guardado si lo exportaste.', { name: esc(C.eventName(FEST, tx)) }) + '</p>';
     const acts = [{ label: 'Cancelar' }];
     if (d.total) acts.push({ label: 'Exportar el actual', run: () => { exportJSON(); setTimeout(askNew, 300); } });
     acts.push({ label: 'Crear evento', kind: 'primary', run: () => {
@@ -1579,11 +1581,11 @@
     }
     const s = r.state, ev = s.event || {};
     // Sin evento abierto y archivo limpio: se abre directamente (no hay nada que perder ni que avisar)
-    if (!FEST && !r.warnings.length) { loadNew(s, tx('Evento abierto: {name}', { name: ev.nombre || fname })); return; }
+    if (!FEST && !r.warnings.length) { loadNew(s, tx('Evento abierto: {name}', { name: ev.nombre ? C.eventName(s, tx) : fname })); return; }
     const dShow = C.festivalDays(s, 'show'), dSc = C.festivalDays(s, 'sc');
     const nT = s.artists.filter(a => C.tipoOf(a) === 'tarea').length, nH = s.artists.filter(a => C.tipoOf(a) === 'hito').length;
     let html = '<p>' + tx('Archivo: <b>{f}</b>', { f: esc(fname) }) + '</p><ul>' +
-      '<li>' + tx('Evento: <b>{name}</b>', { name: esc(ev.nombre || tx('sin nombre')) }) + '</li>' +
+      '<li>' + tx('Evento: <b>{name}</b>', { name: esc(C.eventName(s, tx)) }) + '</li>' +
       '<li>' + tx('{n} bandas', { n: s.artists.length - nT - nH }) + ' · ' + (nT ? tx('{n} tareas', { n: nT }) + ' · ' : '') + (nH ? tx('{n} marcadores', { n: nH }) + ' · ' : '') + tx('{n} zonas', { n: s.escenarios.length }) + '</li>' +
       '<li>Shows: ' + (dShow.length ? dShow.map(fmtDay).map(esc).join(', ') : tx('ninguno')) + '</li>' +
       '<li>Soundchecks: ' + (dSc.length ? dSc.map(fmtDay).map(esc).join(', ') : tx('ninguno')) + '</li>' +
@@ -1595,8 +1597,8 @@
     if (n) {
       html += '<div class="warnbox">' + (n === 1 ? tx('Tienes 1 cambio sin exportar que se perderá. Exporta antes si lo quieres guardar.') : tx('Tienes {n} cambios sin exportar que se perderán. Exporta antes si los quieres guardar.', { n })) + '</div>';
       acts.push({ label: 'Exportar los cambios', run: () => { exportJSON(); setTimeout(() => askImport(text, fname), 300); } });
-      acts.push({ label: 'Abrir y perder cambios', kind: 'danger', run: () => loadNew(s, tx('Evento abierto: {name}', { name: ev.nombre || '' })) });
-    } else acts.push({ label: 'Abrir evento', kind: 'primary', run: () => loadNew(s, tx('Evento abierto: {name}', { name: ev.nombre || '' })) });
+      acts.push({ label: 'Abrir y perder cambios', kind: 'danger', run: () => loadNew(s, tx('Evento abierto: {name}', { name: C.eventName(s, tx) })) });
+    } else acts.push({ label: 'Abrir evento', kind: 'primary', run: () => loadNew(s, tx('Evento abierto: {name}', { name: C.eventName(s, tx) })) });
     modal('Abrir evento', html, acts);
   }
 
@@ -1739,7 +1741,7 @@
       const rows = P.rowsOf(FEST, { day: PR.day, zone: PR.zone, kinds: prKinds() });
       if (!rows.length) { toast('No hay bloques con estos filtros', true); return false; }
       const dl = PR.day === 'all' ? days : [PR.day];
-      const doc = P.html({ rows, days: dl, title: (FEST.event && FEST.event.nombre) || 'Evento', format: PR.fmt, orient: PR.fmt === 'gantt' ? 'landscape' : PR.orient, notes: PR.notes, call: PR.call, now: new Date(), full: prKinds().length === 4 });   // idioma: el activo de Showtime
+      const doc = P.html({ rows, days: dl, title: C.eventName(FEST, tx), format: PR.fmt, orient: PR.fmt === 'gantt' ? 'landscape' : PR.orient, notes: PR.notes, call: PR.call, now: new Date(), full: prKinds().length === 4 });   // idioma: el activo de Showtime
       P.launch(doc);
       toast('Hoja lista: en la impresión, elige «Guardar como PDF»');
     } }], { wide: true });
@@ -1836,7 +1838,7 @@
     const days = FEST ? C.eventDays(FEST) : [], stg = FEST ? FEST.escenarios || [] : [];
     IMP = { text: text || '', mode: CONFIG.mode === 'sc' ? 'sc' : 'show', fresh: !FEST, base: FEST, jorTouched: false,
       defJor: FEST && CONFIG.day !== 'all' ? CONFIG.day : days.length === 1 ? days[0] : '', defEsc: stg.length === 1 ? stg[0].nombre : '',
-      header: undefined, map: null, create: {}, extend: true, include: {}, edits: {}, read: null, pv: null };
+      header: undefined, map: null, create: {}, extend: true, include: {}, edits: {}, read: null, pv: null, name: '' };
     $('imp-notice').hidden = !notice; $('imp-notice').textContent = notice || '';
     setAddTabs('paste');
     $('imp-text').value = IMP.text;
@@ -1912,7 +1914,9 @@
     let nh = '';
     if (IMP.fresh) {
       const ev = IMP.base.event, d1 = fmtDay(ev.fechaInicio), d2 = fmtDay(ev.fechaFin);
-      nh += '<span class="imp-fresh">' + tx('Sin evento abierto: al importar se crea <b>«Evento sin nombre»</b> · {d} (nombre y fechas, luego en Configuración).', { d: esc(d1 === d2 ? d1 : d1 + ' → ' + d2) }) + '</span>';
+      // Sin evento abierto: el nombre se puede poner aquí mismo (vacío = «Evento sin nombre»)
+      nh += '<label class="imp-name"><span>' + tx('Nombre del evento') + '</span><input id="imp-name" type="text" maxlength="80" autocomplete="off" spellcheck="false" placeholder="' + esc(tx('Evento sin nombre')) + '" value="' + esc(IMP.name || '') + '"></label>'
+        + '<span class="imp-fresh">' + tx('Sin evento abierto: al importar se crea un evento nuevo · {d} (fechas y zonas, luego en Configuración).', { d: esc(d1 === d2 ? d1 : d1 + ' → ' + d2) }) + '</span>';
     }
     if (pv.newStages.length) {
       nh += '<span><b>' + tx(pv.newStages.length === 1 ? '{n} zona nueva:' : '{n} zonas nuevas:', { n: pv.newStages.length }) + '</b></span>' +
@@ -1969,7 +1973,9 @@
   }
   function impDoImport() {
     if (!IMP || !IMP.pv || !IMP.pv.counts.importar) return;
-    const fresh = IMP.fresh, base = IMP.base;
+    const fresh = IMP.fresh, name = fresh ? String(IMP.name || '').replace(/\s+/g, ' ').trim().slice(0, 80) : '';
+    let base = IMP.base;
+    if (name) { const ev = C.updateEvent(base, { nombre: name }); if (ev.ok) base = ev.state; }   // nombre escrito en la ventana
     const r = I.apply(base, IMP.pv, { mode: IMP.mode, createStages: IMP.create, extendEvent: IMP.extend });
     IMP_LAST = IMP.pv.rows.filter(x => x.include && x.status !== 'err');
     const used = new Set(IMP.pv.rows.filter(x => x.include && x.status !== 'err').map(x => x.tipo));
@@ -1979,6 +1985,7 @@
       let m = T(r.added === 1 ? 'Importado: {n} entrada nueva' : 'Importado: {n} entradas nuevas', { n: r.added });
       if (r.stagesCreated) m += T(r.stagesCreated === 1 ? ', {n} zona nueva' : ', {n} zonas nuevas', { n: r.stagesCreated });
       if (hidden) m += T(' · Ver: Todo');
+      if (fresh && name) return T('Evento «{_e}» creado · {m}', { _e: name, m: m.charAt(0).toLowerCase() + m.slice(1) });
       return fresh ? T('Evento creado · {m}. Ponle nombre en Configuración', { m: m.charAt(0).toLowerCase() + m.slice(1) }) : m;
     };
     const msg = { es: impMsg(txEs), ui: impMsg(tx) };
@@ -1987,7 +1994,7 @@
     if (hidden) CONFIG = Dt.setConfig({ mode: 'all' });
     commitFestival(r.state, msg);
     // Confirmación clara (2,5 s, en verde) y la tabla arriba para ver el evento recién importado
-    toast(importSummary(IMP_LAST, r.added) + (hidden ? tx(' · Ver: Todo') : '') + (fresh ? tx(' · ponle nombre en Configuración') : ''), false, 2500);
+    toast(importSummary(IMP_LAST, r.added) + (hidden ? tx(' · Ver: Todo') : '') + (fresh && !name ? tx(' · ponle nombre en Configuración') : ''), false, 2500);
     $('toast').classList.add('good');
     const tw = document.querySelector('.tblwrap'); if (tw && tw.scrollTo) tw.scrollTo({ top: 0, behavior: 'smooth' });
     if (r.errors.length) modal('Algunas filas no entraron', '<ul>' + r.errors.map(e => '<li>' + esc(back(e)) + '</li>').join('') + '</ul>', [{ label: 'Entendido', kind: 'primary' }]);
@@ -2086,7 +2093,10 @@
     const s = e.target.closest('select[data-col]'); if (!s) return;
     IMP.map = IMP.read.map.slice(); IMP.map[+s.dataset.col] = s.value; impResetRows(); impRecompute();
   });
+  $('imp-new').addEventListener('input', e => { if (IMP && e.target.id === 'imp-name') IMP.name = e.target.value; });
+  $('imp-new').addEventListener('keydown', e => { if (e.target.id === 'imp-name' && e.key === 'Enter') { e.preventDefault(); impDoImport(); } });
   $('imp-new').addEventListener('change', e => {
+    if (e.target.id === 'imp-name') { if (IMP) IMP.name = e.target.value; return; }
     if (e.target.dataset.newstage) IMP.create[e.target.dataset.newstage] = e.target.checked;
     if (e.target.id === 'imp-extend') IMP.extend = e.target.checked;
     impRecompute();
@@ -2137,7 +2147,7 @@
     if (f) cur.innerHTML = '<span>' + tx('En pantalla: <b>{t}</b> · {l}', { t: esc(f.text), l: flashLeftTxt(f) }) + '</span><button class="btn" id="msg-off" type="button">' + tx('Retirar') + '</button>';
     const chip = $('drift').querySelector('.dchip.msg');
     if (chip) chip.remove();
-    if (f) $('drift').insertAdjacentHTML('afterbegin', '<span class="dchip msg"><svg class="ic"><use href="#i-msg"/></svg>' + (f.to || f.zones ? esc(tgtUi(f.to, f.zones)) : 'Live') + ': «' + esc(f.text) + '»<button class="chipx" data-act="msg-off" title="' + tx('Retirar el mensaje') + '">' + tx('Retirar') + '</button></span>');
+    if (f) $('drift').insertAdjacentHTML('afterbegin', '<span class="dchip msg"><svg class="ic"><use href="#i-msg"/></svg>' + (f.to || f.zones ? esc(tgtUi(f.to, f.zones)) : 'Live') + ': ' + (f.by ? esc(Vs.byLabel(f.by)) + ' ' : '') + '«' + esc(f.text) + '»<button class="chipx" data-act="msg-off" title="' + tx('Retirar el mensaje') + '">' + tx('Retirar') + '</button></span>');
     // Columna izquierda (lo que hay en la Live): tarjeta del mensaje con su aspecto real y el botón para quitarlo
     const card = $('card-msg');
     card.hidden = !f;
@@ -2145,7 +2155,7 @@
     if (card.dataset.id !== f.id) {
       card.dataset.id = f.id;
       const bg = f.bg || '#000000', fg = f.fg || '#ffb347';
-      $('v-msg').innerHTML = '<div class="msg-live" style="--mbg:' + bg + ';--mfg:' + fg + '">' + esc(f.text.toUpperCase()) + '</div>'
+      $('v-msg').innerHTML = '<div class="msg-live" style="--mbg:' + bg + ';--mfg:' + fg + '">' + (f.by ? '<small class="msg-by">' + esc(Vs.byLabel(f.by)) + '</small>' : '') + esc(f.text.toUpperCase()) + '</div>'
         + '<div class="msg-to">→ ' + esc(tgtUi(f.to, f.zones)) + '</div>'
         + '<div class="msg-foot"><span class="msg-left"></span><button class="btn" data-act="msg-off" type="button"><svg class="ic"><use href="#i-x"/></svg>' + tx('Retirar') + '</button></div>';
     }
@@ -2270,7 +2280,8 @@
       h = '<div class="mt-none">' + (need ? esc(tx(need)) + ' ' + tx('en') + ' <button class="linkbtn" data-act="mt-cfg">' + tx('Configuración › Meteo') + '</button>' : (st.m && st.m.err ? tx('SIN DATOS') + ' · ' + esc(tx(st.m.err)) : tx('Cargando…'))) + '</div>';
     } else {
       const s = st.sum;
-      h += '<div class="mt-now' + (s.stale ? ' stale' : '') + '"><svg class="ic mt-sky"><use href="#i-' + s.icon + '"/></svg><span class="mt-t">' + (s.temp === null ? '—' : Math.round(s.temp) + '°') + '</span><span class="mt-sk">' + esc(s.sky || '') + (where ? '<small>' + esc(where) + '</small>' : '') + '</span></div>';
+      const U = c.units;   // unidades (dec. 107): métrico o imperial, solo al enseñar
+      h += '<div class="mt-now' + (s.stale ? ' stale' : '') + '"><svg class="ic mt-sky"><use href="#i-' + s.icon + '"/></svg><span class="mt-t">' + (s.temp === null ? '—' : W.numU('temp', s.temp, U) + '°') + '</span><span class="mt-sk">' + esc(s.sky || '') + (where ? '<small>' + esc(where) + '</small>' : '') + '</span></div>';
       const sn = W.sunNext(st.snap, Date.now());
       if (sn) {
         const fmt = t => { const tm = new Date(t), tomorrow = tm.toDateString() !== new Date().toDateString(); return '<b>' + W.hhmm(t) + '</b>' + (tomorrow ? ' <small>' + tx('mañana') + '</small>' : ''); };
@@ -2278,9 +2289,9 @@
       }
       if (s.stale) h += '<div class="mt-stale"><svg class="ic"><use href="#i-alert"/></svg>' + esc(s.staleTxt) + (st.m && st.m.err ? '<small>' + esc(tx(st.m.err)) + '</small>' : '') + '</div>';
       h += '<div class="mt-grid">' +
-        '<span><svg class="ic"><use href="#i-drop"/></svg>' + tx('Lluvia') + ' <b>' + mtNum(s.rain, true) + '</b> mm/h</span>' +
-        '<span><svg class="ic"><use href="#i-wind"/></svg>' + tx('Viento') + ' <b>' + mtNum(s.wind) + '</b> km/h</span>' +
-        '<span class="mt-gmax"><svg class="ic"><use href="#i-wind"/></svg>' + tx('Ráfagas máx.') + ' <b>' + mtNum(s.gustMax !== null ? s.gustMax : s.gust) + '</b> km/h' +
+        '<span><svg class="ic"><use href="#i-drop"/></svg>' + tx('Lluvia') + ' <b>' + W.numU('rain', s.rain, U) + '</b> ' + W.unitOf('rain', U) + '</span>' +
+        '<span><svg class="ic"><use href="#i-wind"/></svg>' + tx('Viento') + ' <b>' + W.numU('wind', s.wind, U) + '</b> ' + W.unitOf('wind', U) + '</span>' +
+        '<span class="mt-gmax"><svg class="ic"><use href="#i-wind"/></svg>' + tx('Ráfagas máx.') + ' <b>' + W.numU('wind', s.gustMax !== null ? s.gustMax : s.gust, U) + '</b> ' + W.unitOf('wind', U) +
           (s.gustMaxAt ? ' <small>· ' + W.hhmm(s.gustMaxAt) + '</small>' : '') + (st.snap.hours.length ? ' <small>' + tx('(próx. {n} h)', { n: s.horizon }) + '</small>' : ' <small>' + tx('(ahora)') + '</small>') + '</span>' +
         (s.uv !== null || s.uvMax !== null ? '<span><svg class="ic"><use href="#i-sun"/></svg>UV <b>' + mtNum(s.uvMax !== null ? s.uvMax : s.uv) + '</b> ' + W.uvText(s.uvMax !== null ? s.uvMax : s.uv) + '</span>' : '') +
         (c.th.aqiOn && s.aqi !== null ? '<span><svg class="ic"><use href="#i-cloud"/></svg>' + tx('Aire') + ' <b>' + W.aqiText(s.aqi) + '</b></span>' : '') +
@@ -2319,13 +2330,30 @@
     set($('mt-on'), c.on); set($('mt-src'), c.source); set($('mt-lat'), c.lat); set($('mt-lon'), c.lon); set($('mt-url'), c.url);
     set($('mt-ref'), String(c.refresh)); set($('mt-hz'), String(c.horizon));
     document.querySelectorAll('#cfg-s-meteo [data-mp]').forEach(el => set(el, c.map[el.dataset.mp]));
-    document.querySelectorAll('#cfg-s-meteo [data-mn]').forEach(el => set(el, c.manual[el.dataset.mn]));
-    document.querySelectorAll('#cfg-s-meteo [data-th]').forEach(el => set(el, el.dataset.th === 'aqi' ? String(c.th.aqi) : c.th[el.dataset.th]));
+    // Valores manuales y umbrales: se enseñan en la unidad elegida; por dentro siguen en métrico (dec. 107)
+    set($('mt-units'), c.units);
+    document.querySelectorAll('#cfg-s-meteo .mt-u').forEach(el => { el.textContent = W.unitOf(el.dataset.u, c.units); });
+    document.querySelectorAll('#cfg-s-meteo [data-mn]').forEach(el => set(el, mtIn(MT_KIND[el.dataset.mn], c.manual[el.dataset.mn], c.units)));
+    document.querySelectorAll('#cfg-s-meteo [data-th]').forEach(el => set(el, el.dataset.th === 'aqi' ? String(c.th.aqi) : el.type === 'checkbox' ? c.th[el.dataset.th] : mtIn(MT_KIND[el.dataset.th], c.th[el.dataset.th], c.units)));
     document.querySelectorAll('#cfg-s-meteo .mt-g').forEach(g => { g.hidden = g.dataset.src !== c.source; });
     document.querySelectorAll('#cfg-s-meteo .mt-auto').forEach(el => { el.hidden = c.source === 'manual'; });
     $('mt-place').textContent = c.place ? c.place + (c.lat !== null ? ' · ' + c.lat + ', ' + c.lon : '') : '';
     $('mt-aemet').href = W.AEMET_URL;
     fillMeteoStatus();
+  }
+  // Casillas en la unidad elegida: si no se ha tocado la cifra, se queda el valor guardado (sin redondeos de ida y vuelta)
+  const MT_KIND = { temp: 'temp', heat: 'temp', rain: 'rain', wind: 'wind', gust: 'wind', uv: null };
+  function mtIn(kind, v, units) {
+    if (v === null || v === undefined) return '';
+    if (!kind) return v;
+    const x = W.toU(kind, v, units), d = kind === 'rain' ? (units === 'imperial' ? 2 : 1) : kind === 'temp' ? 1 : 0;
+    return String(Number(x.toFixed(d)));
+  }
+  function mtOut(kind, raw, stored, units) {
+    if (raw === '' || raw === null || raw === undefined) return null;
+    if (kind && String(raw) === mtIn(kind, stored, units)) return stored;
+    const n = Number(raw);
+    return kind ? W.fromU(kind, n, units) : n;
   }
   function readMeteoCfg(extra) {
     const c = JSON.parse(JSON.stringify(mtCfg()));
@@ -2334,9 +2362,11 @@
     c.refresh = Number($('mt-ref').value); c.horizon = Number($('mt-hz').value);
     document.querySelectorAll('#cfg-s-meteo [data-mp]').forEach(el => { c.map[el.dataset.mp] = el.value.trim(); });
     let manualChanged = false;
-    document.querySelectorAll('#cfg-s-meteo [data-mn]').forEach(el => { const v = el.value === '' ? null : Number(el.value); if (v !== c.manual[el.dataset.mn]) manualChanged = true; c.manual[el.dataset.mn] = v; });
+    const U = c.units;   // lo escrito está en la unidad que había; la nueva solo cambia cómo se enseña
+    document.querySelectorAll('#cfg-s-meteo [data-mn]').forEach(el => { const k = el.dataset.mn, v = mtOut(MT_KIND[k], el.value, c.manual[k], U); if (v !== c.manual[k]) manualChanged = true; c.manual[k] = v; });
     if (manualChanged) c.manual.at = Date.now();
-    document.querySelectorAll('#cfg-s-meteo [data-th]').forEach(el => { c.th[el.dataset.th] = el.type === 'checkbox' ? el.checked : el.value === '' ? null : Number(el.value); });
+    document.querySelectorAll('#cfg-s-meteo [data-th]').forEach(el => { const k = el.dataset.th; c.th[k] = el.type === 'checkbox' ? el.checked : k === 'aqi' ? Number(el.value) : mtOut(MT_KIND[k], el.value, c.th[k], U); });
+    if ($('mt-units')) c.units = $('mt-units').value;
     return Object.assign(c, extra || {});
   }
   function saveMeteo(extra) {
@@ -2540,7 +2570,7 @@
     if (cmd.op === 'flash') {
       const t = String(a.text).replace(/\s+/g, ' ').trim();
       const to = Vs.normTargets(a.to), zs = Vs.normZones(a.zones);
-      Dt.setFlash(t, to, zs); renderFlash(); toast(fromUi + tx('Mensaje → {to}: «{t}»', { to: tgtUi(to, zs), t: t }));
+      Dt.setFlash(t, to, zs, zone !== null ? { k: 'zone', n: zoneLabel(zone) } : null); renderFlash(); toast(fromUi + tx('Mensaje → {to}: «{t}»', { to: tgtUi(to, zs), t: t }));
       logEvent('msg', '«' + t + '» → ' + Vs.targetsTxt(to, zs, zoneLabel), { src: 'mando', t: abs });
       return { ok: true, msg: 'Mensaje → ' + Vs.targetsTxt(to, zs, zoneLabel) + ': «' + t + '»' };
     }
@@ -2642,11 +2672,11 @@
       tick(); toast('CALL OK · ' + bandOfKey(msg.key) + ' · ' + whoUi);
     } else if (msg.type === 'flash') {
       const to = Vs.normTargets(msg.to);
-      Dt.setFlash(msg.text, to, null); renderFlash();
+      Dt.setFlash(msg.text, to, null, { k: 'prod' }); renderFlash();
       toast(whoUi + ' → ' + tgtUi(to, null) + ': «' + msg.text + '»');
       logEvent('msg', '«' + msg.text + '» → ' + Vs.targetsTxt(to, null, zoneLabel) + ' · ' + who, { src: 'produccion' });
     } else if (msg.type === 'aviso') {
-      if (!Dt.addAviso(msg.text, msg.perm, who)) return;
+      if (!Dt.addAviso(msg.text, msg.perm, who, { k: 'prod' })) return;   // en pantalla «[Producción]»; en el log y en la ✕, quién fue
       if (FEST) renderDrift(Math.floor(C.nowAbs()));
       toast(tx(msg.perm ? '{w} · aviso permanente: «{t}»' : '{w} · aviso puntual: «{t}»', { w: whoUi, t: msg.text }));
       logEvent('msg', 'Aviso ' + (msg.perm ? 'permanente' : 'puntual') + ': «' + msg.text + '» · ' + who, { src: 'produccion' });
@@ -3150,5 +3180,5 @@
     if (mod && !e.shiftKey && !e.altKey && k === 'n') { e.preventDefault(); askNew(); return; }
   });
   window.ShowtimePanel = { reload: () => { loadState(); renderAll(); }, _test: { winState: () => Array.from(WIN.entries()).map(([id, x]) => ({ id, name: x.name, vista: x.vista, zona: x.zona, standby: !!x.standby, fs: x.fs })), setWinVista, setWinStandby, closeLive, openGestor, gestorVisible, emProdMessage, emRegenProd, hitoChips, emUrl, prodBigTitle, fileKind, handleFile, emCommand, importSummary, hidesSome, tipoPill, setWake, wakeState: () => ({ on: wakeOn, lock: !!wakeLock }), showSplash, hideSplash, setStandby, standbyOn, room: () => emRoom,
-    emSnapshot, emCloseDay, emDay, qrDevices, rmZones, setRmZone: z => { RM_ZONE = z; renderCast(); }, setRoom: r => { emRoom = r; }, fakeEm: (em, st) => { EM = em; EMST = st; }, emStateHtml } };   // _test: solo para tests/control.test.js
+    emSnapshot, emCloseDay, emDay, qrDevices, rmZones, setRmZone: z => { RM_ZONE = z; renderCast(); }, setRoom: r => { emRoom = r; }, fakeEm: (em, st) => { EM = em; EMST = st; }, emStateHtml, mtIn, mtOut } };   // _test: solo para tests/control.test.js
 })();

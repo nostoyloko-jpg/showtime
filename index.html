@@ -13,8 +13,8 @@
 <meta name="apple-mobile-web-app-title" content="Showtime">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
-<link rel="stylesheet" href="control.css?v=20261114">
-<link rel="stylesheet" href="marca.css?v=20261114">
+<link rel="stylesheet" href="control.css?v=20261116">
+<link rel="stylesheet" href="marca.css?v=20261116">
 </head>
 <body>
 <div id="splash" class="splash" hidden></div>
@@ -330,6 +330,7 @@
     <div class="form mt">
       <span></span><label class="chk" title="Tarjeta METEO, Live Manager y cinta de Backstage" data-i18n data-i18n-title><input id="mt-on" type="checkbox"> Mostrar el tiempo</label>
       <label for="mt-src" data-i18n>Fuente</label><select id="mt-src"><option value="openmeteo" data-i18n>Open-Meteo · previsión</option><option value="url" data-i18n>URL JSON propia (estación del evento)</option><option value="manual" data-i18n>Manual</option></select>
+      <label for="mt-units" data-i18n>Unidades</label><select id="mt-units"><option value="metric" data-i18n>Métrico (°C, km/h, mm)</option><option value="imperial" data-i18n>Imperial (°F, mph, in)</option></select>
       <div class="mt-g" data-src="openmeteo">
         <label for="mt-q" data-i18n>Lugar</label><span class="nrow wide"><input id="mt-q" type="text" placeholder="Ciudad o recinto" autocomplete="off" spellcheck="false" data-i18n-placeholder><button id="mt-find" class="btn" type="button" data-i18n>Buscar</button></span>
         <span></span><div id="mt-res" class="mt-res"></div>
@@ -345,20 +346,20 @@
         <div class="note" data-i18n>Ruta del dato dentro del JSON, con puntos e índices (<b data-i18n>list.0.temp</b>). El servidor debe permitir leerlo desde el navegador. La URL no se emite a los dispositivos de Staff. Sin previsión: solo avisa de lo que mide ahora.</div>
       </div>
       <div class="mt-g" data-src="manual" hidden>
-        <label data-i18n>Temperatura (°C)</label><span class="nrow"><input data-mn="temp" type="number" step="0.1"></span>
-        <label data-i18n>Lluvia (mm/h)</label><span class="nrow"><input data-mn="rain" type="number" min="0" step="0.1"></span>
-        <label data-i18n>Viento (km/h)</label><span class="nrow"><input data-mn="wind" type="number" min="0"></span>
-        <label data-i18n>Ráfagas (km/h)</label><span class="nrow"><input data-mn="gust" type="number" min="0"></span>
+        <label><span data-i18n>Temperatura</span> (<span class="mt-u" data-u="temp">°C</span>)</label><span class="nrow"><input data-mn="temp" type="number" step="0.1"></span>
+        <label><span data-i18n>Lluvia</span> (<span class="mt-u" data-u="rain">mm/h</span>)</label><span class="nrow"><input data-mn="rain" type="number" min="0" step="0.01"></span>
+        <label><span data-i18n>Viento</span> (<span class="mt-u" data-u="wind">km/h</span>)</label><span class="nrow"><input data-mn="wind" type="number" min="0"></span>
+        <label><span data-i18n>Ráfagas</span> (<span class="mt-u" data-u="wind">km/h</span>)</label><span class="nrow"><input data-mn="gust" type="number" min="0"></span>
         <label data-i18n>Índice UV</label><span class="nrow"><input data-mn="uv" type="number" min="0" max="20"></span>
         <div class="note" data-i18n>Cada cambio queda con la hora en que lo escribes.</div>
       </div>
       <label for="mt-ref" class="mt-auto" data-i18n>Actualizar cada</label><select id="mt-ref" class="mt-auto"><option value="5" data-i18n>5 min</option><option value="10" data-i18n>10 min</option><option value="15" data-i18n>15 min</option><option value="30" data-i18n>30 min</option></select>
       <div class="fsub" data-i18n>Avisos · previsión, no aviso oficial</div>
-      <label for="mt-th-gust" data-i18n>Ráfagas desde</label><span class="nrow" data-i18n><input id="mt-th-gust" data-th="gust" type="number" min="1" placeholder="—"> km/h</span>
-      <label for="mt-th-wind" data-i18n>Viento medio desde</label><span class="nrow" data-i18n><input id="mt-th-wind" data-th="wind" type="number" min="1" placeholder="—"> km/h</span>
+      <label for="mt-th-gust" data-i18n>Ráfagas desde</label><span class="nrow" data-i18n><input id="mt-th-gust" data-th="gust" type="number" min="1" placeholder="—"> <span class="mt-u" data-u="wind">km/h</span></span>
+      <label for="mt-th-wind" data-i18n>Viento medio desde</label><span class="nrow" data-i18n><input id="mt-th-wind" data-th="wind" type="number" min="1" placeholder="—"> <span class="mt-u" data-u="wind">km/h</span></span>
       <div class="note" data-i18n>Vacío = sin aviso. La cifra la marca el plan de autoprotección o el fabricante de la estructura.</div>
-      <label for="mt-th-rain" data-i18n>Lluvia desde</label><span class="nrow" data-i18n><input id="mt-th-rain" data-th="rain" type="number" min="0.1" step="0.1" placeholder="—"> mm/h</span>
-      <label for="mt-th-heat" data-i18n>Calor desde</label><span class="nrow"><input id="mt-th-heat" data-th="heat" type="number" placeholder="—"> °C</span>
+      <label for="mt-th-rain" data-i18n>Lluvia desde</label><span class="nrow" data-i18n><input id="mt-th-rain" data-th="rain" type="number" min="0.01" step="0.01" placeholder="—"> <span class="mt-u" data-u="rain">mm/h</span></span>
+      <label for="mt-th-heat" data-i18n>Calor desde</label><span class="nrow"><input id="mt-th-heat" data-th="heat" type="number" placeholder="—"> <span class="mt-u" data-u="temp">°C</span></span>
       <span></span><div class="chks">
         <label class="chk" data-i18n><input type="checkbox" data-th="storm"> Tormenta prevista</label>
         <label class="chk" data-i18n><input type="checkbox" data-th="uvOn"> Índice UV desde <input class="mini" data-th="uv" type="number" min="1" max="20"></label>
@@ -439,20 +440,20 @@
 <datalist id="zones-dl"></datalist>
 <div id="toast" class="toast" hidden></div>
 
-<script src="i18n.js?v=20261114"></script>
-<script src="core.js?v=20261114"></script>
-<script src="meteo.js?v=20261114"></script>
-<script src="datos.js?v=20261114"></script>
-<script src="importar.js?v=20261114"></script>
-<script src="xlsx.js?v=20261114"></script>
-<script src="qr.js?v=20261114"></script>
-<script src="emision.js?v=20261114"></script>
-<script src="mando.js?v=20261114"></script>
-<script src="vistas.js?v=20261114"></script>
-<script src="log.js?v=20261114"></script>
-<script src="print.js?v=20261114"></script>
-<script src="marca.js?v=20261114"></script>
-<script src="control.js?v=20261114"></script>
-<script src="pwa.js?v=20261114"></script>
+<script src="i18n.js?v=20261116"></script>
+<script src="core.js?v=20261116"></script>
+<script src="meteo.js?v=20261116"></script>
+<script src="datos.js?v=20261116"></script>
+<script src="importar.js?v=20261116"></script>
+<script src="xlsx.js?v=20261116"></script>
+<script src="qr.js?v=20261116"></script>
+<script src="emision.js?v=20261116"></script>
+<script src="mando.js?v=20261116"></script>
+<script src="vistas.js?v=20261116"></script>
+<script src="log.js?v=20261116"></script>
+<script src="print.js?v=20261116"></script>
+<script src="marca.js?v=20261116"></script>
+<script src="control.js?v=20261116"></script>
+<script src="pwa.js?v=20261116"></script>
 </body>
 </html>

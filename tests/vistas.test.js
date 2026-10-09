@@ -181,6 +181,12 @@
     ok(it.every(x => !/MARGEN|REBASADO/.test(x.text)), 'la cinta nunca enseña márgenes');
   });
 
+  test('cinta: los avisos llevan su origen ([PRODUCCIÓN] / [ZONA]); sin origen, solo el texto (dec. 106)', () => {
+    const F = fest(), off = { ticker: { delays: false, hitos: false } };
+    const it = V.tickerItems(F.s, off, at('20:00'), null, [{ text: 'Catering abierto', by: { k: 'prod' } }, { text: 'Foso libre', by: { k: 'zone', n: 'Carpa' } }, { text: 'Sin etiqueta' }]);
+    eq(it.map(x => x.text).join(' | '), '[PRODUCCIÓN] CATERING ABIERTO | [CARPA] FOSO LIBRE | SIN ETIQUETA');
+    eq(V.byLabel({ k: 'prod' }), '[Producción]'); eq(V.byLabel(null), ''); eq(V.byLabel({ k: 'zone', n: 'Escenario 2' }), '[Escenario 2]');
+  });
   test('cinta: categorías apagadas y el tiempo cuando lo haya', () => {
     const F = fest();
     eq(V.tickerItems(F.s, { ticker: { delays: false, hitos: false } }, at('20:00')).length, 0);

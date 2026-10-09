@@ -268,6 +268,15 @@
     eq(L.SRC_TXT.produccion, 'Producción'); eq(L.TYPE_TXT.call, 'CALL confirmado');
   });
 
+  test('Evento sin nombre: el informe dice «Evento sin nombre» en español y «Untitled event» en inglés (el JSON no cambia)', () => {
+    const I = I18(); if (!I) return;
+    const R = rig(), s = Object.assign({}, R.s, { event: Object.assign({}, R.s.event, { nombre: C.UNNAMED }) });
+    const rep = L.report(R.log, s, { day: JOR });
+    eq(rep.event, '', 'sin nombre');
+    ok(/Evento sin nombre/.test(L.toTxt(rep)) && /<h1>Evento sin nombre<\/h1>/.test(L.toHtml(rep)));
+    try { I.setLang('en'); ok(/<h1>Untitled event<\/h1>/.test(L.toHtml(rep)) && /Untitled event/.test(L.toTxt(rep)), 'en inglés'); } finally { I.setLang('es'); }
+    eq(L.report(R.log, R.s, { day: JOR }).event, R.s.event.nombre, 'con nombre, el suyo');
+  });
   test('noReal: la orden (En hora, corrección) pone su propio texto y no se duplica con el ▶ genérico', () => {
     const R = rig(), k = key(R.s, 'Banda A');
     const id = C.buildBlocks(R.s, { mode: 'all', day: 'all' }).find(b => b.name === 'Banda A').id;

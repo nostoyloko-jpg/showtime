@@ -115,7 +115,7 @@
     const a = W.alerts(SNAP, CFG({ gust: 50, storm: false, uvOn: false }), NOW);
     eq(a.length, 1); eq(a[0].kind, 'gust'); eq(a[0].value, 62);
     eq(a[0].short, 'RÁFAGAS 62 KM/H HACIA LAS ' + W.hhmm((H0 + 4 * 3600) * 1000));
-    ok(/umbral 50$/.test(a[0].text));
+    ok(/umbral 50 km\/h$/.test(a[0].text), a[0].text);
     eq(W.alerts(SNAP, CFG({ gust: 70, storm: false, uvOn: false }), NOW).length, 0);
   });
   test('«ahora» si es inminente; viento medio, lluvia, calor, tormenta, UV y aire', () => {
@@ -166,6 +166,29 @@
     ok(!/PUESTA/.test(W.pillText(after)) && !W.tickerList(after, []).some(x => /PUESTA/.test(x.text)), 'ni en la píldora ni en la cinta');
     eq(W.summary(SNAP, CFG(), NOW).sunset, null, 'sin dato de sol, no sale');
   });
+  // ── Unidades (dec. 107) ──
+  test('unidades: métrico por defecto; imperial convierte °F, mph e in/h (ida y vuelta exacta)', () => {
+    eq(W.normMeteo({}).units, 'metric'); eq(W.normMeteo({ units: 'imperial' }).units, 'imperial'); eq(W.normMeteo({ units: 'raro' }).units, 'metric');
+    eq(W.publicMeteo({ units: 'imperial' }).units, 'imperial', 'viaja a las Live y a los QR');
+    eq(W.numU('temp', 20, 'imperial'), '68'); eq(W.numU('wind', 100, 'imperial'), '62'); eq(W.numU('rain', 2.54, 'imperial', 'en'), '0.1');
+    eq(W.fmtU('wind', 45, 'metric'), '45 km/h'); eq(W.fmtU('wind', 45, 'imperial', null, true), '28 MPH'); eq(W.fmtU('rain', 1.27, 'imperial', 'es'), '0,05 in/h');
+    eq(W.fmtU('temp', 30, 'imperial'), '86 °F'); eq(W.numU('rain', 1.25, 'metric', 'es'), '1,3');
+    for (const k of ['temp', 'wind', 'rain']) ok(Math.abs(W.fromU(k, W.toU(k, 37.3, 'imperial'), 'imperial') - 37.3) < 1e-9, k);
+    eq(W.toU('wind', 50, 'metric'), 50, 'métrico: sin tocar');
+  });
+  test('unidades: en imperial, avisos, píldora y cinta salen en °F, mph e in/h (el umbral también)', () => {
+    const c = W.normMeteo({ on: true, lat: 37.18, lon: -3.6, horizon: 3, units: 'imperial', th: { gust: 50, storm: false, uvOn: false } });
+    const a = W.alerts(SNAP, c, NOW);
+    eq(a[0].short, 'RÁFAGAS 39 MPH HACIA LAS ' + W.hhmm((H0 + 4 * 3600) * 1000));
+    ok(/umbral 31 mph$/.test(a[0].text), a[0].text);
+    const s = W.summary(SNAP, c, NOW);
+    eq(s.units, 'imperial');
+    ok(/° · VIENTO \d+ · RÁF\. MÁX 39 MPH/.test(W.pillText(s)), W.pillText(s));
+    const tk = W.tickerList(s, a).map(x => x.text).join(' | ');
+    ok(/°F/.test(tk) && /MPH/.test(tk) && /IN\/H/.test(tk) && !/KM\/H|°C|MM\/H/.test(tk), tk);
+    const m = W.tickerList(W.summary(SNAP, CFG(), NOW), []).map(x => x.text).join(' | ');
+    ok(/°C/.test(m) && /KM\/H/.test(m) && /MM\/H/.test(m), 'métrico como siempre: ' + m);
+  });
   test('cielo, UV y calidad del aire en palabras', () => {
     eq(W.sky(0).icon, 'sun'); eq(W.sky(95).icon, 'storm'); eq(W.sky(99).text, 'Tormenta con granizo'); eq(W.sky(63).text, 'Lluvia');
     eq(W.uvText(8), 'muy alto'); eq(W.uvText(11), 'extremo'); eq(W.aqiText(85), 'muy mala'); eq(W.aqiText(15), 'buena');
@@ -187,8 +210,8 @@
       eq(W.sky(0).text, 'Clear'); eq(W.uvText(9), 'very high');
       const a = W.alerts(SNAP, CFG({ gust: 50, storm: false, uvOn: false }), NOW);
       eq(a[0].short, 'GUSTS 62 KM/H AROUND ' + W.hhmm((H0 + 4 * 3600) * 1000));
-      ok(/^Gusts 62 km\/h around .* · threshold 50$/.test(a[0].text), a[0].text);
-      ok(/^Ráfagas 62 km\/h hacia las .* · umbral 50$/.test(a[0].textEs), 'log en español: ' + a[0].textEs);
+      ok(/^Gusts 62 km\/h around .* · threshold 50 km\/h$/.test(a[0].text), a[0].text);
+      ok(/^Ráfagas 62 km\/h hacia las .* · umbral 50 km\/h$/.test(a[0].textEs), 'log en español: ' + a[0].textEs);
       const s = W.summary(SNAP, CFG(), NOW);
       ok(/WIND/.test(W.pillText(s)) && !/VIENTO/.test(W.pillText(s)), W.pillText(s));
       ok(W.tickerList(s, a).some(x => /^FORECAST · GUSTS/.test(x.text)), 'cinta');

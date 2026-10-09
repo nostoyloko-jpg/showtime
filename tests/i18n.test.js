@@ -144,7 +144,7 @@
     const txt = () => V.tickerItems(F, null, now, null, []).map(x => x.text).join(' | ');
     ok(/EN HORA · SIN INCIDENCIAS/.test(txt()), txt());
     I.setLang('en');
-    try { ok(/ON TIME · NO INCIDENTS/.test(txt()), txt()); } finally { reset(); }
+    try { ok(/ON TIME · ALL CLEAR/.test(txt()), txt()); } finally { reset(); }
     ok(/EN HORA · SIN INCIDENCIAS/.test(txt()), 'vuelve al español');
   });
 
@@ -193,6 +193,18 @@
     const all = [].concat(...pv.rows.map(r => r.errs.concat(r.warns)));
     ok(all.length >= 5, all.length + ' avisos');
     eq(all.filter(x => B(x) === x).join(' | '), '', 'avisos sin traducir');
+  });
+
+  test('Ajustes 10-oct: ON TIME · ALL CLEAR; [Production]; avisos del tiempo con unidades (los del log antiguo siguen traduciéndose)', () => {
+    eq(I.tx('EN HORA · SIN INCIDENCIAS', null, 'en'), 'ON TIME · ALL CLEAR');
+    eq(I.tx('Producción', null, 'en'), 'Production');
+    const B = s => I.txBack(s, 'en');
+    eq(B('Ráfagas 39 mph hacia las 23:00 · umbral 31 mph'), 'Gusts 39 mph around 23:00 · threshold 31 mph', 'imperial');
+    eq(B('Calor 95 °F ahora · umbral 90 °F'), 'Heat 95 °F now · threshold 90 °F');
+    eq(B('Ráfagas 62 km/h hacia las 23:00 · umbral 50 km/h'), 'Gusts 62 km/h around 23:00 · threshold 50 km/h', 'métrico nuevo');
+    eq(B('Ráfagas 62 km/h hacia las 23:00 · umbral 50'), 'Gusts 62 km/h around 23:00 · threshold 50', 'log antiguo');
+    eq(I.tx('Nombre del evento', null, 'en'), 'Event name'); eq(I.tx('Imperial (°F, mph, in)', null, 'en'), 'Imperial (°F, mph, in)');
+    eq(B('Evento «Noches del Botánico» creado · importado: 3 entradas nuevas'), 'Event “Noches del Botánico” created · ' + B('importado: 3 entradas nuevas'));
   });
 
   let fail = 0;

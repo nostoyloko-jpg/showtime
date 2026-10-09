@@ -1101,3 +1101,12 @@ td input:focus,td select:focus,.imp-src textarea:focus,.imp-prev td input[type=t
 .cscope .btn{height:26px;padding:0 10px;font-size:12px}
 /* Mando por zona (dec. 102) */
 .cseg button i{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:1px}
+
+/* Origen de mensajes y avisos (dec. 106) */
+.dchip .byl{font-weight:800;margin-right:2px}
+.msg-live .msg-by{display:block;font-size:.5em;letter-spacing:.12em;opacity:.8;margin-bottom:2px}
+
+/* Importar sin evento: nombre del evento en la propia ventana */
+.imp-name{flex-basis:100%;display:flex!important;align-items:center;gap:10px}
+.imp-name span{font-weight:700;color:var(--text);white-space:nowrap}
+.imp-name input{flex:1;max-width:420px;height:32px}

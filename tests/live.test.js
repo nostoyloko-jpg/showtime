@@ -66,13 +66,34 @@
     const es = el('now-list').innerHTML + el('next-list').innerHTML;
     ok(!/ min left|NO ACTIVITY/.test(es), 'vuelve al español');
   });
-  test('Idioma (Fase 2): Backstage — la cinta en inglés (ON TIME · NO INCIDENTS) y de vuelta', async () => {
+  test('Idioma (Fase 2): Backstage — la cinta en inglés (ON TIME · ALL CLEAR) y de vuelta', async () => {
     const t = await staffL('?vista=backstage'), Dt = t.env.win.ShowtimeDatos, C = t.env.win.ShowtimeCore, el = id => t.env.getEl(id);
     const F = C.demoFestival(Math.floor(C.nowAbs()));
     Dt.loadSnapshot(snapL('en', F));
-    ok(/ON TIME · NO INCIDENTS/.test(el('ticker').innerHTML), el('ticker').innerHTML.slice(0, 160));
+    ok(/ON TIME · ALL CLEAR/.test(el('ticker').innerHTML), el('ticker').innerHTML.slice(0, 160));
     Dt.loadSnapshot(snapL('es', F));
     ok(/EN HORA · SIN INCIDENCIAS/.test(el('ticker').innerHTML), 'vuelve al español');
+  });
+  test('Origen (dec. 106): el mensaje en pantalla lleva [ZONA] / [PRODUCCIÓN] encima; la cinta, igual y en inglés [PRODUCTION]', async () => {
+    const t = await staffL('?vista=backstage'), Dt = t.env.win.ShowtimeDatos, C = t.env.win.ShowtimeCore, el = id => t.env.getEl(id);
+    const F = C.demoFestival(Math.floor(C.nowAbs()));
+    const fl = (by, id) => ({ id, text: '5 minutos', at: Date.now(), ms: 0, to: null, zones: null, by });
+    Dt.loadSnapshot(snapL('es', F, { flash: fl({ k: 'zone', n: 'Carpa' }, 'a1'), avisos: [{ id: 'x', text: 'Catering abierto', at: Date.now(), ms: 0, from: 'Producción (Marta)', by: { k: 'prod' } }] }));
+    t.env.win.ShowtimeLive.reload();
+    eq(el('flash-by').hidden, false); eq(el('flash-by').textContent, '[Carpa]'); eq(el('flash-txt').textContent, '5 MINUTOS');
+    eq(t.env.errors.join(' | '), ''); ok(/\[PRODUCCIÓN\] CATERING ABIERTO/.test(el('ticker').innerHTML), 'cinta: ' + el('ticker').innerHTML.slice(0, 200));
+    ok(!/Marta/.test(el('ticker').innerHTML), 'sin nombres en pantalla'); eq(t.env.errors.join(' | '), '');
+    Dt.loadSnapshot(snapL('en', F, { flash: fl({ k: 'prod' }, 'a2'), avisos: [{ id: 'x', text: 'Catering open', at: Date.now(), ms: 0, by: { k: 'prod' } }] }));
+    eq(el('flash-by').textContent, '[Production]');
+    ok(/\[PRODUCTION\] CATERING OPEN/.test(el('ticker').innerHTML), el('ticker').innerHTML.slice(0, 200));
+    Dt.loadSnapshot(snapL('es', F, { flash: fl(null, 'a3') }));
+    eq(el('flash-by').hidden, true, 'del Dashboard: sin etiqueta');
+  });
+  test('Evento sin nombre: la Live dice «UNTITLED EVENT» / «Evento sin nombre» según el idioma', async () => {
+    const t = await staffL('?vista=manager'), Dt = t.env.win.ShowtimeDatos, C = t.env.win.ShowtimeCore, el = id => t.env.getEl(id);
+    const F = C.demoFestival(Math.floor(C.nowAbs())); F.event.nombre = C.UNNAMED;
+    Dt.loadSnapshot(snapL('en', F)); eq(el('evn-name').textContent, 'Untitled event');
+    Dt.loadSnapshot(snapL('es', F)); eq(el('evn-name').textContent, 'Evento sin nombre');
   });
   test('Idioma (Fase 2): Confidence — mensajes al músico en inglés y de vuelta', async () => {
     const t = await staffL('?vista=confidence'), Dt = t.env.win.ShowtimeDatos, el = id => t.env.getEl(id);
@@ -128,7 +149,7 @@
     eq(I.tx('TIEMPO EXTRA', null, 'en'), 'EXTRA TIME');
     ok(/OVERRUN/.test(I.tx('+{n} MIN · BUFFER AGOTADO (+{o})', { n: 5, o: 2 }, 'en')));
     eq(I.tx('RETRASO +{n} MIN', { n: 10 }, 'en'), '+10 MIN DELAY');
-    eq(I.tx('EN HORA · SIN INCIDENCIAS', null, 'en'), 'ON TIME · NO INCIDENTS');
+    eq(I.tx('EN HORA · SIN INCIDENCIAS', null, 'en'), 'ON TIME · ALL CLEAR');
     eq(I.t('print.pills.hito', null, 'en'), 'KEY TIME'); eq(I.t('print.pills.hito', null, 'es'), 'MARCADOR');
   });
   const clickOk = (t, key) => t.env.fire('document', 'click', { target: { closest: sel => sel === '.callok' ? { dataset: { ck: key } } : null } });

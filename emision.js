@@ -32,7 +32,7 @@
   const PUBLIC_BASE = 'https://nostoyloko-jpg.github.io/showtime/';
   // Versión publicada: va en los enlaces de los QR para que el móvil no abra una copia vieja guardada en su caché
   // (súbela junto con los ?v= de index.html / live.html / remote.html).
-  const BUILD = '20261114';
+  const BUILD = '20261116';
   const CHUNK = 24000;           // bytes por trozo (los repetidores públicos limitan el tamaño de mensaje)
   const BEAT_MS = 10000;         // latido del Mac
   const PRESENCE_MS = 20000;     // latido de cada dispositivo (vista, zona, tipo): telemetría del gestor de pantallas

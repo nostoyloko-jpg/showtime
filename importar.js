@@ -997,7 +997,7 @@
     let fi = days.length ? days[0] : today, ff = days.length ? days[days.length - 1] : today;
     const span = (Date.parse(ff) - Date.parse(fi)) / 86400000;
     if (span > 30) ff = new Date(Date.parse(fi) + 30 * 86400000).toISOString().slice(0, 10);   // el resto saldrá como «fuera del evento»
-    return C.newFestival({ nombre: 'Evento sin nombre', fechaInicio: fi, fechaFin: ff, dayCutoff: C.DEFAULT_CUTOFF }).state;
+    return C.newFestival({ nombre: C.UNNAMED, fechaInicio: fi, fechaFin: ff, dayCutoff: C.DEFAULT_CUTOFF }).state;
   }
 
   const API = { norm, parseTime, parseRange, parseDate, detect, splitRow, parseTable, guessHeader, guessColumns, tableRecords,

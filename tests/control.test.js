@@ -609,11 +609,45 @@
     eq(c.env.getEl('list-empty').hidden, true, 'con entradas, la tabla');
     [a, b, c].forEach(x => eq(x.env.errors.length, 0, x.env.errors.join(' | ')));
   });
+  test('Evento sin nombre en inglés: «Untitled event» en la barra, en el aviso y en Configuración (casilla vacía); al guardar sigue sin nombre', () => {
+    const p = panel({ 'showtime.config': JSON.stringify({ lang: 'en' }) });
+    p.env.fire('document', 'paste', pasteEv(CARTEL));
+    ok(/placeholder="Untitled event"/.test(ultimo(p, 'imp-new')), 'el campo de nombre, en inglés');
+    p.env.fire('imp-go', 'click', {});
+    eq(p.read('showtime.festival').event.nombre, 'Evento sin nombre', 'el JSON guarda el texto de siempre');
+    eq(p.env.getEl('fest-name').textContent, 'Untitled event', 'y se ve traducido');
+    const t = dashboard({ 'showtime.config': JSON.stringify({ lang: 'en' }) });
+    const C2 = t.env.win.ShowtimeCore, T = t.env.win.ShowtimePanel._test;
+    const s0 = JSON.parse(t.env.storage.get('showtime.festival'));
+    const un = Object.assign({}, s0, { event: Object.assign({}, s0.event, { nombre: C2.UNNAMED }) });
+    const u = dashboard({ 'showtime.config': JSON.stringify({ lang: 'en' }), 'showtime.festival': JSON.stringify(un) });
+    eq(u.env.getEl('fest-name').textContent, 'Untitled event', 'barra en inglés');
+    const e = dashboard({ 'showtime.festival': JSON.stringify(un) });
+    eq(e.env.getEl('fest-name').textContent, 'Evento sin nombre', 'en español, igual que siempre');
+    const js = D.src('control.js');
+    ok(/value="' \+ esc\(C\.isUnnamed\(ev\.nombre\) \? '' : ev\.nombre\)/.test(js) && /placeholder="' \+ esc\(tx\('Evento sin nombre'\)\)/.test(js), 'Configuración: casilla vacía con el nombre traducido de fondo');
+    ok(/n \|\| \(FEST && C\.isUnnamed\(FEST\.event && FEST\.event\.nombre\) && \$\('f-nombre'\)\.placeholder \? C\.UNNAMED : ''\)/.test(js), 'guardar sin escribir nombre: sigue sin nombre');
+    eq(C2.eventName({ event: { nombre: '  ' } }, x => x === 'Evento sin nombre' ? 'Untitled event' : x), 'Untitled event');
+    eq(C2.eventName({ event: { nombre: 'Noches' } }), 'Noches');
+    ok(/title: C\.eventName\(FEST, tx\)/.test(js), 'la hoja impresa también');
+  });
+  test('Importar sin evento: el nombre escrito en la ventana es el del evento (sin «ponle nombre en Configuración»)', () => {
+    const t = panel();
+    t.env.fire('document', 'paste', pasteEv(CARTEL));
+    t.env.fire('imp-new', 'input', { target: { id: 'imp-name', value: '  Noches del Botánico  ' } });
+    t.env.fire('imp-go', 'click', {});
+    const s = t.read('showtime.festival');
+    eq(s.event.nombre, 'Noches del Botánico'); eq(s.artists.length, 2);
+    ok(!/ponle nombre/.test(t.env.getEl('toast').textContent), t.env.getEl('toast').textContent);
+    ok(((t.read('showtime.log') || {}).entries || []).length >= 0);
+    eq(t.env.errors.length, 0, t.env.errors.join(' | '));
+  });
   test('⌘V sin evento: abre «Pegar horario» con lo copiado y, al importar, crea «Evento sin nombre» con sus jornadas (y queda sin exportar)', () => {
     const t = panel();
     t.env.fire('document', 'paste', pasteEv(CARTEL));
     eq(t.env.getEl('imp').hidden, false, 'se abre la vista previa'); eq(t.env.getEl('imp-text').value, CARTEL);
-    ok(/Sin evento abierto: al importar se crea <b>«Evento sin nombre»<\/b>/.test(ultimo(t, 'imp-new')), 'avisa de que se crea el evento');
+    ok(/Sin evento abierto: al importar se crea un evento nuevo/.test(ultimo(t, 'imp-new')), 'avisa de que se crea el evento');
+    ok(/id="imp-name"[^>]*placeholder="Evento sin nombre"/.test(ultimo(t, 'imp-new')), 'con su campo de nombre (vacío = «Evento sin nombre»)');
     eq(t.read('showtime.festival'), null, 'nada se guarda solo con pegar (vista previa)');
     t.env.fire('imp-go', 'click', {});
     const s = t.read('showtime.festival');
@@ -1059,6 +1093,19 @@
     eq(t.env.getEl('gv-qrn').textContent, '4 conectados');
     T.fakeEm(null, null);
   });
+  // ── Unidades del tiempo (dec. 107) ──
+  test('Meteo › Unidades: selector Métrico / Imperial; umbrales y valores manuales en la unidad elegida, guardados en métrico', () => {
+    const h = D.src('index.html');
+    ok(/<select id="mt-units"><option value="metric">Métrico \(°C, km\/h, mm\)<\/option><option value="imperial">Imperial \(°F, mph, in\)<\/option><\/select>/.test(h), 'selector');
+    ok(/data-th="gust"[^>]*> <span class="mt-u" data-u="wind">km\/h<\/span>/.test(h) && /data-th="heat"[^>]*> <span class="mt-u" data-u="temp">°C<\/span>/.test(h), 'unidad junto a cada umbral');
+    const T = panel().T;
+    eq(T.mtIn('wind', 50, 'imperial'), '31'); eq(T.mtIn('temp', 30, 'imperial'), '86'); eq(T.mtIn('rain', 2, 'imperial'), '0.08'); eq(T.mtIn('wind', 50, 'metric'), '50');
+    eq(T.mtOut('wind', '31', 50, 'imperial'), 50, 'sin tocar: se queda el guardado (sin redondeos)');
+    ok(Math.abs(T.mtOut('wind', '40', 50, 'imperial') - 64.37376) < 1e-6, '40 mph → km/h');
+    ok(Math.abs(T.mtOut('temp', '100', null, 'imperial') - 37.7778) < 1e-3, '100 °F → °C');
+    eq(T.mtOut('rain', '', 3, 'imperial'), null, 'vacío = sin umbral');
+    eq(D.src('control.js').indexOf("' <b>' + mtNum(s.wind) + '</b> km/h") < 0, true, 'la tarjeta ya no lleva km/h fijo');
+  });
   test('Gestor: el menú dice «Gestionar pantallas y ventanas…»', () => {
     ok(/Gestionar pantallas y ventanas…/.test(D.src('index.html')));
   });
@@ -1269,6 +1316,25 @@
     r = await t.T.emCommand({ id: 'zz', op: 'flashOff', args: {}, t: NOWc, _z: 'inventada' });
     ok(!r.ok && /ya no existe/.test(r.msg), 'zona borrada: no obedece');
     ok((await t.cmd('stop', { key: t.blk('Suena').key })).ok, 'el mando general sigue pudiendo con todo');
+  });
+  // ── Origen de mensajes y avisos (dec. 106) ──
+  test('Origen: el mensaje de un mando de zona sale como «[Zona]»; los de Producción, «[Producción]»; el log guarda quién fue', async () => {
+    const F = festDosDias(), K = F.escenarios[1].id, t = dashboard({ 'showtime.festival': JSON.stringify(F) }, NOWc);
+    ['modal', 'addm', 'imp', 'cfg', 'drop'].forEach(id => { t.env.getEl(id).hidden = true; });
+    t.T = t.env.win.ShowtimePanel._test; t.log = () => ((t.read('showtime.log') || {}).entries || []);
+    let r = await t.T.emCommand({ id: 'f1', op: 'flash', args: { text: '5 MINUTOS', to: ['confidence'], zones: [K] }, t: NOWc, _z: K });
+    ok(r.ok);
+    eq(JSON.stringify(t.read('showtime.flash').by), JSON.stringify({ k: 'zone', n: 'Carpa' }));
+    ok(/\[Carpa\]/.test(t.env.getEl('v-msg').innerHTML), 'tarjeta del Dashboard con la etiqueta');
+    r = await t.T.emCommand({ id: 'f2', op: 'flash', args: { text: 'GENERAL', to: null, zones: null }, t: NOWc });
+    eq(t.read('showtime.flash').by, null, 'mando general: sin etiqueta');
+    t.prod({ type: 'flash', from: 'prod_001', text: 'Prensa en foso', to: ['backstage'] });
+    eq(JSON.stringify(t.read('showtime.flash').by), JSON.stringify({ k: 'prod' }), 'Producción: voz colectiva');
+    t.prod({ type: 'aviso', from: 'prod_002', text: 'Catering abierto', perm: true });
+    const av = t.read('showtime.avisos').find(a => a.text === 'Catering abierto');
+    eq(JSON.stringify(av.by), JSON.stringify({ k: 'prod' })); eq(av.from, 'Producción (Luis)', 'la ✕ y el log saben quién fue');
+    ok(/<b class="byl">\[Producción\]<\/b> Catering abierto/.test(t.env.getEl('drift').innerHTML), 'chip del Dashboard');
+    ok(t.log().some(e => /Catering abierto.*Producción \(Luis\)/.test(e.text)), 'el log con el nombre');
   });
   test('Mando de zona › chat firmado «[Zona] Nombre» en el hilo de Producción; sin nombre, «[Zona] Stage Manager»', async () => {
     const F = festDosDias(), t = conMando(F), K = F.escenarios[1].id;

@@ -78,6 +78,15 @@
     click(t, '[data-delay]', { dataset: { delay: '5' }, disabled: false }); await tick();
     ok(!/data-sc="all"/.test(t.env.getEl('sh-b').innerHTML), 'sin opción de todas las zonas');
   });
+  test('Mando de zona: 5 MINUTOS y ÚLTIMO TEMA van solo a la Confidence de su zona (y a Backstage/Manager si se eligen)', async () => {
+    const F = fest(), K = zoneOf(F, 1);
+    const t = await mando({ fest: F, zone: K });
+    click(t, '.msgp', { dataset: { msg: '5 MINUTOS' }, disabled: false }); await tick(); await tick();
+    const a = t.sent.filter(s => s.op === 'flash').pop();
+    eq(a.args.text, '5 MINUTOS'); eq(JSON.stringify(a.args.zones), JSON.stringify([K]), 'solo su zona');
+    click(t, '.msgp', { dataset: { msg: 'ÚLTIMO TEMA' }, disabled: false }); await tick(); await tick();
+    eq(JSON.stringify(t.sent.filter(s => s.op === 'flash').pop().args.zones), JSON.stringify([K]));
+  });
   test('Mando general (sin zona): como siempre, con selector y todas las zonas', async () => {
     const t = await mando();
     eq(t.Rm.LOCK, null); eq(t.env.getEl('zones').hidden, false); eq(t.env.getEl('zlock').hidden, true);

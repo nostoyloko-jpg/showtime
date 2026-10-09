@@ -210,7 +210,8 @@
     const days = o.day && o.day !== 'all' ? [o.day] : reportDays(log, state);
     let sections = days.map(j => section(log, state, j, cats));
     if (!o.day || o.day === 'all') sections = sections.filter(s => s.rows.length);
-    return { event: (state && state.event && state.event.nombre) || 'Evento', day: o.day || 'all', cats, generated: o.nowMs || Date.now(), sections };
+    // Sin nombre: '' (el informe lo enseña traducido, «Evento sin nombre» / «Untitled event»)
+    return { event: C.isUnnamed(state && state.event && state.event.nombre) ? '' : state.event.nombre.trim(), day: o.day || 'all', cats, generated: o.nowMs || Date.now(), sections };
   }
 
   // ── Formatos ──────────────────────────────────────────────────────────
@@ -263,11 +264,13 @@
   function secTitle(s) { return dayUi(s.jornada, true); }
   function secNote(s) { return s.foto ? tx('Previsto: el horario tal como estaba a las {h} (foto de la jornada)', { h: hm(s.fotoAt) }) : tx('Previsto: el horario actual (esta jornada no tiene foto)'); }
   const TITLE = () => tx('REGISTRO DE EVENTOS · INFORME DE JORNADA');
+  /** Nombre del evento en el informe: sin nombre, «Evento sin nombre» / «Untitled event». */
+  const evName = rep => rep.event || tx(C.UNNAMED);
 
   function toTxt(rep) {
     const L = [], pad = (s, n) => { s = String(s); return s.length >= n ? s.slice(0, n - 1) + ' ' : s + ' '.repeat(n - s.length); };
     const lab = (k, n) => pad(tx(k), n || 11);
-    L.push('SHOWTIME · ' + TITLE(), '='.repeat(72), lab('Evento:') + rep.event, lab('Jornada:') + (rep.day === 'all' ? tx('Todo el evento') : dayUi(rep.day, true)),
+    L.push('SHOWTIME · ' + TITLE(), '='.repeat(72), lab('Evento:') + evName(rep), lab('Jornada:') + (rep.day === 'all' ? tx('Todo el evento') : dayUi(rep.day, true)),
       lab('Incluye:') + catsTxt(rep.cats), lab('Generado:') + genTxt(rep.generated), '', tx('Leyenda: * = hora distinta de la prevista · >> = incidencia'), '');
     if (!rep.sections.length) L.push(tx('(Sin nada que mostrar con estos filtros)'));
     rep.sections.forEach(s => {
@@ -324,10 +327,10 @@
         (s.rows.length ? '<table><colgroup><col class="c-h"><col class="c-k"><col><col class="c-t"><col class="c-t"><col class="c-s"></colgroup><thead><tr><th>' + esc(tx('Hora')) + '</th><th>' + esc(tx('Tipo')) + '</th><th>' + esc(tx('Suceso / acción · escenario')) + '</th><th>' + esc(tx('Previsto')) + '</th><th>' + esc(tx('Real')) + '</th><th>' + esc(tx('Estado')) + ' / ' + esc(tx('Usuario')) + '</th></tr></thead><tbody>' + rows + '</tbody></table>'
           : empty) + '</section>';
     }).join('');
-    const title = tx('Registro · {e} · {d}', { e: rep.event, d: rep.day === 'all' ? tx('todo el evento') : dayUi(rep.day) });
+    const title = tx('Registro · {e} · {d}', { e: evName(rep), d: rep.day === 'all' ? tx('todo el evento') : dayUi(rep.day) });
     return '<!DOCTYPE html><html lang="' + (isEn() ? 'en' : 'es') + '"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' + esc(title) + '</title><style>' + printCss() + '</style></head><body>' +
       '<div class="bar"><span>' + tx('Vista para imprimir · en el diálogo, elige <b>Guardar como PDF</b>') + '</span><button onclick="window.print()">' + esc(tx('Imprimir / Guardar PDF')) + '</button></div>' +
-      '<main><header><div class="brand">SHOWTIME · ' + esc(TITLE()) + '</div><h1>' + esc(rep.event) + '</h1>' +
+      '<main><header><div class="brand">SHOWTIME · ' + esc(TITLE()) + '</div><h1>' + esc(evName(rep)) + '</h1>' +
       '<dl><div><dt>' + esc(tx('Jornada')) + '</dt><dd>' + esc(rep.day === 'all' ? tx('Todo el evento') : dayUi(rep.day, true)) + '</dd></div><div><dt>' + esc(tx('Incluye')) + '</dt><dd>' + esc(catsTxt(rep.cats)) + '</dd></div><div><dt>' + esc(tx('Generado')) + '</dt><dd>' + esc(genTxt(rep.generated)) + '</dd></div></dl>' +
       '<p class="legend"><span class="sw chgsw">21:04</span> ' + esc(tx('hora distinta de la prevista (con barra lateral)')) + ' <span class="sw incsw"></span> ' + esc(tx('incidencia (hora en que pasó)')) + ' <span class="sw gonesw">Banda</span> ' + esc(tx('borrada o movida')) + '</p></header>' +
       (secs || empty) + '</main></body></html>';

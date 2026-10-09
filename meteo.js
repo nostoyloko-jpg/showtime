@@ -31,8 +31,32 @@
     url: '', map: { temp: '', rain: '', wind: '', gust: '', code: '' },
     manual: { temp: null, rain: null, wind: null, gust: null, uv: null, at: null },
     th: { wind: null, gust: null, rain: null, heat: null, storm: true, uvOn: true, uv: 8, aqiOn: false, aqi: 80 },
-    horizon: 3, refresh: 15
+    horizon: 3, refresh: 15, units: 'metric'
   };
+  // ── Unidades (dec. 107): por dentro todo en métrico (°C, km/h, mm/h); se enseña y se escribe en la unidad elegida ──
+  const UNITS = ['metric', 'imperial'];
+  const imp = u => u === 'imperial';
+  /** Métrico → unidad elegida. kind: 'temp' | 'wind' (también ráfagas) | 'rain'. */
+  function toU(kind, v, units) {
+    if (v === null || v === undefined || !imp(units)) return v;
+    return kind === 'temp' ? v * 9 / 5 + 32 : kind === 'rain' ? v / 25.4 : v / 1.609344;
+  }
+  /** Unidad elegida → métrico (para guardar lo que escribe el regidor). */
+  function fromU(kind, v, units) {
+    if (v === null || v === undefined || !imp(units)) return v;
+    return kind === 'temp' ? (v - 32) * 5 / 9 : kind === 'rain' ? v * 25.4 : v * 1.609344;
+  }
+  function unitOf(kind, units) { return kind === 'temp' ? (imp(units) ? '°F' : '°C') : kind === 'rain' ? (imp(units) ? 'in/h' : 'mm/h') : (imp(units) ? 'mph' : 'km/h'); }
+  /** Solo la cifra, en la unidad elegida: temperatura y viento sin decimales; lluvia con 1 (mm) o 2 (in). */
+  function numU(kind, v, units, l) {
+    if (v === null || v === undefined) return '—';
+    const x = toU(kind, v, units);
+    if (kind !== 'rain') return String(Math.round(x));
+    const d = imp(units) ? 100 : 10, s = (Math.round(x * d) / d).toString();
+    return enOn(l) ? s : s.replace('.', ',');
+  }
+  /** Cifra y unidad («45 km/h», «28 mph», «0,05 in/h»; up = en mayúsculas para la cinta). */
+  function fmtU(kind, v, units, l, up) { const u = unitOf(kind, units); return numU(kind, v, units, l) + ' ' + (up ? u.toUpperCase() : u); }
   // Margen para no encender y apagar un aviso cada vez que llega un dato (histéresis) y para volver a avisar si empeora
   const HYST = { gust: 5, wind: 5, rain: 1, heat: 1, uv: 1, aqi: 10, storm: 0 };
   const WORSE = { gust: 5, wind: 5, rain: 2, heat: 2, uv: 1, aqi: 10, storm: Infinity };
@@ -64,7 +88,8 @@
         aqiOn: th.aqiOn === true, aqi: pick(th.aqi, AQI_TH, D.th.aqi)
       },
       horizon: pick(s.horizon, HORIZON, D.horizon),
-      refresh: pick(s.refresh, REFRESH, D.refresh)
+      refresh: pick(s.refresh, REFRESH, D.refresh),
+      units: UNITS.indexOf(s.units) >= 0 ? s.units : 'metric'
     };
   }
   /** Lo que se emite a los dispositivos de Staff: sin la URL propia ni su mapeo (pueden llevar una clave privada). */
@@ -241,7 +266,7 @@
       src: snap.src, at: snap.t, stale, staleTxt: stale ? tx('SIN DATOS DESDE {h}', { h: hhmm(snap.t) }) : '',
       temp: snap.cur.temp, rain: snap.cur.rain, wind: snap.cur.wind, gust: snap.cur.gust,
       gustMax: g ? g.v : null, gustMaxAt: g ? g.t : null, uv: snap.cur.uv, uvMax: u ? u.v : null, aqi: snap.cur.aqi,
-      code: snap.cur.code, icon: s.icon, sky: s.text, horizon: c.horizon
+      code: snap.cur.code, icon: s.icon, sky: s.text, horizon: c.horizon, units: c.units
     };
   }
 
@@ -266,10 +291,12 @@
         out.push(Object.assign({ kind, value: mx.v, at: mx.t, th }, ui, { textEs: es.text }));
       }
     };
-    check('gust', 'gust', c.th.gust, (v, w, L) => ({ short: tx('RÁFAGAS {v} KM/H {w}', { v: r0(v), w }, L), text: tx('Ráfagas {v} km/h {w} · umbral {u}', { v: r0(v), w: w.toLowerCase(), u: r0(c.th.gust) }, L) }));
-    check('wind', 'wind', c.th.wind, (v, w, L) => ({ short: tx('VIENTO {v} KM/H {w}', { v: r0(v), w }, L), text: tx('Viento medio {v} km/h {w} · umbral {u}', { v: r0(v), w: w.toLowerCase(), u: r0(c.th.wind) }, L) }));
-    check('rain', 'rain', c.th.rain, (v, w, L) => ({ short: tx('LLUVIA {v} MM/H {w}', { v: r1(v, L), w }, L), text: tx('Lluvia {v} mm/h {w} · umbral {u}', { v: r1(v, L), w: w.toLowerCase(), u: r1(c.th.rain, L) }, L) }));
-    check('heat', 'temp', c.th.heat, (v, w, L) => ({ short: tx('CALOR {v} °C {w}', { v: r0(v), w }, L), text: tx('Calor {v} °C {w} · umbral {u}', { v: r0(v), w: w.toLowerCase(), u: r0(c.th.heat) }, L) }));
+    // Cifras en la unidad elegida (dec. 107): «Ráfagas 45 km/h …» / «Gusts 28 mph …». El umbral, igual.
+    const U = c.units, F = (k, v, L, up) => fmtU(k, v, U, L, up);
+    check('gust', 'gust', c.th.gust, (v, w, L) => ({ short: tx('RÁFAGAS {_v} {w}', { _v: F('wind', v, L, true), w }, L), text: tx('Ráfagas {_v} {_n} {w} · umbral {_u}', { _v: numU('wind', v, U, L), _n: unitOf('wind', U), w: w.toLowerCase(), _u: F('wind', c.th.gust, L) }, L) }));
+    check('wind', 'wind', c.th.wind, (v, w, L) => ({ short: tx('VIENTO {_v} {w}', { _v: F('wind', v, L, true), w }, L), text: tx('Viento medio {_v} {_n} {w} · umbral {_u}', { _v: numU('wind', v, U, L), _n: unitOf('wind', U), w: w.toLowerCase(), _u: F('wind', c.th.wind, L) }, L) }));
+    check('rain', 'rain', c.th.rain, (v, w, L) => ({ short: tx('LLUVIA {_v} {w}', { _v: F('rain', v, L, true), w }, L), text: tx('Lluvia {_v} {_n} {w} · umbral {_u}', { _v: numU('rain', v, U, L), _n: unitOf('rain', U), w: w.toLowerCase(), _u: F('rain', c.th.rain, L) }, L) }));
+    check('heat', 'temp', c.th.heat, (v, w, L) => ({ short: tx('CALOR {_v} {w}', { _v: F('temp', v, L, true), w }, L), text: tx('Calor {_v} {_n} {w} · umbral {_u}', { _v: numU('temp', v, U, L), _n: unitOf('temp', U), w: w.toLowerCase(), _u: F('temp', c.th.heat, L) }, L) }));
     if (c.th.storm) {
       const st = pts.find(p => isStorm(p.code));
       if (st) {
@@ -297,12 +324,12 @@
   function pillText(sum) {
     if (!sum) return '';
     if (sum.stale) return sum.staleTxt;
-    const p = [];
-    if (sum.temp !== null) p.push(r0(sum.temp) + '°');
-    if (sum.wind !== null) p.push(tx('VIENTO {v}', { v: r0(sum.wind) }));
-    if (sum.gustMax !== null) p.push(tx('RÁF. MÁX {v} KM/H', { v: r0(sum.gustMax) }));
-    else if (sum.gust !== null) p.push(tx('RÁF. {v} KM/H', { v: r0(sum.gust) }));
-    if (sum.rain !== null && sum.rain > 0) p.push(tx('LLUVIA {v}', { v: r1(sum.rain) }));
+    const p = [], U = sum.units;
+    if (sum.temp !== null) p.push(numU('temp', sum.temp, U) + '°');
+    if (sum.wind !== null) p.push(tx('VIENTO {v}', { v: numU('wind', sum.wind, U) }));
+    if (sum.gustMax !== null) p.push(tx('RÁF. MÁX {_v}', { _v: fmtU('wind', sum.gustMax, U, undefined, true) }));
+    else if (sum.gust !== null) p.push(tx('RÁF. {_v}', { _v: fmtU('wind', sum.gust, U, undefined, true) }));
+    if (sum.rain !== null && sum.rain > 0) p.push(tx('LLUVIA {v}', { v: numU('rain', sum.rain, U) }));
     if (sum.sunset) p.push(tx('PUESTA {h}', { h: hhmm(sum.sunset) }));
     return p.join(' · ');
   }
@@ -311,12 +338,12 @@
   function tickerList(sum, list) {
     if (!sum) return [];
     if (sum.stale) return [{ kind: 'meteo', level: 'warn', text: tx('EL TIEMPO: {s}', { s: sum.staleTxt }) }];
-    const p = [];
-    if (sum.temp !== null) p.push(r0(sum.temp) + ' °C');
+    const p = [], U = sum.units;
+    if (sum.temp !== null) p.push(fmtU('temp', sum.temp, U, undefined, true));
     if (sum.sky) p.push(sum.sky.toUpperCase());
-    if (sum.rain !== null) p.push(tx('LLUVIA {v} MM/H', { v: r1(sum.rain) }));
-    if (sum.wind !== null) p.push(tx('VIENTO {v} KM/H', { v: r0(sum.wind) }));
-    if (sum.gustMax !== null) p.push(tx('RÁFAGAS MÁX {v} KM/H', { v: r0(sum.gustMax) }));
+    if (sum.rain !== null) p.push(tx('LLUVIA {_v}', { _v: fmtU('rain', sum.rain, U, undefined, true) }));
+    if (sum.wind !== null) p.push(tx('VIENTO {_v}', { _v: fmtU('wind', sum.wind, U, undefined, true) }));
+    if (sum.gustMax !== null) p.push(tx('RÁFAGAS MÁX {_v}', { _v: fmtU('wind', sum.gustMax, U, undefined, true) }));
     const out = p.length ? [{ kind: 'meteo', level: 'ok', text: p.join(' · ') }] : [];
     if (sum.sunset) out.push({ kind: 'meteo', level: 'ok', text: tx('PUESTA DE SOL {h}', { h: hhmm(sum.sunset) }) });
     (list || []).forEach(a => out.push({ kind: 'meteo', level: 'warn', text: tx('PREVISIÓN') + ' · ' + a.short }));
@@ -325,7 +352,7 @@
 
   const API = { OM_FC, OM_AQ, OM_GEO, AEMET_URL, ATTRIB, SOURCES, REFRESH, HORIZON, AQI_TH, DEFAULT_METEO,
     normMeteo, publicMeteo, staleMins, forecastUrl, airUrl, geoUrl, parseOpenMeteo, getPath, parseGeneric, manualSnap, fetchSnap, parseGeo,
-    sky, uvText, aqiText, hhmm, sunNext, summary, alerts, pendingAlerts, ack, pruneAcks, pillText, tickerList, fmt1: r1 };
+    sky, uvText, aqiText, hhmm, sunNext, summary, alerts, pendingAlerts, ack, pruneAcks, pillText, tickerList, fmt1: r1, UNITS, toU, fromU, unitOf, numU, fmtU };
   if (isNode) module.exports = API;
   else root.ShowtimeMeteo = API;
 })(typeof window !== 'undefined' ? window : globalThis);

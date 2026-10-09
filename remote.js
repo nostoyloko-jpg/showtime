@@ -80,7 +80,7 @@
     renderRx();
     if (!FEST) { $('evn').textContent = tx(ST && ST.state === 'end' ? 'La emisión está parada en el Dashboard' : 'Esperando los datos del Mac…'); setActs(null); return; }
     const sc = Dt.getScope ? Dt.getScope() : null, jor = sc ? sc.day : C.activeJornada(FEST, Math.floor(n));
-    $('evn').textContent = ((FEST.event && FEST.event.nombre) || tx('Evento')) + ' · ' + fmtDay(jor) + (sc && sc.closed ? ' · ' + tx('jornada cerrada en el Dashboard') : '');
+    $('evn').textContent = C.eventName(FEST, tx) + ' · ' + fmtDay(jor) + (sc && sc.closed ? ' · ' + tx('jornada cerrada en el Dashboard') : '');
     const zl = LOCK ? zones()[0] : null;
     $('zlock').hidden = !LOCK;
     if (LOCK) { $('zlock').textContent = zl ? zl.name : tx('Zona'); $('zlock').style.setProperty('--zc', (zl && zl.color) || '#888'); }

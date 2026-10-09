@@ -88,6 +88,13 @@
   const UI_EN = {
     /*UI-EN-BEGIN*/
     panel: {
+      "Unidades": "Units",
+      "Métrico (°C, km/h, mm)": "Metric (°C, km/h, mm)",
+      "Imperial (°F, mph, in)": "Imperial (°F, mph, in)",
+      "Temperatura": "Temperature",
+      "Ráfagas": "Gusts",
+      "Nombre del evento": "Event name",
+      "Sin evento abierto: al importar se crea un evento nuevo · {d} (fechas y zonas, luego en Configuración).": "No event open: importing creates a new event · {d} (dates and stages, later in Settings).",
       "Gestionar pantallas y ventanas…": "Manage screens and windows…",
       "Monitores del Mac y dispositivos conectados por QR": "Mac monitors and devices connected by QR",
       "Pantallas y ventanas": "Screens and windows",
@@ -747,6 +754,7 @@
       "o": "or"
     },
     toasts: {
+      "Evento «{_e}» creado · {m}": "Event “{_e}” created · {m}",
       "Jornada cerrada: los dispositivos QR muestran «Jornada finalizada»": "Day closed: QR devices show “Day finished”",
       "Jornada reabierta en los dispositivos QR": "Day reopened on the QR devices",
       "Clave nueva del mando de {z}: escanea otra vez su QR": "New remote key for {z}: scan its QR again",
@@ -1062,7 +1070,7 @@
       "Pulsa <kbd>F</kbd> (o haz clic y pulsa F) para pantalla completa": "Press <kbd>F</kbd> (or click and press F) for full screen",
       "RETRASO +{n} MIN": "+{n} MIN DELAY",
       "(+{n} EN VIVO)": "(+{n} LIVE)",
-      "EN HORA · SIN INCIDENCIAS": "ON TIME · NO INCIDENTS",
+      "EN HORA · SIN INCIDENCIAS": "ON TIME · ALL CLEAR",
       "TIEMPO EXTRA +{n} MIN": "EXTRA TIME +{n} MIN",
       "Cerrar la Pantalla Live": "Close the Live Screen",
       "Arrastra para ajustar el ancho": "Drag to adjust the width",
@@ -1094,6 +1102,19 @@
       "Se queda en la cinta hasta que lo quite el Stage Manager": "Stays on the ticker until the Stage Manager removes it"
     },
     meteo: {
+      "RÁFAGAS {_v} {w}": "GUSTS {_v} {w}",
+      "Ráfagas {_v} {_n} {w} · umbral {_u}": "Gusts {_v} {_n} {w} · threshold {_u}",
+      "VIENTO {_v} {w}": "WIND {_v} {w}",
+      "Viento medio {_v} {_n} {w} · umbral {_u}": "Mean wind {_v} {_n} {w} · threshold {_u}",
+      "LLUVIA {_v} {w}": "RAIN {_v} {w}",
+      "Lluvia {_v} {_n} {w} · umbral {_u}": "Rain {_v} {_n} {w} · threshold {_u}",
+      "CALOR {_v} {w}": "HEAT {_v} {w}",
+      "Calor {_v} {_n} {w} · umbral {_u}": "Heat {_v} {_n} {w} · threshold {_u}",
+      "RÁF. MÁX {_v}": "MAX GUST {_v}",
+      "RÁF. {_v}": "GUST {_v}",
+      "LLUVIA {_v}": "RAIN {_v}",
+      "VIENTO {_v}": "WIND {_v}",
+      "RÁFAGAS MÁX {_v}": "MAX GUSTS {_v}",
       "Despejado": "Clear",
       "Casi despejado": "Mostly clear",
       "Parcialmente nuboso": "Partly cloudy",

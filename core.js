@@ -648,6 +648,12 @@
     return { ok: true, event: { nombre, fechaInicio: fi, fechaFin: ff, dayCutoff: cut, callMins: cm, coMin: co } };
   }
 
+  /** Evento sin nombre (importar sin poner nombre): se guarda con este texto (el nombre es obligatorio) y se ENSEÑA
+   *  traducido («Untitled event» en inglés) en el Dashboard, la Live, el mando, la impresión y el informe. */
+  const UNNAMED = 'Evento sin nombre';
+  function isUnnamed(nombre) { const n = String(nombre == null ? '' : nombre).trim(); return !n || n === UNNAMED; }
+  /** Nombre para enseñar: el del evento o, sin nombre, «Evento sin nombre» pasado por `t` (el traductor de cada pantalla). */
+  function eventName(state, t) { const n = state && state.event && state.event.nombre; return isUnnamed(n) ? (t ? t(UNNAMED) : UNNAMED) : String(n).trim(); }
   function newFestival(ev) {
     const r = checkEvent(ev || {});
     if (!r.ok) return r;
@@ -1161,7 +1167,7 @@
 
   const API = {
     DEFAULT_CUTOFF, DEFAULT_CALL_MINS, DEFAULT_DURATION, DEFAULT_CO_MIN, isFija, setFija, coMinFor,
-    MARGIN_WARN, scopeToJornada, jornadaOver, isLibre, setDelayFlag, movesWithDelay, setReal, jornadaOfAbs, activeJornada, legacyCallKey, callIsDone, callKeyName, driftByZone, delayByZone, addRetraso, retrasosOf, blockedIn, movesBy, setAlargar, hitoMargins, MAX_NEXT, ARTIST_COLORS, TIPO_COLORS,
+    MARGIN_WARN, UNNAMED, isUnnamed, eventName, scopeToJornada, jornadaOver, isLibre, setDelayFlag, movesWithDelay, setReal, jornadaOfAbs, activeJornada, legacyCallKey, callIsDone, callKeyName, driftByZone, delayByZone, addRetraso, retrasosOf, blockedIn, movesBy, setAlargar, hitoMargins, MAX_NEXT, ARTIST_COLORS, TIPO_COLORS,
     pad2, parseHM, fmtHM, dayIndex, isoOfDay, shiftDate, toAbs, adjustEnd, nowAbs,
     cutoffMins, festivalDateOf, entersMode, festivalDays, TIPOS, tipoOf, isBand, isAll, entriesOf, tasksNow, hitosOf,
     getEscenario, artistColor, callAbsFor, buildBlocks,

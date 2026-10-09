@@ -84,7 +84,7 @@
     CALL_DONE = new Set(Dt.getCallDone());
     applyInfoWidth();   // ancho del panel de info: manual si lo arrastraste; si no, según el nombre más largo del día
 
-    $('evn-name').textContent = NOFEST ? tx('SIN EVENTO') : (DEMO ? 'DEMO · ' : '') + ((FEST.event && FEST.event.nombre) || '');
+    $('evn-name').textContent = NOFEST ? tx('SIN EVENTO') : (DEMO ? 'DEMO · ' : '') + C.eventName(FEST, tx);
     $('evn-mode').textContent = tx(vt[0]) + ' · ';
     const msg = NOFEST ? tx(Dt.READONLY ? 'ESPERANDO LOS DATOS DE LA SALA…' : 'SIN EVENTO CARGADO · ábrelo en el Dashboard')
       : DAY_MISSING ? tx('EL {d} NO TIENE {w} · elige otro día', { d: fmtDay(DAY_MISSING), w: tx(vt[1]) })
@@ -831,7 +831,7 @@
   requestWake();
 
   // Cambios desde el Panel de Control (o desde otra Live)
-  Dt.onChange(type => { if (type === 'flash') { renderFlash(); return; } if (type === 'standbyAll') { followStandby(); return; } load(); if (type === 'snapshot') followStandby(); if (type === 'config' || type === 'snapshot') applyVista(); else tick(); });
+  Dt.onChange(type => { if (type === 'flash') { renderFlash(); return; } if (type === 'standbyAll') { followStandby(); return; } load(); if (type === 'snapshot') { followStandby(); renderFlash(); } if (type === 'config' || type === 'snapshot') applyVista(); else tick(); });
 
   // ── Mensaje flash (2c-C) ─────────────────────────────────────────────
   let flashId = '';
@@ -843,6 +843,8 @@
     if (f.id !== flashId) {
       flashId = f.id;
       $('flash-txt').textContent = f.text.toUpperCase();
+      const lb = Vs.byLabel ? Vs.byLabel(f.by) : '', be = $('flash-by');   // origen (dec. 106): [ZONA] o [PRODUCCIÓN]
+      if (be) { be.textContent = lb; be.hidden = !lb; }
       const box = el.querySelector('.fl-box');
       if (f.bg) box.style.setProperty('--mbg', f.bg); else box.style.removeProperty('--mbg');
       if (f.fg) box.style.setProperty('--mfg', f.fg); else box.style.removeProperty('--mfg');

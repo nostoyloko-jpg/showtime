@@ -441,6 +441,19 @@
     rx.stop(); await tx.stop();
   });
 
+  test('Origen de mensajes (dec. 106): la etiqueta [Zona] / [Producción] viaja con el mensaje y los avisos; el nombre de la persona va aparte', async () => {
+    const R = rig(), room = await E.newRoom();
+    const snap = { festival: null, config: {}, callDone: [], flash: { id: 'f', text: '5 MINUTOS', at: 1, ms: 0, to: ['confidence'], zones: ['esc2'], by: { k: 'zone', n: 'Carpa' } },
+      avisos: [{ id: 'a', text: 'Catering', at: 1, ms: 0, from: 'Producción (Marta)', by: { k: 'prod' } }] };
+    const tx = new E.Emisor({ room, brokers: R.brokers, WebSocket: R.WS, getSnapshot: () => snap });
+    await tx.start();
+    const v = viewer(room, R); await v.rx.start();
+    await until(() => v.snaps.length, 4000, 'estado');
+    const s = v.snaps[v.snaps.length - 1];
+    eq(JSON.stringify(s.flash.by), JSON.stringify({ k: 'zone', n: 'Carpa' })); eq(JSON.stringify(s.avisos[0].by), JSON.stringify({ k: 'prod' }));
+    v.rx.stop(); await tx.stop();
+  });
+
   test('Conexión «zombi»: kick reconecta el repetidor y wake pide el estado de nuevo', async () => {
     const R = rig(), room = await E.newRoom();
     const tx = new E.Emisor({ room, brokers: R.brokers, WebSocket: R.WS, getSnapshot: () => ({ n: 1 }) });

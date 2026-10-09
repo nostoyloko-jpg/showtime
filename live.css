@@ -237,6 +237,9 @@ body[data-lv="escenario"] .txtbtn{color:#fff}
 #flash[hidden]{display:none}
 .fl-box{--mbg:#000;--mfg:var(--call);width:94vw;padding:4vh 3vw;border-radius:18px;background:var(--mbg);border:6px solid var(--mfg);text-align:center;box-shadow:0 0 60px color-mix(in srgb,var(--mfg) 35%,transparent)}
 .fl-bar[hidden]{display:none}
+/* Origen del mensaje (dec. 106): «[PRODUCCIÓN]» / «[ESCENARIO 1]», pequeño, encima del texto */
+.fl-by{color:var(--mfg);opacity:.8;font-weight:800;font-size:clamp(14px,3vh,34px);letter-spacing:.14em;margin-bottom:1.2vh;text-transform:uppercase}
+.fl-by[hidden]{display:none}
 #flash-txt{color:var(--mfg);font-weight:900;line-height:1.02;letter-spacing:.02em;overflow-wrap:normal;word-break:normal;hyphens:none;width:100%}
 .fl-bar{height:8px;margin-top:3vh;border-radius:4px;background:rgba(128,128,128,.35);overflow:hidden}
 #flash-prog{height:100%;background:#fff;transition:width .25s linear}
