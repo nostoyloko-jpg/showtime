@@ -8,7 +8,7 @@
  * (sin recargar ninguna pantalla: lo nuevo se usa la próxima vez que se abra).
  */
 'use strict';
-const VERSION = '20261128';
+const VERSION = '20261129';
 const CACHE = 'showtime-' + VERSION;
 const NET_TIMEOUT = 3000;
 const PRECACHE = [
