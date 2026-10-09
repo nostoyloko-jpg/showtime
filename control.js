@@ -742,9 +742,7 @@
     const d = new Date();
     $('clock').textContent = pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds());
     const nOpen = openIds().length;
-    $('live-state').className = 'state ' + (nOpen ? 'on' : 'off');
-    $('live-state').title = nOpen ? (nOpen === 1 ? tx('1 Pantalla Live abierta') : tx('{n} Pantallas Live abiertas', { n: nOpen })) : tx('Ninguna Pantalla Live abierta');
-    $('btn-live').title = tx('Pantallas Live: Manager, Confidence (por zona) y Backstage');
+    renderHubLed(nOpen); renderCastBar();   // LED y «N dispositivos conectados», al segundo
     if ($('lv-closeall')) $('lv-closeall').hidden = nOpen < 2;
     if ($('lv-standby')) {
       const on = standbyOn();
@@ -1221,7 +1219,7 @@
   });
 
   // ── Menús de la barra (cristal): hover o clic; se cierran al salir el cursor o con Esc ──
-  const MENUS = Array.from(document.querySelectorAll('.menus .menu, #m-live'));
+  const MENUS = Array.from(document.querySelectorAll('.menus .menu, #m-hub'));
   function setMenu(m, on) { m.classList.toggle('open', on); m.querySelector('.mbtn').setAttribute('aria-expanded', String(on)); }
   function closeMenus(except) { MENUS.forEach(m => { if (m !== except) setMenu(m, false); }); }
   MENUS.forEach(m => {
@@ -1232,7 +1230,7 @@
     // Las acciones cierran el menú (los toggles de Retrasos no: se marcan varios seguidos)
     m.querySelectorAll('.mitem').forEach(it => it.addEventListener('click', () => setMenu(m, false)));
   });
-  document.addEventListener('pointerdown', e => { if (!e.target.closest('.menus, #m-live')) closeMenus(); if (!e.target.closest('.more')) document.querySelectorAll('.more.open').forEach(x => x.classList.remove('open')); });
+  document.addEventListener('pointerdown', e => { if (!e.target.closest('.menus, #m-hub')) closeMenus(); if (!e.target.closest('.more')) document.querySelectorAll('.more.open').forEach(x => x.classList.remove('open')); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenus(); });
 
   // ── Retrasos: categorías BLOQUEADAS («Bloquear retraso»). De entrada todo se mueve; lo marcado no. ──
@@ -1405,12 +1403,24 @@
     if (FEST && C.buildBlocks(FEST, { mode: 'all', day: 'all' }).some(b => C.isBand(b) && !b.stageId)) zs.push({ id: '', name: tx('Sin zona'), color: '#888' });
     return zs;
   }
-  /** Menú de Live: solo las zonas para abrir Confidence (lo abierto se ve en el gestor). */
+  /** Centro de Pantallas y Emisión (dec. 109): selector de zona para abrir Confidence (lo abierto se ve en el gestor). */
   function renderLiveMenu() {
-    const box = $('lv-zones'); if (!box) return;
-    if (!FEST) { box.innerHTML = '<p class="mnote">' + tx('Sin evento cargado.') + '</p>'; return; }
-    const h = zonasLive().map(z => '<button class="mitem lvz" data-vista="confidence" data-zona="' + esc(z.id) + '"><i style="background:' + esc(safeColor(z.color, '#888')) + '"></i>' + esc(z.name) + '</button>').join('');
-    if (box.dataset.h !== h) { box.innerHTML = h; box.dataset.h = h; }
+    const sel = $('lv-zone'); if (!sel) return;
+    const zs = FEST ? zonasLive() : [];
+    const h = zs.length ? zs.map(z => '<option value="' + esc(z.id) + '">' + esc(z.name) + '</option>').join('') : '<option value="">' + tx('Sin zonas') + '</option>';
+    if (sel.dataset.h !== h) { const keep = sel.value; sel.innerHTML = h; sel.dataset.h = h; if (zs.some(z => z.id === keep)) sel.value = keep; }
+    sel.disabled = !zs.length;
+    if ($('lv-conf')) $('lv-conf').disabled = !FEST;
+  }
+  /** LED del botón maestro: VERDE si hay emisión o alguna Live abierta; GRIS si no. Nunca rojo (el rojo es para alertas). */
+  function renderHubLed(nOpen) {
+    const led = $('hub-led'); if (!led) return;
+    const n = nOpen === undefined ? openIds().length : nOpen, on = !!EM || n > 0;
+    led.classList.toggle('on', on);
+    const parts = [];
+    if (EM) parts.push(tx('Emitiendo por QR'));
+    parts.push(n ? (n === 1 ? tx('1 Pantalla Live abierta') : tx('{n} Pantallas Live abiertas', { n: n })) : tx('Ninguna Pantalla Live abierta'));
+    $('btn-hub').title = tx('Pantallas Live del Mac y emisión a dispositivos por QR') + ' · ' + parts.join(' · ');
   }
   /** Abre una Pantalla Live nueva (cada vez una ventana nueva: puede haber varias de la misma vista). Con un segundo monitor, se abre en él. */
   async function openLive(vista, zona) {
@@ -1536,7 +1546,7 @@
   function renderGestorQr() {
     const box = $('gv-qrl'); if (!box) return;
     const now = Date.now(), list = qrDevices(now).slice().sort((a, b) => ((DEV_ORDER[a.r ? 'mando' : a.v] ?? 9) - (DEV_ORDER[b.r ? 'mando' : b.v] ?? 9)) || (a.first - b.first));
-    const h = !EM ? '<p class="mnote">' + tx('La emisión está parada: Emisión ▾ › Empezar a emitir.') + '</p>'
+    const h = !EM ? '<p class="mnote">' + tx('La emisión está parada: Pantallas y Emisión ▾ › Empezar a emitir.') + '</p>'
       : !list.length ? '<p class="mnote">' + tx('Ningún dispositivo conectado por QR.') + '</p>'
       : list.map(d => {
         const s = Math.max(0, Math.round((now - d.t) / 1000));
@@ -1571,8 +1581,9 @@
     if (e.target.closest('#lv-standby')) { e.preventDefault(); e.stopPropagation(); closeMenus(); setStandby(!standbyOn()); return; }
     if (e.target.closest('#lv-gestor')) { e.preventDefault(); e.stopPropagation(); closeMenus(); openGestor(); return; }
     if (e.target.closest('#lv-closeall')) { closeLive(null); return; }
-    const it = e.target.closest('#m-live [data-vista]'); if (!it) return;
-    openLive(it.dataset.vista, it.dataset.zona);
+    const it = e.target.closest('#m-hub [data-vista]'); if (!it) return;
+    closeMenus();
+    openLive(it.dataset.vista, it.dataset.vista === 'confidence' ? (it.dataset.zona !== undefined ? it.dataset.zona : ($('lv-zone') ? $('lv-zone').value : '')) : null);
   }, true);
   // Cada Live dice qué vista muestra, si está en standby y qué zona (al abrirse, al cambiar con la V y en el latido)
   window.addEventListener('message', e => {
@@ -2729,7 +2740,27 @@
       .map(l => '<span class="clink ' + (l.state === 'on' ? 'on' : '') + '" title="' + esc(l.state === 'on' ? tx('Conectado') : l.err ? tx('Sin conexión: {e}', { e: l.err }) : tx('Conectando…')) + '">' + esc(l.name) + '</span>').join('');
     const v = EMST ? EMST.viewers : 0, r = kind === 'remote' ? qrDevices().filter(d => d.r && (RM_ZONE ? d.s === RM_ZONE : !d.s)).length : 0;
     const who = kind === 'remote' ? (r ? '<b class="cok">' + tx('Stage Manager conectado') + '</b>' : tx('Sin Stage Manager conectado')) : kind === 'produccion' ? '<span>' + tx('{n} persona(s) de Producción', { n: PRODUCERS.length }) + '</span>' : tx(v === 1 ? '1 dispositivo conectado' : '{n} dispositivos conectados', { n: v });
-    return '<div class="cstate"><span class="cdot ' + cls + '"></span><b>' + txt + '</b></div><div class="cview">' + who + '</div><div class="clinks">' + links + '</div>' + (kind === 'staff' && !big ? emScopeHtml() : '');
+    return '<div class="cstate"><span class="cdot ' + cls + '"></span><b>' + txt + '</b></div><div class="cview">' + who + '</div><div class="clinks">' + links + '</div>' + '';
+  }
+  /** Barra de estado de la emisión: conectar / desconectar, sala y dispositivos conectados (telemetría). */
+  function renderCastBar() {
+    const bar = $('cast-bar'); if (!bar) return;
+    let h;
+    if (!emCan()) h = '<span class="cb-st"><i class="cb-led"></i>' + tx('Este navegador no permite la emisión cifrada.') + '</span>';
+    else if (!EM) h = '<span class="cb-st"><i class="cb-led"></i><b>' + tx('Emisión detenida') + '</b></span><button class="btn primary" type="button" data-act="cast-start"><svg class="ic"><use href="#i-cast"/></svg>' + tx('Empezar a emitir') + '</button>';
+    else {
+      const n = qrDevices().length, links = emLinksOn();
+      h = '<span class="cb-st"><i class="cb-led on' + (links ? '' : ' wait') + '"></i><b>' + tx(links ? 'En directo' : 'Conectando…') + '</b>'
+        + (emRoom ? '<small>' + tx('Sala {s}', { s: esc(String(emRoom.sala).slice(0, 4).toUpperCase()) }) + '</small>' : '')
+        + '<small class="cb-n">' + tx(n === 1 ? '1 dispositivo conectado' : '{n} dispositivos conectados', { n: n }) + '</small></span>'
+        + '<button class="btn" type="button" data-act="cast-stop">' + tx('Parar emisión') + '</button>';
+    }
+    if (bar.dataset.h !== h) { bar.innerHTML = h; bar.dataset.h = h; }
+    // Seguridad: cerrar / reabrir la jornada en los QR y regenerar las claves
+    const sec = $('cast-sec'); if (!sec) return;
+    const s = (EM ? emScopeHtml() : '') + (emRoom && emCan() ? '<button class="btn ghost" type="button" data-act="cast-regen"><svg class="ic"><use href="#i-refresh"/></svg>' + tx('Regenerar claves de acceso…') + '</button>' : '');
+    if (sec.dataset.h !== s) { sec.innerHTML = s; sec.dataset.h = s; }
+    sec.hidden = !s;
   }
   /** Jornada que ven los QR («Solo hoy») y el botón Cerrar / Reabrir jornada. */
   function emScopeHtml() {
@@ -2876,9 +2907,7 @@
         + '<button class="btn" type="button" data-act="cast-copy" data-k="remote"><svg class="ic"><use href="#i-copy"/></svg>' + tx('Copiar enlace') + '</button>'
         + '<button class="btn ghost" type="button" data-act="cast-regencmd">' + tx('Nueva clave del mando…') + '</button>'
       : '<button class="btn" type="button" data-act="cast-big" data-k="staff"><svg class="ic"><use href="#i-expand"/></svg>' + tx('Ampliar') + '</button>'
-        + '<button class="btn" type="button" data-act="cast-copy" data-k="staff"><svg class="ic"><use href="#i-copy"/></svg>' + tx('Copiar enlace') + '</button>'
-        + '<button class="btn" type="button" data-act="cast-stop">' + tx('Parar emisión') + '</button>'
-        + '<button class="btn ghost" type="button" data-act="cast-regen">' + tx('Regenerar claves…') + '</button>';
+        + '<button class="btn" type="button" data-act="cast-copy" data-k="staff"><svg class="ic"><use href="#i-copy"/></svg>' + tx('Copiar enlace') + '</button>';
     const note = kind === 'remote'
       ? '<p class="cwarn"><svg class="ic"><use href="#i-alert"/></svg><span>' + tx('<b>Privado.</b> Quien tenga este QR puede mandar al Mac (▶ / ■, En hora, retrasos, mensajes, CALL). No lo compartas; si se escapa, «Nueva clave del mando».') + '</span></p>'
       : '<p class="mnote">' + tx('Abre la Pantalla Live en el dispositivo (móvil, tablet…), en solo lectura. Si el Mac se duerme o se cierra el Dashboard, la emisión se corta y los dispositivos lo avisan.') + '</p>';
@@ -2892,8 +2921,7 @@
     if (!$('cast-staff')) return;
     const on = !!EM;
     if (on) emZoneKeys();
-    $('cast-on').hidden = !on;
-    $('cast-on').classList.toggle('warn', on && !emLinksOn());
+    renderHubLed(); renderCastBar();
     ['staff', 'remote', 'produccion'].forEach(kind => {
       const box = $('cast-' + kind);
       if (!emCan()) { box.innerHTML = '<p class="cintro">' + tx('Este navegador no permite la emisión cifrada.') + '</p>'; return; }
@@ -2904,8 +2932,6 @@
           : kind === 'produccion'
           ? '<p class="cintro">' + tx('Acceso para <b>Producción</b>: ver la Live de Manager, confirmar CALL, enviar mensajes y avisos y chatear con el Stage Manager. Necesita que la emisión esté activa.') + '</p>'
           : '<p class="cintro">' + tx('Emite el horario en directo a los dispositivos del equipo (técnicos, producción, managers…). Lo ven <b>solo en lectura</b>: nadie puede cambiar nada desde ellos.') + '</p>')
-          + '<div class="cbtns"><button class="btn primary" type="button" data-act="cast-start"><svg class="ic"><use href="#i-cast"/></svg>' + tx('Empezar a emitir') + '</button>'
-          + (emRoom && kind === 'staff' ? '<button class="btn" type="button" data-act="cast-regen">' + tx('Regenerar claves…') + '</button>' : '') + '</div>'
           + '<p class="mnote">' + tx('Necesita internet en el Mac y en los dispositivos (4G o Wi-Fi con salida). Todo va cifrado: los repetidores públicos solo ven datos ilegibles y no guardan nada.') + '</p>';
         return;
       }
@@ -2924,7 +2950,7 @@
       $('qr-big-st').innerHTML = emStateHtml(bigTab, true);
     }
     // Pestaña del mando: punto si hay un mando conectado
-    const rt = document.querySelector('#m-cast .ctab[data-tab="remote"]');
+    const rt = document.querySelector('#m-hub .ctab[data-tab="remote"]');
     if (rt) rt.classList.toggle('rlive', on && !!(EMST && EMST.remotes));
   }
   async function emCopy(kind) {
@@ -2934,11 +2960,11 @@
   }
   function setCastTab(tab) {
     emTab = tab;
-    document.querySelectorAll('#m-cast .ctab').forEach(b => { const on = b.dataset.tab === tab; b.classList.toggle('on', on); b.setAttribute('aria-selected', String(on)); });
+    document.querySelectorAll('#m-hub .ctab').forEach(b => { const on = b.dataset.tab === tab; b.classList.toggle('on', on); b.setAttribute('aria-selected', String(on)); });
     $('cast-staff').hidden = tab !== 'staff'; $('cast-remote').hidden = tab !== 'remote'; $('cast-produccion').hidden = tab !== 'produccion';
   }
   document.addEventListener('click', e => {
-    const t = e.target.closest('[data-act^="cast-"], [data-act^="prod-"], #m-cast .ctab, #qr-big-x');
+    const t = e.target.closest('[data-act^="cast-"], [data-act^="prod-"], #m-hub .ctab, #qr-big-x');
     if (!t) { if (e.target.id === 'qr-big') $('qr-big').hidden = true; return; }
     if (t.classList.contains('ctab')) { setCastTab(t.dataset.tab); return; }
     if (t.id === 'qr-big-x') { $('qr-big').hidden = true; return; }
@@ -3209,5 +3235,5 @@
     if (mod && !e.shiftKey && !e.altKey && k === 'n') { e.preventDefault(); askNew(); return; }
   });
   window.ShowtimePanel = { reload: () => { loadState(); renderAll(); }, _test: { winState: () => Array.from(WIN.entries()).map(([id, x]) => ({ id, name: x.name, vista: x.vista, zona: x.zona, standby: !!x.standby, fs: x.fs })), setWinVista, setWinStandby, closeLive, openGestor, gestorVisible, emProdMessage, emRegenProd, hitoChips, emUrl, prodBigTitle, fileKind, handleFile, emCommand, importSummary, hidesSome, tipoPill, setWake, wakeState: () => ({ on: wakeOn, lock: !!wakeLock }), showSplash, hideSplash, setStandby, standbyOn, room: () => emRoom,
-    emSnapshot, emCloseDay, emDay, qrDevices, rmZones, setRmZone: z => { RM_ZONE = z; renderCast(); }, setRoom: r => { emRoom = r; }, fakeEm: (em, st) => { EM = em; EMST = st; }, emStateHtml, mtIn, mtOut, cfSimState, renderCfSim, cfSim: () => CFSIM } };   // _test: solo para tests/control.test.js
+    emSnapshot, emCloseDay, emDay, qrDevices, rmZones, setRmZone: z => { RM_ZONE = z; renderCast(); }, setRoom: r => { emRoom = r; }, fakeEm: (em, st) => { EM = em; EMST = st; }, emStateHtml, renderCastBar, renderHubLed, mtIn, mtOut, cfSimState, renderCfSim, cfSim: () => CFSIM } };   // _test: solo para tests/control.test.js
 })();

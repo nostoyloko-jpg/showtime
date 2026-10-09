@@ -7,3 +7,6 @@ parches/synapse-live/
 Claude outputs/
 .DS_Store
 *.antes-*
+# Comprimidos (resúmenes, copias): nunca al repositorio
+*.zip
+*.zip

@@ -292,8 +292,9 @@
   test('Barra superior en 3 bloques: Archivo y Deshacer · filtros y acciones · Live, Sin reposo, reloj y ⚙', () => {
     const izq = seccion('<header class="bar">', 'class="bsep"'), centro = seccion('class="menus mcenter"', '<div class="bright">'), der = seccion('<div class="bright">', '</header>');
     ok(/class="brand"/.test(izq) && /id="m-file"/.test(izq) && /id="btn-undo"/.test(izq) && /id="mods"/.test(izq), 'izquierda');
-    ['m-view', 'm-days', 'm-delay', 'm-msg', 'm-cast', 'm-chat'].forEach(id => ok(centro.indexOf('id="' + id + '"') > 0, 'centro: ' + id));
-    ['m-live', 'id="wake"', 'id="clock"', 'id="btn-cfg"'].forEach(x => ok(der.indexOf(x) > 0, 'derecha: ' + x));
+    ['m-view', 'm-days', 'm-delay', 'm-msg', 'm-chat'].forEach(id => ok(centro.indexOf('id="' + id + '"') > 0, 'centro: ' + id));
+    ok(HTML.indexOf('id="m-cast"') < 0 && HTML.indexOf('id="m-live"') < 0, 'Live ▾ y Emisión ▾ ya no van por separado (dec. 109)');
+    ['m-hub', 'id="wake"', 'id="clock"', 'id="btn-cfg"'].forEach(x => ok(der.indexOf(x) > 0, 'derecha: ' + x));
     ok(/<span class="mlbl">Ver:<\/span>/.test(HTML) && /<span class="mlbl">Día:<\/span>/.test(HTML), 'Ver: / Día:');
     ok(!/id="mods" class="chip warn"/.test(HTML), 'la píldora de cambios no es amarilla');
     ok(!/Configuración<\/button>/.test(der), '⚙ sin texto');
@@ -352,12 +353,12 @@
     ok(!/id="wake"[^>]*><span class="led"/.test(html), 'sin la clase .led');
     ok(/\.wake \.wled\{[^}]*background:#5b5f67/.test(css) && /\.wake\.on \.wled[^{]*\{[^}]*background:var\(--ok\)/.test(css));
   });
-  test('Estilos del Dashboard: tabla limpia en reposo, Añadir neutro, Live en rojo y números tabulares', () => {
+  test('Estilos del Dashboard: tabla limpia en reposo, Añadir neutro, Pantallas y Emisión neutro y números tabulares', () => {
     const css = D.src('control.css');
     ok(/#tbl tbody td select\{[^}]*appearance:none/.test(css), 'sin flechas en reposo');
     ok(/#tbl tbody tr:hover td input\[type=text\],#tbl tbody tr:hover td select\{[^}]*border-color/.test(css), 'controles al pasar el ratón');
     ok(/\.btn\.addnew\{[^}]*background:#14151b/.test(css), 'Añadir neutro');
-    ok(/#m-live \.mbtn\.btn\.primary\{background:var\(--live\)/.test(css), 'Live en rojo');
+    ok(/#m-hub \.mbtn\.hubbtn\{[^}]*background:#1c1e26/.test(css), 'botón maestro neutro (sin rojo)');
     ok(/\.bar \.clock\{[^}]*color:#fff[^}]*tabular-nums/.test(css), 'reloj blanco y tabular');
     ok(/--dim:#8a8f98/.test(css), 'texto atenuado con contraste');
   });
@@ -859,13 +860,13 @@
     ok(/Dt\.KEYS\.meteo, Dt\.KEYS\.standby\]/.test(D.src('control.js')), 'cambiarlo vuelve a emitir');
     clickStb(t);
     eq(t.read('showtime.standby').on, false, 'se quita con el mismo botón'); eq(t.env.getEl('lv-standby-t').textContent, 'Standby en Confidence');
-    ok(/id="lv-standby"[\s\S]*Cartel de Showtime y hora en cada Confidence \(también por QR\)/.test(D.src('index.html')));
+    ok(/id="lv-standby"[\s\S]*Modo Cartel en cada Confidence \(también por QR\)/.test(D.src('index.html')));
   });
   test('Gestor de ventanas Live: cada Live tiene nombre, vista y standby; se cambian desde el gestor, se recuerdan y se cierran', async () => {
     const t = panel(), msgs = [];
     const w = { closed: false, focus() {}, postMessage(m) { msgs.push(m); }, close() { this.closed = true; } };
     t.env.win.open = () => w;
-    t.env.fire('document', 'click', { target: { closest: q => q === '#m-live [data-vista]' ? { dataset: { vista: 'manager' } } : null } });
+    t.env.fire('document', 'click', { target: { closest: q => q === '#m-hub [data-vista]' ? { dataset: { vista: 'manager' } } : null } });
     await new Promise(r => setImmediate(r));
     const [a] = t.T.winState();
     ok(a && a.name === 'Manager' && a.vista === 'manager' && a.standby === false, 'se abre con su nombre por defecto');
@@ -981,7 +982,7 @@
     const t = panel(), js = D.src('control.js'), css = D.src('control.css'), live = D.src('live.js');
     const w = { closed: false, focus() {}, postMessage() {}, close() { this.closed = true; } };
     t.env.win.open = () => w;
-    t.env.fire('document', 'click', { target: { closest: q => q === '#m-live [data-vista]' ? { dataset: { vista: 'manager' } } : null } });
+    t.env.fire('document', 'click', { target: { closest: q => q === '#m-hub [data-vista]' ? { dataset: { vista: 'manager' } } : null } });
     await new Promise(r => setImmediate(r));
     eq(t.T.winState()[0].fs, undefined, 'sin dato hasta que la ventana avisa (se ve como Ventana)');
     t.env.fire('window', 'message', { data: { app: 'showtime', type: 'vistaState', vista: 'manager', zona: null, standby: false, fs: true }, source: w });
@@ -994,12 +995,12 @@
     ok(/\.gv-fs\.on::before\{[^}]*box-shadow/.test(css) && /\.gv-fs\{[^}]*color:var\(--dim/.test(css), 'iluminado si está en completa; atenuado si es Ventana');
     ok(/fs: !!\(document\.fullscreenElement \|\| document\.webkitFullscreenElement\)/.test(live), 'la Live lee su estado de pantalla completa en reportVista');
   });
-  test('Botones: primario blanco, peligro rojo solo para borrar, secundarios neutros; Live ▾ sigue en rojo', () => {
+  test('Botones: primario blanco, peligro rojo solo para borrar, secundarios neutros; Pantallas y Emisión sin rojo', () => {
     const css = D.src('control.css'), js = D.src('control.js');
     ok(/\.btn\.primary\{background:#fff;border-color:#fff;color:#000;font-weight:700/.test(css), 'primario: blanco sólido con texto negro');
     ok(/\.btn\.danger\{background:#d9363e;border-color:#d9363e;color:#fff/.test(css), 'peligro: #d9363e con texto blanco');
     ok(/^\.btn\{[^}]*background:#1c1e26;color:#fff/m.test(css), 'secundario: fondo #1c1e26');
-    ok(/#m-live \.mbtn\.btn\.primary\{background:var\(--live\)/.test(css), 'Live ▾ mantiene su rojo de emisión');
+    ok(/\.hubled\{[^}]*background:#4a4d57/.test(css) && /\.hubled\.on\{background:#10b981/.test(css) && !/\.hubled[^{]*\{[^}]*(#ff3b30|#d9363e|var\(--live\))/.test(css), 'LED: gris o verde, nunca rojo');
     ok(!/label: 'Cerrar', kind: 'primary'/.test(js), 'Cerrar de los modales es secundario');
     ok(/kind: 'danger', run: \(\) => \{ const r = C\.removeArtist/.test(js), 'Borrar banda sigue siendo peligro');
   });
@@ -1148,12 +1149,55 @@
     T.emCloseDay(false);
     eq(T.emSnapshot().festival.artists.length > 0, true, 'reabierta');
   });
-  test('Solo hoy: la Configuración de emisión enseña la jornada y el botón Cerrar / Reabrir jornada', () => {
+  test('Solo hoy: el bloque de seguridad de la emisión enseña la jornada y Cerrar / Reabrir jornada (y Regenerar claves)', () => {
     const t = conMando(festDosDias());
-    ok(/Los QR ven solo hoy/.test(t.T.emStateHtml('staff')) && /data-act="cast-closeday" data-on="1"/.test(t.T.emStateHtml('staff')));
-    ok(!/cast-closeday/.test(t.T.emStateHtml('staff', true)), 'no en el QR ampliado');
+    t.T.setRoom({ sala: 'ABCDEFGHIJKLMNOP' }); t.T.fakeEm({ push() {}, setZoneKeys: async () => {} }, { links: [{ name: 'A', state: 'on' }], viewers: 0, remotes: 0, devices: [] });
+    t.T.renderCastBar();
+    const sec = () => t.env.getEl('cast-sec').innerHTML;
+    ok(/Los QR ven solo hoy/.test(sec()) && /data-act="cast-closeday" data-on="1"/.test(sec()), sec());
+    ok(/data-act="cast-regen"[\s\S]*Regenerar claves de acceso…/.test(sec()), 'regenerar claves');
+    ok(!/cast-closeday/.test(t.T.emStateHtml('staff', true)) && !/cast-closeday/.test(t.T.emStateHtml('staff')), 'no dentro del QR');
     t.T.emCloseDay(true);
-    ok(/Jornada cerrada en los QR/.test(t.T.emStateHtml('staff')) && /Reabrir jornada/.test(t.T.emStateHtml('staff')));
+    ok(/Jornada cerrada en los QR/.test(sec()) && /Reabrir jornada/.test(sec()));
+    t.T.fakeEm(null, null);
+  });
+  // ── Centro de Pantallas y Emisión (dec. 109) ──
+  test('Pantallas y Emisión: un botón con LED verde (emisión o Live abierta) o gris; panel con señales locales arriba y emisión QR abajo', () => {
+    const html = D.src('index.html');
+    const hub = html.slice(html.indexOf('id="m-hub"'), html.indexOf('<button id="wake"'));
+    ok(/Pantallas y Emisión/.test(hub) && /id="hub-led" class="hubled"/.test(hub), 'botón con su LED');
+    const b1 = hub.indexOf('Señales locales'), b2 = hub.indexOf('Emisión inalámbrica');
+    ok(b1 > 0 && b2 > b1, 'bloque 1 arriba, bloque 2 abajo');
+    const loc = hub.slice(b1, b2);
+    ok(/data-vista="manager"/.test(loc) && /id="lv-zone"/.test(loc) && /data-vista="confidence"/.test(loc) && /data-vista="backstage"/.test(loc), 'Manager · Confidence con zona · Backstage, cada una con Abrir');
+    ok(/id="lv-standby"/.test(loc) && /id="lv-gestor"/.test(loc), 'Standby y gestor');
+    const em = hub.slice(b2);
+    ok(/id="cast-bar"/.test(em) && /Camerinos \/ Staff/.test(em) && /data-tab="remote"/.test(em) && /data-tab="produccion"/.test(em) && /id="cast-sec"/.test(em), 'barra de emisión, 3 pestañas y seguridad');
+    ok(/\.mpanel\.hub\{[^}]*width:480px/.test(D.src('control.css')), 'panel de 480 px');
+    const t = dashboard();
+    eq(t.env.getEl('hub-led').classList.contains('on'), false, 'sin emisión ni Live: gris');
+    t.env.win.ShowtimePanel._test.fakeEm({ push() {} }, { links: [], devices: [] }); t.env.win.ShowtimePanel._test.renderHubLed(0);
+    eq(t.env.getEl('hub-led').classList.contains('on'), true, 'emitiendo: verde');
+    t.env.win.ShowtimePanel._test.fakeEm(null, null); t.env.win.ShowtimePanel._test.renderHubLed(1);
+    eq(t.env.getEl('hub-led').classList.contains('on'), true, 'una Live abierta: verde');
+  });
+  test('Pantallas y Emisión: Confidence se abre con la zona del selector; la barra de emisión dice sala y dispositivos', async () => {
+    const t = panel({ 'showtime.festival': JSON.stringify(festDosDias()) }, NOWc), urls = [];
+    const w = { closed: false, focus() {}, postMessage() {}, close() {} };
+    t.env.win.open = u => { urls.push(u); return w; };
+    const K = JSON.parse(t.env.storage.get('showtime.festival')).escenarios[1].id;
+    t.env.getEl('lv-zone').value = K;
+    t.env.fire('document', 'click', { target: { closest: q => q === '#m-hub [data-vista]' ? { dataset: { vista: 'confidence' } } : null } });
+    await new Promise(r => setImmediate(r));
+    eq(t.T.winState()[0].vista, 'confidence'); eq(t.T.winState()[0].zona, K, 'la zona elegida');
+    t.T.renderCastBar();
+    ok(/data-act="cast-start"/.test(t.env.getEl('cast-bar').innerHTML) && /Emisión detenida/.test(t.env.getEl('cast-bar').innerHTML), 'parada: botón Empezar');
+    t.T.setRoom({ sala: 'abcdEFGHIJKLMNOP' });
+    t.T.fakeEm({ push() {} }, { links: [{ name: 'A', state: 'on' }], devices: [{ id: 'x', t: Date.now(), first: 1, r: 0, v: 'backstage' }, { id: 'y', t: Date.now(), first: 2, r: 0, v: 'manager' }] });
+    t.T.renderCastBar();
+    const bar = t.env.getEl('cast-bar').innerHTML;
+    ok(/En directo/.test(bar) && /Sala ABCD/.test(bar) && /2 dispositivos conectados/.test(bar) && /data-act="cast-stop"/.test(bar), bar);
+    t.T.fakeEm(null, null);
   });
   test('⇧⌘C: alterna Escenario (alto contraste) y vuelve al tema anterior; queda en Configuración y en la ayuda', () => {
     const t = dashboard({ 'showtime.panel.style': '"neutro"' });

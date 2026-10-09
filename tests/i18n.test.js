@@ -195,6 +195,11 @@
     eq(all.filter(x => B(x) === x).join(' | '), '', 'avisos sin traducir');
   });
 
+  test('CALL: «AVISADO» / «NOTIFIED» (estándar de gira) y «Marcar como avisado» / «Mark as notified»', () => {
+    eq(I.tx('AVISADO', null, 'en'), 'NOTIFIED'); eq(I.tx('AVISADO', null, 'es'), 'AVISADO');
+    eq(I.tx('Marcar como avisado', null, 'en'), 'Mark as notified');
+    ok(I.keys('en').every(k => !/CALLED|Mark as called/.test(I.tx(k, null, 'en'))), 'ni rastro de CALLED');
+  });
   test('Ajustes 10-oct: ON TIME · ALL CLEAR; [Production]; avisos del tiempo con unidades (los del log antiguo siguen traduciéndose)', () => {
     eq(I.tx('EN HORA · SIN INCIDENCIAS', null, 'en'), 'ON TIME · ALL CLEAR');
     eq(I.tx('Producción', null, 'en'), 'Production');

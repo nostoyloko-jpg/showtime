@@ -30,7 +30,7 @@
   const params = Em && Em.parseHash(location.hash);
   if (!params || !params.c || !(window.crypto && crypto.subtle) || !('WebSocket' in window)) {
     $('bad').hidden = false; $('app').hidden = true; document.querySelector('.actbar').hidden = true;
-    if (params && !params.c) $('bad-t').textContent = tx('Este es el QR de Staff (solo lectura). Para mandar, escanea el QR del Stage Manager (Dashboard › Emisión › Stage Manager · mando).');
+    if (params && !params.c) $('bad-t').textContent = tx('Este es el QR de Staff (solo lectura). Para mandar, escanea el QR del Stage Manager (Dashboard › Pantallas y Emisión › Stage Manager).');
     return;
   }
 
