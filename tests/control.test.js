@@ -1014,7 +1014,7 @@
     ok(/\.mitem\.on\{color:#fff;font-weight:700\}/.test(css) && /\.mitem\.on::after\{background:#fff\}/.test(css), 'menús: seleccionado en blanco, sin rojo');
     ok(/\.mpanel \.days button\.on\{background:rgba\(255,255,255,\.08\);color:#fff/.test(css), 'Día: seleccionado en blanco');
     ok(/td input:focus,td select:focus,\.imp-src textarea:focus[^{]*\{border-color:rgba\(255,255,255,\.35\);box-shadow:0 0 0 1px rgba\(255,255,255,\.15\)\}/.test(css), 'foco de campos en blanco translúcido');
-    ok(/\.focusitem\.on \.fbox\{background:#fff/.test(css), 'casillas marcadas en blanco');
+    ok(!/\.focusitem|\.fbox/.test(css), 'el antiguo interruptor de foco ya no existe (dec. 117)');
   });
   test('Paleta de comandos: ⌘K y Ctrl+K abren/cierran; «/» abre fuera de un campo y no dentro', () => {
     const t = dashboard(), sp = t.env.getEl('spotlight');
@@ -1788,6 +1788,16 @@ const miss = [...found].filter(k => !I.txHas(k) && !/^(OK|CALL|SC|Live|Raycast|S
     const ajena = {}; Object.defineProperty(ajena, 'ShowtimeEmision', { get() { throw new Error('SecurityError'); } });
     eq(T.refreshStale(ajena), false, 'otro origen: no se toca'); eq(T.refreshStale(null), false);
     ok(/Pantalla Live actualizada a la versión /.test(JSON.stringify(t.read('showtime.log') || {})), 'queda en el log');
+  });
+
+  test('Dec. 117: poda de CSS huérfano — fuera lo que nada usa; dentro lo que sí (QR del Hub, importador)', () => {
+    const css = D.src('control.css'), html = D.src('index.html'), js = D.src('control.js');
+    ['#m-cast', '.lvpanel', '.lvh', '.lvzones', '.lvz', '.lvnow', '.csoon', '.cbtns', '.focusitem', '.fbox', '.hub-h2', '.add-msg', '.cfg-files', '.filebar', '.gv-qrh', '.lvx', '.realc']
+      .forEach(sel => ok(!new RegExp(sel.replace('.', '\\.') + '(?![\\w-])').test(css), 'fuera: ' + sel));
+    // Se quedan porque se usan (aunque estaban en la lista inicial)
+    ['.cpick', '.cseg', '.czone', '.csub'].forEach(sel => { ok(css.indexOf(sel) >= 0, 'sigue: ' + sel); ok(js.indexOf(sel.slice(1)) >= 0, sel + ' lo usa el Hub'); });
+    ok(/\.imp-prev tr\.st-ok/.test(css) && /'<tr class="st-' \+ r\.status/.test(js), '.st-ok/.st-warn/.st-err: filas del importador');
+    ok(/\.lvon\.on/.test(css) && /id="lv-standby-on"/.test(html), '.lvon: «ABIERTA» del Standby');
   });
 
   // ── Ejecutor ─────────────────────────────────────────────────────────

@@ -192,7 +192,6 @@ tr.nueva td.name input[type=text]{border-color:rgba(61,220,151,.5)}
 .delbtn:hover{color:var(--err);border-color:rgba(255,107,107,.45);background:rgba(255,107,107,.08)}
 tr.sec td{background:var(--head);color:var(--muted);font-size:11px;letter-spacing:.12em;text-transform:uppercase;font-weight:800;padding:8px}
 tfoot tr.add td{background:var(--foot);border-top:2px solid var(--line2);position:sticky;bottom:28px}
-tfoot tr.add-msg td{background:var(--foot);padding:4px 10px 8px;position:sticky;bottom:0;height:28px}
 tfoot input.bad,tfoot select.bad{border-color:var(--err)!important;background-color:rgba(255,107,107,.12)!important}
 /* Formularios de los modales */
 .form{display:grid;grid-template-columns:auto 1fr;gap:10px 14px;align-items:center}
@@ -236,7 +235,6 @@ tfoot input.bad,tfoot select.bad{border-color:var(--err)!important;background-co
 /* Cabeceras de sección (eyebrow): gris pizarra frío, sin el rojo del acento (el rojo es para alertas) */
 .cfg-s h3{font-size:11px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:#8a8f98;margin-bottom:8px}
 .cfg-s.flash{animation:flash 1.2s ease-out}
-.cfg-files{display:flex;flex-wrap:wrap;gap:8px}
 .cfg .form{grid-template-columns:auto 1fr}
 
 /* ── Stage (dec. 111): único modificador de la base Studio — negro y amarillo #FFD600 para el sol ── */
@@ -245,10 +243,9 @@ body[data-ps="stage"] .clock{color:#FFD600}
 body[data-ps="stage"] .btn{background:#000;border-color:rgba(255,214,0,.55);color:#FFD600}
 body[data-ps="stage"] .btn.primary{background:#FFD600;color:#000}
 body[data-ps="stage"] select,body[data-ps="stage"] input[type=text],body[data-ps="stage"] input[type=number],body[data-ps="stage"] .form input[type=date]{background-color:#000;border-color:rgba(255,214,0,.45);color:#fff}
-body[data-ps="stage"] thead th,body[data-ps="stage"] tfoot tr.add td,body[data-ps="stage"] tfoot tr.add-msg td,body[data-ps="stage"] tr.sec td{background:#0a0a00}
+body[data-ps="stage"] thead th,body[data-ps="stage"] tfoot tr.add td,body[data-ps="stage"] tr.sec td{background:#0a0a00}
 
 /* ── Archivo en la barra superior ── */
-.filebar{display:flex;gap:6px}
 
 /* ── Cristal: UNA sola definición (menús, panel lateral, modales, avisos y QR grande) ── */
 :root{--glass-bg:rgba(18,19,22,.9);--glass-line:rgba(255,255,255,.16);--glass-blur:blur(24px) saturate(160%)}   /* cristal esmerilado (ver «Cristal esmerilado» al final: Safari) */
@@ -378,9 +375,6 @@ body[data-ps="stage"] .mpanel{box-shadow:none}
 .dchip.ok{color:var(--muted)}
 .dchip.ok .ic{color:#10b981}
 .dchip.acc{color:var(--call);border-color:rgba(255,197,51,.5);background:rgba(255,197,51,.08)}
-.realc{display:block;font-size:11px;font-weight:700;color:var(--muted);margin-top:2px;white-space:nowrap}
-.realc b{font-weight:800;font-variant-numeric:tabular-nums}
-.realc b.chg{color:var(--call)}   /* ámbar: la hora real no es la programada (salida tarde, fin antes o después) */
 tr:not(.started) .livebtn.pasv{display:none}   /* ■ sin ▶: solo desde su hora */
 tr.ended .livebtn{display:none}   /* sin Alargar se para a su hora: ya no hay ▶ ni ■ */
 .dw-over{display:flex;flex-direction:column;gap:6px;flex:1}
@@ -496,14 +490,12 @@ td.stage input[type=text]{width:var(--escw,140px);min-width:120px;max-width:260p
 
 /* ── Emisión (2d-A): menú con pestañas, QR y estado ─────────────────── */
 .mpanel.cast{width:440px;padding:8px}
-.menu#m-cast .mpanel{left:auto;right:0}
 .ctabs{display:flex;gap:4px;padding:2px;margin-bottom:8px;border-radius:8px;background:rgba(255,255,255,.04)}
 .ctab{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:7px;height:32px;border:0;border-radius:6px;background:transparent;color:var(--muted);font:inherit;font-weight:700;font-size:12.5px;cursor:pointer}
 .ctab:hover{color:var(--text)}
 .ctab.on{background:rgba(255,255,255,.09);color:var(--text)}
 .cpane[hidden]{display:none}
 .cintro{font-size:13px;line-height:1.45;color:var(--text);padding:4px 8px 10px;white-space:normal}
-.cbtns{display:flex;gap:8px;padding:0 8px 4px;flex-wrap:wrap}
 .cgrid{display:flex;gap:12px;padding:4px 6px 4px}
 .cqr{flex:0 0 212px;width:212px;height:212px;border-radius:8px;overflow:hidden;background:#fff}
 .cqr svg,#qr-big-svg svg{display:block;width:100%;height:100%}
@@ -521,10 +513,6 @@ td.stage input[type=text]{width:var(--escw,140px);min-width:120px;max-width:260p
 .clink::before{content:'';width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.3)}
 .clink.on{color:var(--text)}
 .clink.on::before{background:#10b981;box-shadow:0 0 5px #10b981}
-.csoon{display:flex;flex-direction:column;align-items:center;gap:6px;padding:22px 18px;text-align:center;color:var(--muted);white-space:normal;font-size:13px;line-height:1.45}
-.csoon .ic{width:28px;height:28px;opacity:.6}
-.csoon b{color:var(--text);font-size:14px}
-#m-cast .mdot.warn{background:#ffb347;box-shadow:0 0 6px #ffb347}
 /* QR en grande */
 .qr-big{position:fixed;inset:0;z-index:300;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
 .qr-big[hidden]{display:none}
@@ -541,18 +529,9 @@ body[data-ps="stage"] .qr-big-box{background:#000;border-color:rgba(255,214,0,.4
 .ctab.rlive::after{content:'';width:6px;height:6px;border-radius:50%;background:#10b981;box-shadow:0 0 5px #10b981}
 .qr-big.remote .qr-big-box{border-color:rgba(255,59,48,.6)}
 .qr-big.remote .qr-big-t{color:#ff6b61}
-/* Live ▾ (2e-A) */
-.lvpanel{width:380px}
-.lvpanel .mitem{height:auto;min-height:44px;padding:7px 10px;white-space:normal;align-items:center}
+/* Filas del Hub (.lvt) y estado «ABIERTA» (.lvon) */
 .lvt{display:flex;flex-direction:column;gap:1px;flex:1;min-width:0}
 .lvt small{font-weight:600;color:var(--muted);font-size:12px}
-.lvh{cursor:default}
-.lvh:hover{background:transparent!important}
-.lvzones{display:flex;flex-direction:column;gap:2px;padding:0 0 4px 36px}
-.lvz{min-height:34px!important;height:34px!important;padding:0 10px!important;font-weight:700}
-.lvz i{width:9px;height:9px;border-radius:50%;flex:0 0 auto}
-.lvnow{margin-left:auto;font-size:11px;font-weight:700;letter-spacing:.02em;color:var(--muted);white-space:nowrap}
-.lvnow:empty{display:none}
 .lvon{display:none}
 .lvon.on{display:inline-flex;align-items:center;gap:5px;margin-left:auto;flex:0 0 auto;font-size:10.5px;font-weight:800;letter-spacing:.08em;color:#10b981}
 .lvon.on::before{content:'';width:7px;height:7px;border-radius:50%;background:#10b981;box-shadow:0 0 6px #10b981}
@@ -591,10 +570,6 @@ body[data-ps="stage"] .qr-big-box{background:#000;border-color:rgba(255,214,0,.4
 .msgzones .dtog{padding:0}
 
 /* Cerrar una Live desde «Live ▾» */
-.lvx{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;margin-left:6px;border-radius:6px;border:1px solid var(--line2);color:var(--muted);flex:0 0 auto;cursor:pointer}
-.lvx[hidden]{display:none}
-.lvx .ic{width:12px;height:12px}
-.lvx:hover{color:#fff;border-color:#ff3b30;background:rgba(255,59,48,.25)}
 .lvcloseall[hidden]{display:none}
 .lvcloseall .ic{color:#ff6b61}
 /* ── El tiempo (2e-B) ────────────────────────────────────────────── */
@@ -846,11 +821,6 @@ tr.k-hito td.ti::after{display:none}
 .xtrabtn.bis:hover{background:rgba(255,197,51,.16)}
 
 /* ── Modo foco: para operar en directo a 1-2 m de la mesa ── */
-.focusitem{display:flex;align-items:center;gap:8px}
-.focusitem kbd{margin-left:auto;font-size:11px}
-.focusitem .fbox{width:14px;height:14px;border-radius:4px;border:1.5px solid var(--muted);flex:0 0 auto;position:relative}
-.focusitem.on .fbox{background:var(--accent-fill,var(--accent));border-color:var(--accent-fill,var(--accent))}
-.focusitem.on .fbox::after{content:'';position:absolute;left:4px;top:1px;width:4px;height:8px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
 body.focus #tbl .c-jor,body.focus #tbl td.f,body.focus #tbl .c-tp,body.focus #tbl td.tp,body.focus #tbl .c-n,body.focus #tbl td.n,body.focus #tbl th.mo,body.focus #tbl td.mo{display:none}
 body.focus #tbl thead th{font-size:12px;padding-top:9px;padding-bottom:9px}
 body.focus #tbl tbody td{padding:9px 7px;font-size:16px}
@@ -993,7 +963,6 @@ main.vacia .list-empty{padding:16px 16px 9vh}
 .gv-fs.on::before{background:var(--ok);box-shadow:0 0 6px var(--ok),0 0 12px rgba(61,220,151,.5)}
 .gv-empty{margin:4px 0}
 .gv-qr{margin-top:8px;padding-top:12px;border-top:1px solid var(--hair)}
-.gv-qrh{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
 .gv-foot{display:flex;justify-content:space-between;align-items:center;gap:8px;padding-top:12px;border-top:1px solid var(--line)}
 .gv-foot .gv-close{background:#1c1e26;border:1px solid var(--hair2);color:#fff}
 .gv-foot .gv-close:hover{background:#252832}
@@ -1012,8 +981,6 @@ td input:focus,td select:focus,.imp-src textarea:focus,.imp-prev td input[type=t
 .drop-box .ic{color:var(--text)}
 .imp-notice{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.16)}
 .addtabs button[data-addtab="paste"] .ic{color:#fff}
-.focusitem.on .fbox{background:#fff;border-color:#fff}
-.focusitem.on .fbox::after{border-color:#000}
 
 /* ═══ Paleta de comandos (⌘K / «/») — estilo Raycast/Linear ═══ */
 .spot{position:fixed;inset:0;z-index:300;display:flex;align-items:flex-start;justify-content:center;padding:12vh 16px 16px;background:rgba(0,0,0,.45);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
@@ -1134,7 +1101,6 @@ td input:focus,td select:focus,.imp-src textarea:focus,.imp-prev td input[type=t
 .hub-h .ic{width:15px;height:15px;align-self:center;opacity:.8}
 .hub-h b{font-weight:800;color:var(--text)}
 .hub-h small{text-transform:none;letter-spacing:0;color:var(--dim);font-size:11.5px}
-.hub-h2{margin-top:6px;padding-top:12px;border-top:1px solid var(--hair2)}
 .hub-row{display:flex;align-items:center;gap:8px;min-height:44px;padding:4px 6px;border-radius:8px}
 .hub-row:hover{background:rgba(255,255,255,.04)}
 .hub-row .lvt{flex:1;min-width:0;display:flex;flex-direction:column}
