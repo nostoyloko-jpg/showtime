@@ -97,6 +97,19 @@
   // ── Lectura / escritura ──────────────────────────────────────────────
   function getFestival() { return read(K.festival, null); }
   function getConfig() { return normConfig(read(K.config, null)); }
+  /** Compatibilidad hacia delante (dec. 116b): un valor que ESTA versión no conoce (p. ej. «Ver: Tareas» llegando a una ventana
+   *  con código anterior) no se «arregla» al guardar: se guarda tal cual vino. Para pintar, cada ventana lo normaliza al leer
+   *  (getConfig). Sin esto, una Live abierta antes de actualizar devolvía «mode: show» y el Dashboard saltaba a Shows. */
+  function keepNewer(raw, norm, skip) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return norm;
+    const out = keepUnknown(raw, Object.assign({}, norm));
+    Object.keys(raw).forEach(k => {
+      const v = raw[k];
+      if ((skip && k in skip) || v === null || typeof v === 'object') return;
+      if (out[k] !== v) out[k] = v;
+    });
+    return out;
+  }
   function getOriginal() { return read(K.original, null); }
   function setOriginal(f) { write(K.original, f); }
   function getCallDone() { const a = read(K.callDone, []); return Array.isArray(a) ? a : []; }
@@ -170,7 +183,7 @@
   function receive(m) {
     if (!m || m.app !== APP) return;
     if (m.type === 'festival') write(K.festival, m.festival);
-    else if (m.type === 'config') { const c = normConfig(m.config); if (JSON.stringify(c) !== JSON.stringify(read(K.config, null))) write(K.config, c); }   // sin eco: si ya está igual, no se reescribe
+    else if (m.type === 'config') { const c = keepNewer(m.config, normConfig(m.config)); if (JSON.stringify(c) !== JSON.stringify(read(K.config, null))) write(K.config, c); }   // sin eco; y sin «arreglar» lo que no conoce (dec. 116b)
     else if (m.type === 'callDone') write(K.callDone, m.callDone || []);
     else if (m.type === 'flash') write(K.flash, m.flash || null);
     else if (m.type === 'meteo') write(K.meteo, m.meteo || null);
@@ -242,8 +255,9 @@
   function setFestival(f) { if (READONLY) return; write(K.festival, f); send({ type: 'festival', festival: f }); }
   function setConfig(patch) {
     if (READONLY) return getConfig();
-    const c = normConfig(Object.assign(getConfig(), patch || {}));
-    write(K.config, c); send({ type: 'config', config: c }); return c;
+    const raw = read(K.config, null), c = normConfig(Object.assign(getConfig(), patch || {}));
+    const out = keepNewer(raw, c, patch || {});   // lo que no toca este cambio y esta versión no conoce, se queda como estaba
+    write(K.config, out); send({ type: 'config', config: out }); return c;
   }
   function markCallDone(key, nowAbs) {
     if (READONLY) return getCallDone();

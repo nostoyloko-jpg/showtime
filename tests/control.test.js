@@ -1779,6 +1779,17 @@ const miss = [...found].filter(k => !I.txHas(k) && !/^(OK|CALL|SC|Live|Raycast|S
     ['Tareas', 'Marcadores', 'Solo las tareas técnicas y de producción', 'Solo los marcadores temporales y toques de queda'].forEach(k => ok(I.txHas(k), 'EN: ' + k));
   });
 
+  test('Dec. 116b: una Live con código anterior (abierta antes de actualizar) se recarga sola UNA vez; la de la misma versión, nunca', () => {
+    const t = dashboard(), T = t.env.win.ShowtimePanel._test, B = t.env.win.ShowtimeEmision.BUILD;
+    let n = 0; const vieja = { ShowtimeEmision: { BUILD: '20261126' }, location: { reload() { n++; } } };
+    eq(T.refreshStale(vieja), true); eq(n, 1, 'recargada');
+    eq(T.refreshStale(vieja), false); eq(n, 1, 'una sola vez (sin bucles si siguiera vieja)');
+    let m = 0; eq(T.refreshStale({ ShowtimeEmision: { BUILD: B }, location: { reload() { m++; } } }), false); eq(m, 0, 'misma versión: nada');
+    const ajena = {}; Object.defineProperty(ajena, 'ShowtimeEmision', { get() { throw new Error('SecurityError'); } });
+    eq(T.refreshStale(ajena), false, 'otro origen: no se toca'); eq(T.refreshStale(null), false);
+    ok(/Pantalla Live actualizada a la versión /.test(JSON.stringify(t.read('showtime.log') || {})), 'queda en el log');
+  });
+
   // ── Ejecutor ─────────────────────────────────────────────────────────
   (async () => {
     let pass = 0, fail = 0;

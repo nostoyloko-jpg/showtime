@@ -73,6 +73,21 @@
     live.Dt.setConfig({ style: 'stage' });
     eq(dash.Dt.getConfig().meteo.units, 'imperial'); eq(dash.Dt.getConfig().style, 'stage');
   });
+  test('Dec. 116b: un valor que esta versión no conoce (p. ej. una vista nueva) no se «arregla» al recibirlo ni al guardar otro ajuste', () => {
+    const r = red({ bc: true }), dash = r.ventana('dash'), live = r.ventana('live');
+    dash.Dt.setConfig({ mode: 'tarea' });
+    eq(live.Dt.getConfig().mode, 'tarea', 'Tareas llega a la Live');
+    // Una versión FUTURA manda un modo que esta no conoce
+    dash.win.postMessage({ app: 'showtime', type: 'config', config: Object.assign({}, dash.Dt.getConfig(), { mode: 'futuro', nuevo: 1 }) });
+    eq(JSON.parse(dash.mem.get('showtime.config')).mode, 'futuro', 'se guarda tal cual vino (no pasa a «show»)');
+    eq(dash.Dt.getConfig().mode, 'show', 'para pintar, esta versión lo lee como Shows');
+    eq(JSON.parse(dash.mem.get('showtime.config')).nuevo, 1, 'ni se pierden claves nuevas');
+    // Cambiar OTRO ajuste aquí no pisa el valor desconocido; cambiar ESE ajuste, sí
+    dash.Dt.setConfig({ style: 'stage' });
+    eq(JSON.parse(dash.mem.get('showtime.config')).mode, 'futuro', 'otro ajuste: el modo nuevo sigue');
+    eq(JSON.parse(dash.mem.get('showtime.config')).style, 'stage');
+    dash.Dt.setConfig({ mode: 'hito' }); eq(dash.Dt.getConfig().mode, 'hito', 'elegido aquí: manda lo elegido');
+  });
   test('Estilos (dec. 111): solo «studio» y «stage»; lo guardado con versiones anteriores se migra solo', () => {
     const r = red({ bc: false }), w = r.ventana('w');
     eq(w.Dt.STYLES.join(), 'studio,stage');

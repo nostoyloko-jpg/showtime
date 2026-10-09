@@ -88,6 +88,7 @@
   const UI_EN = {
     /*UI-EN-BEGIN*/
     panel: {
+      "Pantalla Live actualizada a la versión nueva": "Live screen updated to the new version",
       "El {dia} no tiene {what}.": "{dia} has no {what}.",
       "tareas": "tasks",
       "marcadores": "key times",

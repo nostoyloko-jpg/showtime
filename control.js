@@ -1604,7 +1604,23 @@
   });
   // Las ventanas que se abrieron antes de recargar el Dashboard se vuelven a presentar solas: se recuperan con su nombre.
   let peerN = 0;
+  /** Live abierta ANTES de actualizar Showtime (código viejo en memoria): se recarga sola con la versión nueva (dec. 116b).
+   *  Una Live vieja no entiende los ajustes nuevos y podía devolverlos «arreglados» (Ver: Tareas → Shows). Misma carpeta = mismo
+   *  origen: el Dashboard ve su versión. La recarga tarda ~1 s y conserva vista y zona (van en la URL y en el nombre). */
+  const STALE = typeof WeakSet === 'function' ? new WeakSet() : null;   // una sola recarga por ventana: si aun así sigue vieja, no se insiste (sin bucles en un monitor)
+  function refreshStale(w) {
+    try {
+      const b = w && w.ShowtimeEmision && w.ShowtimeEmision.BUILD;
+      if (!b || !Em || b === Em.BUILD || !STALE || STALE.has(w)) return false;
+      STALE.add(w);
+      w.location.reload();
+      logEvent('msg', 'Pantalla Live actualizada a la versión ' + Em.BUILD + ' (tenía la ' + b + ')', { src: 'panel' });
+      toast(tx('Pantalla Live actualizada a la versión nueva'));
+      return true;
+    } catch (e) { return false; }   // otro origen (doble clic en Firefox): no se puede tocar
+  }
   if (Dt.onPeer) Dt.onPeer((w, m) => {
+    if (refreshStale(w)) return;   // vuelve a presentarse sola en cuanto cargue la versión nueva
     let id = m && typeof m.name === 'string' ? m.name : ''; if (!id) { try { id = w.name; } catch (e) {} }
     if (!id) id = 'peer-' + (++peerN);
     const old = WIN.get(id) || {};
@@ -3332,5 +3348,5 @@
   });
   window.ShowtimePanel = { reload: () => { loadState(); renderAll(); }, _test: { winState: () => Array.from(WIN.entries()).map(([id, x]) => ({ id, name: x.name, vista: x.vista, zona: x.zona, standby: !!x.standby, fs: x.fs })), setWinVista, setWinStandby, closeLive, openGestor, gestorVisible, emProdMessage, emRegenProd, hitoChips, emUrl, prodBigTitle, fileKind, handleFile, emCommand, importSummary, hidesSome, tipoPill, setWake, wakeState: () => ({ on: wakeOn, lock: !!wakeLock }), showSplash, hideSplash, setStandby, standbyOn, room: () => emRoom,
     emSnapshot, emCloseDay, emDay, qrDevices, rmZones, setRmZone: z => { RM_ZONE = z; renderCast(); }, setRoom: r => { emRoom = r; }, fakeEm: (em, st) => { EM = em; EMST = st; }, emStateHtml, renderCastBar, renderHubLed, mtIn, mtOut, cfSimState, renderCfSim, cfSim: () => CFSIM,
-    net: () => NET, setNet: o => { NET = netNorm(o); }, netNorm, emLink, emBrokers, emUrl, netHtml, renderCast } };   // _test: solo para tests/control.test.js
+    refreshStale, net: () => NET, setNet: o => { NET = netNorm(o); }, netNorm, emLink, emBrokers, emUrl, netHtml, renderCast } };   // _test: solo para tests/control.test.js
 })();
