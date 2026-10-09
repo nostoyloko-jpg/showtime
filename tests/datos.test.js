@@ -60,6 +60,19 @@
     dash.Dt.addAviso('Curfew 23:00', true, 'Producción'); eq(live.Dt.getAvisos()[0].text, 'Curfew 23:00');
     eq(live.cambios.join(), 'festival,config,callDone,flash,avisos');
   });
+  test('Ajustes nuevos sobreviven a una ventana con código viejo (bug de «Imperial» que volvía a métrico)', () => {
+    const r = red({ bc: true }), dash = r.ventana('dash'), live = r.ventana('live');
+    // El Dashboard conoce «units»; la Live tiene un meteo.js viejo que no lo conoce (lo quitaría al normalizar)
+    dash.win.ShowtimeMeteo = { normMeteo: m => Object.assign({ on: true, horizon: 3 }, m && m.units ? { units: m.units } : {}) };
+    live.win.ShowtimeMeteo = { normMeteo: m => ({ on: true, horizon: 3 }) };
+    dash.Dt.setConfig({ meteo: { on: true, units: 'imperial' } });
+    eq(dash.Dt.getConfig().meteo.units, 'imperial');
+    eq(live.Dt.getConfig().meteo.units, 'imperial', 'la Live vieja no borra lo que no conoce');
+    eq(JSON.parse(live.mem.get('showtime.config')).meteo.units, 'imperial', 'ni al guardarlo');
+    // y si la Live reenvía la configuración, el Dashboard la sigue teniendo en imperial
+    live.Dt.setConfig({ style: 'neutro' });
+    eq(dash.Dt.getConfig().meteo.units, 'imperial'); eq(dash.Dt.getConfig().style, 'neutro');
+  });
   test('Firefox con doble clic (sin BroadcastChannel ni almacenamiento compartido): la Live abierta recibe por mensaje directo', () => {
     const r = red({ bc: false }), dash = r.ventana('dash'), live = r.ventana('live');
     r.enlazar(dash, live);

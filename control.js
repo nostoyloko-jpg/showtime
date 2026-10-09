@@ -1022,10 +1022,32 @@
     });
     const pv = $('sc-tprev'); pv.style.background = sc.ticker.bg; pv.style.color = sc.ticker.fg; pv.className = 'tkprev ' + sc.ticker.mode;
     pv.style.setProperty('--tk-speed', (sc.ticker.speed * 0.3) + 's');   // la vista previa va proporcional (más corta)
-    // referencia del parpadeo: el mismo número en el mismo color y ritmo que verá la Live
-    const bp = $('sc-bprev');
-    if (bp) { bp.style.setProperty('--blink-speed', sc.conf.blinkSpeed + 's'); bp.style.color = sc.conf.overNum; bp.classList.toggle('still', !sc.conf.blink); }
+    renderCfSim();
   }
+  // ── Simulador del monitor Confidence: el estado elegido con los umbrales, el parpadeo y los colores de ESTOS ajustes ──
+  let CFSIM = 'ok';
+  const mmss = m => { const s = Math.max(0, Math.round(m * 60)); return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); };
+  function cfSimState(st, sc, msg) {
+    const c = sc.conf, w = Math.max(0, c.showWarn), d = Math.max(0, Math.min(c.showDanger, w));
+    // Cifras de ejemplo dentro de cada tramo de ESTOS umbrales (ámbar a falta de w min, rojo a falta de d min)
+    const ok = w + 12, warn = d < w ? (w + d) / 2 : w, danger = d > 0 ? Math.max(0.5, d - 1.5) : 0.5;
+    const s = { ok: { t: mmss(ok), f: 0.75 }, warn: { t: mmss(warn), f: Math.max(0.08, warn / ok * 0.75) }, danger: { t: mmss(danger), f: Math.max(0.04, danger / ok * 0.75) }, over: { t: '-02:15', f: 1 }, flash: { t: mmss(ok), f: 0.75 } }[st] || {};
+    return Object.assign(s, { cls: 'cfsim lv-' + (st === 'flash' ? 'ok' : st) + (st === 'over' && c.blink ? ' blink' : ''), flash: st === 'flash', msgBg: msg.bg, msgFg: msg.fg });
+  }
+  function renderCfSim() {
+    const box = $('cfsim'); if (!box) return;
+    const sc = CONFIG.screens || Vs.normScreens(), st = cfSimState(CFSIM, sc, { bg: CONFIG.msgBg, fg: CONFIG.msgFg });
+    box.className = st.cls;
+    box.style.setProperty('--ov-bg', sc.conf.overBg); box.style.setProperty('--ov-num', sc.conf.overNum); box.style.setProperty('--blink-speed', sc.conf.blinkSpeed + 's');
+    box.style.setProperty('--mbg', st.msgBg); box.style.setProperty('--mfg', st.msgFg);
+    $('cfsim-top').innerHTML = 'PRINCIPAL · <span class="k">SHOW</span> · ' + esc(tx('LA BANDA'));
+    $('cfsim-t').textContent = st.t;
+    $('cfsim-fill').style.width = Math.round(st.f * 100) + '%';
+    const d = new Date(); $('cfsim-foot').textContent = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    $('cfsim-fl').hidden = !st.flash; $('cfsim-flt').textContent = tx('5 MINUTOS');
+    document.querySelectorAll('[data-cfsim]').forEach(b => { const on = b.dataset.cfsim === CFSIM; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); });
+  }
+  document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('[data-cfsim]'); if (!b) return; CFSIM = b.dataset.cfsim; renderCfSim(); });
   function saveScreens(el) {
     const sc = JSON.parse(JSON.stringify(CONFIG.screens || Vs.normScreens()));
     const [g, k] = el.dataset.sc.split('.');
@@ -1034,7 +1056,10 @@
     if (g === 'back' && !sc.back.cards && !sc.back.lines && !sc.back.ticker) { el.checked = true; toast('Backstage necesita al menos un bloque', true); return; }
     CONFIG = Dt.setConfig({ screens: sc }); fillScreensCfg();
   }
-  document.querySelectorAll('#cfg-s-screens [data-sc]').forEach(el => el.addEventListener(el.type === 'color' ? 'input' : 'change', () => saveScreens(el)));
+  document.querySelectorAll('#cfg-s-screens [data-sc]').forEach(el => el.addEventListener(el.type === 'color' || el.dataset.sc === 'conf.blinkSpeed' ? 'input' : 'change', () => {
+    if (el.dataset.sc === 'conf.blinkSpeed' && !(Number(el.value) >= 0.1 && Number(el.value) <= 5)) return;   // mientras se escribe: solo cifras válidas
+    saveScreens(el);
+  }));
   function fillMsgCfg() {
     $('cfg-msg-bg').value = CONFIG.msgBg;
     $('cfg-msg-fg').value = CONFIG.msgFg;
@@ -1042,6 +1067,7 @@
     $('cfg-aviso-secs').value = String(CONFIG.avisoSecs);
     const pv = $('cfg-msg-prev');
     pv.style.setProperty('--mbg', CONFIG.msgBg); pv.style.setProperty('--mfg', CONFIG.msgFg);
+    renderCfSim();   // el botón [Flash] del simulador usa estos colores
   }
 
   function saveFest() {
@@ -2357,6 +2383,8 @@
   }
   function readMeteoCfg(extra) {
     const c = JSON.parse(JSON.stringify(mtCfg()));
+    // Unidades: lo PRIMERO que se lee es el selector (lo que ve el regidor manda). Las casillas se leen en la unidad que tenían.
+    const unitsNow = $('mt-units') && W.UNITS.indexOf($('mt-units').value) >= 0 ? $('mt-units').value : c.units;
     c.on = $('mt-on').checked; c.source = $('mt-src').value;
     c.lat = $('mt-lat').value; c.lon = $('mt-lon').value; c.url = $('mt-url').value.trim();
     c.refresh = Number($('mt-ref').value); c.horizon = Number($('mt-hz').value);
@@ -2366,11 +2394,12 @@
     document.querySelectorAll('#cfg-s-meteo [data-mn]').forEach(el => { const k = el.dataset.mn, v = mtOut(MT_KIND[k], el.value, c.manual[k], U); if (v !== c.manual[k]) manualChanged = true; c.manual[k] = v; });
     if (manualChanged) c.manual.at = Date.now();
     document.querySelectorAll('#cfg-s-meteo [data-th]').forEach(el => { const k = el.dataset.th; c.th[k] = el.type === 'checkbox' ? el.checked : k === 'aqi' ? Number(el.value) : mtOut(MT_KIND[k], el.value, c.th[k], U); });
-    if ($('mt-units')) c.units = $('mt-units').value;
+    c.units = unitsNow;
     return Object.assign(c, extra || {});
   }
   function saveMeteo(extra) {
-    const before = mtCfg(), next = W.normMeteo(readMeteoCfg(extra));
+    const before = mtCfg(), raw = readMeteoCfg(extra), next = W.normMeteo(raw);
+    next.units = raw.units === 'imperial' ? 'imperial' : 'metric';   // atómico: la unidad elegida se guarda tal cual, en el mismo paso
     if ($('mt-url').value.trim() && !next.url) toast('La URL tiene que empezar por https://', true);
     CONFIG = Dt.setConfig({ meteo: next });
     const c = mtCfg();
@@ -3180,5 +3209,5 @@
     if (mod && !e.shiftKey && !e.altKey && k === 'n') { e.preventDefault(); askNew(); return; }
   });
   window.ShowtimePanel = { reload: () => { loadState(); renderAll(); }, _test: { winState: () => Array.from(WIN.entries()).map(([id, x]) => ({ id, name: x.name, vista: x.vista, zona: x.zona, standby: !!x.standby, fs: x.fs })), setWinVista, setWinStandby, closeLive, openGestor, gestorVisible, emProdMessage, emRegenProd, hitoChips, emUrl, prodBigTitle, fileKind, handleFile, emCommand, importSummary, hidesSome, tipoPill, setWake, wakeState: () => ({ on: wakeOn, lock: !!wakeLock }), showSplash, hideSplash, setStandby, standbyOn, room: () => emRoom,
-    emSnapshot, emCloseDay, emDay, qrDevices, rmZones, setRmZone: z => { RM_ZONE = z; renderCast(); }, setRoom: r => { emRoom = r; }, fakeEm: (em, st) => { EM = em; EMST = st; }, emStateHtml, mtIn, mtOut } };   // _test: solo para tests/control.test.js
+    emSnapshot, emCloseDay, emDay, qrDevices, rmZones, setRmZone: z => { RM_ZONE = z; renderCast(); }, setRoom: r => { emRoom = r; }, fakeEm: (em, st) => { EM = em; EMST = st; }, emStateHtml, mtIn, mtOut, cfSimState, renderCfSim, cfSim: () => CFSIM } };   // _test: solo para tests/control.test.js
 })();

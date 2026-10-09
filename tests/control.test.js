@@ -894,11 +894,31 @@
     ok(/id="lv-gestor"/.test(D.src('index.html')), 'el gestor está en el menú de Live');
     ok(!/data-now=|data-close=|lvnow|data-on=/.test(D.src('index.html')), 'el menú ya no lleva las marcas viejas por nombre');
   });
-  test('Parpadeo del sobretiempo: referencia junto a la velocidad (mismo color y ritmo; quieta si el parpadeo está apagado)', () => {
-    const html = D.src('index.html'), css = D.src('control.css'), js = D.src('control.js');
-    ok(/id="sc-bprev" class="blkprev"/.test(html), 'la referencia está junto al campo de velocidad');
-    ok(/\.blkprev\{[^}]*animation:blkprev var\(--blink-speed,1s\) steps\(1,end\) infinite/.test(css) && /\.blkprev\.still\{animation:none\}/.test(css), 'parpadea a la velocidad elegida; quieta si está apagado');
-    ok(/bp\.style\.setProperty\('--blink-speed', sc\.conf\.blinkSpeed \+ 's'\)/.test(js) && /bp\.style\.color = sc\.conf\.overNum/.test(js), 'mismo ritmo y color que la Live');
+  test('Simulador de Confidence: monitor con banda, reloj monoespaciado y barra; botones Normal · Ámbar · Rojo · Sobretiempo · Flash', () => {
+    const html = D.src('index.html'), css = D.src('control.css');
+    ok(!/sc-bprev/.test(html), 'el relojito de antes ya no está');
+    ok(/<div id="cfsim" class="cfsim lv-ok"/.test(html) && /id="cfsim-t"/.test(html) && /id="cfsim-fill"/.test(html) && /id="cfsim-fl"/.test(html), 'monitor: banda, reloj, barra y capa del mensaje');
+    eq((html.match(/data-cfsim="(ok|warn|danger|over|flash)"/g) || []).join(','), 'data-cfsim="ok",data-cfsim="warn",data-cfsim="danger",data-cfsim="over",data-cfsim="flash"');
+    ok(/\.cfsim-dig span\{font-family:ui-monospace/.test(css), 'reloj monoespaciado');
+    ok(/\.cfsim\.lv-over\{background:var\(--ov-bg,#000\)\}/.test(css) && /\.cfsim\.lv-over \.cfsim-dig span\{color:var\(--ov-num,#ff3b30\)\}/.test(css), 'colores de sobretiempo');
+    ok(/\.cfsim\.blink \.cfsim-dig span\{animation:cfsimdig var\(--blink-speed,1s\) steps\(1,end\) infinite\}/.test(css), 'parpadeo a la velocidad elegida');
+    ok(/\.cfsim-flbox\{[^}]*background:var\(--mbg,#000\);border:3px solid var\(--mfg,#ffb347\)/.test(css), 'Flash con los colores de Mensajes');
+  });
+  test('Simulador de Confidence: refleja umbrales, parpadeo y colores de la configuración; los botones cambian el estado', () => {
+    const t = panel({ 'showtime.config': JSON.stringify({ msgBg: '#112233', msgFg: '#ffee00', screens: { conf: { showWarn: 10, showDanger: 5, blink: true, blinkSpeed: 0.4, overBg: '#220000', overNum: '#00ff00' } } }) });
+    const T = t.T, sc = t.env.win.ShowtimeVistas.normScreens({ conf: { showWarn: 10, showDanger: 5, blink: true, blinkSpeed: 0.4 } }), msg = { bg: '#112233', fg: '#ffee00' };
+    eq(T.cfSimState('ok', sc, msg).t, '22:00'); eq(T.cfSimState('warn', sc, msg).t, '07:30', 'entre el ámbar y el rojo'); eq(T.cfSimState('danger', sc, msg).t, '03:30', 'por debajo del rojo');
+    eq(T.cfSimState('over', sc, msg).cls, 'cfsim lv-over blink'); eq(T.cfSimState('over', sc, msg).t, '-02:15');
+    const quieto = t.env.win.ShowtimeVistas.normScreens({ conf: { blink: false } });
+    eq(T.cfSimState('over', quieto, msg).cls, 'cfsim lv-over', 'sin parpadeo si está apagado');
+    const fl = T.cfSimState('flash', sc, msg); ok(fl.flash); eq(fl.msgBg, '#112233'); eq(fl.msgFg, '#ffee00');
+    t.env.fire('document', 'click', { target: { closest: q => q === '[data-cfsim]' ? { dataset: { cfsim: 'over' } } : null } });
+    eq(T.cfSim(), 'over'); eq(t.env.getEl('cfsim').className, 'cfsim lv-over blink'); eq(t.env.getEl('cfsim-t').textContent, '-02:15');
+    t.env.fire('document', 'click', { target: { closest: q => q === '[data-cfsim]' ? { dataset: { cfsim: 'flash' } } : null } });
+    eq(t.env.getEl('cfsim-fl').hidden, false); eq(t.env.getEl('cfsim-flt').textContent, '5 MINUTOS');
+    t.env.fire('document', 'click', { target: { closest: q => q === '[data-cfsim]' ? { dataset: { cfsim: 'ok' } } : null } });
+    eq(t.env.getEl('cfsim-fl').hidden, true); eq(t.env.getEl('cfsim').className, 'cfsim lv-ok');
+    ok(/el\.dataset\.sc === 'conf\.blinkSpeed' \? 'input' : 'change'/.test(D.src('control.js')), 'la velocidad se ve al momento, mientras se escribe');
   });
   test('Chat: ventana flotante con botón ⤢ Ventana; lista con scroll y formulario abajo; Esc, ✕ o clic fuera la cierran', () => {
     const html = D.src('index.html'), css = D.src('control.css'), js = D.src('control.js');

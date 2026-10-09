@@ -88,6 +88,13 @@
   const UI_EN = {
     /*UI-EN-BEGIN*/
     panel: {
+      "Ámbar": "Amber",
+      "Rojo": "Red",
+      "Sobretiempo": "Overtime",
+      "Flash": "Flash",
+      "LA BANDA": "THE BAND",
+      "Vista previa de Confidence": "Confidence preview",
+      "Probar estado": "Try a state",
       "Unidades": "Units",
       "Métrico (°C, km/h, mm)": "Metric (°C, km/h, mm)",
       "Imperial (°F, mph, in)": "Imperial (°F, mph, in)",

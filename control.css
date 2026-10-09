@@ -1060,9 +1060,6 @@ td input:focus,td select:focus,.imp-src textarea:focus,.imp-prev td input[type=t
 .chat-box .chat-form,.chat-box .mnote{flex:0 0 auto}
 
 /* Referencia del parpadeo del sobretiempo (Configuración › Pantallas Live) */
-.blkprev{font-style:normal;font-weight:900;font-size:13px;font-variant-numeric:tabular-nums;margin-left:10px;padding:2px 8px;border-radius:6px;background:rgba(255,255,255,.06);animation:blkprev var(--blink-speed,1s) steps(1,end) infinite}
-.blkprev.still{animation:none}
-@keyframes blkprev{50%{color:#fff!important}}
 
 /* Hoja de ruta (modal Imprimir): casillas en línea */
 .pr-ck{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--text);cursor:pointer;margin-right:14px}
@@ -1110,3 +1107,30 @@ td input:focus,td select:focus,.imp-src textarea:focus,.imp-prev td input[type=t
 .imp-name{flex-basis:100%;display:flex!important;align-items:center;gap:10px}
 .imp-name span{font-weight:700;color:var(--text);white-space:nowrap}
 .imp-name input{flex:1;max-width:420px;height:32px}
+
+/* ═══ Simulador del monitor Confidence (Configuración › Pantallas Live y vistas) ═══ */
+.cfsim-wrap{grid-column:1/-1;display:flex;flex-direction:column;gap:8px;margin:6px 0 4px}
+.cfsim{position:relative;aspect-ratio:16/9;width:100%;max-width:440px;margin:0 auto;display:flex;flex-direction:column;justify-content:space-between;gap:6px;padding:14px 16px;
+  background:#000;border-radius:10px;border:6px solid #17191f;box-shadow:0 0 0 1px rgba(255,255,255,.12),0 10px 30px rgba(0,0,0,.45);overflow:hidden;--cf:#10b981;color:#fff;container-type:inline-size}
+.cfsim-top{font-size:clamp(10px,4.2cqi,18px);font-weight:900;letter-spacing:.05em;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cfsim-top .k{color:rgba(255,255,255,.6)}
+.cfsim-dig{flex:1 1 auto;display:flex;align-items:center;justify-content:center;min-height:0}
+.cfsim-dig span{font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;font-size:clamp(34px,22cqi,110px);font-weight:900;line-height:.9;letter-spacing:-.03em;font-variant-numeric:tabular-nums;color:#fff}
+.cfsim-bar{height:10px;border-radius:99px;background:rgba(255,255,255,.12);overflow:hidden}
+.cfsim-bar i{display:block;height:100%;border-radius:99px;background:var(--cf);transition:width .3s,background .3s}
+.cfsim-foot{font-size:clamp(10px,3.6cqi,16px);font-weight:800;text-align:center;color:rgba(255,255,255,.75);font-variant-numeric:tabular-nums}
+.cfsim.lv-warn{--cf:#ffb347} .cfsim.lv-warn .cfsim-dig span{color:#ffb347}
+.cfsim.lv-danger,.cfsim.lv-over{--cf:#ff3b30} .cfsim.lv-danger .cfsim-dig span{color:#ff3b30}
+.cfsim.lv-over{background:var(--ov-bg,#000)} .cfsim.lv-over .cfsim-dig span{color:var(--ov-num,#ff3b30)}
+.cfsim.blink .cfsim-dig span{animation:cfsimdig var(--blink-speed,1s) steps(1,end) infinite}
+@keyframes cfsimdig{50%{color:#fff}}
+.cfsim-fl{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.72)}
+.cfsim-fl[hidden]{display:none}
+.cfsim-flbox{width:90%;padding:6% 4%;border-radius:8px;background:var(--mbg,#000);border:3px solid var(--mfg,#ffb347);text-align:center;animation:cfsimfl 1s steps(1,end) infinite}
+.cfsim-flbox b{font-size:clamp(16px,10cqi,48px);font-weight:900;letter-spacing:.02em;color:var(--mfg,#ffb347);animation:cfsimflt 1s steps(1,end) infinite}
+@keyframes cfsimfl{0%{background:var(--mbg)}50%{background:var(--mfg)}100%{background:var(--mbg)}}
+@keyframes cfsimflt{0%{color:var(--mfg)}50%{color:var(--mbg)}100%{color:var(--mfg)}}
+.cfsim-btns{display:flex;flex-wrap:wrap;justify-content:center;gap:4px}
+.cfsim-btns button{height:28px;padding:0 12px;border-radius:7px;border:1px solid var(--hair2,rgba(255,255,255,.16));background:rgba(255,255,255,.04);color:var(--muted);font:inherit;font-size:12.5px;font-weight:800;cursor:pointer}
+.cfsim-btns button.on{background:#fff;color:#000;border-color:#fff}
+@media (prefers-reduced-motion:reduce){ .cfsim.blink .cfsim-dig span,.cfsim-flbox,.cfsim-flbox b{animation:none} }

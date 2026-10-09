@@ -78,12 +78,22 @@
     o.msgSecs = MSG_SECS.indexOf(Number(o.msgSecs)) >= 0 ? Number(o.msgSecs) : DEFAULT_CONFIG.msgSecs;
     o.avisoSecs = AVISO_SECS.indexOf(Number(o.avisoSecs)) >= 0 ? Number(o.avisoSecs) : DEFAULT_CONFIG.avisoSecs;
     // Pantallas Live y vistas (2e-A): umbrales de Confidence, bloques de Backstage y cinta de avisos
-    if (root.ShowtimeVistas) o.screens = root.ShowtimeVistas.normScreens(o.screens);
-    if (root.ShowtimeMeteo) o.meteo = root.ShowtimeMeteo.normMeteo(o.meteo);   // el tiempo (2e-B): fuente, lugar y umbrales del regidor
+    // Lo que esta versión no conoce (un ajuste nuevo de una versión más moderna) se CONSERVA: una ventana con código viejo
+    // no puede borrarlo al normalizar (así se perdía «Imperial»: la Live vieja reescribía la configuración sin `units`).
+    if (root.ShowtimeVistas) o.screens = keepUnknown(o.screens, root.ShowtimeVistas.normScreens(o.screens));
+    if (root.ShowtimeMeteo) o.meteo = keepUnknown(o.meteo, root.ShowtimeMeteo.normMeteo(o.meteo));   // el tiempo (2e-B): fuente, lugar y umbrales del regidor
     o.delayZone = typeof o.delayZone === 'string' ? o.delayZone : 'all';   // zona que se está editando en el menú Retrasos
     o.lang = o.lang === 'en' ? 'en' : 'es';
     o.bisWindow = [5, 10, 15].indexOf(Number(o.bisWindow)) >= 0 ? Number(o.bisWindow) : 10;   // ventana de Bis / Extender prueba (min)   // idioma de toda la suite: lo manda el Panel y viaja con la emisión
     return o;
+  }
+
+  /** Copia en `norm` las claves de `raw` que la normalización no conoce (a cualquier profundidad). Las conocidas mandan las normalizadas. */
+  function keepUnknown(raw, norm) {
+    const plain = x => x && typeof x === 'object' && !Array.isArray(x);
+    if (!plain(raw) || !plain(norm)) return norm;
+    Object.keys(raw).forEach(k => { if (!(k in norm)) norm[k] = raw[k]; else if (plain(raw[k]) && plain(norm[k])) keepUnknown(raw[k], norm[k]); });
+    return norm;
   }
 
   // ── Lectura / escritura ──────────────────────────────────────────────
@@ -162,7 +172,7 @@
   function receive(m) {
     if (!m || m.app !== APP) return;
     if (m.type === 'festival') write(K.festival, m.festival);
-    else if (m.type === 'config') write(K.config, normConfig(m.config));
+    else if (m.type === 'config') { const c = normConfig(m.config); if (JSON.stringify(c) !== JSON.stringify(read(K.config, null))) write(K.config, c); }   // sin eco: si ya está igual, no se reescribe
     else if (m.type === 'callDone') write(K.callDone, m.callDone || []);
     else if (m.type === 'flash') write(K.flash, m.flash || null);
     else if (m.type === 'meteo') write(K.meteo, m.meteo || null);
