@@ -62,6 +62,13 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .trow.co.idle .tname{color:var(--muted);letter-spacing:.14em;font-weight:800;font-size:min(7cqw,3vh);white-space:normal;overflow-wrap:normal}
 .tbadge.sb{color:var(--muted);border-style:dashed}
 /* Aviso visible (sin festival, día sin datos): se enseña, no se corrige solo */
+/* «Solo hoy» (dec. 105): jornada cerrada o terminada en los QR — por encima de todo menos la conexión, el chat y los mensajes */
+.jfin{position:fixed;inset:0;z-index:155;display:flex;align-items:center;justify-content:center;background:#07080a;text-align:center;padding:24px}
+.jfin[hidden]{display:none}
+.jfin-box{display:flex;flex-direction:column;align-items:center;gap:14px;max-width:90vw}
+.jfin-clk{font-variant-numeric:tabular-nums;font-weight:800;font-size:clamp(48px,14vw,160px);line-height:1;color:#fff;letter-spacing:-.02em}
+.jfin-box b{font-size:clamp(20px,4.4vw,44px);letter-spacing:.14em;color:var(--call,#ffb347)}
+.jfin-box span{font-size:clamp(14px,2.2vw,20px);color:rgba(255,255,255,.62)}
 #banner{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:150;max-width:80vw;background:var(--call);color:#000;
   font-weight:900;letter-spacing:.06em;padding:8px 18px;border-radius:8px;font-size:clamp(12px,1.5vw,20px);text-align:center;box-shadow:0 4px 18px rgba(0,0,0,.5)}
 #banner[hidden]{display:none}

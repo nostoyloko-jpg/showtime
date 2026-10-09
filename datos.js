@@ -21,6 +21,7 @@
     chat:     'showtime.chat',         // chat Producción ↔ Stage Manager: [{ id, at, from, pid, text, sm }] (NO va en la emisión general: solo a los enlaces de Producción)
     avisos:   'showtime.avisos',       // avisos escritos a mano (cinta de Backstage + barra del Dashboard): [{ id, text, at, ms (0 = permanente), from }]
     standby:  'showtime.standby',      // Standby (Modo Cartel) de las Confidence, puesto desde el Dashboard: { on, at (ms) } o null — va también por QR
+    scope:    'showtime.scope',        // «Solo hoy» (dec. 105), SOLO en los QR: { day, closed } — la jornada que emite el Panel y si la ha cerrado
     meteo:    'showtime.meteo'         // el tiempo (2e-B): { snap, err, errAt } — lo pide el Dashboard; la Live y los dispositivos lo leen
   };
   const STYLES = ['clasico', 'escenario', 'neutro', 'raycast'];
@@ -213,8 +214,12 @@
     write(K.festival, s.festival || null); write(K.config, normConfig(s.config)); write(K.callDone, Array.isArray(s.callDone) ? s.callDone : []); write(K.flash, s.flash || null);
     write(K.avisos, normAvisos(s.avisos, Date.now())); write(K.meteo, s.meteo || null);
     write(K.standby, normStandby(s.standby));
+    write(K.scope, normScope(s.scope));
     listeners.forEach(fn => { try { fn('snapshot'); } catch (e) { console.error(e); } });
   }
+  function normScope(x) { return x && typeof x.day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x.day) ? { day: x.day, closed: x.closed === true } : null; }
+  /** «Solo hoy» en un QR: { day, closed } o null (Panel, ventanas del Mac o emisión antigua). */
+  function getScope() { return READONLY ? normScope(read(K.scope, null)) : null; }
   function onPeer(fn) { peerListeners.push(fn); }
   /** La Live se presenta cada pocos segundos a la ventana que la abrió (barato; solo cuenta la primera vez). */
   function ping() { if (READONLY) return; if (root.opener && !root.opener.closed) { try { root.opener.postMessage({ app: APP, type: 'ping', name: String(root.name || '').slice(0, 80) }, '*'); } catch (e) {} } }
@@ -292,6 +297,6 @@
     getFestival, getConfig, getCallDone, getFlash, setFlash, getAvisos, addAviso, removeAviso, normAvisos, getChat, addChat, getMeteo, setMeteo, getStandby, setStandby, normStandby, FLASH_MS, MSG_SECS, AVISO_SECS, flashMs, flashLeft, callMinsOf, getOriginal, setOriginal,
     setFestival, setConfig, markCallDone, pruneCallDone,
     onChange, onPeer, addPeer, send, hello, ping,
-    READONLY, onWrite, onSaveState, getSnapshot, loadSnapshot
+    READONLY, onWrite, onSaveState, getSnapshot, loadSnapshot, getScope, normScope
   };
 })(window);

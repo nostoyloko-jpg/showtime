@@ -19,7 +19,7 @@
   const I18 = () => root.ShowtimeI18n || (isNode ? (() => { try { return require('./i18n.js'); } catch (e) { return null; } })() : null);
   const tx = (s, v) => { const I = I18(); return I ? I.tx(s, v) : (v ? String(s).replace(/\{(\w+)\}/g, (m, k) => (v[k] !== undefined && v[k] !== null ? String(v[k]) : m)) : s); };
 
-  const OPS = ['start', 'stop', 'onTime', 'stretch', 'delay', 'flash', 'flashOff', 'callOk'];
+  const OPS = ['start', 'stop', 'onTime', 'stretch', 'delay', 'flash', 'flashOff', 'callOk', 'chat', 'chatsync'];
   const CATS = ['show', 'sc', 'tarea', 'hito'];
 
   // ── Bloqueos del menú Retrasos (los mismos que usa el Panel) ──────────
@@ -32,9 +32,10 @@
 
   // ── Qué banda se marca ───────────────────────────────────────────────
   /** Bandas (shows y soundchecks con hora) de una zona ('' = sin zona) en la jornada de ese momento, en orden. */
-  function targets(state, zoneId, nowAbs) {
+  function targets(state, zoneId, nowAbs, jornada) {
     if (!state) return [];
-    const jor = C.activeJornada(state, Math.floor(nowAbs));   // pasado el corte, si una banda sigue sonando, sigue su jornada
+    // pasado el corte, si una banda sigue sonando, sigue su jornada. Con «Solo hoy» (dec. 105) manda la jornada que emite el Panel.
+    const jor = jornada && C.dayIndex(jornada) !== null ? jornada : C.activeJornada(state, Math.floor(nowAbs));
     return allBlocks(state, nowAbs).filter(b => C.isBand(b) && b.psi !== null && b.jornada === jor && (b.stageId || '') === (zoneId || ''))
       .sort((x, y) => x.pmi - y.pmi);
   }
@@ -249,8 +250,41 @@
         return null;
       case 'flashOff': return null;
       case 'callOk': return str(a.key, 200) ? null : 'Falta el CALL';
+      case 'chat':
+        if (!(typeof a.text === 'string' && a.text.trim().length > 0 && a.text.length <= 300)) return 'Mensaje vacío o de más de 300 caracteres';
+        if (a.name !== undefined && a.name !== null && !(typeof a.name === 'string' && a.name.length <= 40)) return 'Nombre no válido';
+        return null;
+      case 'chatsync': return null;
     }
     return 'Orden desconocida';
+  }
+
+  // ── Mando de UNA zona (dec. 102): solo toca lo suyo ──────────────────
+  /** ¿Puede el mando de la zona `zone` dar esta orden? null = sí; si no, el motivo (en español: va al aviso y al log).
+   *  zone null/undefined = mando general (todo). La zona la pone el Mac según la clave que firma, nunca el móvil. */
+  function zoneDenied(state, cmd, zone) {
+    if (zone === null || zone === undefined) return null;
+    const a = (cmd && cmd.args) || {}, other = 'Este mando es solo de su zona: no puede tocar otras zonas';
+    const inZone = b => !!b && (b.stageId || '') === zone;
+    switch (cmd && cmd.op) {
+      case 'start': case 'stop': case 'onTime': case 'stretch':
+        return inZone(findBlock(state, a.key)) ? null : other;
+      case 'callOk':
+        return inZone(allBlocks(state).find(b => C.callKey(b) === a.key)) ? null : other;
+      case 'delay':
+        return Array.isArray(a.zones) && a.zones.length === 1 && a.zones[0] === zone ? null : other;
+      case 'flash': {   // a Confidence, solo la de su zona (Manager y Backstage son de todos)
+        const toConf = !a.to || a.to.indexOf('confidence') >= 0;
+        return !toConf || (Array.isArray(a.zones) && a.zones.length === 1 && a.zones[0] === zone) ? null : other;
+      }
+    }
+    return null;   // flashOff, chat, chatsync
+  }
+  /** Firma del chat del mando: «[Zona] Nombre» (sin nombre: «[Zona] Stage Manager»; mando general: «[Stage Manager] Nombre»). */
+  function chatSign(zoneName, name) {
+    const n = String(name || '').replace(/[\[\]]/g, '').replace(/\s+/g, ' ').trim().slice(0, 40);
+    const z = String(zoneName || '').replace(/[\[\]]/g, '').trim().slice(0, 40) || 'Stage Manager';
+    return '[' + z + '] ' + (n || 'Stage Manager');
   }
 
   // ── Píldora de retraso por zona (Panel y mando) ─────────────────────
@@ -269,7 +303,7 @@
     return { cls: 'ok', text: nm + ' · ' + tx('En hora'), title: tx('Sin retraso acumulado ni desfase en vivo') };
   }
 
-  const API = { withBlk, OPS, delayPill, isBlocked, targets, suggest, actionsFor, startedBySchedule, findBlock, realPlan, onTimePlan, stretchPlan, editStartPlan, bisWindow, bisState, bisMinutes, BIS_OPTS, BIS_DEFAULT, delayPlan, delayStamp, checkCmd, };
+  const API = { withBlk, OPS, delayPill, isBlocked, targets, suggest, actionsFor, startedBySchedule, findBlock, realPlan, onTimePlan, stretchPlan, editStartPlan, bisWindow, bisState, bisMinutes, BIS_OPTS, BIS_DEFAULT, delayPlan, delayStamp, checkCmd, zoneDenied, chatSign };
   if (isNode) module.exports = API;
   else root.ShowtimeMando = API;
 })(typeof window !== 'undefined' ? window : globalThis);

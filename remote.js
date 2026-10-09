@@ -34,6 +34,11 @@
     return;
   }
 
+  // Mando de UNA zona (dec. 102): la zona va en el enlace con su propia clave; el Mac rechaza lo que toque otra zona.
+  // Aquí solo se ve y se maneja esa zona (sin selector), los retrasos son solo de ella y a Confidence solo va la suya.
+  const LOCK = typeof params.z === 'string' && params.z ? params.z : null;
+  if (LOCK) { ZONE = LOCK; MSG_ZONES = [LOCK]; }
+
   // ── Datos ────────────────────────────────────────────────────────────
   function load() {
     FEST = Dt.getFestival(); CONFIG = Dt.getConfig();
@@ -44,14 +49,16 @@
     if (!FEST) return [];
     const z = (FEST.escenarios || []).map(e => ({ id: e.id, name: e.nombre, color: e.color }));
     if (C.buildBlocks(FEST, { mode: 'all', day: 'all' }).some(b => C.isBand(b) && !b.stageId)) z.push({ id: '', name: tx('Sin zona'), color: '#888' });
-    return z;
+    return LOCK ? z.filter(x => x.id === LOCK) : z;
   }
+  /** «Solo hoy» (dec. 105): la jornada que emite el Panel (null en emisiones antiguas: la del reloj). */
+  function scopeDay() { const s = Dt.getScope ? Dt.getScope() : null; return s ? s.day : null; }
   function curZone(zs) { return zs.some(z => z.id === ZONE) ? ZONE : (zs[0] ? zs[0].id : null); }
   function zoneName(id) { const z = zones().find(x => x.id === id); return z ? z.name : tx('Sin zona'); }
   function current() {
     const zs = zones(), zid = curZone(zs);
     if (zid === null) return { list: [], band: null, zid };
-    const list = M.targets(FEST, zid, now());
+    const list = M.targets(FEST, zid, now(), scopeDay());
     let band = SEL ? list.find(b => b.key === SEL) || null : null;
     if (!band) { SEL = null; band = M.suggest(list, now()); }
     return { list, band, zid };
@@ -72,12 +79,15 @@
     $('clk').textContent = pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds());
     renderRx();
     if (!FEST) { $('evn').textContent = tx(ST && ST.state === 'end' ? 'La emisión está parada en el Dashboard' : 'Esperando los datos del Mac…'); setActs(null); return; }
-    const jor = C.activeJornada(FEST, Math.floor(n));
-    $('evn').textContent = ((FEST.event && FEST.event.nombre) || tx('Evento')) + ' · ' + fmtDay(jor);
+    const sc = Dt.getScope ? Dt.getScope() : null, jor = sc ? sc.day : C.activeJornada(FEST, Math.floor(n));
+    $('evn').textContent = ((FEST.event && FEST.event.nombre) || tx('Evento')) + ' · ' + fmtDay(jor) + (sc && sc.closed ? ' · ' + tx('jornada cerrada en el Dashboard') : '');
+    const zl = LOCK ? zones()[0] : null;
+    $('zlock').hidden = !LOCK;
+    if (LOCK) { $('zlock').textContent = zl ? zl.name : tx('Zona'); $('zlock').style.setProperty('--zc', (zl && zl.color) || '#888'); }
 
     // CALL activos
     const blocks = C.buildBlocks(FEST, { mode: 'all', day: 'all' });
-    const calls = C.callList(blocks, n, Dt.callMinsOf(FEST, CONFIG), Dt.getCallDone());
+    const calls = C.callList(blocks, n, Dt.callMinsOf(FEST, CONFIG), Dt.getCallDone()).filter(b => !LOCK || (b.stageId || '') === LOCK);
     const ch = calls.map(b => '<div class="call"><div class="call-i"><svg class="ic"><use href="#i-bell"/></svg></div><div class="call-t"><b>CALL ' + C.fmtHM(C.callAt(b, Dt.callMinsOf(FEST, CONFIG))) + ' · ' + esc(b.name) + '</b><span>' + esc(KIND[b.kind] || '') + ' ' + C.fmtHM(b.si) + (b.stage ? ' · ' + esc(b.stage) : '') + ' · ' + tx('faltan {t}', { t: fmtMin(b.si - n) }) + '</span></div>'
       + '<button class="tbtn callok" data-ck="' + esc(C.callKey(b)) + '"' + (live() && !BUSY ? '' : ' disabled') + '><svg class="ic"><use href="#i-check"/></svg>' + tx('Confirmar') + '</button></div>').join('');
     if ($('calls').dataset.h !== ch) { $('calls').innerHTML = ch; $('calls').dataset.h = ch; }
@@ -130,7 +140,7 @@
     let dh = '';
     if (dz) { const p = M.delayPill(dz, zoneName(cur.zid)); dh = '<span class="dchip ' + p.cls + '">' + (p.cls === 'ok' || p.cls === 'early' ? '<svg class="ic"><use href="#i-check"/></svg>' : '') + esc(p.text) + '</span>'; }
     if ($('drift').dataset.h !== dh) { $('drift').innerHTML = dh; $('drift').dataset.h = dh; }
-    $('delay-hint').textContent = tx('Zona {z} (o todas, en el resumen) · lo que empiece desde las {h}', { z: zoneName(cur.zid), h: C.fmtHM(Math.floor(n)) });
+    $('delay-hint').textContent = LOCK ? tx('Solo {z} · lo que empiece desde las {h}', { z: zoneName(cur.zid), h: C.fmtHM(Math.floor(n)) }) : tx('Zona {z} (o todas, en el resumen) · lo que empiece desde las {h}', { z: zoneName(cur.zid), h: C.fmtHM(Math.floor(n)) });
 
     // Mensaje en pantalla
     const f = Dt.getFlash();
@@ -218,6 +228,7 @@
   });
   /** Zonas de Confidence que reciben el mensaje (si va a Confidence y hay más de una zona). */
   function renderMsgZones() {
+    if (LOCK) { MSG_ZONES = [LOCK]; $('msg-zones').hidden = true; return; }   // a Confidence, solo la de su zona
     const zs = zones(), box = $('msg-zones');
     box.hidden = !((!MSG_TO || MSG_TO.indexOf('confidence') >= 0) && zs.length > 1);
     if (MSG_ZONES) { MSG_ZONES = MSG_ZONES.filter(id => zs.some(z => z.id === id)); if (!MSG_ZONES.length) MSG_ZONES = null; }
@@ -277,7 +288,7 @@
       body: () => {
         const p = plan();
         const head = (W.custom ? '<label class="nrow">+ <input id="d-n" type="number" inputmode="numeric" min="1" max="600" value="' + W.mins + '"> min</label>' : '<div class="dbig">+' + W.mins + ' min</div>')
-          + '<div class="seg"><button data-sc="z" class="' + (W.all ? '' : 'on') + '">' + tx('Solo {z}', { z: esc(zoneName(zid)) }) + '</button><button data-sc="all" class="' + (W.all ? 'on' : '') + '">' + tx('Todas las zonas') + '</button></div>'
+          + (LOCK ? '' : '<div class="seg"><button data-sc="z" class="' + (W.all ? '' : 'on') + '">' + tx('Solo {z}', { z: esc(zoneName(zid)) }) + '</button><button data-sc="all" class="' + (W.all ? 'on' : '') + '">' + tx('Todas las zonas') + '</button></div>')
           + '<p class="dfrom">' + tx('Lo que empiece desde las {h} · respeta los DELAY en rojo y los bloqueos del Dashboard', { h: C.fmtHM(W.from) }) + '</p>';
         if (!p.ok) return head + '<p class="err">' + esc(back(p.error)) + '</p>';
         const sum = '<div class="dsum"><b>' + tx('mueve {n}', { n: p.moved.length }) + '</b> · ' + tx(p.kept.length === 1 ? '{n} fija' : '{n} fijas', { n: p.kept.length }) + (p.clashes.length ? ' · <span class="bad">' + tx(p.clashes.length === 1 ? '{n} choque' : '{n} choques', { n: p.clashes.length }) + '</span>' : '') + '</div>';
@@ -300,10 +311,62 @@
     });
   }
 
+  // ── Chat de Producción en el mando (dec. 104) ─────────────────────────
+  // El hilo es el de Producción ↔ Stage Manager: llega entero del Mac (firmado) y se escribe con una orden firmada del mando.
+  // Cada mensaje sale firmado «[Zona] Nombre» (el Mac pone la zona según la clave del mando, no el móvil).
+  const NKEY = 'showtime.remote.name', CHAT_ON = !!params.q;
+  let CHAT = [], CHAT_PEND = [], CHAT_SEEN = null, CHAT_OPEN = false;
+  const myPid = LOCK ? 'mando:' + LOCK : 'mando';
+  function myName() { try { return localStorage.getItem(NKEY) || ''; } catch (e) { return ''; } }
+  function hhmm(ms) { const d = new Date(ms); return pad2(d.getHours()) + ':' + pad2(d.getMinutes()); }
+  function chatIn(m) {
+    const list = Em.cleanChatLog ? Em.cleanChatLog(m) : null; if (!list) return;
+    const fresh = list.filter(x => !CHAT.some(y => y.id === x.id));
+    CHAT = list;
+    CHAT_PEND = CHAT_PEND.filter(p => !fresh.some(x => x.pid === myPid && x.text === p.text));   // ya ha llegado del Mac
+    if (CHAT_SEEN === null) CHAT_SEEN = new Set(list.map(x => x.id));   // lo que ya había al conectar no cuenta como nuevo
+    else if (fresh.length && !CHAT_OPEN && fresh.some(x => x.pid !== myPid)) $('chat-dot').hidden = false;
+    renderChat();
+  }
+  function renderChat() {
+    const box = $('chat-list'); if (!box) return;
+    const sig = LOCK ? (zones()[0] || {}).name || tx('Zona') : 'Stage Manager';
+    $('chat-sig').textContent = '[' + sig + ']';
+    const items = CHAT.map(x => ({ from: x.sm ? 'Stage Manager' : x.from, at: x.at, text: x.text, me: x.pid === myPid, sm: x.sm, pend: false }))
+      .concat(CHAT_PEND.map(p => ({ from: '[' + sig + '] ' + (myName() || 'Stage Manager'), at: p.at, text: p.text, me: true, pend: true })));
+    const h = items.length ? items.map(x => '<div class="cmsg' + (x.me ? ' me' : '') + (x.sm ? ' sm' : '') + (x.pend ? ' pend' : '') + '"><b>' + esc(x.from) + '<small>' + hhmm(x.at) + '</small></b><span>' + esc(x.text) + '</span></div>').join('')
+      : '<p class="csh-empty">' + tx('Sin mensajes todavía. Lo que escribas lo ven el Dashboard y Producción.') + '</p>';
+    if (box.dataset.h !== h) { box.innerHTML = h; box.dataset.h = h; box.scrollTop = box.scrollHeight; }
+  }
+  function renderChatState() { const b = $('chat-form') && $('chat-form').querySelector('.send'); if (b) b.disabled = !live(); }
+  function openChat() {
+    CHAT_OPEN = true; $('chat-sheet').hidden = false; $('chat-dot').hidden = true;
+    $('chat-name').value = myName(); renderChat(); renderChatState();
+    if (R && live()) R.command('chatsync', {}).catch(() => {});   // pide el hilo al momento (si no, llega en el siguiente envío)
+  }
+  function closeChat() { CHAT_OPEN = false; $('chat-sheet').hidden = true; $('chat-text').blur(); }
+  $('chat-dot').hidden = true; $('chat-sheet').hidden = true;
+  if (!CHAT_ON) $('chat-fab').hidden = true; else document.body.classList.add('has-chat');   // QR del mando anterior (sin la clave de Producción): sin chat
+  $('chat-fab').addEventListener('click', openChat);
+  $('chat-x').addEventListener('click', closeChat);
+  $('chat-sheet').addEventListener('click', e => { if (e.target.id === 'chat-sheet') closeChat(); });
+  $('chat-name').addEventListener('change', () => { const v = $('chat-name').value.replace(/\s+/g, ' ').trim().slice(0, 40); $('chat-name').value = v; try { localStorage.setItem(NKEY, v); } catch (e) {} renderChat(); });
+  $('chat-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const inp = $('chat-text'), text = inp.value.replace(/\s+/g, ' ').trim().slice(0, 300);
+    if (!text || !live()) return;
+    const p = { text, at: Date.now() };
+    CHAT_PEND.push(p); inp.value = ''; renderChat();
+    let r; try { r = await R.command('chat', { text, name: myName() || null }); } catch (er) { r = { ok: false, msg: String(er && er.message || er) }; }
+    if (!r || !r.ok) { CHAT_PEND = CHAT_PEND.filter(x => x !== p); if (!inp.value) inp.value = text; renderChat(); toast(tx('No se ha enviado') + ' · ' + back((r && r.msg) || ''), true); }
+  });
+
   // ── Arranque ─────────────────────────────────────────────────────────
   load();
   Dt.onChange(() => { load(); render(); });
-  R = new Em.Receptor({ params, onSnapshot: s => Dt.loadSnapshot(s), onStatus: st => { ST = st; renderRx(); setActs(FEST ? current().band : null, now()); } });
+  R = new Em.Receptor({ params, onSnapshot: s => Dt.loadSnapshot(s), onStatus: st => { ST = st; renderRx(); setActs(FEST ? current().band : null, now()); renderChatState(); },
+    info: () => ({ v: 'mando', s: LOCK, d: Em.devClass(navigator.userAgent, window.screen && window.screen.width) }),
+    onProdMessage: m => chatIn(m) });
   R.start().catch(e => { console.error(e); toast(tx('No se pudo conectar: {e}', { e: e && e.message || e }), true); });
   // Al cambiar de idioma (llega con la emisión) se repinta todo al momento, sin recargar
   if (I18) I18.onChange(() => { ['calls', 'zones', 'band', 'drift', 'flash-cur', 'msg-zl'].forEach(id => { if ($(id)) $(id).dataset.h = ''; }); if (SHEET) { $('sh-b').dataset.h = ''; } render(); });
@@ -316,5 +379,5 @@
   let wl = null;
   async function wake() { if (!('wakeLock' in navigator) || wl || document.visibilityState !== 'visible') return; try { wl = await navigator.wakeLock.request('screen'); wl.addEventListener('release', () => { wl = null; }); } catch (e) {} }
   document.addEventListener('visibilitychange', wake); document.addEventListener('pointerdown', wake); wake();
-  window.ShowtimeRemote = { send, current };
+  window.ShowtimeRemote = { send, current, chatIn, openChat, LOCK };
 })();

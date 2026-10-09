@@ -31,6 +31,7 @@
   let FEST = null, CONFIG = null, BLOCKS = [], HITOS = [], ALLB = [], MARG = {}, CALL_MINS = 15, CALL_DONE = new Set(), DEMO = false;
   const VIEW_TXT = { all: ['JORNADA COMPLETA', 'ENTRADAS'], show: ['SHOW', 'SHOWS'], sc: ['SOUNDCHECK', 'SOUNDCHECKS'] };
   let NOFEST = false, DAY_MISSING = '';   // estados que se ENSEÑAN, nunca se corrigen solos
+  let JFIN = false;                       // «Solo hoy» (QR): jornada cerrada en el Dashboard o ya terminada
   let TIME_OFFSET = 0;
   let ACCENT = '#e94560', CALLC = '#ffb347';
   const ZOOM_STEPS = [20, 30, 45, 60, 90, 120, 180, 240, 360];
@@ -91,6 +92,20 @@
     $('banner').textContent = msg;
     $('banner').hidden = !msg;
     applyStyle(CONFIG.style);
+    renderJfin();
+  }
+  /** «Solo hoy» (dec. 105): en los QR solo llega la jornada que emite el Panel. Cerrada a mano o terminada (nada sonando ni
+   *  por llegar, marcadores incluidos) → «JORNADA FINALIZADA» hasta que el Panel emita la siguiente. */
+  function renderJfin() {
+    const sc = Dt.getScope ? Dt.getScope() : null;
+    JFIN = !!(sc && FEST && !DEMO && (sc.closed || C.jornadaOver(FEST, sc.day, Math.floor(C.nowAbs()))));
+    const box = $('jfin'); if (!box) return;
+    box.hidden = !JFIN;
+    document.body.classList.toggle('jfin-on', JFIN);
+    if (JFIN) {
+      $('jfin-sub').textContent = fmtDay(sc.day) + ' · ' + tx(sc.closed ? 'cerrada en el Dashboard' : 'sin nada más por hoy') + ' · ' + tx('hasta que arranque la siguiente');
+      const d = new Date(); $('jfin-clk').textContent = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    }
   }
 
   function fmtDay(iso) {
@@ -987,7 +1002,9 @@
       rx.title = st ? st.links.map(l => l.name + ': ' + tx(l.state === 'on' ? 'conectado' : 'sin conexión')).join(' · ') : '';
     }
     if (!params || !(window.crypto && crypto.subtle) || !('WebSocket' in window)) { render(null); return; }
-    const R = new Em.Receptor({ params, onSnapshot: snap => Dt.loadSnapshot(snap), onStatus: st => { render(st); if (PRODID) chatOnStatus(st); }, onProdMessage: m => { if (PRODID) chatIn(m); } });
+    // Telemetría (dec. 103): cada latido dice qué enseña esta pantalla (vista, zona), qué es (móvil, tablet…) y si es de Producción
+    const info = () => ({ v: VISTA, z: VISTA === 'confidence' && ZONA !== null ? String(ZONA) : null, d: Em.devClass(navigator.userAgent, window.screen && window.screen.width), p: PRODID || null });
+    const R = new Em.Receptor({ params, info, onSnapshot: snap => Dt.loadSnapshot(snap), onStatus: st => { render(st); if (PRODID) chatOnStatus(st); }, onProdMessage: m => { if (PRODID) chatIn(m); } });
     if (PRODID) { PROD_R = R; document.body.classList.add('prod'); initProdDock(); initChat(); }
     R.start().catch(e => { console.error(e); render(null); });
     // Al volver a encender la pantalla (o volver a la pestaña), se reconecta a fondo y se pide el estado: nada de conexiones «zombi»
@@ -1210,7 +1227,7 @@
   setZoom(0);
   setRowH(ROW_H);
   tick();
-  setInterval(tick, 1000);
+  setInterval(() => { tick(); if (JFIN) renderJfin(); }, 1000);
   window.addEventListener('resize', () => requestAnimationFrame(tick));
   if (Dt.READONLY) startStaff();
   if (window.opener || !Dt.getFestival()) Dt.hello();   // pide los datos al Panel que la abrió (o a uno abierto)

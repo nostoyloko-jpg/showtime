@@ -285,7 +285,7 @@
     const pu = E.productionUrl(room, E.PUBLIC_BASE, 'prod_001');
     ok(pu.indexOf('&q=' + room.q) > 0, 'el QR de Producción la lleva');
     ok(E.staffUrl(room, E.PUBLIC_BASE).indexOf(room.q) < 0, 'el de Staff NO');
-    ok(E.remoteUrl(room, E.PUBLIC_BASE).indexOf(room.q) < 0, 'el del mando NO');
+    ok(E.remoteUrl(room, E.PUBLIC_BASE).indexOf('&q=' + room.q) > 0, 'el del mando SÍ (chat de Producción en el mando, dec. 104)');
     eq(paramsOf(pu).q, room.q);
     eq(E.parseHash(pu.slice(pu.indexOf('#')).replace('&q=' + room.q, '')), null, 'QR de Producción antiguo (sin clave): no válido');
     eq(E.parseHash(pu.slice(pu.indexOf('#')).replace('&q=' + room.q, '&q=abc')), null, 'clave mal formada');
@@ -365,6 +365,80 @@
     await sleep(300);
     eq(got.length, 1, 'ni repetido, ni viejo, ni sin id');
     prod.stop(); await tx.stop();
+  });
+
+  // ── Telemetría de dispositivos (dec. 103) y mandos por zona (dec. 102) ──
+  test('Telemetría: el latido lleva vista, zona y tipo; lo raro se limpia; latido cada 20 s y fuera a los 45 s', async () => {
+    eq(E.PRESENCE_MS, 20000); eq(E.VIEWER_TTL, 45000);
+    const room = await E.newRoom(), K = await _.macKeys(room), V = await _.viewerKeys(room);
+    const h = await _.openHello(K, await _.sealHello(V, { id: 'abc', v: 'confidence', z: 'esc2', d: 'tablet', p: 'prod_001' }));
+    eq(h.v, 'confidence'); eq(h.z, 'esc2'); eq(h.d, 'tablet'); eq(h.p, 'prod_001');
+    const raro = await _.openHello(K, await _.sealHello(V, { id: 'x', v: '<script>', z: 'z'.repeat(200), d: 'nevera', p: 'a b' }));
+    eq(raro.v, null); eq(raro.z, null); eq(raro.d, null); eq(raro.p, null);
+    eq(E.devClass('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)'), 'movil');
+    eq(E.devClass('Mozilla/5.0 (Linux; Android 14; SM-X710) AppleWebKit Safari'), 'tablet', 'Android sin «Mobile»');
+    eq(E.devClass('Mozilla/5.0 (iPad; CPU OS 16_0 like Mac OS X)'), 'tablet');
+    eq(E.devClass('Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0)', 1800), 'ordenador');
+  });
+  test('Telemetría: el Mac ve cada dispositivo (vista, zona, hace cuánto) y lo quita sin latido', async () => {
+    const R = rig(), room = await E.newRoom();
+    let est = null;
+    const tx = new E.Emisor({ room, brokers: R.brokers, WebSocket: R.WS, getSnapshot: () => ({}), onStatus: s => { est = s; } });
+    await tx.start();
+    const p = paramsOf(E.staffUrl(room, 'http://x/', { vista: 'confidence', zona: 'esc1' }));
+    const a = new E.Receptor({ params: p, brokers: R.brokers, WebSocket: R.WS, onSnapshot() {}, onStatus() {}, info: () => ({ v: 'confidence', z: 'esc1', d: 'movil' }) });
+    const b = new E.Receptor({ params: p, brokers: R.brokers, WebSocket: R.WS, onSnapshot() {}, onStatus() {}, info: () => ({ v: 'backstage', d: 'tablet' }) });
+    await a.start(); await b.start();
+    await until(() => est && est.devices && est.devices.length === 2, 3000, 'dos dispositivos');
+    const da = est.devices.find(d => d.id === a.id);
+    eq(da.v, 'confidence'); eq(da.z, 'esc1'); eq(da.d, 'movil'); eq(da.r, 0); ok(da.ago <= 1);
+    eq(est.devices.find(d => d.id === b.id).v, 'backstage'); eq(est.viewers, 2);
+    // Sin latido en 45 s: fuera de la lista
+    tx.devices.get(a.id).t -= 46000; tx.viewers.set(a.id, Date.now() - 46000); tx.status();
+    eq(est.devices.length, 1, 'el que no late desaparece'); eq(est.devices[0].id, b.id); eq(est.viewers, 1);
+    a.stop(); b.stop(); await tx.stop();
+    eq(est.devices.length, 0, 'emisión parada: lista vacía');
+  });
+  test('Mandos por zona: cada zona con su clave; la ZONA la dice la clave que firma (no la orden)', async () => {
+    let room = E.withZoneKeys(await E.newRoom(), ['esc1', 'esc2']);
+    ok(room.cz.esc1 && room.cz.esc2 && room.cz.esc1 !== room.cz.esc2 && room.cz.esc1 !== room.c, 'claves distintas');
+    eq(E.withZoneKeys(room, ['esc1']), room, 'sin zonas nuevas, la misma sala');
+    const u1 = E.remoteUrl(room, 'http://x/', 'esc1'), p1 = paramsOf(u1);
+    ok(/remote\.html\?stage=esc1&b=/.test(u1), 'enlace legible con ?stage=');
+    eq(p1.c, room.cz.esc1); eq(p1.z, 'esc1'); eq(p1.q, room.q, 'lleva la clave de Producción (chat)');
+    ok(Q.encode(E.remoteUrl(room, E.PUBLIC_BASE, 'esc1'), { ecl: 'M' }).version <= 10, 'QR de zona: se escanea igual de fácil');
+    eq(paramsOf(E.remoteUrl(room, 'http://x/', 'nope')).z, undefined, 'zona sin clave → mando general');
+    eq(E.parseHash(u1.slice(u1.indexOf('#')).replace(/&c=[^&]+/, '')), null, 'zona sin clave de mando: no válido');
+    const K = await _.macKeys(room);
+    const V1 = await _.viewerKeys(p1), Vg = await _.viewerKeys(paramsOf(E.remoteUrl(room, 'http://x/')));
+    const c1 = await _.openCmd(K, await _.sealCmd(V1, { id: 'abcdefgh', t: Date.now(), op: 'flashOff', args: {}, _z: null }));
+    eq(c1._z, 'esc1', 'la zona sale de la clave, aunque la orden diga otra cosa');
+    eq((await _.openCmd(K, await _.sealCmd(Vg, { id: 'abcdefgi', t: Date.now(), op: 'flashOff', args: {}, _z: 'esc2' })))._z, null, 'mando general');
+    // Clave nueva de una zona: su mando viejo deja de valer; los demás siguen
+    const old = await _.sealCmd(V1, { id: 'abcdefgj', t: Date.now(), op: 'flashOff', args: {} });
+    room = E.newZoneKey(room, 'esc1');
+    const K2 = await _.macKeys(room);
+    eq(await _.openCmd(K2, old), null, 'el QR viejo de esc1 ya no manda');
+    const V2 = await _.viewerKeys(paramsOf(E.remoteUrl(room, 'http://x/', 'esc2')));
+    eq((await _.openCmd(K2, await _.sealCmd(V2, { id: 'abcdefgk', t: Date.now(), op: 'flashOff', args: {} })))._z, 'esc2', 'el de esc2 sigue');
+  });
+  test('Mandos por zona: de punta a punta, el Dashboard recibe la zona; el mando lee el chat de Producción', async () => {
+    const R = rig(), room = E.withZoneKeys(await E.newRoom(), ['esc2']);
+    const got = [], chat = [];
+    let est = null;
+    const tx = new E.Emisor({ room, brokers: R.brokers, WebSocket: R.WS, getSnapshot: () => ({}), onStatus: s => { est = s; }, onCommand: async c => { got.push(c); return { ok: true, msg: 'ok' }; } });
+    await tx.start();
+    const rx = new E.Receptor({ params: paramsOf(E.remoteUrl(room, 'http://x/', 'esc2')), brokers: R.brokers, WebSocket: R.WS, onSnapshot() {}, onStatus() {}, onProdMessage: m => chat.push(m), info: () => ({ v: 'mando', s: 'esc2', d: 'movil' }) });
+    await rx.start();
+    await until(() => est && est.devices.some(d => d.r && d.s === 'esc2'), 3000, 'el mando de la zona en la lista');
+    const r = await rx.command('chat', { text: 'Hola', name: 'Ana' });
+    ok(r.ok); eq(got[0]._z, 'esc2'); eq(got[0].op, 'chat');
+    await tx.sendProd({ type: 'chatlog', list: [{ id: 'a', at: 1, from: '[Carpa] Ana', text: 'Hola', sm: false }] });
+    await until(() => chat.some(m => m.type === 'chatlog'), 3000, 'el mando recibe el chat');
+    // Nueva clave de la zona: su mando sale de la lista
+    await tx.setZoneKeys(E.newZoneKey(room, 'esc2').cz);
+    ok(!est.devices.some(d => d.r && d.s === 'esc2'), 'mando con clave vieja: fuera');
+    rx.stop(); await tx.stop();
   });
 
   test('Conexión «zombi»: kick reconecta el repetidor y wake pide el estado de nuevo', async () => {

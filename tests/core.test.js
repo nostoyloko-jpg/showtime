@@ -222,6 +222,44 @@
     ok(!C.changeoverBefore(B, B.find(b => b.key === '3:sc')).idle, 'hito no rompe');
     eq(C.changeoversNow(B, at(D10, '17:10')).find(x => x.stageId === 'esc1').kind, 'changeover');
   });
+  test('105: «Solo hoy» — la copia para los QR lleva solo la jornada pedida (y la parte de ese día de cada banda)', () => {
+    const f = JSON.parse(JSON.stringify(FEST));
+    f.event.fechaFin = '2026-07-12';
+    f.artists.push({ id: 5, nombre: 'Mañana', escenarioId: 'esc1', fecha: '2026-07-11', inicio: '21:00', fin: '22:00', soundcheckInicio: '17:00', soundcheckFin: '17:30' });
+    f.artists.push({ id: 6, nombre: 'Prueba hoy, show mañana', escenarioId: 'esc2', fecha: '2026-07-11', inicio: '20:00', fin: '21:00', soundcheckFecha: '2026-07-10', soundcheckInicio: '19:00', soundcheckFin: '19:30', notas: 'privado' });
+    f.artists.push({ id: 7, showtimeTipo: 'tarea', nombre: 'Carga mañana', escenarioId: 'esc1', fecha: '2026-07-11', inicio: '10:00', fin: '11:00' });
+    f.showtimeRetrasos = [{ id: 'a', at: 1, minutes: 5, zones: 'all', day: '2026-07-10', from: D10 }, { id: 'b', at: 1, minutes: 5, zones: 'all', day: '2026-07-11', from: D11 }];
+    const s = C.scopeToJornada(f, '2026-07-10');
+    eq(s.artists.map(a => a.id).join(), '1,2,3,4,6', 'el DJ de las 02:00 es de la jornada del 10');
+    const p6 = s.artists.find(a => a.id === 6);
+    eq(p6.inicio, undefined, 'el show de mañana no viaja'); eq(p6.notas, undefined); eq(p6.soundcheckInicio, '19:00');
+    eq(C.buildBlocks(s, { mode: 'sc', day: '2026-07-10' }).filter(b => b.id === 6).length, 1, 'su prueba de hoy sigue');
+    eq(C.festivalDays(s, 'all').join(), '2026-07-10', 'solo hay un día');
+    eq(s.showtimeRetrasos.map(d => d.id).join(), 'a');
+    eq(f.artists.length, 7, 'el original no se toca');
+    const m = C.scopeToJornada(f, '2026-07-11');
+    eq(m.artists.map(a => a.id).sort().join(), '5,6,7');
+    eq(C.buildBlocks(m, { mode: 'all', day: '2026-07-11' }).length, 4, 'show y prueba de Mañana, show del 6 y la tarea');
+  });
+  test('105: jornada terminada = nada sonando ni por llegar (con marcadores)', () => {
+    eq(C.jornadaOver(FEST, '2026-07-10', at(D10, '22:00')), false);
+    eq(C.jornadaOver(FEST, '2026-07-10', at(D11, '03:00')), false, 'el DJ sigue');
+    eq(C.jornadaOver(FEST, '2026-07-10', at(D11, '04:30')), true);
+    const f = JSON.parse(JSON.stringify(FEST));
+    f.artists.push({ id: 9, showtimeTipo: 'hito', nombre: 'Curfew', escenarioId: 'esc1', fecha: '2026-07-11', inicio: '05:00' });
+    eq(C.jornadaOver(f, '2026-07-10', at(D11, '04:30')), false, 'falta el curfew');
+    eq(C.jornadaOver(FEST, '2026-07-12', at(D11, '04:30')), false, 'día sin nada: no se da por terminado');
+  });
+  test('101: soundcheck → show de bandas DISTINTAS tampoco es changeover (sin actividad); show → show sí', () => {
+    const f = JSON.parse(JSON.stringify(FEST));
+    f.artists = f.artists.filter(a => a.id === 1 || a.id === 3);   // Principal: SC 1, SC 3, show 1, show 3
+    const B = C.buildBlocks(f, { mode: 'all', day: 'all' });
+    const s1 = B.find(b => b.key === '1:show'), s3 = B.find(b => b.key === '3:show');
+    const co1 = C.changeoverBefore(B, s1);
+    eq(co1.prev.kind, 'sc'); ok(co1.idle, 'el anterior es un soundcheck (de otra banda): sin actividad');
+    ok(!C.changeoverBefore(B, s3).idle, 'show → show de bandas distintas: changeover');
+    ok(!C.changeoverBefore(B, B.find(b => b.key === '3:sc')).idle, 'soundcheck → soundcheck: changeover');
+  });
   test('76: una tarea de la zona dentro del hueco lo deja en sin actividad; en curso, manda la tarea', () => {
     const f = JSON.parse(JSON.stringify(FEST));
     f.artists.push({ id: 9, showtimeTipo: 'tarea', nombre: 'Montaje luces', escenarioId: 'esc1', fecha: '2026-07-10', inicio: '17:00', fin: '17:45' });

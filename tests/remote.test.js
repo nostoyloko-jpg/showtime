@@ -32,7 +32,8 @@
   async function mando(opts) {
     const o = opts || {};
     ROOM = ROOM || await E.newRoom();
-    const url = o.kind === 'staff' ? E.staffUrl(ROOM, 'http://x/') : E.remoteUrl(ROOM, 'http://x/');
+    if (o.zone) ROOM = E.withZoneKeys(ROOM, [o.zone]);
+    const url = o.kind === 'staff' ? E.staffUrl(ROOM, 'http://x/') : E.remoteUrl(ROOM, 'http://x/', o.zone);
     const env = D.makeEnv({ cripto: true, now: NOW, hash: o.kind === 'nada' ? '' : url.slice(url.indexOf('#')) });
     D.cargar(env, MODULOS);
     const sent = [], ctl = { reply: { ok: true, msg: 'Hecho en el Mac' }, wakes: 0, R: null };
@@ -49,6 +50,77 @@
     return t;
   }
   const click = (t, sel, el) => t.env.fire('document', 'click', { target: { closest: q => q === sel ? el : null } });
+
+  // ── Mando de UNA zona (dec. 102) ──
+  const zoneOf = (s, i) => s.escenarios[i].id;
+  test('Mando de zona: solo ve su zona (sin selector), su etiqueta arriba y sus CALL; el telemetría dice qué zona es', async () => {
+    const F = fest(), K = zoneOf(F, 1);
+    const t = await mando({ fest: F, zone: K });
+    eq(t.env.errors.length, 0, t.env.errors.join(' | '));
+    eq(t.Rm.LOCK, K);
+    eq(t.Rm.current().zid, K); eq(t.Rm.current().band.name, 'Lejos', 'propone la de SU zona');
+    eq(t.env.getEl('zones').hidden, true, 'sin selector de zona');
+    eq(t.env.getEl('zlock').hidden, false); eq(t.env.getEl('zlock').textContent, 'Carpa');
+    const i = t.ctl.R.o.info(); eq(i.v, 'mando'); eq(i.s, K);
+    ok(/Solo Carpa/.test(t.env.getEl('delay-hint').textContent), t.env.getEl('delay-hint').textContent);
+  });
+  test('Mando de zona: ▶ y retrasos van a su zona; los mensajes a Confidence, solo a la suya', async () => {
+    const F = fest(), K = zoneOf(F, 1);
+    const t = await mando({ fest: F, zone: K });
+    t.env.fire('b-start', 'click', {}); await tick(); await tick();
+    eq(t.sent[0].op, 'start'); eq(t.sent[0].args.key, t.Rm.current().band.key);
+    t.env.fire('msg-text', 'input', {}); t.env.getEl('msg-text').value = 'HOLA';
+    t.env.fire('msg-form', 'submit', { preventDefault() {} }); await tick(); await tick();
+    const fl = t.sent.find(s => s.op === 'flash');
+    eq(JSON.stringify(fl.args.zones), JSON.stringify([K]), 'Confidence: solo su zona');
+    eq(t.env.getEl('msg-zones').hidden, true, 'sin elegir zonas');
+    // Retraso: sin «Todas las zonas» en el resumen
+    click(t, '[data-delay]', { dataset: { delay: '5' }, disabled: false }); await tick();
+    ok(!/data-sc="all"/.test(t.env.getEl('sh-b').innerHTML), 'sin opción de todas las zonas');
+  });
+  test('Mando general (sin zona): como siempre, con selector y todas las zonas', async () => {
+    const t = await mando();
+    eq(t.Rm.LOCK, null); eq(t.env.getEl('zones').hidden, false); eq(t.env.getEl('zlock').hidden, true);
+  });
+  // ── Chat de Producción en el mando (dec. 104) ──
+  test('Chat: botón flotante; el hilo llega del Mac, se pinta (míos a la derecha) y avisa con un punto si está cerrado', async () => {
+    const F = fest(), K = zoneOf(F, 1);
+    const t = await mando({ fest: F, zone: K });
+    eq(t.env.getEl('chat-fab').hidden, false, 'el QR trae la clave de Producción: hay chat');
+    t.ctl.R.o.onProdMessage({ type: 'chatlog', list: [{ id: 'a', at: 1, from: 'Marta', pid: 'prod_001', text: 'Hola', sm: false }] });
+    eq(t.env.getEl('chat-dot').hidden, true, 'lo que ya había no cuenta como nuevo');
+    t.ctl.R.o.onProdMessage({ type: 'chatlog', list: [{ id: 'a', at: 1, from: 'Marta', pid: 'prod_001', text: 'Hola', sm: false }, { id: 'b', at: 2, from: 'Marta', pid: 'prod_001', text: '¿Cambio?', sm: false }] });
+    eq(t.env.getEl('chat-dot').hidden, false, 'mensaje nuevo con el chat cerrado: punto');
+    t.env.fire('chat-fab', 'click', {}); await tick();
+    eq(t.env.getEl('chat-sheet').hidden, false); eq(t.env.getEl('chat-dot').hidden, true);
+    ok(t.sent.some(s => s.op === 'chatsync'), 'al abrir pide el hilo');
+    ok(/¿Cambio\?/.test(t.env.getEl('chat-list').innerHTML));
+    eq(t.env.getEl('chat-sig').textContent, '[Carpa]', 'firma de la zona');
+  });
+  test('Chat: enviar manda una orden firmada con el nombre; se ve al momento y no se duplica al llegar del Mac', async () => {
+    const F = fest(), K = zoneOf(F, 1);
+    const t = await mando({ fest: F, zone: K });
+    t.env.fire('chat-fab', 'click', {}); await tick();
+    t.env.getEl('chat-name').value = '  Ana  '; t.env.fire('chat-name', 'change', {});
+    eq(t.env.storage.get('showtime.remote.name'), 'Ana', 'el nombre se recuerda');
+    t.env.getEl('chat-text').value = 'Necesito pinza'; t.env.fire('chat-form', 'submit', { preventDefault() {} }); await tick(); await tick();
+    const c = t.sent.find(s => s.op === 'chat');
+    eq(c.args.text, 'Necesito pinza'); eq(c.args.name, 'Ana');
+    ok(/cmsg me pend/.test(t.env.getEl('chat-list').innerHTML), 'pendiente, a la derecha');
+    t.ctl.R.o.onProdMessage({ type: 'chatlog', list: [{ id: 'z', at: 5, from: '[Carpa] Ana', pid: 'mando:' + K, text: 'Necesito pinza', sm: false }] });
+    const h = t.env.getEl('chat-list').innerHTML;
+    eq((h.match(/Necesito pinza/g) || []).length, 1, 'sin duplicar'); ok(/cmsg me"/.test(h), 'mío');
+    // Falla el envío: el texto vuelve al campo
+    t.ctl.reply = { ok: false, msg: 'Sin conexión: la orden no ha salido' };
+    t.env.getEl('chat-text').value = 'Otro'; t.env.fire('chat-form', 'submit', { preventDefault() {} }); await tick(); await tick();
+    eq(t.env.getEl('chat-text').value, 'Otro'); ok(/No se ha enviado/.test(t.env.getEl('toast').textContent));
+  });
+  test('Chat: la hoja tiene altura fija con scroll interno y el campo fijo al pie', () => {
+    const css = D.src('remote.css');
+    ok(/\.csheet-box\{[^}]*height:min\(62dvh,560px\)[^}]*display:flex;flex-direction:column/.test(css), 'altura fija');
+    ok(/\.csh-list\{flex:1 1 auto;min-height:0;overflow-y:auto/.test(css), 'la lista hace scroll');
+    ok(/\.csh-f\{[^}]*flex:0 0 auto/.test(css), 'el campo queda al pie');
+  });
 
   test('remote.js: la sintaxis es válida', () => { new vm.Script(D.src('remote.js'), { filename: 'remote.js' }); });
   test('Enlace sin claves o el QR de Staff: no hay mando (y dice cuál escanear)', async () => {

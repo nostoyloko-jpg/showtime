@@ -163,6 +163,38 @@
     eq(B('Algo que no conoce nadie'), 'Algo que no conoce nadie', 'lo desconocido se queda como está');
   });
 
+  if (isNode) test('Fase 4: avisos del importador y errores de core.js / mando.js se leen en inglés (txBack); en español, intactos', () => {
+    const fs = require('fs'), path = require('path'), src = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
+    // 1) mensajes fijos (sin trozos variables): todos tienen traducción
+    const lits = (code, re) => { const out = []; let m; while ((m = re.exec(code))) out.push(m[1]); return out; };
+    const fixed = []
+      .concat(lits(src('core.js'), /error: '((?:[^'\\]|\\.)*)'(?=\s*[,}])/g))
+      .concat(lits(src('mando.js'), /error: '((?:[^'\\]|\\.)*)'(?=\s*[,}])/g))
+      .concat(lits(src('importar.js'), /(?:errs|warns)\.push\('((?:[^'\\]|\\.)*)'\)/g));
+    ok(fixed.length > 40, fixed.length + ' mensajes fijos');
+    eq(fixed.filter(k => !I.txHas(k)).join(' | '), '', 'sin traducción');
+    // 2) mensajes con datos: se traducen enteros y los datos (nombres, horas) se quedan
+    const B = s => I.txBack(s, 'en');
+    eq(B('Pon el nombre de la banda.'), 'Enter the band name.');
+    eq(B('Tiene 2 bandas. Muévelas a otra zona o bórralas antes.'), 'It has 2 bands. Move them to another stage or delete them first.');
+    eq(B('La zona «Carpa Norte» no existe (marca «crear» o cámbiala)'), 'Stage “Carpa Norte” doesn’t exist (tick “create” or change it)');
+    eq(B('Ya hay una entrada igual en esta jornada (marcador 19:30): ¿pegada dos veces?'), 'There is already an identical entry on this day (key time 19:30): pasted twice?');
+    eq(B('25:30 se lee como 01:30 (madrugada)'), '25:30 is read as 01:30 (early morning)');
+    eq(B('OMEGA: Esa zona no existe.'), 'OMEGA: That stage doesn’t exist.', 'error de una fila al importar');
+    eq(B('Prueba de sonido'), 'Prueba de sonido', 'sin comodines: un texto cualquiera no se destroza');
+    eq(I.txBack('Pon el nombre de la banda.', 'es'), 'Pon el nombre de la banda.');
+    // 3) un horario real con problemas: todos sus avisos y errores salen en inglés
+    const C = require('../core.js'), Im = require('../importar.js');
+    let st = C.newFestival({ nombre: 'X', fechaInicio: '2026-07-10', fechaFin: '2026-07-10' }).state;
+    st = C.addStage(st, 'Principal').state;
+    const txt = 'Hora\tBanda\tZona\tFin\tCALL\n21:00\tLos Test\tPrincipal\t\t\n25:30\tTarde\tPrincipal\t\t\n8 y pico\tRaro\tCarpa\tluego\tya\n21:00\tLos Test\tPrincipal\t\t\n\tSin hora\tPrincipal\t\t';
+    const rd = Im.read(txt, Im.contextOf(st), {});
+    const pv = Im.preview(st, rd.records, { mode: 'show', ctx: Im.contextOf(st), createStages: { carpa: false } });
+    const all = [].concat(...pv.rows.map(r => r.errs.concat(r.warns)));
+    ok(all.length >= 5, all.length + ' avisos');
+    eq(all.filter(x => B(x) === x).join(' | '), '', 'avisos sin traducir');
+  });
+
   let fail = 0;
   if (!NT) for (const [name, fn] of tests) {
     try { fn(); console.log('  ✓ ' + name); }

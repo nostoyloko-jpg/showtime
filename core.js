@@ -310,6 +310,7 @@
   function gapIdle(prev, b, tareas) {
     if (!prev) return true;
     if (prev.id && prev.id === b.id) return true;                 // soundcheck → show de la misma banda
+    if (prev.kind === 'sc' && b.kind === 'show') return true;     // soundcheck → show, aunque sean bandas distintas (dec. 101)
     const k = stageKey(b), s = blockEnd(prev), e = b.si;
     return (tareas || []).some(x => x.kind === 'tarea' && hasStart(x) && stageKey(x) === k && x.si < e && blockEnd(x) > s);
   }
@@ -832,6 +833,30 @@
     return playing ? prev : j;
   }
 
+  /** «Solo hoy» (dec. 105): copia del evento con SOLO lo de una jornada, para la emisión a los QR (privacidad de artistas en
+   *  ciclos largos). Fuera: las entradas de otros días (y la parte de otro día de una banda: su prueba de ayer o su show de
+   *  mañana) y los retrasos de otras jornadas. Zonas, ajustes y datos del evento se quedan. */
+  function scopeToJornada(state, day) {
+    if (!state || dayIndex(day) === null) return state;
+    const next = clone(state);
+    next.artists = (state.artists || []).map(a => {
+      const sh = jornadaOf(state, a, 'show') === day, sc = tipoOf(a) === 'banda' && jornadaOf(state, a, 'sc') === day;
+      if (!sh && !sc) return null;
+      const r = clone(a);
+      if (!sh) { r.soundcheckFecha = fieldValue(a, 'sc', 'fecha'); Object.keys(FIELDS.show).forEach(k => { delete r[FIELDS.show[k]]; }); }
+      if (!sc) Object.keys(FIELDS.sc).forEach(k => { delete r[FIELDS.sc[k]]; });
+      return r;
+    }).filter(Boolean);
+    if (Array.isArray(state.showtimeRetrasos)) next.showtimeRetrasos = state.showtimeRetrasos.filter(d => d && d.day === day);
+    return next;
+  }
+  /** ¿Ha terminado la jornada? Tiene entradas con hora y ninguna suena ni está por llegar (marcadores incluidos: el curfew también cuenta). */
+  function jornadaOver(state, day, now) {
+    if (!state || dayIndex(day) === null) return false;
+    const bl = buildBlocks(state, { mode: 'all', day: day, now: now }).filter(hasStart);
+    return bl.length > 0 && !bl.some(b => isPlaying(b, now) || blockEnd(b) > now);
+  }
+
   /** Jornada (día del evento) en la que cae un instante absoluto, con la hora de corte. */
   function jornadaOfAbs(state, abs) {
     const d = Math.floor(abs / 1440), t = abs - d * 1440;
@@ -1136,7 +1161,7 @@
 
   const API = {
     DEFAULT_CUTOFF, DEFAULT_CALL_MINS, DEFAULT_DURATION, DEFAULT_CO_MIN, isFija, setFija, coMinFor,
-    MARGIN_WARN, isLibre, setDelayFlag, movesWithDelay, setReal, jornadaOfAbs, activeJornada, legacyCallKey, callIsDone, callKeyName, driftByZone, delayByZone, addRetraso, retrasosOf, blockedIn, movesBy, setAlargar, hitoMargins, MAX_NEXT, ARTIST_COLORS, TIPO_COLORS,
+    MARGIN_WARN, scopeToJornada, jornadaOver, isLibre, setDelayFlag, movesWithDelay, setReal, jornadaOfAbs, activeJornada, legacyCallKey, callIsDone, callKeyName, driftByZone, delayByZone, addRetraso, retrasosOf, blockedIn, movesBy, setAlargar, hitoMargins, MAX_NEXT, ARTIST_COLORS, TIPO_COLORS,
     pad2, parseHM, fmtHM, dayIndex, isoOfDay, shiftDate, toAbs, adjustEnd, nowAbs,
     cutoffMins, festivalDateOf, entersMode, festivalDays, TIPOS, tipoOf, isBand, isAll, entriesOf, tasksNow, hitosOf,
     getEscenario, artistColor, callAbsFor, buildBlocks,

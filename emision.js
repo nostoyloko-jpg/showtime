@@ -32,11 +32,11 @@
   const PUBLIC_BASE = 'https://nostoyloko-jpg.github.io/showtime/';
   // Versión publicada: va en los enlaces de los QR para que el móvil no abra una copia vieja guardada en su caché
   // (súbela junto con los ?v= de index.html / live.html / remote.html).
-  const BUILD = '20261112';
+  const BUILD = '20261114';
   const CHUNK = 24000;           // bytes por trozo (los repetidores públicos limitan el tamaño de mensaje)
   const BEAT_MS = 10000;         // latido del Mac
-  const PRESENCE_MS = 30000;     // presencia de cada móvil
-  const VIEWER_TTL = 75000;      // un móvil cuenta como conectado si se ha presentado en este tiempo
+  const PRESENCE_MS = 20000;     // latido de cada dispositivo (vista, zona, tipo): telemetría del gestor de pantallas
+  const VIEWER_TTL = 45000;      // un dispositivo sin latido en este tiempo sale de la lista (y deja de contar)
   const STALE_MS = 40000;        // sin noticias del Mac en este tiempo → «sin conexión con la sala» (margen por si el navegador frena los latidos)
   const DEAD_MS = 75000;         // un repetidor que no manda nada en este tiempo (ni la respuesta al ping) está muerto: se reconecta
   const RETRY = [1000, 2000, 5000, 10000, 15000];
@@ -153,6 +153,16 @@
   function withCmdKey(room) { return room && !room.c ? Object.assign({}, room, { c: b64u(rand(16)) }) : room; }
   /** Clave de mando nueva (el QR del mando anterior deja de valer; los de Staff y Producción siguen). */
   function newCmdKey(room) { return Object.assign({}, room, { c: b64u(rand(16)) }); }
+  /** Mandos por zona (dec. 102): cada zona tiene su PROPIA clave de mando («cz»: { idZona: clave }). El Mac sabe la zona por la
+   *  clave que firma la orden (no por lo que diga el enlace) y rechaza lo que toque otra zona. Añade las que falten. */
+  function withZoneKeys(room, ids) {
+    if (!room) return room;
+    const cz = Object.assign({}, room.cz || {}); let ch = false;
+    (ids || []).forEach(id => { if (typeof id === 'string' && id && !key16(cz[id])) { cz[id] = b64u(rand(16)); ch = true; } });
+    return ch ? Object.assign({}, room, { cz }) : room;
+  }
+  /** Clave nueva para el mando de UNA zona (los de las demás zonas y el general siguen valiendo). */
+  function newZoneKey(room, id) { return Object.assign({}, room, { cz: Object.assign({}, room.cz || {}, { [id]: b64u(rand(16)) }) }); }
   /** Clave PROPIA de Producción («q»): cifra su canal (OK de CALL, mensajes, avisos, chat). Staff no la tiene: no puede leer ni hacerse pasar por Producción.
    *  Salas anteriores (sin «q»): se les añade una; los QR de Staff y del mando no cambian. */
   function withProdKey(room) { return room && !room.q ? Object.assign({}, room, { q: b64u(rand(16)) }) : room; }
@@ -165,7 +175,12 @@
   async function macKeys(room) {
     return { sala: room.sala, aes: await aesKey(room.k), pub: unb64u(room.pub), sk: await subtle.importKey('jwk', room.sk, ECDSA, false, ['sign']),
       cmd: room.c && unb64u(room.c) && unb64u(room.c).length === 16 ? await hmacKey(room.c) : null,
-      prod: key16(room.q) ? await aesKey(room.q) : null };
+      prod: key16(room.q) ? await aesKey(room.q) : null, zcmd: await zoneKeys(room.cz) };
+  }
+  async function zoneKeys(cz) {
+    const out = [];
+    for (const id of Object.keys(cz || {})) if (key16(cz[id])) out.push({ id, key: await hmacKey(cz[id]) });
+    return out;
   }
   function aad(sala, kind) { return enc.encode(sala + '|' + kind); }
 
@@ -204,8 +219,24 @@
       if (!f || f.length < 2 + 12 + 16 || f[0] !== VER || f[1] !== K_HELLO) return null;
       const iv = f.subarray(2, 14), ct = f.subarray(14);
       const o = JSON.parse(dec.decode(await subtle.decrypt({ name: 'AES-GCM', iv, additionalData: aad(K.sala, K_HELLO) }, K.aes, ct)));
-      return o && typeof o.id === 'string' && o.id.length <= 32 ? o : null;
+      return o && typeof o.id === 'string' && o.id.length <= 32 ? cleanHello(o) : null;
     } catch (e) { return null; }
+  }
+  /** Latido de un dispositivo (entrada NO fiable: solo sirve para la lista del gestor). v: vista · z: zona de Confidence ·
+   *  s: zona del mando · d: tipo (movil|tablet|ordenador) · p: id de Producción. */
+  const DEV_VISTAS = ['manager', 'confidence', 'backstage', 'mando'], DEV_TIPOS = ['movil', 'tablet', 'ordenador'];
+  function cleanHello(o) {
+    const s80 = x => typeof x === 'string' && x.length <= 80 ? x : null;
+    return { id: o.id, want: !!o.want, r: o.r ? 1 : 0, v: DEV_VISTAS.indexOf(o.v) >= 0 ? o.v : (o.r ? 'mando' : null), z: s80(o.z), s: s80(o.s),
+      d: DEV_TIPOS.indexOf(o.d) >= 0 ? o.d : null, p: typeof o.p === 'string' && /^[A-Za-z0-9_-]{1,40}$/.test(o.p) ? o.p : null };
+  }
+  /** Tipo de dispositivo por el navegador (para la lista del gestor). */
+  function devClass(ua, w) {
+    const u = String(ua || '');
+    if (/iPad|Tablet|PlayBook|Silk|Android(?!.*Mobile)/i.test(u)) return 'tablet';
+    if (/Mobi|iPhone|iPod|Android/i.test(u)) return 'movil';
+    if (/Macintosh/.test(u) && w && w < 1400 && typeof navigator !== 'undefined' && navigator.maxTouchPoints > 1) return 'tablet';   // iPad con iPadOS (se presenta como Mac)
+    return 'ordenador';
   }
 
   /** Mando → Mac: orden cifrada (clave de lectura) y firmada con la clave del mando. Marco: ver · tipo · iv (12) · firma (32) · cifrado. */
@@ -216,13 +247,19 @@
     return concat([VER, K_CMD], iv, mac, ct);
   }
   /** Mac: abre una orden. null si no la firma el mando de esta sala o está alterada. */
+  /** La orden sale con «_z»: null = mando general (todas las zonas) · id = mando de esa zona (lo dice la CLAVE que firma, nunca la orden). */
   async function openCmd(K, f) {
     try {
-      if (!K.cmd || !f || f.length < 2 + 12 + 32 + 16 || f[0] !== VER || f[1] !== K_CMD) return null;
-      const iv = f.subarray(2, 14), mac = f.subarray(14, 46), ct = f.subarray(46);
-      if (!await subtle.verify('HMAC', K.cmd, mac, concat([VER, K_CMD], iv, ct, enc.encode(K.sala)))) return null;
+      if ((!K.cmd && !(K.zcmd && K.zcmd.length)) || !f || f.length < 2 + 12 + 32 + 16 || f[0] !== VER || f[1] !== K_CMD) return null;
+      const iv = f.subarray(2, 14), mac = f.subarray(14, 46), ct = f.subarray(46), data = concat([VER, K_CMD], iv, ct, enc.encode(K.sala));
+      let zone;
+      if (K.cmd && await subtle.verify('HMAC', K.cmd, mac, data)) zone = null;
+      else for (const z of (K.zcmd || [])) if (await subtle.verify('HMAC', z.key, mac, data)) { zone = z.id; break; }
+      if (zone === undefined) return null;
       const o = JSON.parse(dec.decode(await subtle.decrypt({ name: 'AES-GCM', iv, additionalData: aad(K.sala, K_CMD) }, K.aes, ct)));
-      return o && typeof o === 'object' ? o : null;
+      if (!o || typeof o !== 'object' || Array.isArray(o)) return null;
+      o._z = zone;
+      return o;
     } catch (e) { return null; }
   }
   /** Contra repeticiones: cada orden lleva id y hora; se rechaza si es vieja (o del futuro) y se ignora si ya llegó (por el otro repetidor). */
@@ -251,7 +288,13 @@
     return (base || publicBase()) + 'live.html' + q + '#sala=' + room.sala + '&k=' + room.k + '&p=' + room.p;
   }
   /** QR PRIVADO del Stage Manager: lo mismo que el de Staff + la clave del mando. */
-  function remoteUrl(room, base) { return (base || publicBase()) + 'remote.html?b=' + BUILD + '#sala=' + room.sala + '&k=' + room.k + '&p=' + room.p + '&c=' + room.c; }
+  /** zone (dec. 102): mando de UNA zona → «?stage=» (legible) y, en el #, la clave de esa zona y su id. Lleva también la clave de
+   *  Producción («q») para leer y escribir en el chat de Producción. */
+  function remoteUrl(room, base, zone) {
+    const z = typeof zone === 'string' && zone && room.cz && key16(room.cz[zone]) ? zone : null;
+    return (base || publicBase()) + 'remote.html?' + (z ? 'stage=' + encodeURIComponent(z) + '&' : '') + 'b=' + BUILD + '#sala=' + room.sala + '&k=' + room.k + '&p=' + room.p
+      + '&c=' + (z ? room.cz[z] : room.c) + (z ? '&z=' + encodeURIComponent(z) : '') + (key16(room.q) ? '&q=' + room.q : '');
+  }
   /** QR para Producción: con ID único personalizado. */
   /** Enlace de Producción: la Live de Manager (solo lectura) + «id» del productor, que activa sus mandos (OK de CALL, mensajes). */
   function productionUrl(room, base, prodId) { return (base || publicBase()) + 'live.html?vista=manager&b=' + BUILD + '#sala=' + room.sala + '&k=' + room.k + '&p=' + room.p + '&q=' + room.q + '&id=' + encodeURIComponent(prodId); }
@@ -295,6 +338,7 @@
     if (o.c !== undefined) { const c = unb64u(o.c); if (!c || c.length !== 16) return null; r.c = o.c; }
     if (o.q !== undefined) { if (!key16(o.q)) return null; r.q = o.q; }
     if (o.id !== undefined) { if (!/^[A-Za-z0-9_-]{1,40}$/.test(o.id) || !r.q) return null; r.id = o.id; }   // enlace de Producción: siempre con su clave propia
+    if (o.z !== undefined) { if (!r.c || !o.z || o.z.length > 80) return null; r.z = o.z; }   // mando de una zona: siempre con su clave
     return r;
   }
 
@@ -370,7 +414,7 @@
    * st: { on, links:[{id,name,state}], viewers, lastTs }
    */
   function Emisor(opts) {
-    this.o = opts; this.K = null; this.links = []; this.viewers = new Map(); this.remotes = new Map(); this.on = false; this.guard = new CmdGuard(); this.prodGuard = new CmdGuard();
+    this.o = opts; this.K = null; this.links = []; this.viewers = new Map(); this.remotes = new Map(); this.devices = new Map(); this.on = false; this.guard = new CmdGuard(); this.prodGuard = new CmdGuard();
     this.lastTs = 0; this.pushT = null; this.lastPush = 0; this.beatT = null; this.busy = Promise.resolve();
   }
   Emisor.prototype.start = async function () {
@@ -390,7 +434,14 @@
     const now = Date.now();
     this.viewers.forEach((t, id) => { if (now - t > VIEWER_TTL) this.viewers.delete(id); });
     this.remotes.forEach((t, id) => { if (now - t > VIEWER_TTL) this.remotes.delete(id); });
-    if (this.o.onStatus) this.o.onStatus({ on: this.on, links: linkStatus(this.links), viewers: this.viewers.size, remotes: this.remotes.size, lastTs: this.lastTs });
+    this.devices.forEach((d, id) => { if (now - d.t > VIEWER_TTL) this.devices.delete(id); });
+    if (this.o.onStatus) this.o.onStatus({ on: this.on, links: linkStatus(this.links), viewers: this.viewers.size, remotes: this.remotes.size, lastTs: this.lastTs, devices: this.deviceList(now) });
+  };
+  /** Telemetría (dec. 103): dispositivos por QR vivos → [{ id, r, v, z, s, d, p, t (último latido, ms), ago (s), first }], más reciente primero. */
+  Emisor.prototype.deviceList = function (now) {
+    const n = now === undefined ? Date.now() : now;
+    return Array.from(this.devices.entries()).map(([id, d]) => Object.assign({ id }, d, { ago: Math.max(0, Math.round((n - d.t) / 1000)) }))
+      .sort((a, b) => a.first - b.first);
   };
   /** Programa el envío del estado (agrupa cambios seguidos). */
   Emisor.prototype.push = function (delay) {
@@ -419,8 +470,9 @@
     const h = await openHello(this.K, payload);
     if (!h) return;
     const map = h.r ? this.remotes : this.viewers;
-    const isNew = !map.has(h.id);
-    map.set(h.id, Date.now());
+    const isNew = !map.has(h.id), t = Date.now(), old = this.devices.get(h.id);
+    map.set(h.id, t);
+    this.devices.set(h.id, { t, first: old ? old.first : t, r: h.r, v: h.v, z: h.z, s: h.s, d: h.d, p: h.p });
     if (h.want) this.push(Math.max(0, 1500 - (Date.now() - this.lastPush)));   // como mucho un reenvío cada 1,5 s
     if (isNew || h.want) this.status();
   };
@@ -451,7 +503,19 @@
   }
   const CHAT_SEND = 60;   // últimos mensajes que se mandan (cada envío cabe de sobra en los repetidores)
   /** Clave de mando nueva sin cortar la emisión (el QR de Staff sigue valiendo). */
-  Emisor.prototype.setCmdKey = async function (c) { this.o.room = Object.assign({}, this.o.room, { c }); if (this.K) this.K.cmd = await hmacKey(c); this.remotes.clear(); this.status(); };
+  Emisor.prototype.setCmdKey = async function (c) {
+    this.o.room = Object.assign({}, this.o.room, { c }); if (this.K) this.K.cmd = await hmacKey(c);
+    this.devices.forEach((d, id) => { if (d.r && !d.s) { this.devices.delete(id); this.remotes.delete(id); } });   // los mandos generales tienen que volver a escanear
+    this.status();
+  };
+  /** Claves de los mandos por zona (todas a la vez). Si una zona cambia de clave, su mando sale de la lista hasta que vuelva a escanear. */
+  Emisor.prototype.setZoneKeys = async function (cz) {
+    const before = this.o.room.cz || {};
+    this.o.room = Object.assign({}, this.o.room, { cz: cz || {} });
+    if (this.K) this.K.zcmd = await zoneKeys(cz);
+    this.devices.forEach((d, id) => { if (d.r && d.s && before[d.s] !== (cz || {})[d.s]) { this.devices.delete(id); this.remotes.delete(id); } });
+    this.status();
+  };
   /** Orden del mando: se comprueba (firma, hora, repetida), se ejecuta en el Mac (opts.onCommand) y se contesta. */
   Emisor.prototype.onCmd = async function (payload) {
     const cmd = await openCmd(this.K, payload);
@@ -461,7 +525,7 @@
     let res;
     if (g === 'old') res = { ok: false, msg: 'Orden caducada (revisa la hora del móvil)' };
     else {
-      if (cmd.from) this.remotes.set(String(cmd.from).slice(0, 32), Date.now());
+      if (cmd.from) { const id = String(cmd.from).slice(0, 32), d = this.devices.get(id); this.remotes.set(id, Date.now()); if (d) d.t = Date.now(); }
       try { res = this.o.onCommand ? await this.o.onCommand(cmd) : { ok: false, msg: 'El Dashboard no acepta órdenes' }; }
       catch (e) { res = { ok: false, msg: 'Error en el Dashboard: ' + (e && e.message || e) }; }
     }
@@ -480,7 +544,7 @@
     this.on = false;
     await new Promise(r => setTimeout(r, 150));
     this.links.forEach(l => l.stop());
-    this.viewers.clear();
+    this.viewers.clear(); this.remotes.clear(); this.devices.clear();
     this.status();
   };
 
@@ -498,7 +562,7 @@
     const brokers = this.o.brokers || BROKERS;
     const topics = [topic(this.V.sala, 's')];
     // Producción (con su clave propia): escucha lo que el Mac le manda por su canal
-    if (this.o.params.id && this.V.prod) { topics.push(topic(this.V.sala, 'prodx')); this.VP = Object.assign({}, this.V, { aes: this.V.prod, verify: null, pubRaw: null }); }
+    if ((this.o.params.id || this.o.params.c) && this.V.prod) { topics.push(topic(this.V.sala, 'prodx')); this.VP = Object.assign({}, this.V, { aes: this.V.prod, verify: null, pubRaw: null }); }
     this.links = brokers.map(b => new Link(b, {
       WebSocket: this.o.WebSocket, topics,
       onMessage: (t, payload) => { this.queue = (this.queue || Promise.resolve()).then(() => this.onMessage(t, payload)).catch(e => console.error(e)); },
@@ -511,7 +575,8 @@
   };
   Receptor.prototype.hello = async function (want, only) {
     if (want) this.lastAsk = Date.now();
-    const f = await sealHello(this.V, { id: this.id, want: !!want, r: this.V.cmd ? 1 : 0 });
+    let info = {}; try { info = (this.o.info && this.o.info()) || {}; } catch (e) { info = {}; }
+    const f = await sealHello(this.V, Object.assign({}, info, { id: this.id, want: !!want, r: this.V.cmd ? 1 : 0 }));
     (only ? [only] : this.links).forEach(l => l.publish(topic(this.V.sala, 'h'), f));
   };
   Receptor.prototype.onMessage = async function (t, payload) {
@@ -588,7 +653,7 @@
 
   const API = {
     BROKERS, PUBLIC_BASE, BUILD, PROTO, STALE_MS, DEAD_MS, VIEWER_TTL, CMD_WINDOW, K_STATE, K_BEAT, K_END, K_ACK, K_HELLO, K_CMD, K_PROD_MSG,
-    newRoom, validRoom, withCmdKey, newCmdKey, withProdKey, newProdKey, staffUrl, remoteUrl, productionUrl, parseHash, cleanProdMsg, cleanChatLog, CHAT_SEND, publicBase, Emisor, Receptor, CmdGuard,
+    PRESENCE_MS, newRoom, validRoom, withCmdKey, newCmdKey, withZoneKeys, newZoneKey, devClass, cleanHello, withProdKey, newProdKey, staffUrl, remoteUrl, productionUrl, parseHash, cleanProdMsg, cleanChatLog, CHAT_SEND, publicBase, Emisor, Receptor, CmdGuard,
     // internos (para los tests)
     _: { b64u, unb64u, concat, MQ, varLen, pack, unpack, splitChunks, Assembler, macKeys, viewerKeys, seal, openFrame, sealHello, openHello, sealCmd, openCmd, fingerprint, topic, Link }
   };

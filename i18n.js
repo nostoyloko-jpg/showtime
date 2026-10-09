@@ -88,6 +88,29 @@
   const UI_EN = {
     /*UI-EN-BEGIN*/
     panel: {
+      "Gestionar pantallas y ventanas…": "Manage screens and windows…",
+      "Monitores del Mac y dispositivos conectados por QR": "Mac monitors and devices connected by QR",
+      "Pantallas y ventanas": "Screens and windows",
+      "Monitores locales (HDMI / Mac)": "Local monitors (HDMI / Mac)",
+      "Dispositivos remotos por QR (en vivo)": "Remote QR devices (live)",
+      "sin zona elegida": "no stage chosen",
+      "hace {n} s": "{n} s ago",
+      "hace {n} min": "{n} min ago",
+      "La emisión está parada: Emisión ▾ › Empezar a emitir.": "Broadcast is stopped: Broadcast ▾ › Start broadcasting.",
+      "Ningún dispositivo conectado por QR.": "No devices connected by QR.",
+      "Dispositivo": "Device",
+      "Móvil": "Phone",
+      "Tablet": "Tablet",
+      "Ordenador": "Computer",
+      "1 conectado": "1 connected",
+      "{n} conectados": "{n} connected",
+      "Jornada cerrada en los QR · {d}": "Day closed on the QR screens · {d}",
+      "Los QR ven solo hoy · {d}": "QR screens see today only · {d}",
+      "Reabrir jornada": "Reopen day",
+      "Cerrar jornada": "Close day",
+      "Solo ve y controla {z} (shows, pruebas, tiempos y su Confidence). Chat de Producción incluido.": "Sees and controls {z} only (shows, soundchecks, times and its Confidence). Production chat included.",
+      "Mando general: todas las zonas. Chat de Producción incluido.": "General remote: all stages. Production chat included.",
+      "Desde el mando del Stage Manager ({_z})": "From the Stage Manager remote ({_z})",
       "· el navegador no tiene espacio. Lo que cambies se ve y se emite, pero se pierde si recargas: guarda el evento en un archivo (.json), exporta el log y libera espacio.": "· the browser is out of storage. Your changes are shown and broadcast, but they are lost if you reload: save the event to a file (.json), export the log and free up space.",
       "NO SE ESTÁ GUARDANDO": "NOT SAVING",
       "Archivo": "File",
@@ -408,6 +431,8 @@
       "Clic o Esc para cerrar": "Click or Esc to close"
     },
     modals: {
+      "Nueva clave del mando de {z}": "New remote key for {z}",
+      "El QR del mando de <b>{z}</b> deja de poder mandar al Mac. Los mandos de las demás zonas, el general, Staff y Producción siguen valiendo y la emisión no se corta.": "The <b>{z}</b> remote QR can no longer control the Mac. The other stages’ remotes, the general remote, Staff and Production keep working and the broadcast is not interrupted.",
       "Cerrar (Esc)": "Close (Esc)",
       "Cerrar el chat": "Close the chat",
       "🇪🇸 Español": "🇪🇸 Español",
@@ -722,6 +747,9 @@
       "o": "or"
     },
     toasts: {
+      "Jornada cerrada: los dispositivos QR muestran «Jornada finalizada»": "Day closed: QR devices show “Day finished”",
+      "Jornada reabierta en los dispositivos QR": "Day reopened on the QR devices",
+      "Clave nueva del mando de {z}: escanea otra vez su QR": "New remote key for {z}: scan its QR again",
       "Deshecho": "Undone",
       "No se puede guardar el log del evento: el almacenamiento del navegador está lleno. Exporta el JSON.": "The event log cannot be saved: the browser storage is full. Export the JSON.",
       "{who} aún no ha empezado: la hora real de inicio se corrige cuando ya ha empezado": "{who} hasn’t started yet: the actual start time can be corrected once it has started",
@@ -935,9 +963,42 @@
       "Excel leído: {f}": "Excel read: {f}",
       "hoja «{s}»": "sheet “{s}”",
       "{n} hojas ({s})": "{n} sheets ({s})",
-      " · sin horarios: {s}": " · no schedules: {s}"
+      " · sin horarios: {s}": " · no schedules: {s}",
+      "La noche sigue pasadas las {h}: va a la jornada siguiente ({d})": "The night continues past {h}: it goes to the next day ({d})",
+      "Palabras separadas: «{_a}» → «{_b}»": "Words split: “{_a}” → “{_b}”",
+      "{h} se lee como {r} (madrugada)": "{h} is read as {r} (early morning)",
+      "«{_r}» se lee como {d}": "“{_r}” is read as {d}",
+      "«{_r}» sin mes: se lee como {d} (revísalo)": "“{_r}” has no month: read as {d} (check it)",
+      "Inicio y fin venían en la misma celda": "Start and end came in the same cell",
+      "Hora de inicio no reconocida: «{_t}»": "Start time not recognised: “{_t}”",
+      "Hora de fin no reconocida: «{_t}»": "End time not recognised: “{_t}”",
+      "CALL no reconocido: «{_t}»": "CALL not recognised: “{_t}”",
+      "Jornada no reconocida: «{_t}»": "Day not recognised: “{_t}”",
+      "Falta el nombre de la banda": "Band name missing",
+      "Falta el nombre": "Name missing",
+      "La zona «{_z}» no existe (marca «crear» o cámbiala)": "Stage “{_z}” doesn’t exist (tick “create” or change it)",
+      "Zona nueva: {_z}": "New stage: {_z}",
+      "Falta la zona (elige una por defecto o una columna)": "Stage missing (choose a default one or a column)",
+      "Falta la jornada (elige una por defecto)": "Day missing (choose a default one)",
+      "Jornada fuera del evento: {d}": "Day outside the event: {d}",
+      "Falta la hora de inicio": "Start time missing",
+      "Duración no válida: «{_t}»": "Invalid duration: “{_t}”",
+      "La duración ({n} min) no cuadra con {a}–{b}: se queda la hora de fin": "The duration ({n} min) doesn’t match {a}–{b}: the end time is kept",
+      "Fin calculado con la duración: {h}": "End calculated from the duration: {h}",
+      "Un marcador no tiene fin: se ignora {h}": "A key time has no end: {h} is ignored",
+      "Sin fin: se estiman {n} min": "No end: {n} min assumed",
+      "Los marcadores no tienen CALL: se ignora {c}": "Key times have no CALL: {c} is ignored",
+      "Las tareas no tienen CALL: se ignora {c}": "Tasks have no CALL: {c} is ignored",
+      "Cruza medianoche: termina al día siguiente": "Crosses midnight: ends the next day",
+      "Antes de la hora de corte: fecha real {d}": "Before the cut-off time: actual date {d}",
+      "Ya hay una entrada igual en esta jornada ({k} {h}): ¿pegada dos veces?": "There is already an identical entry on this day ({k} {h}): pasted twice?",
+      "Se solapa con {_l}": "Overlaps with {_l}"
     },
     live: {
+      "JORNADA FINALIZADA": "DAY FINISHED",
+      "cerrada en el Dashboard": "closed on the Dashboard",
+      "sin nada más por hoy": "nothing else today",
+      "hasta que arranque la siguiente": "until the next one starts",
       "EN {n}º LUGAR": "{n} UP",
       "AHORA": "NOW",
       "SIGUIENTE": "NEXT",
@@ -1090,6 +1151,8 @@
       "Falta el lugar del evento": "Event location missing"
     },
     log: {
+      "Jornada cerrada en los QR: {_d}": "Day closed on the QR screens: {_d}",
+      "Jornada reabierta en los QR: {_d}": "Day reopened on the QR screens: {_d}",
       "{k} «{_n}»: tipo {a} → {b}": "{k} “{_n}”: type {a} → {b}",
       "{k} «{_n}»": "{k} “{_n}”",
       "sin hora": "no time",
@@ -1214,6 +1277,13 @@
       "Mensaje → {to}: «{_t}»": "Message → {to}: “{_t}”"
     },
     remote: {
+      "Chat de Producción": "Production chat",
+      "Tu nombre": "Your name",
+      "Escribe a Producción…": "Write to Production…",
+      "jornada cerrada en el Dashboard": "day closed on the Dashboard",
+      "Solo {z} · lo que empiece desde las {h}": "{z} only · whatever starts from {h}",
+      "Sin mensajes todavía. Lo que escribas lo ven el Dashboard y Producción.": "No messages yet. The Dashboard and Production see what you write.",
+      "No se ha enviado": "Not sent",
       "Este es el QR de Staff (solo lectura). Para mandar, escanea el QR del Stage Manager (Dashboard › Emisión › Stage Manager · mando).": "This is the Staff QR code (read-only). To send commands, scan the Stage Manager QR code (Dashboard › Broadcast › Stage Manager · remote).",
       "EMISIÓN DETENIDA": "BROADCAST STOPPED",
       "SIN CONEXIÓN CON EL MAC": "NO CONNECTION WITH THE MAC",
@@ -1276,6 +1346,12 @@
       "Escanea el QR del Stage Manager (Dashboard › Emisión › Stage Manager · mando).": "Scan the Stage Manager QR code (Dashboard › Broadcast › Stage Manager · remote)."
     },
     mando: {
+      "Este mando es solo de su zona: no puede tocar otras zonas": "This remote is for its own stage only: it cannot touch other stages",
+      "Mensaje vacío o de más de 300 caracteres": "Empty message or longer than 300 characters",
+      "Nombre no válido": "Invalid name",
+      "Esta zona ya no existe en el Dashboard": "This stage no longer exists on the Dashboard",
+      "Mensaje vacío": "Empty message",
+      "Enviado": "Sent",
       "Retraso acumulado: lo que viene va +{n} min respecto al horario original (retrasos y desbordes ya aplicados)": "Accumulated delay: what follows is +{n} min against the original schedule (delays and overruns already applied)",
       "+{a} min (+{l} vivo)": "+{a} min (+{l} live)",
       "buffer agotado": "buffer exhausted",
@@ -1330,6 +1406,54 @@
       "No hay evento abierto en el Dashboard": "No event open on the Dashboard",
       "¡choque con entrada en rojo!": "clash with a red entry!",
       "El horario ha cambiado desde el resumen: revísalo y confirma otra vez": "The schedule changed since the summary: check it and confirm again"
+    },
+    core: {
+      "Artista no encontrado.": "Artist not found.",
+      "El nombre no puede quedar vacío.": "The name can’t be empty.",
+      "Esa zona no existe.": "That stage doesn’t exist.",
+      "Color no válido.": "Invalid colour.",
+      "Tipo no válido.": "Invalid type.",
+      "Tiene también horario de show: cambia el tipo desde la fila del show.": "It also has a show time: change the type from the show row.",
+      "Elige la jornada.": "Choose the day.",
+      "Fecha no válida.": "Invalid date.",
+      "Hora no válida (usa HH:MM).": "Invalid time (use HH:MM).",
+      "La hora de inicio no puede quedar vacía.": "The start time can’t be empty.",
+      "Elige primero la jornada.": "Choose the day first.",
+      "Campo no editable.": "Field not editable.",
+      "Entrada no encontrada.": "Entry not found.",
+      "Pon un nombre al evento.": "Give the event a name.",
+      "Primera jornada no válida.": "Invalid first day.",
+      "Última jornada no válida.": "Invalid last day.",
+      "La última jornada es anterior a la primera.": "The last day is before the first one.",
+      "Máximo 31 jornadas.": "Maximum 31 days.",
+      "Hora de corte no válida (HH:MM).": "Invalid cut-off time (HH:MM).",
+      "Aviso CALL: entre 1 y 180 minutos.": "CALL notice: between 1 and 180 minutes.",
+      "Changeover mínimo: entre 0 y 180 minutos.": "Minimum changeover: between 0 and 180 minutes.",
+      "Pon un nombre a la zona.": "Give the stage a name.",
+      "Ya hay una zona con ese nombre.": "There is already a stage with that name.",
+      "Zona no encontrada.": "Stage not found.",
+      "Changeover mínimo: entre 0 y 180 minutos (vacío = el del evento).": "Minimum changeover: between 0 and 180 minutes (empty = the event’s).",
+      "No se puede mover.": "It can’t be moved.",
+      "Tiene {n} banda. Muévelas a otra zona o bórralas antes.": "It has {n} band. Move it to another stage or delete it first.",
+      "Tiene {n} bandas. Muévelas a otra zona o bórralas antes.": "It has {n} bands. Move them to another stage or delete them first.",
+      "Pon el nombre de la banda.": "Enter the band name.",
+      "Pon el nombre (p. ej. Puertas).": "Enter the name (e.g. Doors).",
+      "Pon el nombre (p. ej. Comida técnicos).": "Enter the name (e.g. Crew lunch).",
+      "Elige la zona.": "Choose the stage.",
+      "Pon la hora de inicio.": "Enter the start time.",
+      "Hora de inicio no válida (HH:MM).": "Invalid start time (HH:MM).",
+      "Hora de fin no válida (HH:MM).": "Invalid end time (HH:MM).",
+      "Duración en minutos (1–1440).": "Duration in minutes (1–1440).",
+      "El fin ({f}) no cuadra con la duración ({d}). Deja uno de los dos.": "The end ({f}) doesn’t match the duration ({d}). Keep only one of them.",
+      "Hora de CALL no válida (HH:MM).": "Invalid CALL time (HH:MM).",
+      "Un marcador no tiene hora real.": "A key time has no actual time.",
+      "Solo los shows y soundchecks tienen Tiempo extra.": "Only shows and soundchecks have Extra time.",
+      "No hay lista de artistas (artists).": "No artist list (artists).",
+      "Hora de corte no válida («{_v}»): se usa {d}.": "Invalid cut-off time (“{_v}”): {d} is used.",
+      "{_n}: show sin fecha válida, no aparecerá en la línea de tiempo.": "{_n}: show without a valid date, it won’t appear on the timeline.",
+      "{_n}: hora no válida en {k} («{_v}»).": "{_n}: invalid time in {k} (“{_v}”).",
+      "{_n}: escenario «{_e}» no existe.": "{_n}: stage “{_e}” doesn’t exist.",
+      "{_n}: {e}": "{_n}: {e}"
     }
     /*UI-EN-END*/
   };
@@ -1364,9 +1488,11 @@
       }).join('');
       return { k, re: new RegExp('^' + src + '$'), names, lit, dots: k.indexOf(' · ') >= 0, tail: /\{[a-zA-Z]\w*\}$/.test(k) };
     };
-    const tpl = o => Object.keys(o || {}).filter(k => /\{\w+\}/.test(k) && !/\}\{/.test(k)).map(mk).sort((x, y) => y.lit - x.lit);
-    const rest = {}; Object.keys(UI_EN).forEach(g => { if (g !== 'log') Object.assign(rest, UI_EN[g]); });
-    BACK = tpl(UI_EN.log).concat(tpl(rest));
+    // Todas las plantillas, las más concretas (más texto fijo) antes; a igualdad, las del grupo log
+    const isLog = k => !!(UI_EN.log && has(UI_EN.log, k));
+    const letters = k => k.replace(/\{\w+\}/g, '').replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñü]/g, '').length;
+    BACK = Object.keys(UI).filter(k => /\{\w+\}/.test(k) && !/\}\{/.test(k) && (letters(k) >= 4 || isLog(k) || k === '{_n}: {e}')).map(mk)
+      .sort((x, y) => (y.lit - x.lit) || ((isLog(y.k) ? 1 : 0) - (isLog(x.k) ? 1 : 0)));
     return BACK;
   }
   function txBack(src, lang, depth) {
@@ -1374,15 +1500,16 @@
     if (norm(lang || cur) !== 'en' || !s || d > 5) return s;
     if (has(UI, s)) return UI[s];
     const list = backList(), parts = splitDots(s), multi = parts.length > 1;
-    for (let i = 0; i < list.length; i++) {
-      if (multi && !list[i].dots && !list[i].tail) continue;   // con varios trozos « · »: plantillas que los tienen o que acaban en una variable (que se lleva el resto)
-      const m = list[i].re.exec(s); if (!m) continue;
-      const v = {};
-      list[i].names.forEach((n, j) => { v[n] = n.charAt(0) === '_' ? m[j + 1] : txBack(m[j + 1], 'en', d + 1); });
-      return fill(UI[list[i].k], v);
-    }
-    if (multi) return parts.map(x => txBack(x, 'en', d + 1)).join(' · ');
-    return s;
+    const apply1 = (t, m) => { const v = {}; t.names.forEach((n, j) => { v[n] = n.charAt(0) === '_' ? m[j + 1] : txBack(m[j + 1], 'en', d + 1); }); return fill(UI[t.k], v); };
+    const best = (str, ok) => { for (let i = 0; i < list.length; i++) { if (ok && !ok(list[i])) continue; const m = list[i].re.exec(str); if (m) return { t: list[i], m }; } return null; };
+    if (!multi) { const b = best(s); return b ? apply1(b.t, b.m) : s; }
+    // Varios trozos « · »: 1) una plantilla pensada con « · »; 2) una que acaba en variable (se lleva el resto) si es al menos
+    // tan concreta como la que encaja con el primer trozo solo; 3) si no, trozo a trozo.
+    const dt = best(s, t => t.dots);
+    if (dt) return apply1(dt.t, dt.m);
+    const tl = best(s, t => t.tail), first = best(parts[0]);
+    if (tl && (!first || tl.t.lit >= first.t.lit)) return apply1(tl.t, tl.m);
+    return parts.map(x => txBack(x, 'en', d + 1)).join(' · ');
   }
   /** Trozos separados por « · », sin partir lo que va entre «comillas» (lo escrito por la gente). */
   function splitDots(s) {

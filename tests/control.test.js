@@ -1031,9 +1031,62 @@
     ok(/<button type="button" class="spot-i[^"]*" data-i="0"><span class="spot-slot"><svg class="ic spot-ic" aria-hidden="true"><use href="#i-clock"\/>/.test(html) && html.indexOf('spot-slot') < html.indexOf('spot-t'), 'icono a la izquierda de cada vista');
     ok(/<kbd>⇧⌘F<\/kbd>/.test(html) && /<kbd>⌘S<\/kbd>/.test(html), 'atajos en una sola etiqueta <kbd>');
   });
-  test('QR: el título es «Pantallas QR», sin «móviles»', () => {
-    const js = D.src('control.js');
-    ok(/tx\('Pantallas QR'\) \+ '<\/div>/.test(js) && !/Pantallas QR \(móviles\)/.test(js), 'sin «(móviles)»');
+  // ── Gestor de pantallas: telemetría de los dispositivos QR (dec. 103) ──
+  test('Gestor: dos secciones (monitores locales y dispositivos por QR); lista viva con vista, zona y hace cuánto', () => {
+    const now = Date.now(), t = dashboard();
+    const T = t.env.win.ShowtimePanel._test;
+    ['modal', 'addm', 'imp', 'cfg', 'drop'].forEach(id => { t.env.getEl(id).hidden = true; });
+    const zid = t.F.s.escenarios[0].id;
+    T.openGestor();
+    let html = t.env.getEl('gv').innerHTML;
+    ok(/Monitores locales \(HDMI \/ Mac\)/.test(html) && /Dispositivos remotos por QR \(en vivo\)/.test(html), 'las dos secciones');
+    ok(/La emisión está parada/.test(t.env.getEl('gv-qrl').innerHTML), 'sin emisión lo dice');
+    T.fakeEm({ push() {} }, { links: [], viewers: 3, remotes: 1, devices: [
+      { id: 'aaaa1111', t: now - 3000, first: 1, r: 0, v: 'confidence', z: zid, d: 'movil' },
+      { id: 'bbbb2222', t: now - 30000, first: 2, r: 0, v: 'backstage', d: 'tablet' },
+      { id: 'cccc3333', t: now - 1000, first: 3, r: 1, v: 'mando', s: zid, d: 'movil' },
+      { id: 'dddd4444', t: now - 2000, first: 4, r: 0, v: 'manager', p: 'prod_001', d: 'ordenador' },
+      { id: 'eeee5555', t: now - 50000, first: 5, r: 0, v: 'manager', d: 'movil' } ] });
+    T.openGestor();
+    const rows = t.env.getEl('gv-qrl').innerHTML;
+    ok(/Confidence · Principal/.test(rows), 'Confidence con su zona');
+    ok(/Backstage/.test(rows) && /hace 30 s/.test(rows) && /gq-dot late/.test(rows), 'un latido perdido: punto ámbar');
+    ok(/Stage Manager · mando · Principal/.test(rows), 'el mando de la zona');
+    ok(/Producción · Marta/.test(rows), 'Producción con su nombre');
+    ok(!/eeee/.test(rows), 'sin latido en 45 s: fuera de la lista');
+    ok(rows.indexOf('cccc') < rows.indexOf('aaaa') && rows.indexOf('aaaa') < rows.indexOf('bbbb'), 'orden: mando, Manager/Confidence, Backstage');
+    ok(/Tablet/.test(rows) && /Móvil/.test(rows), 'tipo de dispositivo');
+    eq(t.env.getEl('gv-qrn').textContent, '4 conectados');
+    T.fakeEm(null, null);
+  });
+  test('Gestor: el menú dice «Gestionar pantallas y ventanas…»', () => {
+    ok(/Gestionar pantallas y ventanas…/.test(D.src('index.html')));
+  });
+  // ── «Solo hoy» (dec. 105) ──
+  test('Solo hoy: a los QR viaja solo la jornada activa del Panel; «Cerrar jornada» la vacía y queda en el log', () => {
+    const t = conMando(festDosDias());
+    const T = t.T, s = T.emSnapshot(), day = T.emDay();
+    eq(s.scope.day, day); eq(s.scope.closed, false); eq(s.config.day, day, 'la Live del QR se queda en ese día');
+    ok(s.festival.artists.every(a => a.nombre !== 'Mañana'), 'el día siguiente no viaja');
+    ok(s.festival.artists.some(a => a.nombre === 'Suena'));
+    // Panel con otro día elegido: manda ese
+    t.env.storage.set('showtime.config', JSON.stringify(Object.assign({}, t.read('showtime.config') || {}, { day: C.shiftDate(day, 1) })));
+    eq(T.emSnapshot().festival.artists.map(a => a.nombre).join(), 'Mañana', 'la jornada elegida en el Panel');
+    t.env.storage.set('showtime.config', JSON.stringify(Object.assign({}, t.read('showtime.config'), { day: 'all' })));
+    T.emCloseDay(true);
+    const c = T.emSnapshot();
+    eq(c.scope.closed, true); eq(c.festival.artists.length, 0, 'cerrada: no viaja ninguna entrada');
+    ok(t.log().some(e => /Jornada cerrada en los QR: /.test(e.text)), 'en el log');
+    eq(JSON.parse(t.env.storage.get('showtime.emision') || '{}').closed, day, 'se recuerda al recargar');
+    T.emCloseDay(false);
+    eq(T.emSnapshot().festival.artists.length > 0, true, 'reabierta');
+  });
+  test('Solo hoy: la Configuración de emisión enseña la jornada y el botón Cerrar / Reabrir jornada', () => {
+    const t = conMando(festDosDias());
+    ok(/Los QR ven solo hoy/.test(t.T.emStateHtml('staff')) && /data-act="cast-closeday" data-on="1"/.test(t.T.emStateHtml('staff')));
+    ok(!/cast-closeday/.test(t.T.emStateHtml('staff', true)), 'no en el QR ampliado');
+    t.T.emCloseDay(true);
+    ok(/Jornada cerrada en los QR/.test(t.T.emStateHtml('staff')) && /Reabrir jornada/.test(t.T.emStateHtml('staff')));
   });
   test('⇧⌘C: alterna Escenario (alto contraste) y vuelve al tema anterior; queda en Configuración y en la ayuda', () => {
     const t = dashboard({ 'showtime.panel.style': '"neutro"' });
@@ -1173,6 +1226,18 @@
   function festMando() {
     return festEn(NOWc, add => { add('Suena', -30, 30); add('Viene', 20, 80); });
   }
+  /** festMando + otra zona («Carpa», con «Lejos») y una banda al día siguiente («Mañana»). */
+  function festDosDias() {
+    let s = festMando();
+    const j = C.jornadaOfAbs(s, nAbs), m = C.shiftDate(j, 1), hm = x => C.fmtHM(((x % 1440) + 1440) % 1440);
+    s = C.updateEvent(s, { fechaFin: m }).state;
+    s = C.addStage(s, 'Carpa').state;
+    const P = s.escenarios[0].id, K = s.escenarios[1].id;
+    for (const a of [{ jornada: j, nombre: 'Lejos', escenarioId: K, inicio: hm(nAbs + 60), fin: hm(nAbs + 120) }, { jornada: m, nombre: 'Mañana', escenarioId: P, inicio: '21:00', fin: '22:00' }]) {
+      const r = C.addArtist(s, 'show', a); if (!r.ok) throw new Error(r.error); s = r.state;
+    }
+    return s;
+  }
   function conMando(F) {
     const t = panel(F === null ? {} : { 'showtime.festival': JSON.stringify(F || festMando()) }, NOWc);
     const cmd = (op, args, t0) => t.T.emCommand({ id: 'x', op, args: args || {}, t: t0 === undefined ? NOWc : t0 });
@@ -1180,6 +1245,58 @@
     const log = () => ((t.read('showtime.log') || {}).entries || []);
     return Object.assign(t, { cmd, blk, log });
   }
+  // ── Mandos por zona (dec. 102) y chat en el mando (dec. 104) ──
+  test('Mando de zona › solo toca su zona: ▶/■, retrasos y Confidence; lo de otra zona se rechaza sin tocar nada', async () => {
+    const F = festDosDias(), t = conMando(F), K = F.escenarios[1].id, P = F.escenarios[0].id;
+    const zc = (op, args) => t.T.emCommand({ id: 'x' + Math.random(), op, args: args || {}, t: NOWc, _z: K });
+    const antes = t.env.storage.get('showtime.festival');
+    let r = await zc('stop', { key: t.blk('Suena').key });
+    ok(!r.ok && /solo de su zona/.test(r.msg), 'Suena es de Principal: ' + r.msg);
+    r = await zc('delay', { minutes: 5, zones: 'all', from: nAbs, stamp: 'x' });
+    ok(!r.ok && /solo de su zona/.test(r.msg), 'retraso a todas: no');
+    r = await zc('delay', { minutes: 5, zones: [P], from: nAbs, stamp: 'x' });
+    ok(!r.ok && /solo de su zona/.test(r.msg), 'retraso a otra zona: no');
+    r = await zc('flash', { text: 'HOLA', to: null, zones: null });
+    ok(!r.ok, 'mensaje a todas las Confidence: no');
+    eq(t.env.storage.get('showtime.festival'), antes, 'el evento no cambia');
+    r = await zc('flash', { text: 'HOLA', to: ['backstage'], zones: null });
+    ok(r.ok, 'a Backstage sí (es de todos)');
+    r = await zc('flash', { text: 'CARPA', to: ['confidence'], zones: [K] });
+    ok(r.ok, 'a la Confidence de su zona sí');
+    r = await zc('start', { key: t.blk('Lejos').key });
+    ok(r.ok, 'su banda: ' + r.msg);
+    ok(t.log().some(e => /Desde el mando del Stage Manager \(Carpa\)|mando/.test(JSON.stringify(e))), 'queda en el log');
+    r = await t.T.emCommand({ id: 'zz', op: 'flashOff', args: {}, t: NOWc, _z: 'inventada' });
+    ok(!r.ok && /ya no existe/.test(r.msg), 'zona borrada: no obedece');
+    ok((await t.cmd('stop', { key: t.blk('Suena').key })).ok, 'el mando general sigue pudiendo con todo');
+  });
+  test('Mando de zona › chat firmado «[Zona] Nombre» en el hilo de Producción; sin nombre, «[Zona] Stage Manager»', async () => {
+    const F = festDosDias(), t = conMando(F), K = F.escenarios[1].id;
+    let r = await t.T.emCommand({ id: 'c1', op: 'chat', args: { text: 'Necesito pinza en monitores', name: 'Ana' }, t: NOWc, _z: K });
+    ok(r.ok);
+    r = await t.T.emCommand({ id: 'c2', op: 'chat', args: { text: 'Listos' }, t: NOWc, _z: K });
+    r = await t.T.emCommand({ id: 'c3', op: 'chat', args: { text: 'General', name: 'Luis' }, t: NOWc });
+    const chat = t.read('showtime.chat');
+    eq(chat.map(m => m.from).join(' | '), '[Carpa] Ana | [Carpa] Stage Manager | [Stage Manager] Luis');
+    eq(chat[0].sm, false); eq(chat[0].pid, 'mando:' + K);
+    ok(/\[Carpa\] Ana/.test(t.env.getEl('chat-list').innerHTML), 'se ve en el chat del Panel');
+    ok((await t.T.emCommand({ id: 'c4', op: 'chatsync', args: {}, t: NOWc, _z: K })).ok);
+    ok(!(await t.T.emCommand({ id: 'c5', op: 'chat', args: { text: ' ' }, t: NOWc })).ok, 'vacío: no');
+  });
+  test('Emisión › Stage Manager: con varias zonas, un QR por zona (remote.html?stage=…) con su propia clave', async () => {
+    const F = festDosDias(), t = conMando(F), K = F.escenarios[1].id;
+    t.T.setRoom(await E.newRoom());
+    t.T.fakeEm({ push() {}, setZoneKeys: async () => {} }, { links: [], viewers: 0, remotes: 0, devices: [] });
+    eq(t.T.rmZones().length, 2);
+    t.T.setRmZone(K);
+    const url = t.T.emUrl('remote'), p = E.parseHash(url.slice(url.indexOf('#'))), room = t.T.room();
+    ok(url.indexOf('remote.html?stage=' + K + '&') > 0, url);
+    eq(p.z, K); eq(p.c, room.cz[K]); ok(room.cz[K] !== room.c, 'clave propia'); eq(p.q, room.q, 'chat de Producción');
+    t.T.setRmZone(null);
+    const g = t.T.emUrl('remote');
+    ok(g.indexOf('stage=') < 0 && E.parseHash(g.slice(g.indexOf('#'))).c === room.c, 'el general sigue igual');
+    t.T.fakeEm(null, null);
+  });
   test('Mando › órdenes mal formadas o desconocidas: se rechazan sin tocar nada', async () => {
     const t = conMando(), antes = t.env.storage.get('showtime.festival');
     for (const [op, args, re] of [['borrarTodo', {}, /desconocida/], ['start', {}, /Falta la banda/], ['stretch', { key: 'x' }, /Falta si se activa/],
@@ -1371,6 +1488,18 @@ const miss = [...found].filter(k => !I.txHas(k) && !/^(OK|CALL|SC|Live|Raycast|S
     ok(/msg = obj \? msg0\.es : mm\[0\] \? txEs\(mm\[0\], mm\[1\]\)/.test(js), 'Deshacer y log: txEs (español)');
     ok(/const msg = \{ es: impMsg\(txEs\), ui: impMsg\(tx\) \}/.test(js), 'importar: {es, ui}');
     ok(/sendFlash\(tx\(b\.dataset\.msg\)\)/.test(js), 'los mensajes rápidos salen en el idioma del Panel');
+  });
+
+  test('Idioma (Fase 4): errores de core.js y avisos del importador se enseñan en el idioma del Panel (txBack); el aviso también', () => {
+    const js = D.src('control.js');
+    ok(/const back = s => I18 && I18\.txBack \? I18\.txBack\(s\) : s;/.test(js), 'helper back()');
+    ok((js.match(/textContent = back\((r|z)\.error\)/g) || []).length >= 6, 'errores de los formularios');
+    ok(/r\.errs\.map\(x => '<div class="e">' \+ esc\(back\(x\)\)/.test(js) && /r\.warns\.map\(x => '<div>' \+ esc\(back\(x\)\)/.test(js), 'avisos de las filas al importar');
+    ok(/r\.errors\.map\(e => esc\(back\(e\)\)\)/.test(js) && /esc\(back\(w\)\)/.test(js), 'abrir un .json: errores y avisos');
+    ok(/t\.textContent = I18 && I18\.txBack \? I18\.txBack\(msg\) : tx\(msg\);/.test(js), 'el aviso (toast) pasa por txBack');
+    const t = dashboard({ 'showtime.config': JSON.stringify({ lang: 'en' }) });
+    t.env.fire('btn-paste', 'click', {});
+    eq(t.env.getEl('imp-go').textContent, 'Import 0 entries');
   });
 
   // ── Ejecutor ─────────────────────────────────────────────────────────

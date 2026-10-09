@@ -178,3 +178,36 @@ input,select,textarea{font-size:16px}   /* en iPhone, menos de 16 px hace zoom a
   .act{height:88px}
   .foot{grid-column:1/-1}
 }
+
+/* ═══ Mando de UNA zona (dec. 102) y chat de Producción en el mando (dec. 104) ═══════════════════════════════════ */
+.zlock{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;padding:2px 8px;border-radius:5px;
+  border:1px solid var(--zc,#888);color:#fff;max-width:46vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:0 0 auto}
+.rh-top .rx{min-width:0;overflow:hidden} .rh-top .rx #rx-t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+body.has-chat{padding-bottom:calc(176px + var(--safe-b))}   /* se puede bajar hasta dejar libre el botón del chat */
+.zlock::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--zc,#888);flex:0 0 auto}
+.chat-fab{position:fixed;right:calc(14px + env(safe-area-inset-right,0px));bottom:calc(108px + var(--safe-b));z-index:35;width:56px;height:56px;border-radius:50%;
+  border:1px solid rgba(255,255,255,.22);background:#1c1f27;color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(0,0,0,.55)}
+.chat-fab .ic{width:26px;height:26px}
+.chat-dot{position:absolute;top:8px;right:9px;width:12px;height:12px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 2px #1c1f27}
+.csheet{position:fixed;inset:0;z-index:45;display:flex;align-items:flex-end;background:rgba(0,0,0,.6)}
+/* Altura FIJA: no crece con los mensajes ni tapa el mando entero; la lista hace scroll por dentro y el campo queda al pie */
+.csheet-box{width:100%;height:min(62vh,560px);height:min(62dvh,560px);display:flex;flex-direction:column;background:#111318;border-top:2px solid rgba(255,255,255,.2);
+  border-radius:18px 18px 0 0;padding:12px 14px calc(12px + var(--safe-b))}
+.csh-h{display:flex;align-items:center;gap:10px;flex:0 0 auto}
+.csh-h h3{font-size:18px;font-weight:900;flex:1}
+.csh-x{width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:transparent;display:flex;align-items:center;justify-content:center}
+.csh-me{display:flex;align-items:center;gap:8px;flex:0 0 auto;margin:8px 0;font-size:12px;color:var(--dim);font-weight:700}
+.csh-me input{flex:1;min-width:0;height:36px;border-radius:9px;border:1px solid var(--line);background:#0b0c10;color:#fff;padding:0 10px}
+.csh-list{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;display:flex;flex-direction:column;gap:6px;padding:4px 0}
+.cmsg{align-self:flex-start;max-width:86%;padding:7px 10px;border-radius:12px;background:#1b1e26;border:1px solid var(--line)}
+.cmsg.me{align-self:flex-end;background:#10261e;border-color:rgba(16,185,129,.5)}
+.cmsg.sm{border-color:rgba(233,69,96,.55)}
+.cmsg.pend{opacity:.55}
+.cmsg b{display:block;font-size:11px;letter-spacing:.06em;color:var(--muted);font-weight:800}
+.cmsg b small{font-weight:600;margin-left:6px;color:var(--dim)}
+.cmsg span{font-size:15px;overflow-wrap:anywhere}
+.csh-empty{margin:auto;color:var(--dim);font-size:14px;text-align:center}
+.csh-f{display:grid;grid-template-columns:1fr auto;gap:8px;flex:0 0 auto;padding-top:8px;border-top:1px solid var(--line)}
+.csh-f input{height:48px;border-radius:12px;border:1px solid var(--line);background:#0b0c10;color:#fff;padding:0 12px;min-width:0}
+.csh-f .send{min-height:48px;padding:0 16px}
+@media (orientation:landscape) and (min-width:900px) and (min-height:600px){ .csheet{justify-content:flex-end;align-items:flex-end} .csheet-box{width:420px;margin-right:16px;border-radius:18px 18px 0 0} }

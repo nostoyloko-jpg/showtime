@@ -14,6 +14,7 @@
   const tx = (s, v) => I18 ? I18.tx(s, v) : (v ? String(s).replace(/\{(\w+)\}/g, (m, k) => (v[k] !== undefined && v[k] !== null ? String(v[k]) : m)) : s);
   const LOCALE = () => (I18 && I18.getLang() === 'en' ? 'en-GB' : 'es-ES');
   const txEs = (s, v) => I18 ? I18.tx(s, v, 'es') : tx(s, v);   // lo que queda escrito (Deshacer, log): siempre en español
+  const back = s => I18 && I18.txBack ? I18.txBack(s) : s;   // avisos y errores que llegan escritos en español (core, importador, mando) → idioma activo
 
   // ── Estado (declarado antes de usarse) ───────────────────────────────
   let FEST = null, ORIG = null, CONFIG = Dt.getConfig();
@@ -354,7 +355,7 @@
     const go = p => commitFestival(p.state, p.msg, { noTimes: true, ev: [{ type: 'buffer', amber: p.late !== null && p.late !== undefined, text: p.msg }] });
     if (r.late === null || r.late === undefined) { go(r); return; }
     const sc = r.kind === 'sc';
-    modal(i18t(sc ? 'bis.modalSc' : 'bis.modalShow'), '<p>' + esc(r.msg) + '</p>', [
+    modal(i18t(sc ? 'bis.modalSc' : 'bis.modalShow'), '<p>' + esc(back(r.msg)) + '</p>', [
       { label: 'Cancelar' },
       { label: i18t(sc ? 'bis.yesSc' : 'bis.yesShow'), kind: 'primary', run: () => { const p = M.stretchPlan(FEST, key, on, logNow(), CONFIG); if (!p.ok) { toast(p.error, true); return; } go(p); } }
     ]);
@@ -576,11 +577,11 @@
     document.querySelectorAll('#addrow .bad').forEach(x => x.classList.remove('bad'));
     const v = addValues();
     const z = resolveZone(FEST, $('add-escenario').value);
-    if (!z.ok) { $('add-err').textContent = z.error; $('add-escenario').classList.add('bad'); return; }
+    if (!z.ok) { $('add-err').textContent = back(z.error); $('add-escenario').classList.add('bad'); return; }
     v.escenarioId = z.id;
     const r = C.addArtist(z.state, v.modo, v);
     if (!r.ok) {
-      $('add-err').textContent = r.error;
+      $('add-err').textContent = back(r.error);
       const f = r.field && document.querySelector('#addrow [data-f="' + (r.field === 'duracion' ? 'fin' : r.field) + '"]');
       if (f) { f.classList.add('bad'); f.focus(); }
       return;
@@ -787,7 +788,7 @@
     }
     const r = C.editArtist(FEST, id, rmode, k, el.value);
     if (!r.ok && k === 'tipo') el.value = el.dataset.orig;
-    if (!r.ok) { el.classList.add('bad'); el.title = r.error; toast(r.error, true); return; }
+    if (!r.ok) { el.classList.add('bad'); el.title = back(r.error); toast(r.error, true); return; }
     el.classList.remove('bad'); el.title = '';
     if (!r.changed) { el.value = el.dataset.orig; return; }
     const name = (r.state.artists.find(a => String(a.id) === String(id)) || {}).nombre || '';
@@ -885,7 +886,7 @@
       '<div id="d-err" class="err" style="grid-column:1/-1;margin:0"></div></div>';
     modal('Duplicar en otra jornada', html, [{ label: 'Cancelar' }, { label: 'Duplicar', kind: 'primary', run: () => {
       const r = C.duplicateArtist(FEST, id, rmode, { nombre: $('d-nombre').value, jornada: $('d-jor').value, inicio: $('d-ini').value, fin: $('d-fin').value, duracion: $('d-dur').value, call: $('d-call').value });
-      if (!r.ok) { $('d-err').textContent = r.error; return false; }
+      if (!r.ok) { $('d-err').textContent = back(r.error); return false; }
       const jor = $('d-jor').value;
       commitFestival(r.state, [CONFIG.day !== 'all' && CONFIG.day !== jor ? 'Duplicada: {n} en {d} (no es la jornada que estás viendo)' : 'Duplicada: {n} en {d}', { n: a.nombre, d: fmtDay(jor) }]);
     } }]);
@@ -958,7 +959,7 @@
     if (d.total) acts.push({ label: 'Exportar el actual', run: () => { exportJSON(); setTimeout(askNew, 300); } });
     acts.push({ label: 'Crear evento', kind: 'primary', run: () => {
       const r = C.newFestival(readFestForm());
-      if (!r.ok) { $('f-err').textContent = r.error; return false; }
+      if (!r.ok) { $('f-err').textContent = back(r.error); return false; }
       loadNew(r.state, tx('Evento creado: {name}. Ahora crea las zonas.', { name: r.state.event.nombre }));
       setTimeout(() => openConfig('stages'), 50);
     } });
@@ -1043,7 +1044,7 @@
 
   function saveFest() {
     const r = C.updateEvent(FEST, readFestForm());
-    if (!r.ok) { $('f-err').textContent = r.error; return; }
+    if (!r.ok) { $('f-err').textContent = back(r.error); return; }
     if (CONFIG.callMins) CONFIG = Dt.setConfig({ callMins: null });   // un único aviso CALL: el del festival
     if (r.changed) { document.activeElement && document.activeElement.blur(); commitFestival(r.state, 'Datos del evento guardados', { skip: true }); }
     else toast('Sin cambios');
@@ -1071,7 +1072,7 @@
   }
 
   function stageCommit(r, msg, refocusNew) {
-    if (!r.ok) { $('s-err').textContent = r.error; return; }
+    if (!r.ok) { $('s-err').textContent = back(r.error); return; }
     if (r.changed === false) return;
     if (document.activeElement && $('cfg-stages').contains(document.activeElement)) document.activeElement.blur();
     commitFestival(r.state, msg);
@@ -1441,8 +1442,8 @@
   }
   // ── Gestor de ventanas Live (Live ▾ › Gestionar ventanas…): nombre, vista (y zona) y standby de cada una ──
   let gvSig = null;
-  function gestorVisible() { return !$('modal').hidden && $('modal-title').textContent === tx('Ventanas Live'); }
-  function openGestor() { gvSig = null; modal('Ventanas Live', '<div id="gv"></div>', [], { wide: true }); renderGestor(); }
+  function gestorVisible() { return !$('modal').hidden && $('modal-title').textContent === tx('Pantallas y ventanas'); }
+  function openGestor() { gvSig = null; modal('Pantallas y ventanas', '<div id="gv"></div>', [], { wide: true }); renderGestor(); }
   function gvRowHtml(id) {
     const x = WIN.get(id);
     return '<div class="gv-row" data-id="' + esc(id) + '">' +
@@ -1482,12 +1483,43 @@
       const head = '<div class="gv-top"><div class="gv-seg"><button type="button" class="gv-segb" data-gv="all" data-on="1">' + tx('⏸ Todas en standby') + '</button><button type="button" class="gv-segb" data-gv="all" data-on="0">' + tx('▶ Reanudar todas') + '</button></div></div>';
       const hd = '<div class="gv-row gv-hd" aria-hidden="true"><span>' + tx('Nombre') + '</span><span>' + tx('Vista') + '</span><span>' + tx('Zona') + '</span><span>' + tx('Pantalla') + '</span><span>' + tx('Standby') + '</span><span></span></div>';
       const rows = ids.length ? hd + ids.map(gvRowHtml).join('') : '<p class="mnote gv-empty">' + tx('No hay ventanas Live abiertas desde este Dashboard.') + '</p>';
-      const qr = '<div class="gv-qr"><div class="gv-qrh">' + tx('Pantallas QR') + '</div><p class="mnote">' + tx('Aún vacía: aquí irán las pantallas QR con la misma rejilla.') + '</p></div>';
+      const loc = '<div class="gv-sec"><svg class="ic"><use href="#i-screen"/></svg><b>' + tx('Monitores locales (HDMI / Mac)') + '</b></div>';
+      const qr = '<div class="gv-qr"><div class="gv-sec"><svg class="ic"><use href="#i-cast"/></svg><b>' + tx('Dispositivos remotos por QR (en vivo)') + '</b><span id="gv-qrn" class="gv-qrn"></span></div><div id="gv-qrl" class="gv-qrl"></div></div>';
       const foot = '<div class="gv-foot"><button type="button" class="btn" data-gv="new">' + tx('+ Abrir ventana Live') + '</button><button type="button" class="btn gv-close" data-gv="done">' + tx('Cerrar') + '</button></div>';
-      box.innerHTML = head + '<div class="gv-list">' + rows + '</div>' + qr + foot;
+      box.innerHTML = loc + head + '<div class="gv-list">' + rows + '</div>' + qr + foot;
     }
     gvSync(ids);
+    renderGestorQr();
   }
+  // ── Telemetría (dec. 103): los dispositivos abiertos por QR se presentan cada 20 s; sin latido en 45 s, fuera de la lista ──
+  const DEV_TXT = { movil: 'Móvil', tablet: 'Tablet', ordenador: 'Ordenador' };
+  function qrDevices(now) {
+    const n = now === undefined ? Date.now() : now;
+    return EM && EMST && Array.isArray(EMST.devices) ? EMST.devices.filter(d => n - d.t <= Em.VIEWER_TTL) : [];
+  }
+  function devLabel(d) {
+    if (d.r) return tx('Stage Manager · mando') + ' · ' + (d.s ? zoneLabel(d.s) : tx('todas las zonas'));
+    if (d.p) return tx('Producción') + ' · ' + prodName(d.p);
+    const v = d.v && Vs.VISTA_TXT[d.v] ? Vs.VISTA_TXT[d.v] : tx('Pantalla Live');
+    return v + (d.v === 'confidence' ? ' · ' + (d.z !== null && d.z !== undefined ? zoneLabel(d.z) : tx('sin zona elegida')) : '');
+  }
+  function agoTxt(s) { return s < 60 ? tx('hace {n} s', { n: s }) : tx('hace {n} min', { n: Math.floor(s / 60) }); }
+  const DEV_ORDER = { mando: 0, manager: 1, confidence: 2, backstage: 3 };
+  function renderGestorQr() {
+    const box = $('gv-qrl'); if (!box) return;
+    const now = Date.now(), list = qrDevices(now).slice().sort((a, b) => ((DEV_ORDER[a.r ? 'mando' : a.v] ?? 9) - (DEV_ORDER[b.r ? 'mando' : b.v] ?? 9)) || (a.first - b.first));
+    const h = !EM ? '<p class="mnote">' + tx('La emisión está parada: Emisión ▾ › Empezar a emitir.') + '</p>'
+      : !list.length ? '<p class="mnote">' + tx('Ningún dispositivo conectado por QR.') + '</p>'
+      : list.map(d => {
+        const s = Math.max(0, Math.round((now - d.t) / 1000));
+        return '<div class="gq-row' + (d.r ? ' gq-sm' : '') + '" data-dev="' + esc(d.id) + '"><i class="gq-dot' + (s > PRESENCE_LATE ? ' late' : '') + '" aria-hidden="true"></i>'
+          + '<span class="gq-v">' + esc(devLabel(d)) + '</span><span class="gq-d">' + esc(tx(DEV_TXT[d.d] || 'Dispositivo')) + ' <small>#' + esc(String(d.id).slice(0, 4)) + '</small></span>'
+          + '<span class="gq-ago">' + agoTxt(s) + '</span></div>';
+      }).join('');
+    if (box.dataset.h !== h) { box.innerHTML = h; box.dataset.h = h; }
+    const n = $('gv-qrn'); if (n) n.textContent = EM && list.length ? tx(list.length === 1 ? '1 conectado' : '{n} conectados', { n: list.length }) : '';
+  }
+  const PRESENCE_LATE = 25;   // s sin latido: punto ámbar (un latido perdido); a los 45 s sale de la lista
   $('modal-body').addEventListener('change', e => {
     const t = e.target, row = t.closest && t.closest('.gv-row'); if (!row) return;
     const id = row.dataset.id, x = WIN.get(id); if (!x) return;
@@ -1542,7 +1574,7 @@
   function askImport(text, fname) {
     const r = C.validateProject(text);
     if (!r.ok) {
-      modal('No se puede abrir', '<div class="errbox">' + r.errors.map(esc).join('<br>') + '</div><p style="margin-top:10px">' + tx('Archivo: {f}', { f: esc(fname) }) + '</p>', [{ label: 'Cerrar' }]);
+      modal('No se puede abrir', '<div class="errbox">' + r.errors.map(e => esc(back(e))).join('<br>') + '</div><p style="margin-top:10px">' + tx('Archivo: {f}', { f: esc(fname) }) + '</p>', [{ label: 'Cerrar' }]);
       return;
     }
     const s = r.state, ev = s.event || {};
@@ -1556,7 +1588,7 @@
       '<li>Shows: ' + (dShow.length ? dShow.map(fmtDay).map(esc).join(', ') : tx('ninguno')) + '</li>' +
       '<li>Soundchecks: ' + (dSc.length ? dSc.map(fmtDay).map(esc).join(', ') : tx('ninguno')) + '</li>' +
       '<li>' + tx('Hora de corte: {cut} · aviso CALL: {n} min', { cut: esc(ev.dayCutoff || C.DEFAULT_CUTOFF), n: esc(ev.callMins || C.DEFAULT_CALL_MINS) }) + '</li></ul>';
-    if (r.warnings.length) html += '<p style="margin-top:10px"><b>' + tx('Avisos del archivo:') + '</b></p><ul>' + r.warnings.slice(0, 12).map(w => '<li>' + esc(w) + '</li>').join('') + (r.warnings.length > 12 ? '<li>' + tx('… y {n} más', { n: r.warnings.length - 12 }) + '</li>' : '') + '</ul>';
+    if (r.warnings.length) html += '<p style="margin-top:10px"><b>' + tx('Avisos del archivo:') + '</b></p><ul>' + r.warnings.slice(0, 12).map(w => '<li>' + esc(back(w)) + '</li>').join('') + (r.warnings.length > 12 ? '<li>' + tx('… y {n} más', { n: r.warnings.length - 12 }) + '</li>' : '') + '</ul>';
     html += '<p style="margin-top:10px">' + tx('Al abrirlo, la jornada queda en <b>Todas</b>: elige la que quieras arriba.') + '</p>';
     const n = FEST && ORIG ? C.diffSummary(ORIG, FEST).total : 0;
     const acts = [{ label: 'Cancelar' }];
@@ -1906,7 +1938,7 @@
         inp(r, 'jornada', r.jornada ? fmtDay(r.jornada) : '') +
         inp(r, 'inicio', r.inicio, 't') + (r.tipo === 'hito' ? '<td class="t"><span class="dash">—</span></td>' : inp(r, 'fin', r.fin, 't')) +
         (r.tipo === 'show' || r.tipo === 'sc' ? inp(r, 'call', r.call, 't') : '<td class="t"><span class="dash">—</span></td>') + inp(r, 'notas', r.notas) +
-        '<td class="av">' + r.errs.map(x => '<div class="e">' + esc(x) + '</div>').join('') + r.warns.map(x => '<div>' + esc(x) + '</div>').join('') + '</td></tr>').join('') + '</tbody>';
+        '<td class="av">' + r.errs.map(x => '<div class="e">' + esc(back(x)) + '</div>').join('') + r.warns.map(x => '<div>' + esc(back(x)) + '</div>').join('') + '</td></tr>').join('') + '</tbody>';
     }
     // Líneas ignoradas (texto libre)
     const ign = rd.ignored || [];
@@ -1958,7 +1990,7 @@
     toast(importSummary(IMP_LAST, r.added) + (hidden ? tx(' · Ver: Todo') : '') + (fresh ? tx(' · ponle nombre en Configuración') : ''), false, 2500);
     $('toast').classList.add('good');
     const tw = document.querySelector('.tblwrap'); if (tw && tw.scrollTo) tw.scrollTo({ top: 0, behavior: 'smooth' });
-    if (r.errors.length) modal('Algunas filas no entraron', '<ul>' + r.errors.map(e => '<li>' + esc(e) + '</li>').join('') + '</ul>', [{ label: 'Entendido', kind: 'primary' }]);
+    if (r.errors.length) modal('Algunas filas no entraron', '<ul>' + r.errors.map(e => '<li>' + esc(back(e)) + '</li>').join('') + '</ul>', [{ label: 'Entendido', kind: 'primary' }]);
   }
 
   /** Lee .csv/.tsv/.txt: UTF-8 y, si salen caracteres raros, Windows-1252 (CSV de Excel en Windows). */
@@ -2345,23 +2377,62 @@
   const Em = window.ShowtimeEmision, QR = window.ShowtimeQR;
   const EM_KEY = 'showtime.emision';          // { room, on } — la sala y sus claves solo viven en este navegador
   let EM = null, EMST = null, emRoom = null, emTab = 'staff', bigTab = 'staff';
+  let RM_ZONE = null;       // QR del mando que se enseña: null = general (todas las zonas) · id = mando de esa zona (dec. 102)
+  let EM_CLOSED = null;     // jornada cerrada a mano para los QR («Cerrar jornada», dec. 105): fecha o null
+  let EM_DAY = null;        // última jornada emitida (si cambia, se vuelve a emitir)
   function emLoad() {
     try {
       const v = JSON.parse(localStorage.getItem(EM_KEY) || 'null');
       if (!v || !Em || !Em.validRoom(v.room)) return null;
       if (!v.room.c) { v.room = Em.withCmdKey(v.room); localStorage.setItem(EM_KEY, JSON.stringify(v)); }   // sala de la 2d-A: se le añade la clave del mando
       if (!v.room.q) { v.room = Em.withProdKey(v.room); localStorage.setItem(EM_KEY, JSON.stringify(v)); }   // sala anterior: se le añade la clave propia de Producción
+      EM_CLOSED = typeof v.closed === 'string' ? v.closed : null;
       return v;
     } catch (e) { return null; }
   }
-  function emSave(on) { try { localStorage.setItem(EM_KEY, JSON.stringify({ room: emRoom, on: !!on })); } catch (e) {} }
+  function emSave(on) { try { localStorage.setItem(EM_KEY, JSON.stringify({ room: emRoom, on: !!on, closed: EM_CLOSED })); } catch (e) {} }
+  // ── «Solo hoy» (dec. 105): a los QR solo viaja la jornada activa del Panel (la elegida; con «Todos los días», la del reloj) ──
+  function emDay() {
+    if (!FEST) return null;
+    const cfg = Dt.getConfig(), d = cfg && cfg.day && cfg.day !== 'all' ? cfg.day : C.activeJornada(FEST, Math.floor(C.nowAbs()));
+    return C.dayIndex(d) === null ? null : d;
+  }
+  function emSnapshot() {
+    const s = Dt.getSnapshot(), day = emDay();
+    EM_DAY = day;
+    if (!s.festival || !day) return s;
+    const closed = EM_CLOSED === day, f = C.scopeToJornada(s.festival, day);
+    if (closed) { f.artists = []; f.showtimeRetrasos = []; }   // cerrada: no viaja ni una entrada
+    return Object.assign({}, s, { festival: f, config: Object.assign({}, s.config, { day }), scope: { day, closed } });
+  }
+  /** Cerrar / reabrir la jornada en los QR (Staff, Camerinos, Producción y mando): enseñan «Jornada finalizada». Se reabre sola al cambiar de jornada. */
+  function emCloseDay(on) {
+    const day = emDay(); if (!day) return;
+    EM_CLOSED = on ? day : null; emSave(!!EM);
+    if (EM) EM.push(0);
+    logEvent('msg', (on ? 'Jornada cerrada en los QR: ' : 'Jornada reabierta en los QR: ') + day, { src: 'panel' });
+    toast(on ? 'Jornada cerrada: los dispositivos QR muestran «Jornada finalizada»' : 'Jornada reabierta en los dispositivos QR');
+    renderCast();
+  }
+  // La jornada de los QR cambia con el reloj (hora de corte) o al elegir otro día en el Panel: se vuelve a emitir
+  setInterval(() => { if (EM && emDay() !== EM_DAY) EM.push(0); }, 15000);
+  /** Mandos por zona (dec. 102): cada zona del evento tiene su clave. Se crean al emitir (y al añadir zonas). */
+  function rmZones() { return FEST ? (FEST.escenarios || []).map(z => ({ id: z.id, name: z.nombre, color: z.color })) : []; }
+  function emZoneKeys() {
+    if (!emRoom) return;
+    const next = Em.withZoneKeys(emRoom, rmZones().map(z => z.id));
+    if (next === emRoom) return;
+    emRoom = next; emSave(!!EM);
+    if (EM) EM.setZoneKeys(emRoom.cz).catch(e => console.error(e));
+  }
   function emCan() { return !!(Em && QR && M && window.crypto && crypto.subtle && 'WebSocket' in window); }
   async function emStart(resumed) {
     if (!emCan()) { toast('Este navegador no permite la emisión cifrada', true); return; }
     if (EM) return;
     try {
       if (!emRoom) { const saved = emLoad(); emRoom = saved ? saved.room : await Em.newRoom(); }
-      EM = new Em.Emisor({ room: emRoom, getSnapshot: Dt.getSnapshot, onCommand: emCommand, onStatus: st => { EMST = st; renderCast(); }, onProdMessage: emProdMessage });
+      emZoneKeys();
+      EM = new Em.Emisor({ room: emRoom, getSnapshot: emSnapshot, onCommand: emCommand, onStatus: st => { EMST = st; renderCast(); }, onProdMessage: emProdMessage });
       await EM.start(); emSave(true); renderCast(); renderChat(); emPushChat();
       toast(resumed ? 'Emisión reanudada (estaba activa antes de recargar el Dashboard)' : 'Emitiendo: escanea el QR con el dispositivo');
     } catch (e) { console.error(e); EM = null; renderCast(); toast(tx('No se pudo empezar la emisión: {e}', { e: e && e.message || e }), true); }
@@ -2384,6 +2455,18 @@
     ]);
   }
   function emRegenCmd() {
+    const z = RM_ZONE && rmZones().find(x => x.id === RM_ZONE);
+    if (z) {
+      modal(tx('Nueva clave del mando de {z}', { z: z.name }), '<p>' + tx('El QR del mando de <b>{z}</b> deja de poder mandar al Mac. Los mandos de las demás zonas, el general, Staff y Producción siguen valiendo y la emisión no se corta.', { z: esc(z.name) }) + '</p>', [
+        { label: 'Cancelar' },
+        { label: 'Nueva clave', kind: 'primary', run: () => { (async () => {
+          emRoom = Em.newZoneKey(emRoom, z.id); emSave(!!EM);
+          if (EM) await EM.setZoneKeys(emRoom.cz);
+          renderCast(); toast(tx('Clave nueva del mando de {z}: escanea otra vez su QR', { z: z.name }));
+        })(); } }
+      ]);
+      return;
+    }
     modal('Nueva clave del mando', '<p>' + tx('El QR del mando anterior <b>deja de poder mandar</b> al Mac. Los QR de Staff y Producción siguen valiendo y la emisión no se corta.') + '</p>', [
       { label: 'Cancelar' },
       { label: 'Nueva clave', kind: 'primary', run: () => { (async () => {
@@ -2415,10 +2498,16 @@
     const bad = M.checkCmd(cmd);
     if (bad) return { ok: false, msg: bad };
     const a = cmd.args || {};
+    // Mando de una zona (dec. 102): la zona la pone emision.js según la clave que firma; aquí solo se le deja tocar lo suyo
+    const zone = typeof cmd._z === 'string' ? cmd._z : null;
+    if (zone !== null && !rmZones().some(z => z.id === zone)) return { ok: false, msg: 'Esta zona ya no existe en el Dashboard' };
+    if (zone !== null && FEST) { const den = M.zoneDenied(FEST, cmd, zone); if (den) return { ok: false, msg: den }; }
+    if (cmd.op === 'chat' || cmd.op === 'chatsync') return emRemoteChat(cmd, zone);
     if (!FEST && ['flash', 'flashOff'].indexOf(cmd.op) < 0) return { ok: false, msg: 'No hay evento abierto en el Dashboard' };
     const at = Math.abs(Date.now() - cmd.t) < 120000 ? cmd.t : Date.now();     // la hora en que se pulsó en el móvil
     const abs = Math.floor(C.nowAbs(new Date(at)));
-    const from = 'Desde el mando del Stage Manager · ', fromUi = tx(from);
+    const from = zone !== null ? 'Desde el mando del Stage Manager (' + zoneLabel(zone) + ') · ' : 'Desde el mando del Stage Manager · ';
+    const fromUi = zone !== null ? tx('Desde el mando del Stage Manager ({_z})', { _z: zoneLabel(zone) }) + ' · ' : tx(from);
     if (cmd.op === 'start' || cmd.op === 'stop') {
       const r = M.realPlan(FEST, CONFIG, a.key, cmd.op === 'start' ? 'i' : 'f', abs);
       if (!r.ok) return { ok: false, msg: r.error };
@@ -2464,6 +2553,19 @@
       return { ok: true, msg: 'CALL confirmado' };
     }
     return { ok: false, msg: 'Orden desconocida' };
+  }
+
+  /** Chat desde el mando (dec. 104): firma «[Zona] Nombre» y va al hilo de Producción (lo ven el Panel, Producción y los mandos). */
+  function emRemoteChat(cmd, zone) {
+    if (cmd.op === 'chatsync') { emPushChat(); return { ok: true, msg: '' }; }
+    const from = M.chatSign(zone !== null ? zoneLabel(zone) : null, cmd.args.name);
+    const m = Dt.addChat(cmd.args.text, from, zone !== null ? 'mando:' + zone : 'mando', false);
+    if (!m) return { ok: false, msg: 'Mensaje vacío' };
+    renderChat();
+    if (!$('m-chat').classList.contains('open') && !chatPopOn) $('chat-on').hidden = false;   // sin leer
+    if (CONFIG && CONFIG.prodChatPopup !== false) toast(tx('Chat · {p}: {t}', { p: from, t: m.text.slice(0, 100) }));
+    emPushChat();
+    return { ok: true, msg: 'Enviado' };
   }
 
   // ── CALL OK: quién lo ha dado queda en el log (Stage Manager desde el Panel, el mando o una pantalla Live; o la persona de Producción) ──
@@ -2560,15 +2662,22 @@
   }
 
   function emLinksOn() { return EMST ? EMST.links.filter(l => l.state === 'on').length : 0; }
-  function emStateHtml(kind) {
+  function emStateHtml(kind, big) {
     const n = emLinksOn(), tot = EMST ? EMST.links.length : 2;
     const cls = n ? 'ok' : 'warn';
     const txt = n === 0 ? tx('Conectando con los repetidores…') : n < tot ? tx('En directo ({n} de {t} repetidores)', { n: n, t: tot }) : tx('En directo');
     const links = (EMST ? EMST.links : Em.BROKERS.map(b => ({ name: b.name, state: 'connecting' })))
       .map(l => '<span class="clink ' + (l.state === 'on' ? 'on' : '') + '" title="' + esc(l.state === 'on' ? tx('Conectado') : l.err ? tx('Sin conexión: {e}', { e: l.err }) : tx('Conectando…')) + '">' + esc(l.name) + '</span>').join('');
-    const v = EMST ? EMST.viewers : 0, r = EMST ? EMST.remotes : 0;
+    const v = EMST ? EMST.viewers : 0, r = kind === 'remote' ? qrDevices().filter(d => d.r && (RM_ZONE ? d.s === RM_ZONE : !d.s)).length : 0;
     const who = kind === 'remote' ? (r ? '<b class="cok">' + tx('Stage Manager conectado') + '</b>' : tx('Sin Stage Manager conectado')) : kind === 'produccion' ? '<span>' + tx('{n} persona(s) de Producción', { n: PRODUCERS.length }) + '</span>' : tx(v === 1 ? '1 dispositivo conectado' : '{n} dispositivos conectados', { n: v });
-    return '<div class="cstate"><span class="cdot ' + cls + '"></span><b>' + txt + '</b></div><div class="cview">' + who + '</div><div class="clinks">' + links + '</div>';
+    return '<div class="cstate"><span class="cdot ' + cls + '"></span><b>' + txt + '</b></div><div class="cview">' + who + '</div><div class="clinks">' + links + '</div>' + (kind === 'staff' && !big ? emScopeHtml() : '');
+  }
+  /** Jornada que ven los QR («Solo hoy») y el botón Cerrar / Reabrir jornada. */
+  function emScopeHtml() {
+    const day = emDay(); if (!day) return '';
+    const closed = EM_CLOSED === day;
+    return '<div class="cscope' + (closed ? ' closed' : '') + '"><span>' + tx(closed ? 'Jornada cerrada en los QR · {d}' : 'Los QR ven solo hoy · {d}', { d: fmtDay(day) }) + '</span>'
+      + '<button class="btn" type="button" data-act="cast-closeday" data-on="' + (closed ? '0' : '1') + '">' + tx(closed ? 'Reabrir jornada' : 'Cerrar jornada') + '</button></div>';
   }
   // QR de Staff por pantalla (2e-A): Manager · Confidence (con zona) · Backstage
   let CAST_VISTA = 'manager', CAST_ZONA = null;
@@ -2604,7 +2713,7 @@
     return zs;
   }
   function emUrl(kind) {
-    if (kind === 'remote') return Em.remoteUrl(emRoom);
+    if (kind === 'remote') { if (RM_ZONE && !rmZones().some(z => z.id === RM_ZONE)) RM_ZONE = null; return Em.remoteUrl(emRoom, undefined, RM_ZONE); }
     if (kind === 'produccion') {
       if (!PROD_DEFAULT_ID && PRODUCERS.length) PROD_DEFAULT_ID = PRODUCERS[0].id;
       const sel = PRODUCERS.some(p => p.id === PROD_SEL) ? PROD_SEL : PROD_DEFAULT_ID;
@@ -2694,6 +2803,13 @@
       + (CAST_VISTA === 'confidence' ? '<select class="czone" data-cz="1">' + zs.map(z => '<option value="' + esc(z.id) + '"' + (z.id === CAST_ZONA ? ' selected' : '') + '>' + esc(z.name) + '</option>').join('') + '</select>' : '')
       + '<span class="csub">' + esc(tx(Vs.VISTA_SUB[CAST_VISTA])) + '</span></div>';
   }
+  /** Mando por zona: «Todas las zonas» (el general) o el de una zona (solo si el evento tiene varias). */
+  function rmPickHtml() {
+    const zs = rmZones(); if (zs.length < 2) return '';
+    return '<div class="cpick"><div class="cseg"><button type="button" data-rz="" class="' + (RM_ZONE ? '' : 'on') + '">' + tx('Todas las zonas') + '</button>'
+      + zs.map(z => '<button type="button" data-rz="' + esc(z.id) + '" class="' + (RM_ZONE === z.id ? 'on' : '') + '"><i style="background:' + esc(safeColor(z.color, '#888')) + '"></i>' + esc(z.name) + '</button>').join('') + '</div>'
+      + '<span class="csub">' + esc(RM_ZONE ? tx('Solo ve y controla {z} (shows, pruebas, tiempos y su Confidence). Chat de Producción incluido.', { z: zoneLabel(RM_ZONE) }) : tx('Mando general: todas las zonas. Chat de Producción incluido.')) + '</span></div>';
+  }
   function paneHtml(kind) {
     const url = emUrl(kind);
     const side = kind === 'remote'
@@ -2710,12 +2826,13 @@
     if (kind === 'produccion') {
       return '<div class="cprod-split"><div class="cprod-left"><div class="cprod-add"><input type="text" id="prod-input" placeholder="' + tx('Nombre productor…') + '" /><button class="btn primary" type="button" data-act="prod-add-person"><svg class="ic"><use href="#i-plus"/></svg></button></div><div class="cprod-list" id="prod-list"></div><p class="mnote">' + tx('Toca una persona para ver su QR. Ve la Live de Manager, confirma los CALL, manda mensajes y avisos y chatea contigo (sin tocar horarios).') + '</p></div><div class="cprod-right"><div id="prod-qr-side" class="prod-qr-side"></div></div></div>';
     }
-    return (kind === 'staff' ? castPickHtml() : '') + '<div class="cgrid"><div class="cqr" title="' + tx('QR de {k}', { k: kind === 'remote' ? 'Stage Manager' : 'Staff · ' + Vs.VISTA_TXT[CAST_VISTA] }) + '">' + QR.svg(url, { ecl: 'M', margin: 3 }) + '</div>'
+    return (kind === 'staff' ? castPickHtml() : kind === 'remote' ? rmPickHtml() : '') + '<div class="cgrid"><div class="cqr" title="' + tx('QR de {k}', { k: kind === 'remote' ? 'Stage Manager' : 'Staff · ' + Vs.VISTA_TXT[CAST_VISTA] }) + '">' + QR.svg(url, { ecl: 'M', margin: 3 }) + '</div>'
       + '<div class="cside"><div class="cst" data-k="' + kind + '"></div>' + side + '</div></div>' + note;
   }
   function renderCast() {
     if (!$('cast-staff')) return;
     const on = !!EM;
+    if (on) emZoneKeys();
     $('cast-on').hidden = !on;
     $('cast-on').classList.toggle('warn', on && !emLinksOn());
     ['staff', 'remote', 'produccion'].forEach(kind => {
@@ -2743,9 +2860,9 @@
     else {
       const url = emUrl(bigTab);
       if ($('qr-big-svg').dataset.url !== url) { $('qr-big-svg').dataset.url = url; $('qr-big-svg').innerHTML = QR.svg(url, { ecl: 'M', margin: 4 }); }
-      $('qr-big-t').textContent = bigTab === 'remote' ? tx('Stage Manager · mando (privado)') : bigTab === 'produccion' ? prodBigTitle() : 'Staff · ' + Vs.VISTA_TXT[CAST_VISTA] + (CAST_VISTA === 'confidence' ? ' · ' + ((castZones().find(z => z.id === CAST_ZONA) || {}).name || '') : '') + tx(' · solo lectura');
+      $('qr-big-t').textContent = bigTab === 'remote' ? tx('Stage Manager · mando (privado)') + (RM_ZONE ? ' · ' + zoneLabel(RM_ZONE) : '') : bigTab === 'produccion' ? prodBigTitle() : 'Staff · ' + Vs.VISTA_TXT[CAST_VISTA] + (CAST_VISTA === 'confidence' ? ' · ' + ((castZones().find(z => z.id === CAST_ZONA) || {}).name || '') : '') + tx(' · solo lectura');
       $('qr-big').classList.toggle('remote', bigTab === 'remote');
-      $('qr-big-st').innerHTML = emStateHtml(bigTab);
+      $('qr-big-st').innerHTML = emStateHtml(bigTab, true);
     }
     // Pestaña del mando: punto si hay un mando conectado
     const rt = document.querySelector('#m-cast .ctab[data-tab="remote"]');
@@ -2771,6 +2888,7 @@
     else if (a === 'cast-stop') emStop();
     else if (a === 'cast-regen') { closeMenus(); emRegen(); }
     else if (a === 'cast-regencmd') { closeMenus(); emRegenCmd(); }
+    else if (a === 'cast-closeday') emCloseDay(t.dataset.on === '1');
     else if (a === 'cast-copy') emCopy(t.dataset.k || 'staff');
     else if (a === 'cast-big') { closeMenus(); bigTab = t.dataset.k || 'staff'; renderCast(); $('qr-big').hidden = false; }
     else if (a === 'prod-regen') { closeMenus(); emRegenProd(); }
@@ -2793,6 +2911,7 @@
     }
   });
   document.addEventListener('click', e => { const b = e.target.closest('#cast-staff [data-cv]'); if (!b) return; CAST_VISTA = b.dataset.cv; renderCast(); });
+  document.addEventListener('click', e => { const b = e.target.closest('#cast-remote [data-rz]'); if (!b) return; RM_ZONE = b.dataset.rz || null; renderCast(); });
   document.addEventListener('change', e => { if (e.target.matches('#cast-staff [data-cz]')) { CAST_ZONA = e.target.value; renderCast(); } });
   // Cada cambio guardado (en este Panel o llegado de la Live, p. ej. un OK de CALL) sale hacia los móviles
   const EM_KEYS = [Dt.KEYS.festival, Dt.KEYS.config, Dt.KEYS.callDone, Dt.KEYS.flash, Dt.KEYS.avisos, Dt.KEYS.meteo, Dt.KEYS.standby];
@@ -3030,5 +3149,6 @@
     if (mod && !e.shiftKey && !e.altKey && k === 'o') { e.preventDefault(); $('file').click(); return; }
     if (mod && !e.shiftKey && !e.altKey && k === 'n') { e.preventDefault(); askNew(); return; }
   });
-  window.ShowtimePanel = { reload: () => { loadState(); renderAll(); }, _test: { winState: () => Array.from(WIN.entries()).map(([id, x]) => ({ id, name: x.name, vista: x.vista, zona: x.zona, standby: !!x.standby, fs: x.fs })), setWinVista, setWinStandby, closeLive, openGestor, gestorVisible, emProdMessage, emRegenProd, hitoChips, emUrl, prodBigTitle, fileKind, handleFile, emCommand, importSummary, hidesSome, tipoPill, setWake, wakeState: () => ({ on: wakeOn, lock: !!wakeLock }), showSplash, hideSplash, setStandby, standbyOn, room: () => emRoom } };   // _test: solo para tests/control.test.js
+  window.ShowtimePanel = { reload: () => { loadState(); renderAll(); }, _test: { winState: () => Array.from(WIN.entries()).map(([id, x]) => ({ id, name: x.name, vista: x.vista, zona: x.zona, standby: !!x.standby, fs: x.fs })), setWinVista, setWinStandby, closeLive, openGestor, gestorVisible, emProdMessage, emRegenProd, hitoChips, emUrl, prodBigTitle, fileKind, handleFile, emCommand, importSummary, hidesSome, tipoPill, setWake, wakeState: () => ({ on: wakeOn, lock: !!wakeLock }), showSplash, hideSplash, setStandby, standbyOn, room: () => emRoom,
+    emSnapshot, emCloseDay, emDay, qrDevices, rmZones, setRmZone: z => { RM_ZONE = z; renderCast(); }, setRoom: r => { emRoom = r; }, fakeEm: (em, st) => { EM = em; EMST = st; }, emStateHtml } };   // _test: solo para tests/control.test.js
 })();

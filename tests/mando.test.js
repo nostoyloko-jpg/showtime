@@ -40,6 +40,35 @@
   const blk = (s, name) => C.buildBlocks(s, { mode: 'all', day: 'all' }).find(b => b.name === name);
   const CFG = { delayBlock: { all: {} } };
 
+  // ── Mando de UNA zona (dec. 102) y chat (dec. 104) ──
+  test('Mando de zona: zoneDenied deja solo lo de su zona (▶■, En hora, Alargar, CALL, retrasos, Confidence)', async () => {
+    const { s, P, K } = fest(), z = (op, args) => M.zoneDenied(s, { op, args }, K);
+    eq(z('start', { key: key(s, 'Acústico') }), null, 'su banda');
+    ok(/solo de su zona/.test(z('stop', { key: key(s, 'Banda A') })), 'banda de otra zona');
+    ok(z('onTime', { key: key(s, 'Banda B') }) && z('stretch', { key: key(s, 'Banda B'), on: true }), 'En hora / Alargar de otra zona');
+    eq(z('callOk', { key: C.callKey(blk(s, 'Acústico')) }), null); ok(z('callOk', { key: C.callKey(blk(s, 'Cabeza')) }), 'CALL de otra zona');
+    eq(z('delay', { zones: [K] }), null); ok(z('delay', { zones: 'all' })); ok(z('delay', { zones: [K, P] })); ok(z('delay', { zones: [P] }));
+    eq(z('flash', { to: ['backstage', 'manager'] }), null, 'Manager/Backstage: de todos');
+    eq(z('flash', { to: ['confidence'], zones: [K] }), null); ok(z('flash', { to: null, zones: null }), 'a todas las Confidence: no'); ok(z('flash', { to: ['confidence'], zones: [P] }));
+    eq(z('flashOff', {}), null); eq(z('chat', { text: 'x' }), null);
+    eq(M.zoneDenied(s, { op: 'stop', args: { key: key(s, 'Banda A') } }, null), null, 'mando general: todo');
+    ok(z('start', { key: 'no-existe' }), 'banda que no existe: no');
+  });
+  test('Chat del mando: la orden se valida y la firma es «[Zona] Nombre»', async () => {
+    eq(M.checkCmd({ op: 'chat', args: { text: 'Hola', name: 'Ana' } }), null);
+    ok(M.checkCmd({ op: 'chat', args: { text: '   ' } })); ok(M.checkCmd({ op: 'chat', args: { text: 'x'.repeat(301) } })); ok(M.checkCmd({ op: 'chat', args: { text: 'x', name: 'n'.repeat(41) } }));
+    eq(M.checkCmd({ op: 'chatsync', args: {} }), null);
+    eq(M.chatSign('Escenario 2', 'Ana'), '[Escenario 2] Ana');
+    eq(M.chatSign('Escenario 2', ''), '[Escenario 2] Stage Manager');
+    eq(M.chatSign(null, 'Luis'), '[Stage Manager] Luis');
+    eq(M.chatSign('Carpa', '[Admin] Pepe'), '[Carpa] Admin Pepe', 'no se pueden colar corchetes');
+  });
+  test('«Solo hoy»: targets usa la jornada que emite el Panel si se le pasa', async () => {
+    const { s, P } = fest();
+    eq(M.targets(s, P, at('20:00'), JOR).length, 4);
+    eq(M.targets(s, P, at('20:00'), '2026-07-11').length, 0, 'otra jornada: nada');
+  });
+
   // ── Qué banda se marca ────────────────────────────────────────────────
   test('bandas de la zona en la jornada, en orden (sin tareas ni hitos)', async () => {
     const F = fest();

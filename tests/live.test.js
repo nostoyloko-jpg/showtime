@@ -503,6 +503,52 @@
     ok(/<button id="stbbtn"[^>]*title="Standby · Modo Cartel/.test(D.src('live.html')), 'botón en los controles de la Live');
   });
 
+  // ── Telemetría QR (dec. 103) y «Solo hoy» (dec. 105) ──
+  test('Telemetría QR: el latido lleva la vista, la zona de Confidence, el tipo de dispositivo y el id de Producción', async () => {
+    const c = await staffL('?vista=confidence&zona=esc1');
+    let i = c.R().o.info();
+    eq(i.v, 'confidence'); eq(i.z, 'esc1'); ok(['movil', 'tablet', 'ordenador'].indexOf(i.d) >= 0, 'tipo: ' + i.d); eq(i.p, null);
+    const b = await staffL('?vista=backstage');
+    i = b.R().o.info(); eq(i.v, 'backstage'); eq(i.z, null, 'sin zona fuera de Confidence');
+    ROOM = ROOM || await E.newRoom();
+    const p = arrancar({ search: '?vista=manager', hash: hashOf(E.productionUrl(ROOM, 'http://x/', 'prod_001')) });
+    eq(p.R().o.info().p, 'prod_001'); eq(p.R().o.info().v, 'manager');
+  });
+  function festHoy(a, b) {
+    const C = require('../core.js'), n = Math.floor(C.nowAbs()), hm = m => C.fmtHM(((m % 1440) + 1440) % 1440);
+    const jor = C.jornadaOfAbs({ event: { dayCutoff: '06:00' } }, n + a);
+    let s = C.newFestival({ nombre: 'Ciclo', fechaInicio: jor, fechaFin: jor, dayCutoff: '06:00' }).state;
+    s = C.addStage(s, 'Principal').state;
+    s = C.addArtist(s, 'show', { jornada: jor, nombre: 'Banda', escenarioId: s.escenarios[0].id, inicio: hm(n + a), fin: hm(n + b) }).state;
+    return { s, jor };
+  }
+  test('Solo hoy: jornada en curso → la Live normal; cerrada en el Dashboard → «JORNADA FINALIZADA»; al llegar la siguiente, vuelve', async () => {
+    const t = await staffL('?vista=manager'), Dt = t.env.win.ShowtimeDatos, el = id => t.env.getEl(id);
+    const { s, jor } = festHoy(-10, 60);
+    Dt.loadSnapshot(snapL('es', s, { config: { lang: 'es', mode: 'all', day: jor }, scope: { day: jor, closed: false } }));
+    eq(el('jfin').hidden, true, 'suena la banda: pantalla normal');
+    Dt.loadSnapshot(snapL('es', Object.assign({}, s, { artists: [] }), { config: { lang: 'es', mode: 'all', day: jor }, scope: { day: jor, closed: true } }));
+    eq(el('jfin').hidden, false, 'cerrada a mano');
+    ok(/cerrada en el Dashboard/.test(el('jfin-sub').textContent) && /hasta que arranque la siguiente/.test(el('jfin-sub').textContent));
+    Dt.loadSnapshot(snapL('en', Object.assign({}, s, { artists: [] }), { config: { lang: 'en', mode: 'all', day: jor }, scope: { day: jor, closed: true } }));
+    ok(/closed on the Dashboard/.test(el('jfin-sub').textContent), 'en inglés: ' + el('jfin-sub').textContent);
+    Dt.loadSnapshot(snapL('es', s, { config: { lang: 'es', mode: 'all', day: jor }, scope: { day: jor, closed: false } }));
+    eq(el('jfin').hidden, true, 'reabierta (o la siguiente jornada)');
+    eq(t.env.errors.length, 0, t.env.errors.join(' | '));
+  });
+  test('Solo hoy: al terminar todo lo del día (sin cerrar a mano) también sale «JORNADA FINALIZADA»; en las ventanas del Mac, nunca', async () => {
+    const t = await staffL('?vista=backstage'), Dt = t.env.win.ShowtimeDatos, el = id => t.env.getEl(id);
+    const { s, jor } = festHoy(-120, -60);
+    Dt.loadSnapshot(snapL('es', s, { config: { lang: 'es', mode: 'all', day: jor }, scope: { day: jor, closed: false } }));
+    eq(el('jfin').hidden, false, 'ya no queda nada');
+    ok(/sin nada más por hoy/.test(el('jfin-sub').textContent));
+    // Sin «scope» (emisión antigua) o en el Mac (sin QR): nada de esto
+    Dt.loadSnapshot(snapL('es', s, { config: { lang: 'es', mode: 'all', day: jor } }));
+    eq(el('jfin').hidden, true, 'sin scope: pantalla normal');
+    const mac = arrancar({ storage: { 'showtime.festival': JSON.stringify(s), 'showtime.config': JSON.stringify({ day: jor, mode: 'all' }) } });
+    eq(mac.env.getEl('jfin').hidden, true, 'la Live del Mac no se cierra');
+  });
+
   (async () => {
     let pass = 0, fail = 0;
     for (const [name, fn] of tests) { try { await fn(); pass++; } catch (e) { fail++; console.log('  ✗ ' + name + '\n      ' + (e && e.message || e)); } }
