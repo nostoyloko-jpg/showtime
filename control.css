@@ -903,9 +903,10 @@ body[data-ps="stage"] .imp-prev thead th{background:#000}
 /* ── Modales sólidos (patrón Raycast Pro): en Safari/WebKit el cristal translúcido dejaba ver la tabla de detrás.
       Fondo de pantalla oscurecido y desenfocado; la caja, opaca y sin backdrop-filter propio. ── */
 .modal{background:rgba(0,0,0,.75);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
-.modal-box,.imp-box{--modal-bg:#0d0e11;background:var(--modal-bg);-webkit-backdrop-filter:none;backdrop-filter:none;border:1px solid rgba(255,255,255,.1);box-shadow:0 24px 64px rgba(0,0,0,.8),0 2px 8px rgba(0,0,0,.5)}
+/* dec. 136: todas las ventanas con el mismo acabado — degradado con volumen, filo de luz arriba y sombra profunda */
+.modal-box,.imp-box{--modal-bg:#0e1015;background:linear-gradient(180deg,#16181f,#0e1015);-webkit-backdrop-filter:none;backdrop-filter:none;border:1px solid rgba(255,255,255,.14);box-shadow:0 24px 64px rgba(0,0,0,.85),inset 0 1px 0 rgba(255,255,255,.08)}
 body[data-ps="stage"] .modal{background:rgba(0,0,0,.85)}
-body[data-ps="stage"] .modal-box,body[data-ps="stage"] .imp-box{--modal-bg:#000;border-color:rgba(255,214,0,.55)}
+body[data-ps="stage"] .modal-box,body[data-ps="stage"] .imp-box,body[data-ps="stage"] .spot-box{--modal-bg:#000;background:#000;border-color:rgba(255,214,0,.55)}
 
 /* ── Modo Foco: micro-píldora del tipo (en vez del cuadradito de color, ambiguo a distancia) ── */
 .tpill{display:none;flex:0 0 106px;width:106px;box-sizing:border-box;text-align:center;align-items:center;justify-content:center;height:22px;padding:0 7px;border-radius:6px;font:800 11px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;letter-spacing:.1em;color:var(--pc);background:rgba(255,255,255,.05);border:1px solid var(--pc);background:color-mix(in srgb,var(--pc) 16%,transparent);border:1px solid color-mix(in srgb,var(--pc) 55%,transparent)}
@@ -991,7 +992,7 @@ td input:focus,td select:focus,.imp-src textarea:focus,.imp-prev td input[type=t
 /* ═══ Paleta de comandos (⌘K / «/») — estilo Raycast/Linear ═══ */
 .spot{position:fixed;inset:0;z-index:300;display:flex;align-items:flex-start;justify-content:center;padding:12vh 16px 16px;background:rgba(0,0,0,.45);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
 .spot[hidden]{display:none}
-.spot-box{width:min(600px,100%);max-height:70vh;display:flex;flex-direction:column;border-radius:14px;overflow:hidden;background:var(--glass-bg,rgba(22,24,30,.92));backdrop-filter:var(--glass-blur,blur(24px));-webkit-backdrop-filter:var(--glass-blur,blur(24px));border:1px solid var(--hair2);box-shadow:0 24px 70px rgba(0,0,0,.6)}
+.spot-box{width:min(600px,100%);max-height:70vh;display:flex;flex-direction:column;border-radius:14px;overflow:hidden;background:linear-gradient(180deg,#16181f,#0e1015);border:1px solid rgba(255,255,255,.14);box-shadow:0 24px 64px rgba(0,0,0,.85),inset 0 1px 0 rgba(255,255,255,.08)}
 .spot-top{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--hair)}
 .spot-lupa{width:18px;height:18px;color:var(--muted);flex:0 0 auto}
 #spot-q{flex:1;min-width:0;height:28px;padding:0;border:0;background:transparent;box-shadow:none;color:var(--text);font:inherit;font-size:16px}
@@ -1143,7 +1144,7 @@ td input:focus,td select:focus,.imp-src textarea:focus,.imp-prev td input[type=t
 .hub-h,.gv-sec{font-size:11px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:#8a8f98;margin:0 0 8px;padding:2px 4px 0}
 .hub-h b,.gv-sec b,#modal-body .gv-sec b{font-weight:700;color:#8a8f98}
 .hub-h .ic,.gv-sec .ic{width:14px;height:14px;opacity:.75;color:#8a8f98}
-.hub-card,.gv-card{background:rgba(255,255,255,.025);border:1px solid var(--hair2);border-radius:10px;padding:4px 6px;margin-bottom:12px}
+.hub-card,.gv-card{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:4px 6px;margin-bottom:12px}
 .hub-list>*+*{border-top:1px solid var(--hair)}
 .hub-list .hub-row,.hub-list .mitem{border-radius:6px}
 .hub-acts{margin-top:0;padding-top:4px;flex-direction:column}
@@ -1156,7 +1157,14 @@ td input:focus,td select:focus,.imp-src textarea:focus,.imp-prev td input[type=t
 .gv-card .gv-qrl{padding:2px 0}
 
 /* ═══ Tarjetas de los modales (dec. 111): Evento, Hoja de ruta y Pegar horario — mismo acabado que el resto ═══ */
-.mcard{background:rgba(255,255,255,.025);border:1px solid var(--hair2);border-radius:10px;padding:12px;margin-bottom:12px}
+.mcard{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px;margin-bottom:12px}
+/* Campos dentro de las ventanas (dec. 136): fondo profundo, borde nítido y halo blanco al escribir. background-color, nunca background (dec. 112) */
+:where(body:not([data-ps="stage"])) :is(.modal-box,.imp-box) :is(input[type=text],input[type=number],input[type=date],input[type=time],input[type=search],input:not([type]),select,textarea){background-color:#08090c;border:1px solid rgba(255,255,255,.12)}
+:where(body:not([data-ps="stage"])) :is(.modal-box,.imp-box) :is(input[type=text],input[type=number],input[type=date],input[type=time],input[type=search],input:not([type]),select,textarea):focus{outline:none;border-color:rgba(255,255,255,.42);box-shadow:0 0 0 3px rgba(255,255,255,.07)}
+/* Pegar horario en tarjetas: lo pegado, opciones, columnas y vista previa */
+.imp-srccard,.imp-prevcard{margin-bottom:0}
+.imp-prevcard{flex:1;min-height:0;display:flex;flex-direction:column}
+.imp-prevcard .imp-prevwrap{border-color:rgba(255,255,255,.08)}
 .mcard-h{font-size:11px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:#8a8f98;margin:0 0 10px}
 .mcard .form{margin:0}
 .mcard .dw-row:last-child{margin-bottom:0}

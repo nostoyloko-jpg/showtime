@@ -308,6 +308,8 @@
       "soundchecks": "soundchecks",
       "Deshacer ({n})": "Undo ({n})",
       "Deshacer": "Undo",
+      "Horario a importar": "Schedule to import",
+      "Vista previa": "Preview",
       "↺ Restablecer": "↺ Reset",
       "Restablecer: anchos, alturas, filas y zoom de fábrica (doble clic en un tirador: solo las columnas de arriba)": "Reset: factory widths, heights, rows and zoom (double-click a handle: top columns only)",
       "Anchos, alturas, filas y zoom de fábrica en todas las ventanas Live abiertas": "Factory widths, heights, rows and zoom in every open Live window",

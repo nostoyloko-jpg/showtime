@@ -821,8 +821,8 @@
   test('Modales sólidos (Safari): fondo oscurecido con desenfoque y caja opaca sin cristal, en Studio y en Stage', () => {
     const css = D.src('control.css'), tail = css.slice(css.lastIndexOf('/* ── Modales sólidos'));
     ok(/\.modal\{background:rgba\(0,0,0,\.75\);-webkit-backdrop-filter:blur\(8px\);backdrop-filter:blur\(8px\)\}/.test(tail));
-    ok(/\.modal-box,\.imp-box\{--modal-bg:#0d0e11;background:var\(--modal-bg\);-webkit-backdrop-filter:none;backdrop-filter:none;border:1px solid rgba\(255,255,255,\.1\);box-shadow:0 24px 64px rgba\(0,0,0,\.8\),0 2px 8px rgba\(0,0,0,\.5\)\}/.test(tail), 'Studio (base): opaco');
-    ok(/body\[data-ps="stage"\] \.modal-box,body\[data-ps="stage"\] \.imp-box\{--modal-bg:#000/.test(tail), 'Stage: negro');
+    ok(/\.modal-box,\.imp-box\{--modal-bg:#0e1015;background:linear-gradient\(180deg,#16181f,#0e1015\);-webkit-backdrop-filter:none;backdrop-filter:none;border:1px solid rgba\(255,255,255,\.14\);box-shadow:0 24px 64px rgba\(0,0,0,\.85\),inset 0 1px 0 rgba\(255,255,255,\.08\)\}/.test(tail), 'Studio (base): opaco, con degradado y filo de luz (dec. 136)');
+    ok(/body\[data-ps="stage"\] \.modal-box,body\[data-ps="stage"\] \.imp-box,body\[data-ps="stage"\] \.spot-box\{--modal-bg:#000;background:#000;/.test(tail), 'Stage: negro (también ⌘K)');
     ok(css.indexOf('/* ── Modales sólidos') > css.indexOf('/* ── Cristal'), 'va después del cristal (gana)');
   });
 
@@ -1183,7 +1183,7 @@
     ok(/\.cfg-s h3\{font-size:11px;letter-spacing:\.12em;text-transform:uppercase;font-weight:700;color:#8a8f98;margin:0\}/.test(css), 'Configuración: eyebrow gris pizarra');
     ok(!/\.cfg-s h3\{[^}]*var\(--accent\)/.test(css), 'sin el rojo del acento');
     ok(/\.hub-h,\.gv-sec\{font-size:11px;letter-spacing:\.12em;text-transform:uppercase;font-weight:700;color:#8a8f98/.test(css), 'misma cabecera en el panel y en el gestor');
-    ok(/\.hub-card,\.gv-card\{background:rgba\(255,255,255,\.025\);border:1px solid var\(--hair2\);border-radius:10px;padding:4px 6px;margin-bottom:12px\}/.test(css), 'tarjeta común');
+    ok(/\.hub-card,\.gv-card\{background:rgba\(255,255,255,\.03\);border:1px solid rgba\(255,255,255,\.08\);border-radius:10px;padding:4px 6px;margin-bottom:12px\}/.test(css), 'tarjeta común');
     ok(/\.hub-list>\*\+\*\{border-top:1px solid var\(--hair\)\}/.test(css), 'separadores de 1 px entre filas');
     const hub = html.slice(html.indexOf('id="m-hub"'), html.indexOf('<button id="wake"'));
     eq((hub.match(/class="hub-card/g) || []).length, 3, 'tres tarjetas: pantallas HDMI, acciones locales y emisión');
@@ -1236,7 +1236,7 @@
   });
   test('Modales en tarjetas (dec. 111): Evento (2), Hoja de ruta (3) y Pegar horario (opciones y columnas), sin tocar ningún id', () => {
     const css = D.src('control.css'), js = D.src('control.js'), html = D.src('index.html');
-    ok(/\.mcard\{background:rgba\(255,255,255,\.025\);border:1px solid var\(--hair2\);border-radius:10px;padding:12px;margin-bottom:12px\}/.test(css), 'tarjeta');
+    ok(/\.mcard\{background:rgba\(255,255,255,\.03\);border:1px solid rgba\(255,255,255,\.08\);border-radius:10px;padding:12px;margin-bottom:12px\}/.test(css), 'tarjeta');
     ok(/\.mcard-h\{font-size:11px;letter-spacing:\.12em;text-transform:uppercase;font-weight:700;color:#8a8f98/.test(css), 'cabecera gris pizarra');
     // Evento: Datos generales (nombre, jornadas, corte) y Tiempos de escenario (CALL y changeover con sus notas)
     const ff = js.slice(js.indexOf('function festForm('), js.indexOf('function readFestForm('));
@@ -2042,6 +2042,17 @@ const miss = [...found].filter(k => !I.txHas(k) && !/^(OK|CALL|SC|Live|Raycast|S
     t.T.resetWinLayout(a.id);
     ok(msgs.some(m => m.type === 'resetLayout'), 'la ventana recibe la orden'); eq(t.T.winState()[0].filas, null, 'y vuelve a Auto');
     ok(/data-gv="reset"/.test(D.src('control.js')) && /openIds\(\)\.forEach\(id => resetWinLayout\(id\)\)/.test(D.src('control.js')), 'botón en la cabecera del gestor: todas las abiertas');
+  });
+
+  test('Dec. 136: todas las ventanas con el mismo acabado — degradado, tarjetas, campos de alto contraste; Pegar horario en 4 tarjetas', () => {
+    const css = D.src('control.css'), html = D.src('index.html');
+    ok(/\.spot-box\{[^}]*background:linear-gradient\(180deg,#16181f,#0e1015\);border:1px solid rgba\(255,255,255,\.14\);box-shadow:0 24px 64px rgba\(0,0,0,\.85\),inset 0 1px 0 rgba\(255,255,255,\.08\)\}/.test(css), '⌘K, igual que las ventanas');
+    ok(css.indexOf(':where(body:not([data-ps="stage"])) :is(.modal-box,.imp-box) :is(input[type=text],input[type=number],input[type=date],input[type=time],input[type=search],input:not([type]),select,textarea){background-color:#08090c;border:1px solid rgba(255,255,255,.12)}') >= 0, 'campos: fondo #08090c y borde nítido (background-color, dec. 112); Stage conserva su negro y amarillo');
+    ok(/,select,textarea\):focus\{outline:none;border-color:rgba\(255,255,255,\.42\);box-shadow:0 0 0 3px rgba\(255,255,255,\.07\)\}/.test(css), 'halo blanco al escribir');
+    const imp = html.slice(html.indexOf('<div id="imp"'), html.indexOf('<datalist id="zones-dl"'));
+    eq((imp.match(/<div class="mcard-h"[^>]*>([^<]+)<\/div>/g) || []).map(x => x.replace(/<[^>]+>/g, '')).join(' · '), 'Horario a importar · Opciones de importación · Columnas del archivo · Vista previa', 'Pegar horario: 4 tarjetas en orden');
+    ok(/class="mcard imp-card imp-srccard">[\s\S]*id="imp-text"/.test(imp) && /class="mcard imp-card imp-prevcard"><div class="mcard-h"[^>]*>Vista previa<\/div><div class="imp-prevwrap"><table id="imp-prev"/.test(imp), 'texto y vista previa en su tarjeta; los id no cambian');
+    ok(/\.imp-prevcard\{flex:1;min-height:0;display:flex;flex-direction:column\}/.test(css), 'la vista previa sigue ocupando el alto que sobra');
   });
 
   // ── Ejecutor ─────────────────────────────────────────────────────────

@@ -13,8 +13,8 @@
 <meta name="apple-mobile-web-app-title" content="Showtime">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
-<link rel="stylesheet" href="control.css?v=20261148">
-<link rel="stylesheet" href="marca.css?v=20261148">
+<link rel="stylesheet" href="control.css?v=20261149">
+<link rel="stylesheet" href="marca.css?v=20261149">
 </head>
 <body>
 <div id="splash" class="splash" hidden></div>
@@ -477,6 +477,7 @@
   <div class="modal-box imp-box" role="dialog" aria-modal="true" aria-labelledby="imp-title">
     <div class="imp-head"><h2 id="imp-title" class="sr-only" data-i18n>Pegar horario completo</h2><div class="addtabs" role="tablist" aria-label="Añadir" data-i18n-aria><button type="button" role="tab" data-addtab="paste" aria-selected="true" class="on" data-i18n><svg class="ic"><use href="#i-bolt"/></svg>Pegar horario completo <small data-i18n>Excel · CSV · PDF</small></button><button type="button" role="tab" data-addtab="row" aria-selected="false" class="" data-i18n><svg class="ic"><use href="#i-plus"/></svg>Añadir 1 fila a mano</button></div><button id="imp-close" class="iconsq" title="Cerrar (Esc)" data-i18n-title><svg class="ic"><use href="#i-x"/></svg></button></div>
     <p id="imp-notice" class="imp-notice" role="status" hidden></p>
+    <div class="mcard imp-card imp-srccard"><div class="mcard-h" data-i18n>Horario a importar</div>
     <div class="imp-src">
       <textarea id="imp-text" spellcheck="false" placeholder="Pega aquí (⌘V) celdas copiadas de Excel, Numbers o Google Sheets, o texto de un PDF, WhatsApp o correo.&#10;&#10;Ejemplos:&#10;21:00-22:15 Los Ejemplos Principal&#10;VIERNES 10 JULIO · 23:30 Cabeza de Cartel (Carpa)" data-i18n-placeholder></textarea>
       <div class="imp-side">
@@ -485,6 +486,7 @@
         <p class="hint" data-i18n>Excel (.xlsx), CSV, TSV o texto. O arrastra el archivo a la ventana.</p>
         <p id="imp-kind" class="imp-kind"></p>
       </div>
+    </div>
     </div>
     <!-- Tarjetas (dec. 111): opciones de importación y, si es una tabla, la columna de cada dato. Los id no cambian. -->
     <div class="mcard imp-card"><div class="mcard-h" data-i18n>Opciones de importación</div>
@@ -497,7 +499,7 @@
     <div id="imp-new" class="imp-new"></div>
     </div>
     <div class="mcard imp-card imp-mapcard"><div class="mcard-h" data-i18n>Columnas del archivo</div><div id="imp-map" class="imp-map"></div></div>
-    <div class="imp-prevwrap"><table id="imp-prev" class="imp-prev"></table></div>
+    <div class="mcard imp-card imp-prevcard"><div class="mcard-h" data-i18n>Vista previa</div><div class="imp-prevwrap"><table id="imp-prev" class="imp-prev"></table></div></div>
     <details id="imp-ign" class="imp-ign" hidden><summary></summary><ul></ul></details>
     <div class="imp-foot"><span id="imp-sum" class="imp-sum"></span><div class="grow"></div><button id="imp-cancel" class="btn" data-i18n>Cancelar</button><button id="imp-go" class="btn primary">Importar</button></div>
   </div>
@@ -506,20 +508,20 @@
 <datalist id="zones-dl"></datalist>
 <div id="toast" class="toast" hidden></div>
 
-<script src="i18n.js?v=20261148"></script>
-<script src="core.js?v=20261148"></script>
-<script src="meteo.js?v=20261148"></script>
-<script src="datos.js?v=20261148"></script>
-<script src="importar.js?v=20261148"></script>
-<script src="xlsx.js?v=20261148"></script>
-<script src="qr.js?v=20261148"></script>
-<script src="emision.js?v=20261148"></script>
-<script src="mando.js?v=20261148"></script>
-<script src="vistas.js?v=20261148"></script>
-<script src="log.js?v=20261148"></script>
-<script src="print.js?v=20261148"></script>
-<script src="marca.js?v=20261148"></script>
-<script src="control.js?v=20261148"></script>
-<script src="pwa.js?v=20261148"></script>
+<script src="i18n.js?v=20261149"></script>
+<script src="core.js?v=20261149"></script>
+<script src="meteo.js?v=20261149"></script>
+<script src="datos.js?v=20261149"></script>
+<script src="importar.js?v=20261149"></script>
+<script src="xlsx.js?v=20261149"></script>
+<script src="qr.js?v=20261149"></script>
+<script src="emision.js?v=20261149"></script>
+<script src="mando.js?v=20261149"></script>
+<script src="vistas.js?v=20261149"></script>
+<script src="log.js?v=20261149"></script>
+<script src="print.js?v=20261149"></script>
+<script src="marca.js?v=20261149"></script>
+<script src="control.js?v=20261149"></script>
+<script src="pwa.js?v=20261149"></script>
 </body>
 </html>
