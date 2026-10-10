@@ -97,8 +97,8 @@ td input{height:30px;border-radius:5px;border:1px solid transparent;background-c
 td input:hover{border-color:var(--line2)}
 td input:focus{outline:none;background-color:var(--field)}
 td.t input{width:68px;text-align:center;font-weight:700}
-td.n{position:relative;width:200px;min-width:160px;max-width:260px}   /* Notas legibles en modo normal (dec. 120); en Foco la columna se oculta */
-td.n input{width:200px;min-width:160px;max-width:260px}
+td.n{position:relative;min-width:88px}   /* Notas (dec. 121): elástica, se queda con el sitio que sobra (0 desplazamiento a 1440 px; ~245 px a 1920). Nota entera: al pasar el ratón (title) o al escribir (320 px). En Foco se oculta */
+td.n input{width:100%;min-width:88px}
 td.n input:focus{position:absolute;right:3px;left:auto;top:50%;transform:translateY(-50%);width:320px;max-width:none;z-index:6;box-shadow:0 6px 20px rgba(0,0,0,.5)}   /* Notas: se ensancha al escribir */
 td select{height:30px;width:118px}
 td.mod input,td.mod select{border-color:rgba(255,197,51,.6);background-color:rgba(255,197,51,.08)}

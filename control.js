@@ -458,7 +458,8 @@
     const v = k => C.fieldValue(a, mode, k);
     const isMod = k => m.indexOf(k) >= 0;
     const td = (k, cls, inner) => '<td class="' + cls + (isMod(k) ? ' mod' : '') + '"' + (isMod(k) ? ' title="' + tx('Cambiado desde la última importación/exportación') + '"' : '') + '>' + inner + '</td>';
-    const inp = (k, ph) => '<input type="text" data-k="' + k + '" value="' + esc(v(k)) + '" data-orig="' + esc(v(k)) + '"' + (ph ? ' placeholder="' + ph + '"' : '') + ' autocomplete="off" spellcheck="false">';
+    const inp = (k, ph) => '<input type="text" data-k="' + k + '" value="' + esc(v(k)) + '" data-orig="' + esc(v(k)) + '"' + (ph ? ' placeholder="' + ph + '"' : '')
+      + (k === 'notas' ? ' title="' + esc(v('notas') || '') + '"' : '') + ' autocomplete="off" spellcheck="false">';   // Notas: la nota entera al pasar el ratón (dec. 121)
     const esc0 = C.getEscenario(FEST, a.escenarioId);
     const scol = safeColor(esc0 && esc0.color, '#555');
     const col = hex6(C.artistColor(FEST, a), '#888888');
@@ -837,6 +838,7 @@
       const el = e.target;
       if (el.matches('select, input[type=color]')) applyEdit(el);
     });
+    tb.addEventListener('input', e => { if (e.target.dataset && e.target.dataset.k === 'notas') e.target.title = e.target.value; });   // el aviso flotante sigue a lo que se escribe
     tb.addEventListener('click', e => {
       const lv = e.target.closest('[data-act="start"], [data-act="stop"]');
       if (lv) { registerReal(lv.closest('tr'), lv.dataset.act === 'start' ? 'i' : 'f'); return; }

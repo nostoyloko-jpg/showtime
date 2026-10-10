@@ -1824,9 +1824,21 @@ const miss = [...found].filter(k => !I.txHas(k) && !/^(OK|CALL|SC|Live|Raycast|S
     const css = D.src('control.css');
     ok(/\.tpill\{display:none;flex:0 0 106px;width:106px;box-sizing:border-box;text-align:center;align-items:center;justify-content:center;/.test(css), 'píldora de 106 px fijos');
     ok(!/\.tpill\{[^}]*min-width/.test(css), 'sin ancho mínimo que varíe según el texto');
-    ok(/td\.n\{position:relative;width:200px;min-width:160px;max-width:260px\}/.test(css) && /td\.n input\{width:200px;min-width:160px;max-width:260px\}/.test(css), 'Notas a 200 px (160–260)');
     ok(/td\.n input:focus\{[^}]*width:320px;max-width:none;/.test(css), 'al escribir se sigue ensanchando a 320 px');
     ok(/body\.focus #tbl \.c-n,body\.focus #tbl td\.n,/.test(css), 'en Foco, Notas sigue oculta');
+  });
+
+  test('Dec. 121: Notas elástica (se queda con el sitio que sobra, nunca obliga a desplazar) y la nota entera al pasar el ratón', () => {
+    const css = D.src('control.css'), js = D.src('control.js');
+    ok(/td\.n\{position:relative;min-width:88px\}/.test(css) && /td\.n input\{width:100%;min-width:88px\}/.test(css), 'sin ancho fijo: la columna crece con la pantalla');
+    ok(!/td\.n(?![\w-])[^{]*\{[^}]*width:(96|140|170|200)px/.test(css), 'ningún ancho fijo que empuje la tabla');
+    ok(/td\.n input:focus\{position:absolute;[^}]*width:320px;max-width:none;z-index:6;/.test(css), 'al escribir flota a 320 px');
+    ok(/body\.focus #tbl \.c-n,body\.focus #tbl td\.n,/.test(css), 'en Foco sigue oculta');
+    ok(/\(k === 'notas' \? ' title="' \+ esc\(v\('notas'\) \|\| ''\) \+ '"' : ''\)/.test(js), 'title con la nota entera');
+    ok(/tb\.addEventListener\('input', e => \{ if \(e\.target\.dataset && e\.target\.dataset\.k === 'notas'\) e\.target\.title = e\.target\.value; \}\)/.test(js), 'el title sigue a lo que se escribe');
+    const t = dashboard(), html = ultimo(t, 'tbody');
+    ok(/<input type="text" data-k="notas" value="[^"]*" data-orig="[^"]*" title="[^"]*" autocomplete/.test(html), 'cada nota de la tabla lleva su title');
+    ok(!/data-k="nombre"[^>]*title=/.test(html), 'los demás campos, sin title');
   });
 
   // ── Ejecutor ─────────────────────────────────────────────────────────
