@@ -861,6 +861,15 @@
     eq(C.eventLogo({ event: { showtimeLogo: big } }), '', 'un .json con un logo enorme o raro: se ignora');
     ok(!C.setEventLogo(null, L).ok);
   });
+
+  test('Dec. 134: las zonas nuevas no nacen rojas (paleta que empieza en azul); las que ya existen guardan su color', () => {
+    eq(C.STAGE_COLORS.join(), '#38bdf8,#818cf8,#34d399,#fbbf24,#c084fc,#f472b6,#a78bfa,#2dd4bf');
+    ok(!C.STAGE_COLORS.some(c => /^#(e94560|ff6363|ff3b30|ff6b6b)$/i.test(c)), 'ningún rojo');
+    let s = C.newFestival({ nombre: 'X', fechaInicio: '2026-10-10' }).state;
+    s = C.addStage(s, 'Principal').state; s = C.addStage(s, 'Carpa').state;
+    eq(s.escenarios[0].color, '#38bdf8', 'la primera, azul'); eq(s.escenarios[1].color, '#818cf8');
+    eq(C.addStage(s, 'Otra', '#e94560').state.escenarios[2].color, '#e94560', 'un color elegido a mano se respeta');
+  });
   let pass = 0; const fails = [];
   tests.forEach(([name, fn]) => {
     try { fn(); pass++; } catch (e) { fails.push([name, e.message]); }

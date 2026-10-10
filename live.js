@@ -38,6 +38,7 @@
   let JFIN = false;                       // «Solo hoy» (QR): jornada cerrada en el Dashboard o ya terminada
   let TIME_OFFSET = 0;
   let ACCENT = '#e94560', CALLC = '#ffb347';
+  const TASK_COL = '#7dd3fc';   // tareas en el cronograma: cian técnico fijo, borde punteado y relleno suave (dec. 134)
   const ZOOM_STEPS = [20, 30, 45, 60, 90, 120, 180, 240, 360];
   let zIdx = (() => { const v = pget(P.zoom, 3); return (v >= 0 && v < ZOOM_STEPS.length) ? v : 3; })();
   let VISIBLE = ZOOM_STEPS[zIdx];
@@ -93,7 +94,6 @@
     applyInfoWidth();   // ancho del panel de info: manual si lo arrastraste; si no, según el nombre más largo del día
 
     $('evn-name').textContent = NOFEST ? tx('SIN EVENTO') : (DEMO ? 'DEMO · ' : '') + C.eventName(FEST, tx);
-    $('evn-mode').textContent = tx(vt[0]) + ' · ';
     const msg = NOFEST ? tx(Dt.READONLY ? 'ESPERANDO LOS DATOS DE LA SALA…' : 'SIN EVENTO CARGADO · ábrelo en el Dashboard')
       : DAY_MISSING ? tx('EL {d} NO TIENE {w} · elige otro día', { d: fmtDay(DAY_MISSING), w: tx(vt[1]) })
       : '';
@@ -238,7 +238,7 @@
       const x1 = xOf(block.si), x2 = xOf(end);
       const bh = compact ? Math.max(12, H - 22) * (task ? 0.8 : 1) : H * (task ? 0.36 : 0.52);
       const by = compact ? 14 + (Math.max(12, H - 22) - bh) / 2 : (H - bh) / 2, bw = x2 - x1;
-      const col = safeColor(task ? (block.stageColor || '#7dd3fc') : block.color, '#888');
+      const col = task ? TASK_COL : safeColor(block.color, '#888');   // dec. 134: la tarea siempre en su cian técnico (no hereda el color de la zona)
       ctx.save();
       const r = Math.min(10, bh / 2);
       ctx.beginPath();

@@ -691,7 +691,8 @@
     return { ok: true, state: next, changed: JSON.stringify(state.event) !== JSON.stringify(next.event) };
   }
 
-  const STAGE_COLORS = ['#e94560', '#4fc3f7', '#1de9b6', '#ffb347', '#c77dff', '#84fab0', '#f77f00', '#a8edea'];
+  // dec. 134: la primera zona ya no nace roja (el rojo es de las alertas). Solo para zonas NUEVAS: las existentes guardan su color.
+  const STAGE_COLORS = ['#38bdf8', '#818cf8', '#34d399', '#fbbf24', '#c084fc', '#f472b6', '#a78bfa', '#2dd4bf'];
 
   function addStage(state, nombre, color) {
     const n = normName(nombre);

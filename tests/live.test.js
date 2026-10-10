@@ -598,6 +598,14 @@
     ok(/if \(ROWS\) setRows\(null, true\);/.test(js), '− / + en la pantalla manda');
     ok(/filas: ROWS \|\| null, standby: STANDBY,/.test(js), 'lo cuenta al Dashboard');
   });
+
+  test('Dec. 134: bajo el reloj, solo el nombre del evento (blanco, hasta 2 líneas); las tareas del cronograma siempre en cian', () => {
+    const h = D.src('live.html'), js = D.src('live.js'), css = D.src('live.css');
+    ok(/<div id="evn"><span id="evn-name"><\/span><\/div>/.test(h) && !/evn-mode/.test(h + js + css), 'fuera «JORNADA COMPLETA · »');
+    ok(/#evn\{font-size:min\(5\.5cqw,1\.9vh\);font-weight:800;color:var\(--text\);[^}]*white-space:normal;line-height:1\.2;[^}]*-webkit-line-clamp:2/.test(css), 'blanco y hasta 2 líneas, sin «…» a mitad');
+    ok(/const TASK_COL = '#7dd3fc';/.test(js) && /const col = task \? TASK_COL : safeColor\(block\.color, '#888'\);/.test(js), 'tarea: cian fijo, no el color de la zona');
+    const t = arrancar({ storage: {} }); eq(t.env.getEl('evn-name').textContent, 'SIN EVENTO');
+  });
   test('Dec. 132: el cartel del reposo y del Standby lleva el logo del evento (si no hay, el de Showtime) y se repinta si cambia', () => {
     const js = D.src('live.js'), css = D.src('live.css');
     ok(/const lg = C\.eventLogo \? C\.eventLogo\(FEST\) : '';\s*return lg \? '<div class="evlogo"><img src="' \+ esc\(lg\) \+ '"/.test(js) && /: Mk\.banner\(\{ version:/.test(js), 'logo o cartel de Showtime');
