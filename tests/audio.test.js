@@ -653,6 +653,69 @@
     eq(rec.notes.length, 0, 'ni el retraso ni el Deshacer suenan'); eq(c.callLog().length, log0, 'log de «CALL OK» intacto');
   });
 
+  // ── Dec. 150 · compatibilidad: OK de CALL guardados por versiones anteriores (solo claves, sin hora) ──
+  /** Mando (remote.js) con el estado que llega por la emisión. */
+  async function mandoCon(snap, now) {
+    const room = await E.newRoom(), url = E.remoteUrl(room, 'http://x/');
+    const env = D.makeEnv({ cripto: true, now, hash: url.slice(url.indexOf('#')) });
+    D.cargar(env, ['i18n.js', 'core.js', 'datos.js', 'emision.js', 'mando.js', 'vistas.js']);
+    const P = env.win.ShowtimeEmision.Receptor.prototype;
+    P.start = async function () {}; P.command = async function () { return { ok: true, msg: '' }; }; P.wake = function () {};
+    env.getEl('sheet').hidden = true; env.getEl('bad').hidden = true;
+    D.cargar(env, ['remote.js']);
+    env.win.ShowtimeDatos.loadSnapshot(snap);
+    return env;
+  }
+
+  test('33 · Compatibilidad: un «showtime.callDone» antiguo (claves sin hora) sigue valiendo, se reabre con un retraso y un cliente antiguo no rompe nada', async () => {
+    const T0 = at2320(), F = festCall(T0), B = C.buildBlocks(F, { mode: 'all', day: 'all' })[0], key = C.callKey(B), legacy = C.legacyCallKey(B);
+    for (const viejo of [key, legacy]) {   // clave actual sin hora y clave aún más antigua (sin zona)
+      const rec = {}, t = dashboard({ 'showtime.festival': JSON.stringify(F), 'showtime.callDone': JSON.stringify([viejo]), [KEY]: JSON.stringify({ on: true }) }, fakeAC2(rec), T0);
+      t.env.fire('document', 'pointerdown', GEST);
+      eq(t.env.errors.length, 0, 'Dashboard arranca sin errores: ' + t.env.errors.join(' | '));
+      const c = { t, key, vcall: () => (t.env.innerLog.filter(([n]) => n === 'v-call').slice(-1)[0] || ['', ''])[1] };
+      ok(!/Banda A/.test(c.vcall()), viejo + ': Dashboard lo da por avisado');
+      ok(t.read('showtime.callDone').indexOf(viejo) >= 0, 'la clave antigua se conserva');
+      ok(t.read('showtime.callDone').some(k => k === viejo + '~' + C.callAt(B, 15)), 'el Dashboard le pone la hora efectiva de ahora (sin cambiar nada más)');
+      // Pantallas con el estado antiguo tal cual llega de un Dashboard anterior (sin sellos) y con el de ahora
+      for (const snap of [{ festival: F, config: { mode: 'all' }, callDone: [viejo], flash: null, avisos: [], meteo: null }, JSON.parse(JSON.stringify(t.T.emSnapshot()))]) {
+        ok(Array.isArray(snap.callDone), 'la emisión lleva una lista de claves, como siempre');
+        for (const v of ['manager', 'backstage']) {
+          const env = await liveCon(v, snap, null, T0), h = env.innerLog.filter(([n]) => n === 'call-list').slice(-1)[0][1];
+          eq(env.errors.length, 0, v + ': sin errores');
+          ok(v === 'manager' ? !/BANDA A/.test(h) : /AVISADO/.test(h), v + ': avisado (' + (snap.callDone.length) + ' entradas)');
+        }
+        const m0 = await mandoCon(Object.assign({}, snap, { callDone: [] }), T0);
+        ok(/Banda A/.test((m0.innerLog.filter(([n]) => n === 'calls').slice(-1)[0] || ['', ''])[1]), 'Mando sin OK: CALL pendiente (control del test)');
+        const m = await mandoCon(snap, T0);
+        eq(m.errors.length, 0, 'Mando: sin errores'); ok(!/Banda A/.test((m.innerLog.filter(([n]) => n === 'calls').slice(-1)[0] || ['', ''])[1]), 'Mando: sin CALL pendiente');
+      }
+      // Después, un retraso que mueve la hora efectiva: se reabre
+      rec.notes = [];
+      await retraso(Object.assign(c, { t }), 3); t.env.win.ShowtimePanel.reload();
+      ok(/Banda A/.test(c.vcall()), viejo + ': tras el retraso vuelve a CALL pendiente');
+      const s = await pantallas(c);
+      ok(/BANDA A/.test(s.manager) && /BANDA A/.test(s.backstage) && !/AVISADO/.test(s.backstage), 'pendiente en Manager y Backstage');
+      eq(rec.notes.length, 0, 'sin sonido (reaparece ya dentro de su ventana)');
+    }
+    // Cliente Live antiguo: escribe el OK sin hora (solo la clave) en el almacén compartido
+    const rec = {}, t = dashboard({ 'showtime.festival': JSON.stringify(F), [KEY]: JSON.stringify({ on: true }) }, fakeAC2(rec), T0);
+    const log0 = ((t.read('showtime.log') || {}).entries || []).filter(e => e.type === 'call').length;
+    t.env.storage.set('showtime.callDone', JSON.stringify([key]));
+    t.env.fire('window', 'storage', { key: 'showtime.callDone', newValue: JSON.stringify([key]) });
+    t.env.win.ShowtimePanel.reload();
+    eq(t.env.errors.length, 0, 'sin errores');
+    const vc = (t.env.innerLog.filter(([n]) => n === 'v-call').slice(-1)[0] || ['', ''])[1];
+    ok(!/Banda A/.test(vc), 'el OK de la Live antigua vale');
+    eq(((t.read('showtime.log') || {}).entries || []).filter(e => e.type === 'call').length, log0 + 1, 'se apunta una sola vez «CALL OK»');
+    ok(t.read('showtime.callDone').some(k => k === key + '~' + C.callAt(B, 15)), 'y el Dashboard le pone su hora');
+    // Producción con un cliente antiguo: el mensaje de OK de siempre ({ type:'call', from, key }) sigue valiendo
+    const t2 = dashboard({ 'showtime.festival': JSON.stringify(F) }, null, T0);
+    t2.T.emProdMessage({ type: 'call', from: 'prod_001', key });
+    ok(C.callIsDone(t2.read('showtime.callDone'), B, 15) && t2.env.errors.length === 0, 'Producción: OK sin hora → avisado, sin errores');
+    eq(E.cleanProdMsg({ type: 'call', from: 'prod_001', key }).key, key, 'el protocolo no cambia');
+  });
+
   (async () => {
     let pass = 0, fail = 0;
     for (const [name, fn] of tests) { try { await fn(); pass++; } catch (e) { fail++; console.log('  ✗ ' + name + '\n      ' + (e && e.stack || e)); } }
