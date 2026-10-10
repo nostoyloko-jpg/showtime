@@ -154,16 +154,16 @@
   });
   const clickOk = (t, key) => t.env.fire('document', 'click', { target: { closest: sel => sel === '.callok' ? { dataset: { ck: key } } : null } });
 
-  test('Ancho del panel de info: automático y estable (medido al tamaño que da el alto de la fila, dec. 141), mínimo 200 px y máximo 55 vw', () => {
+  test('Ancho del panel de info: automático y estable (medido al tamaño que da el alto de la fila, dec. 141), mínimo 160 px y máximo 55 vw', () => {
     const src = D.src('live.js');
-    ok(/const INFO_PAD = 80, INFO_MIN = 200;/.test(src) && !/INFO_REF_NAME/.test(src), 'sin el mínimo fijo de 37 px; margen y mínimo');
+    ok(/const INFO_PAD = 24, INFO_MIN = 160;/.test(src) && !/INFO_REF_NAME/.test(src), 'sin el mínimo fijo de 37 px; margen y mínimo');
     ok(/const nameSz = Math\.max\(14, realSz, fixedRows\(\) \? Math\.min\(80, 0\.3 \* rowH\) : Math\.min\(56, 0\.24 \* rowH\)\);/.test(src), 'nombre al tamaño que le da el alto de la fila (estable: no depende del propio ancho)');
     ok(/const realSz = VISTA === 'backstage' && /.test(src), 'el tamaño real solo cuenta en Backstage');
-    ok(/Math\.max\(INFO_MIN, Math\.min\(need \+ INFO_PAD, hi\)\)/.test(src) && /const hi = window\.innerWidth \* 0\.55/.test(src), 'clamp: mín. 200 px, máx. 55 vw');
+    ok(/Math\.max\(INFO_MIN, Math\.min\(need \+ INFO_PAD, hi\)\)/.test(src) && /const hi = window\.innerWidth \* 0\.55/.test(src), 'clamp: mín. 160 px, máx. 55 vw');
     ok(/\.toUpperCase\(\), 900, nameSz, fam\)/.test(src) && /C\.fmtHM\(b\.si\) \+ '–' \+ C\.fmtHM\(b\.sf\)/.test(src), 'mide el nombre (900) y el horario');
     const rec = {}, t = arrancar({ rec });
     eq(t.env.errors.length, 0, t.env.errors.join(' | '));
-    eq(rec['--info-w'], '200px', 'sin datos: el mínimo de 200 px');
+    eq(rec['--info-w'], '160px', 'sin datos: el mínimo de 160 px');
   });
   test('Ancho manual guardado gana al automático; doble clic en el tirador borra el manual y vuelve a automático', () => {
     const rec = {}, t = arrancar({ rec, storage: { 'showtime.live.infoW': '410' } });
@@ -643,6 +643,11 @@
     ok(/const timeSz = Math\.max\(11, fixedRows\(\) \? Math\.min\(30, 0\.13 \* rowH\) : Math\.min\(24, 0\.12 \* rowH\)\);/.test(js) && /500, timeSz, fam\)/.test(js), 'el horario, también a su tamaño');
     ok(/buildStrips\(visibleCount\(\)\); tick\(\);\s*applyInfoWidth\(\); requestAnimationFrame\(redraw\);/.test(js), 'al cambiar el alto (− / +, filas) se recalcula');
     ok(/function setRows\(n, quiet\) \{[\s\S]*?try \{ localStorage\.removeItem\(P\.infoW\); \} catch \(e\) \{\}[\s\S]*?setRowH\(ROW_H\);/.test(js), 'cambiar las filas borra el ancho a mano');
+  });
+
+  test('Dec. 143: menos colchón entre el texto y el separador — relleno de 16 px y margen de 24 px', () => {
+    ok(/\.info\{[^}]*padding:0 16px\}/.test(D.src('live.css')), 'relleno fijo de 16 px a cada lado');
+    ok(/const INFO_PAD = 24, INFO_MIN = 160;/.test(D.src('live.js')), 'margen total de 24 px (16 del relleno + 8 de holgura)');
   });
   test('Dec. 132: el cartel del reposo y del Standby lleva el logo del evento (si no hay, el de Showtime) y se repinta si cambia', () => {
     const js = D.src('live.js'), css = D.src('live.css');

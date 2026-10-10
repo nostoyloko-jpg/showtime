@@ -770,7 +770,7 @@
   // no el actual: así el resultado es estable y no se persigue a sí mismo.
   // INFO_PAD = relleno real del .info (36 px a cada lado en escritorio) + holgura. Si el nombre se ve a un tamaño
   // mayor que la referencia (p. ej. en Backstage, donde la altura de la fila lo agranda), se mide a ese tamaño.
-  const INFO_PAD = 80, INFO_MIN = 200;
+  const INFO_PAD = 24, INFO_MIN = 160;
   let INFO_CTX = null;
   function measureTxt(txt, weight, size, fam) {
     try {

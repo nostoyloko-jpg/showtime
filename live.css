@@ -110,7 +110,7 @@ body[data-lv="stage"] .tbadge{color:#fff;border-color:rgba(255,214,0,.6)}
    (container queries). Nada se monta: el CALL va en la línea de la etiqueta y, si falta sitio,
    se ocultan primero las notas y luego la hora. (Arreglo ESPEC §8.) */
 .info{width:var(--info-w);min-width:120px;max-width:72vw;flex-shrink:0;overflow:hidden;container-type:size;
-  display:flex;flex-direction:column;justify-content:center;gap:min(3cqh,8px);padding:0 clamp(12px,8cqw,36px)}
+  display:flex;flex-direction:column;justify-content:center;gap:min(3cqh,8px);padding:0 16px}   /* dec. 143: sin el colchón de hasta 36 px a cada lado */
 .ihead{display:flex;align-items:center;gap:10px;min-width:0;white-space:nowrap}
 .lbl{flex:0 0 auto;font-size:clamp(9px,9cqh,13px);letter-spacing:3px;text-transform:uppercase;font-weight:700;color:var(--dim)}
 .strip.first .lbl{color:var(--accent)}

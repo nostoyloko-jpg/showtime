@@ -2079,6 +2079,12 @@ const miss = [...found].filter(k => !I.txHas(k) && !/^(OK|CALL|SC|Live|Raycast|S
     const I = require('../i18n.js'); eq(I.tx('Pantalla Live: {n} filas fijas', { n: 3 }, 'en'), 'Live screen: 3 fixed rows'); eq(I.tx('Pantalla Live: filas automáticas', null, 'en'), 'Live screen: automatic rows');
   });
 
+  test('Dec. 143: Gestor — el reloj no pisa el desplegable que estás usando (vista y zona/filas responden al primer clic)', () => {
+    const js = D.src('control.js');
+    ok(/if \(vs && document\.activeElement !== vs && vs\.value !== x\.vista\) vs\.value = x\.vista;/.test(js), 'vista');
+    ok(/if \(document\.activeElement !== zs\) \{\s*const z = conf \?/.test(js), 'zona / filas');
+  });
+
   // ── Ejecutor ─────────────────────────────────────────────────────────
   (async () => {
     let pass = 0, fail = 0;

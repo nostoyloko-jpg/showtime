@@ -1620,15 +1620,19 @@
       const x = WIN.get(id), row = Array.from(box.querySelectorAll('.gv-row')).find(r => r.dataset.id === id); if (!x || !row) return;
       const name = row.querySelector('.gv-name'), vs = row.querySelector('.gv-vista'), zs = row.querySelector('.gv-zona'), sb = row.querySelector('.gv-sb');
       if (name && document.activeElement !== name && name.value !== x.name) name.value = x.name;
-      if (vs && vs.value !== x.vista) vs.value = x.vista;
+      // dec. 143: los desplegables que estás usando no se tocan (el reloj repinta cada segundo y cerraba / pisaba la elección)
+      if (vs && document.activeElement !== vs && vs.value !== x.vista) vs.value = x.vista;
       if (zs) {   // 3ª columna (dec. 133): Confidence → zona · Manager → filas de esa ventana · Backstage → «—» deshabilitado (la rejilla no cambia)
         const conf = x.vista === 'confidence', mgr = x.vista === 'manager';
         const want = conf ? zonasLive().map(z => '<option value="' + esc(z.id) + '">' + esc(z.name) + '</option>').join('')
           : mgr ? Vs.MGR_ROWS.map(r => '<option value="' + r + '">' + esc(tx(Vs.MGR_ROWS_TXT[r])) + '</option>').join('') : '<option value="">—</option>';
         if (zs.dataset.h !== want) { zs.innerHTML = want; zs.dataset.h = want; }
         zs.disabled = !conf && !mgr;
-        zs.setAttribute('aria-label', tx(mgr ? 'Filas' : 'Zona'));
-        const z = conf ? (x.zona != null ? x.zona : '') : mgr ? String(x.filas || 'auto') : ''; if (zs.value !== z) zs.value = z;
+        const al = tx(mgr ? 'Filas' : 'Zona'); if (zs.getAttribute('aria-label') !== al) zs.setAttribute('aria-label', al);
+        if (document.activeElement !== zs) {
+          const z = conf ? (x.zona != null ? x.zona : '') : mgr ? String(x.filas || 'auto') : '';
+          if (zs.value !== z) zs.value = z;
+        }
       }
       const fe = row.querySelector('.gv-fs');
       if (fe) { const full = !!x.fs; fe.classList.toggle('on', full); fe.textContent = tx(full ? '⛶ Pantalla completa' : 'Ventana'); }
