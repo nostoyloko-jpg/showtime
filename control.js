@@ -1633,6 +1633,9 @@
     if (e.target.closest('#lv-gestor')) { e.preventDefault(); e.stopPropagation(); closeMenus(); openGestor(); return; }
     if (e.target.closest('#lv-closeall')) { closeLive(null); return; }
     const it = e.target.closest('#m-hub [data-vista]'); if (!it) return;
+    // Toda la fila abre (dec. 126), salvo el desplegable de zona y una fila con su botón apagado (Confidence sin evento)
+    if (e.target.closest('select')) return;
+    if (it.querySelector && it.querySelector('button:disabled')) return;
     closeMenus();
     openLive(it.dataset.vista, it.dataset.vista === 'confidence' ? (it.dataset.zona !== undefined ? it.dataset.zona : ($('lv-zone') ? $('lv-zone').value : '')) : null);
   }, true);

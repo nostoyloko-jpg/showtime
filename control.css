@@ -1090,6 +1090,10 @@ td input:focus,td select:focus,.imp-src textarea:focus,.imp-prev td input[type=t
 .hub-h small{font-size:11.5px}
 .hub-row{display:flex;align-items:center;gap:8px;min-height:44px;padding:4px 6px;border-radius:8px}
 .hub-row:hover{background:rgba(255,255,255,.04)}
+.hub-row[data-vista]{cursor:pointer;user-select:none;-webkit-user-select:none;transition:background .12s}
+.hub-row[data-vista]:hover{background:rgba(255,255,255,.08)}
+.hub-row[data-vista]:has(button:disabled){cursor:default}
+.hub-row[data-vista]:has(button:disabled):hover{background:rgba(255,255,255,.04)}
 .hub-row .lvt{flex:1;min-width:0;display:flex;flex-direction:column}
 .hub-row .lvt b{font-weight:700}
 .hub-row .lvt small{font-size:11.5px;color:var(--dim)}

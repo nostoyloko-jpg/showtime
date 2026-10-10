@@ -13,8 +13,8 @@
 <meta name="apple-mobile-web-app-title" content="Showtime">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
-<link rel="stylesheet" href="control.css?v=20261138">
-<link rel="stylesheet" href="marca.css?v=20261138">
+<link rel="stylesheet" href="control.css?v=20261139">
+<link rel="stylesheet" href="marca.css?v=20261139">
 </head>
 <body>
 <div id="splash" class="splash" hidden></div>
@@ -161,9 +161,9 @@
       <!-- Bloque 1 · Señales locales (HDMI / este Mac) -->
       <div class="hub-h"><svg class="ic"><use href="#i-screen"/></svg><b data-i18n>Señales locales</b><small data-i18n>HDMI / este Mac</small></div>
       <div class="hub-card hub-list">
-        <div class="hub-row"><span class="lvt"><b data-i18n>Manager</b><small data-i18n>FOH y regiduría técnica</small></span><button class="btn hub-open" type="button" data-vista="manager"><span data-i18n>Abrir</span> ↗</button></div>
-        <div class="hub-row"><span class="lvt"><b data-i18n>Confidence</b><small data-i18n>Monitor de escenario de una zona</small></span><select id="lv-zone" class="hub-zone" aria-label="Zona" data-i18n-aria></select><button class="btn hub-open" type="button" data-vista="confidence" id="lv-conf"><span data-i18n>Abrir</span> ↗</button></div>
-        <div class="hub-row"><span class="lvt"><b data-i18n>Backstage</b><small data-i18n>Camerinos y catering</small></span><button class="btn hub-open" type="button" data-vista="backstage"><span data-i18n>Abrir</span> ↗</button></div>
+        <div class="hub-row" data-vista="manager"><span class="lvt"><b data-i18n>Manager</b><small data-i18n>FOH y regiduría técnica</small></span><button class="btn hub-open" type="button"><span data-i18n>Abrir</span> ↗</button></div>
+        <div class="hub-row" data-vista="confidence"><span class="lvt"><b data-i18n>Confidence</b><small data-i18n>Monitor de escenario de una zona</small></span><select id="lv-zone" class="hub-zone" aria-label="Zona" data-i18n-aria></select><button class="btn hub-open" type="button" id="lv-conf"><span data-i18n>Abrir</span> ↗</button></div>
+        <div class="hub-row" data-vista="backstage"><span class="lvt"><b data-i18n>Backstage</b><small data-i18n>Camerinos y catering</small></span><button class="btn hub-open" type="button"><span data-i18n>Abrir</span> ↗</button></div>
       </div>
       <div class="hub-h"><svg class="ic"><use href="#i-pause"/></svg><b data-i18n>Acciones locales</b></div>
       <div class="hub-card hub-list hub-acts">
@@ -473,20 +473,20 @@
 <datalist id="zones-dl"></datalist>
 <div id="toast" class="toast" hidden></div>
 
-<script src="i18n.js?v=20261138"></script>
-<script src="core.js?v=20261138"></script>
-<script src="meteo.js?v=20261138"></script>
-<script src="datos.js?v=20261138"></script>
-<script src="importar.js?v=20261138"></script>
-<script src="xlsx.js?v=20261138"></script>
-<script src="qr.js?v=20261138"></script>
-<script src="emision.js?v=20261138"></script>
-<script src="mando.js?v=20261138"></script>
-<script src="vistas.js?v=20261138"></script>
-<script src="log.js?v=20261138"></script>
-<script src="print.js?v=20261138"></script>
-<script src="marca.js?v=20261138"></script>
-<script src="control.js?v=20261138"></script>
-<script src="pwa.js?v=20261138"></script>
+<script src="i18n.js?v=20261139"></script>
+<script src="core.js?v=20261139"></script>
+<script src="meteo.js?v=20261139"></script>
+<script src="datos.js?v=20261139"></script>
+<script src="importar.js?v=20261139"></script>
+<script src="xlsx.js?v=20261139"></script>
+<script src="qr.js?v=20261139"></script>
+<script src="emision.js?v=20261139"></script>
+<script src="mando.js?v=20261139"></script>
+<script src="vistas.js?v=20261139"></script>
+<script src="log.js?v=20261139"></script>
+<script src="print.js?v=20261139"></script>
+<script src="marca.js?v=20261139"></script>
+<script src="control.js?v=20261139"></script>
+<script src="pwa.js?v=20261139"></script>
 </body>
 </html>

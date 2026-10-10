@@ -1907,6 +1907,19 @@ const miss = [...found].filter(k => !I.txHas(k) && !/^(OK|CALL|SC|Live|Raycast|S
     ok(/\.spot-pill\{[^}]*white-space:nowrap/.test(css) && !/\.spot-pill \.pl-l/.test(css), 'sin saltos de línea; fuera el truco de CSS anterior');
   });
 
+  test('Dec. 126: en el Hub toda la fila abre su pantalla local, salvo el desplegable de zona y una fila apagada', async () => {
+    const css = D.src('control.css'), js = D.src('control.js'), html = D.src('index.html');
+    ['manager', 'confidence', 'backstage'].forEach(v => ok(new RegExp('<div class="hub-row" data-vista="' + v + '">').test(html), 'fila ' + v));
+    ok(!/<button[^>]*hub-open[^>]*data-vista=/.test(html), 'el botón ya no lleva data-vista (lo hereda de su fila)');
+    ok(/if \(e\.target\.closest\('select'\)\) return;/.test(js), 'el desplegable de zona no abre');
+    ok(/\.hub-row\[data-vista\]\{cursor:pointer;user-select:none;-webkit-user-select:none;transition:background \.12s\}/.test(css) && /\.hub-row\[data-vista\]:hover\{background:rgba\(255,255,255,\.08\)\}/.test(css), 'cursor de mano y realce');
+    const t = panel(); let n = 0; t.env.win.open = () => { n++; return { closed: false, focus() {}, postMessage() {}, close() {} }; };
+    const row = (vista, over) => ({ target: { closest: q => q === '#m-hub [data-vista]' ? { dataset: { vista }, querySelector: s => s === 'button:disabled' && over === 'off' ? {} : null } : (q === 'select' && over === 'select' ? {} : null) } });
+    t.env.fire('document', 'click', row('confidence', 'select')); await new Promise(r => setImmediate(r)); eq(n, 0, 'clic en el desplegable: no abre');
+    t.env.fire('document', 'click', row('confidence', 'off')); await new Promise(r => setImmediate(r)); eq(n, 0, 'Confidence apagado (sin evento): la fila tampoco abre');
+    t.env.fire('document', 'click', row('backstage')); await new Promise(r => setImmediate(r)); eq(n, 1, 'clic en la fila: abre');
+  });
+
   // ── Ejecutor ─────────────────────────────────────────────────────────
   (async () => {
     let pass = 0, fail = 0;
