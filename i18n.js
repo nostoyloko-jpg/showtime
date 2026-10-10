@@ -1544,7 +1544,13 @@
       "Alerta meteorológica": "Weather alert",
       "Mensajes urgentes de Producción": "Urgent messages from Production",
       "Urgente": "Urgent",
-      "Marcar como urgente": "Mark as urgent"
+      "Marcar como urgente": "Mark as urgent",
+      "Escuchar el tono": "Play the tone",
+      "Repetir hasta confirmar": "Repeat until confirmed",
+      "Los avisos nuevos se repiten hasta confirmarlos en la barra del Dashboard": "New alerts repeat until you confirm them in the Dashboard bar",
+      "Cada cuánto se repiten": "How often they repeat",
+      "Avisos de audio pendientes de confirmar": "Audio alerts waiting for confirmation",
+      "Confirmar aviso": "Confirm alert"
     },
     core: {
       "Artista no encontrado.": "Artist not found.",

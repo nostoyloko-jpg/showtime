@@ -28,18 +28,32 @@
     D.cargar(env, ['audio.js']);
     return { A: env.win.ShowtimeAudio, env };
   }
-  function dashboard(storage, AC) {
+  /** Dashboard simulado con reloj que se puede adelantar (clk.t, ms). */
+  function dashboard(storage, AC, t0) {
     const env = D.makeEnv({ cripto: true, storage: Object.assign({ 'showtime.producers': JSON.stringify({ producers: [{ id: 'prod_001', name: 'Marta' }], counter: 1, defaultId: 'prod_001' }) }, storage || {}) });
+    const clk = { t: Number.isFinite(t0) ? t0 : Date.UTC(2026, 6, 10, 12, 0, 0) };
+    env.win.Date = class extends Date { constructor(...a) { if (a.length) super(...a); else super(clk.t); } static now() { return clk.t; } };
     if (AC) env.win.AudioContext = AC;
     D.cargar(env, MODULOS);
-    return { env, T: env.win.ShowtimePanel._test, read: k => { const v = env.storage.get(k); return v ? JSON.parse(v) : null; } };
+    return { env, clk, T: env.win.ShowtimePanel._test, A: env.win.ShowtimeAudio, adv(ms) { clk.t += ms; }, read: k => { const v = env.storage.get(k); return v ? JSON.parse(v) : null; } };
   }
+  const GEST = { target: { closest: () => null, id: '' } };
+  /** Evento de HOY (hora local del reloj simulado) con «Banda A» y su CALL (15 min antes) ya abierto a las 23:20. */
+  function festCall(hora) {
+    const d = new Date(hora), iso = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    let s = C.newFestival({ nombre: 'Prueba audio', fechaInicio: iso, fechaFin: iso, dayCutoff: '06:00', coMin: 15 }).state;
+    s = C.addStage(s, 'Principal').state;
+    s = C.addArtist(s, 'show', { jornada: iso, nombre: 'Banda A', escenarioId: s.escenarios[0].id, inicio: '23:30', fin: '23:59' }).state;
+    return s;
+  }
+  const at2320 = () => { const d = new Date(); d.setHours(23, 20, 0, 0); return d.getTime(); };
 
   // 1 · Preferencias: clave exacta, apagado por defecto, datos rotos o a medias normalizados
   test('1 · Preferencias en «showtime.audioAlerts»: apagado por defecto y datos rotos o a medias normalizados', () => {
     const { A } = audioIn();
     eq(A.KEY, KEY);
-    eq(JSON.stringify(A.normPrefs(null)), JSON.stringify({ on: false, call: true, overrun: true, meteo: true, urgent: true }), 'por defecto: interruptor apagado, casillas marcadas');
+    eq(JSON.stringify(A.normPrefs(null)), JSON.stringify({ on: false, call: true, overrun: true, meteo: true, urgent: true, repeat: false, every: 10 }), 'por defecto: interruptor apagado, casillas marcadas, sin repetición, 10 s');
+    eq(A.normPrefs({ every: 7 }).every, 10, 'intervalo fuera de la lista → 10 s'); eq(A.normPrefs({ every: 20 }).every, 20); eq(A.normPrefs({ every: '20' }).every, 10, 'texto no vale');
     eq(A.normPrefs({ on: 'true', call: 0, meteo: false, urgent: null, extra: 1 }).on, false, 'cadena «true» no vale');
     const p = A.normPrefs({ on: 'true', call: 0, meteo: false, urgent: null, extra: 1 });
     ok(p.call === true && p.meteo === false && p.urgent === true && !('extra' in p), 'solo booleanos; lo demás, por defecto; campos ajenos fuera');
@@ -48,7 +62,7 @@
     const { A: B, env } = audioIn({ storage: { [KEY]: '{"on":true}' } });
     ok(B.load().on === true && B.load().call === true, 'parcial: lo que falta, por defecto');
     B.save({ on: true, call: false, junk: 'x' });
-    eq(env.storage.get(KEY), JSON.stringify({ on: true, call: false, overrun: true, meteo: true, urgent: true }), 'se guarda normalizado');
+    eq(env.storage.get(KEY), JSON.stringify({ on: true, call: false, overrun: true, meteo: true, urgent: true, repeat: false, every: 10 }), 'se guarda normalizado');
   });
 
   // 2 · Solo local: nada en festival, configuración, JSON exportado ni emisión
@@ -159,21 +173,21 @@
     const t = dashboard({ [KEY]: JSON.stringify({ on: true, meteo: false }) }, fakeAC(log));
     t.T.emProdMessage({ type: 'chat', from: 'prod_001', text: 'antes del gesto', urgent: true });
     eq(log.length, 0, 'sin gesto todavía: no suena');
-    const GEST = { target: { closest: () => null, id: '' } };
     t.env.fire('document', 'pointerdown', GEST);   // primer clic
-    t.T.audioTick(['call-x'], [], []); eq(log.length, 0, 'primer vistazo (sin evento al cargar, aún sin armar): arma sin sonar');
-    t.T.audioTick(['call-x', 'call-y'], [], []); eq(log.join(), '660,880', 'entra un CALL: tono CALL');
-    log.length = 0; t.T.audioTick(['call-x', 'call-y'], [], []); eq(log.length, 0, 'mismo CALL: no repite');
-    t.T.audioTick(['call-x', 'call-y'], ['blk1'], []); eq(log.join(), '440,440,440', 'sobretiempo');
-    log.length = 0; t.T.audioTick(['call-x', 'call-y'], ['blk1'], ['gust']); eq(log.length, 0, 'meteo desmarcado: no suena');
+    t.T.audioTick(null); t.adv(2000);              // sin evento: la lectura arma en silencio (nada activo)
+    t.T.audioTick(['call-x'], [], []); eq(log.join(), '660,880', 'entra un CALL (transición real desde «nada activo»): tono CALL');
+    log.length = 0; t.adv(2000); t.T.audioTick(['call-x', 'call-y'], [], []); eq(log.join(), '660,880', 'entra otro CALL: suena otra vez');
+    log.length = 0; t.adv(2000); t.T.audioTick(['call-x', 'call-y'], [], []); eq(log.length, 0, 'mismo CALL: no repite');
+    t.adv(2000); t.T.audioTick(['call-x', 'call-y'], ['blk1'], []); eq(log.join(), '440,440,440', 'sobretiempo');
+    log.length = 0; t.adv(2000); t.T.audioTick(['call-x', 'call-y'], ['blk1'], ['gust']); eq(log.length, 0, 'meteo desmarcado: no suena');
     t.T.emProdMessage({ type: 'chat', from: 'prod_001', text: 'normal' }); eq(log.length, 0, 'mensaje normal: no suena');
-    t.T.emProdMessage({ type: 'chat', from: 'prod_001', text: '¡ya!', urgent: true }); eq(log.join(), '988,988,988,1319', 'urgente: suena');
+    t.adv(2000); t.T.emProdMessage({ type: 'chat', from: 'prod_001', text: '¡ya!', urgent: true }); eq(log.join(), '988,988,988,1319', 'urgente: suena');
     log.length = 0; t.env.storage.set(KEY, JSON.stringify({ on: false }));
-    t.T.emProdMessage({ type: 'chat', from: 'prod_001', text: '¡otra!', urgent: true }); t.T.audioTick(['z'], ['q'], []); eq(log.length, 0, 'interruptor apagado: silencio');
+    t.adv(2000); t.T.emProdMessage({ type: 'chat', from: 'prod_001', text: '¡otra!', urgent: true }); t.T.audioTick(['z'], ['q'], []); eq(log.length, 0, 'interruptor apagado: silencio');
     const cj = D.src('control.js');
-    ok(/audioTick\(C\.callList\(LIVE, nowInt, Dt\.callMinsOf\(FEST, CONFIG\), new Set\(Dt\.getCallDone\(\)\)\)\.map\(C\.callKey\),/.test(cj), 'CALL: la misma ventana que la tarjeta CALL');
-    ok(/LIVE\.filter\(b => xtraOver\(b, nowInt\) !== null\)\.map\(b => b\.key\),/.test(cj), 'sobretiempo: Tiempo extra pasado de su fin previsto (xtraOver)');
-    ok(/mst && mst\.c\.on \? mst\.pending\.map\(a => a\.kind\) : \[\]\);/.test(cj), 'meteo: la cola de pendientes existente');
+    ok(/audioTick\(C\.callList\(LIVE, nowInt, Dt\.callMinsOf\(FEST, CONFIG\), new Set\(Dt\.getCallDone\(\)\)\)\.map\(b => \(\{ key: C\.callKey\(b\), label: b\.name \}\)\),/.test(cj), 'CALL: la misma ventana que la tarjeta CALL');
+    ok(/LIVE\.filter\(b => xtraOver\(b, nowInt\) !== null\)\.map\(b => \(\{ key: b\.key, label: b\.name \}\)\),/.test(cj), 'sobretiempo: Tiempo extra pasado de su fin previsto (xtraOver)');
+    ok(/mst && mst\.c\.on \? mst\.pending\.map\(a => \(\{ key: a\.kind, label: a\.text \}\)\) : \[\]\);/.test(cj), 'meteo: la cola de pendientes existente');
     const idx = D.src('index.html'), sec = idx.slice(idx.indexOf('<details class="cfg-s" id="cfg-s-audio">'), idx.indexOf('</details>', idx.indexOf('id="cfg-s-audio"')));
     ok(/title="Los avisos solo se reproducen en este dispositivo\." data-i18n data-i18n-title><input id="au-on" type="checkbox" role="switch"> Activar<\/label>/.test(sec), 'interruptor con el tooltip literal');
     eq((sec.match(/data-au="(\w+)"/g) || []).join(' '), 'data-au="call" data-au="overrun" data-au="meteo" data-au="urgent"', 'las 4 casillas');
@@ -187,6 +201,137 @@
     const env2 = D.makeEnv({ storage: { [KEY]: JSON.stringify({ on: true }) } }); const log2 = []; env2.win.AudioContext = fakeAC(log2);
     D.cargar(env2, MODULOS); env2.fire('document', 'pointerdown', GEST);
     ok(log2.length === 0 && env2.errors.length === 0, 'al cargar (y tras el primer clic) no suena nada ni hay errores');
+  });
+
+  // ── Dec. 146 ─────────────────────────────────────────────────────────
+  /** AudioContext de mentira que además cuenta los cortes (stop(0)). */
+  function fakeAC2(rec) {
+    rec.notes = rec.notes || []; rec.cuts = 0;
+    return function () {
+      this.state = 'running'; this.currentTime = 0; this.destination = {};
+      this.resume = () => Promise.resolve();
+      this.createOscillator = () => { const o = { type: '', frequency: { value: 0 }, connect() {}, disconnect() {}, start() { rec.notes.push(o.frequency.value); }, stop(t) { if (t === 0) rec.cuts++; } }; return o; };
+      this.createGain = () => ({ gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect() {} });
+    };
+  }
+
+  test('11 · Carga e importación silenciosas: arrancar, abrir o reemplazar con un CALL ya activo no llama al reproductor; un CALL nuevo después, sí', () => {
+    const rec = {}, T0 = at2320(), F = festCall(T0);
+    const t = dashboard({ 'showtime.festival': JSON.stringify(F), [KEY]: JSON.stringify({ on: true, repeat: true }) }, fakeAC2(rec), T0);
+    eq(t.A.RING.size(), 0, 'al arrancar con el CALL de «Banda A» abierto: nada en la cola');
+    t.env.fire('document', 'pointerdown', GEST); t.adv(1500); t.env.win.ShowtimePanel.reload();
+    eq(rec.notes.length, 0, 'tras el primer clic y otra lectura: silencio (el CALL ya estaba)');
+    const G = festCall(T0); G.event.nombre = 'Otro evento'; G.artists[0].nombre = 'Banda C';   // otro CALL ya abierto
+    ok(C.callKey(C.buildBlocks(G, { mode: 'all', day: 'all' })[0]) !== C.callKey(C.buildBlocks(F, { mode: 'all', day: 'all' })[0]), 'el CALL del evento nuevo es otro');
+    t.adv(1500); t.T.loadNew(G, 'Evento abierto');
+    eq(rec.notes.length + t.A.RING.size(), 0, 'abrir / reemplazar el evento con un CALL activo: silencio y cola vacía');
+    t.adv(1500); t.T.loadNew(JSON.parse(JSON.stringify(G)), 'Evento abierto');
+    eq(rec.notes.length, 0, 'volver a abrir el mismo evento: silencio');
+    const cj = D.src('control.js'), imp = cj.slice(cj.indexOf('function impDoImport'), cj.indexOf('function readTextFile'));
+    ok(imp.indexOf('audioRearm();') > 0 && imp.indexOf('audioRearm();') < imp.indexOf('commitFestival(r.state, msg);'), 'importar (Pegar horario): rearme ANTES de pintar (renderAll lee el estado)');
+    const ln = cj.slice(cj.indexOf('function loadNew'), cj.indexOf('function exportJSON'));
+    ok(ln.indexOf('audioRearm();') > 0 && ln.indexOf('audioRearm();') < ln.indexOf('compute(); renderAll();'), 'abrir / crear / demo: rearme antes de pintar');
+  });
+
+  test('11b · Después de cargar, una transición real inactivo → activo suena UNA vez', () => {
+    const rec = {}, T0 = at2320(), F = festCall(T0);
+    const t = dashboard({ 'showtime.festival': JSON.stringify(F), [KEY]: JSON.stringify({ on: true }) }, fakeAC2(rec), T0);
+    t.env.fire('document', 'pointerdown', GEST);
+    const key = C.callKey(C.buildBlocks(F, { mode: 'all', day: 'all' })[0]);
+    t.adv(1500); t.T.audioTick([{ key, label: 'Banda A' }], [], []); eq(rec.notes.length, 0, 'mismo estado de la carga: nada');
+    t.adv(1500); t.T.audioTick([{ key, label: 'Banda A' }, { key: 'k2', label: 'Banda B' }], [], []); eq(rec.notes.join(), '660,880', 'entra Banda B: suena');
+    t.adv(1500); t.T.audioTick([{ key, label: 'Banda A' }, { key: 'k2', label: 'Banda B' }], [], []); eq(rec.notes.join(), '660,880', 'y no repite (repetición apagada)');
+  });
+
+  test('12 · Muestra de los 4 tonos: con «Activar» apagado, corta la anterior, una sola muestra, no toca nada', () => {
+    const rec = {}, t = dashboard({}, fakeAC2(rec));
+    const before = t.env.storage.get(KEY);
+    const fq = k => t.A.TONES[k].notes.map(n => n[0]).join();
+    ['call', 'overrun', 'meteo', 'urgent'].forEach(k => { rec.notes = []; ok(t.T.audioPreview(k), k + ': suena'); eq(rec.notes.join(), fq(k), k + ': su tono, una vez'); });
+    ok(rec.cuts > 0, 'cada muestra corta la anterior (una sola voz)');
+    eq(t.env.storage.get(KEY), before, 'preferencias intactas (apagado)'); eq(t.A.RING.size(), 0, 'no crea avisos'); eq(t.env.getEl('au-bar').hidden, true, 'sin barra');
+    ok(!t.T.audioPreview('nada'), 'tipo desconocido: nada');
+    const idx = D.src('index.html');
+    ['call', 'overrun', 'meteo', 'urgent'].forEach(k => ok(new RegExp('<button class="au-pv" type="button" data-au-pv="' + k + '" title="Escuchar el tono" aria-label="Escuchar el tono" data-i18n-title data-i18n-aria><svg class="ic"><use href="#i-play"/></svg></button>').test(idx), k + ': botón SVG accesible'));
+    const { A } = audioIn(); ok(!A.preview('call'), 'sin Web Audio: no falla');
+  });
+
+  test('13 · «Repetir hasta confirmar»: apagado por defecto; con él apagado, cada aviso suena una vez y no hay barra', () => {
+    const { A } = audioIn(); eq(A.DEFAULTS.repeat, false); eq(A.load().repeat, false);
+    const rec = {}, t = dashboard({ [KEY]: JSON.stringify({ on: true }) }, fakeAC2(rec));
+    t.env.fire('document', 'pointerdown', GEST); t.T.audioTick(null);
+    t.adv(1000); t.T.audioTick(['c1'], [], []); eq(rec.notes.length, 2, 'suena');
+    for (let i = 0; i < 6; i++) { t.adv(10000); t.T.audioTick(['c1'], [], []); }
+    eq(rec.notes.length, 2, 'sin repetición: una vez'); eq(t.env.getEl('au-bar').hidden, true, 'sin barra');
+    const idx = D.src('index.html');
+    ok(/<input id="au-rep" type="checkbox"> Repetir hasta confirmar<\/label><select id="au-every" class="mini"[^>]*><option value="5">5 s<\/option><option value="10">10 s<\/option><option value="20">20 s<\/option><option value="30">30 s<\/option><\/select>/.test(idx), 'casilla e intervalo (5 · 10 · 20 · 30 s) en la sección');
+  });
+
+  test('14 · Cola única sin solapes: varios pendientes suenan de uno en uno y se repiten cada N s', () => {
+    const played = [], R = audioIn().A.makeRing(k => { played.push(k); return 0.5; });
+    R.add({ id: 'a', kind: 'call', key: 'a', repeat: true }, 0); R.add({ id: 'b', kind: 'overrun', key: 'b', repeat: true }, 0); R.add({ id: 'c', kind: 'urgent', key: 'c', repeat: false }, 0);
+    ok(!R.add({ id: 'a', kind: 'call', key: 'a', repeat: true }, 0), 'sin duplicados');
+    eq(R.step(0, 10), 'a'); eq(R.step(300, 10), null, 'mientras suena «a», nada más');
+    eq(R.step(800, 10), 'b'); eq(R.step(1000, 10), null); eq(R.step(1600, 10), 'c'); eq(R.step(2400, 10), null, 'vuelta acabada');
+    eq(R.size(), 2, 'el de una vez sale al sonar');
+    eq(R.step(9999, 10), null); eq(R.step(10000, 10), 'a', 'a los 10 s, otra vuelta'); eq(R.step(10200, 10), null); eq(R.step(10800, 10), 'b');
+    eq(played.join(), 'call,overrun,urgent,call,overrun', 'nunca dos a la vez');
+    const p2 = [], R2 = audioIn().A.makeRing(k => { p2.push(k); return 0.4; }); R2.add({ id: 'x', kind: 'meteo', key: 'x', repeat: true }, 0);
+    R2.step(0, 20); eq(R2.step(10000, 20), null, 'intervalo de 20 s'); eq(R2.step(20000, 20), 'x');
+    R2.hold(20500, 1); eq(R2.step(21000, 20), null, 'una muestra ocupa la voz: la cola espera');
+  });
+
+  test('15 · Confirmación individual: cada aviso con su ✓; confirmar solo silencia ese; no da OK de CALL, ni «Visto», ni lee el chat', () => {
+    const rec = {}, t = dashboard({ [KEY]: JSON.stringify({ on: true, repeat: true }) }, fakeAC2(rec));
+    t.env.fire('document', 'pointerdown', GEST); t.T.audioTick(null);
+    t.adv(1000); t.T.audioTick([{ key: 'k1', label: 'Banda A' }], [{ key: 'b9', label: 'Banda Z' }], []);
+    t.adv(1000); t.T.emProdMessage({ type: 'chat', from: 'prod_001', text: '¡Corte!', urgent: true });
+    const bar = t.env.getEl('au-bar'), h = bar.innerHTML;
+    eq(bar.hidden, false, 'barra visible');
+    eq((h.match(/data-au-ok="/g) || []).length, 3, 'un ✓ por aviso'); ok(!/confirmar todo|confirm all|au-all/i.test(h) && !/au-all|Confirmar todo/.test(D.src('control.js') + D.src('index.html')), 'sin «confirmar todo»');
+    ok(/<b>CALL<\/b><span class="au-lbl">Banda A<\/span>/.test(h) && /<b>Sobretiempo<\/b><span class="au-lbl">Banda Z<\/span>/.test(h) && /<b>Urgente<\/b><span class="au-lbl">Marta<\/span>/.test(h), 'cada uno por separado, con su etiqueta');
+    ok(/<button class="au-ok" type="button" data-au-ok="call:k1" title="Confirmar aviso" aria-label="Confirmar aviso: CALL · Banda A"><svg class="ic"><use href="#i-check"\/><\/svg><\/button>/.test(h), '✓ SVG accesible');
+    const chatAntes = t.env.storage.get('showtime.chat'), callAntes = t.env.storage.get('showtime.callDone'), ackAntes = t.env.storage.get('showtime.meteo.acks');
+    t.T.audioConfirm('call:k1');
+    eq(t.A.RING.pending().map(x => x.id).join(), 'overrun:b9,urgent:' + t.read('showtime.chat').slice(-1)[0].id, 'solo sale el confirmado');
+    eq(t.env.storage.get('showtime.chat'), chatAntes, 'el chat no cambia'); eq(t.env.storage.get('showtime.callDone'), callAntes, 'no da el OK de CALL'); eq(t.env.storage.get('showtime.meteo.acks'), ackAntes, 'no marca «Visto»');
+    ok(!/data-au-ok="call:k1"/.test(bar.innerHTML), 'ya no está en la barra');
+    rec.notes = []; t.adv(10000); t.T.audioTick([{ key: 'k1', label: 'Banda A' }], [{ key: 'b9', label: 'Banda Z' }], []);
+    eq(rec.notes.join(), '440,440,440', 'a los 10 s repite el siguiente pendiente (no el confirmado)');
+    t.adv(1000); t.T.audioTick([], [{ key: 'b9', label: 'Banda Z' }], []); t.adv(1000); t.T.audioTick([], [], []);
+    ok(!t.A.RING.pending().some(x => x.kind === 'overrun'), 'banda con ■ (fin de estado): se retira solo');
+    ok(t.A.RING.pending().some(x => x.kind === 'urgent'), 'el urgente solo se va con su ✓');
+    const idx = D.src('index.html'); ok(idx.indexOf('id="au-bar"') > idx.indexOf('</header>') && idx.indexOf('id="au-bar"') < idx.indexOf('id="drift"') && idx.indexOf('id="au-bar"') < idx.indexOf('id="warn"'), 'barra bajo la cabecera, antes de retrasos y avisos');
+    ok(!/data-au-ok|au-bar/.test(D.src('live.html') + D.src('remote.html') + D.src('live.js') + D.src('remote.js')), 'Producción y Mando no tienen barra ni ✓ (el urgente sigue siendo solo de Producción)');
+  });
+
+  test('16 · Repetición: no repite lo que ya estaba activo al encenderla; «Activar» OFF silencia, vacía la cola y al volver no suena nada', () => {
+    const rec = {}, t = dashboard({ [KEY]: JSON.stringify({ on: true }) }, fakeAC2(rec));
+    t.env.fire('document', 'pointerdown', GEST); t.T.audioTick(null);
+    t.adv(1000); t.T.audioTick(['viejo'], [], []); rec.notes = [];
+    t.env.storage.set(KEY, JSON.stringify({ on: true, repeat: true }));   // enciende «Repetir»
+    for (let i = 0; i < 3; i++) { t.adv(10000); t.T.audioTick(['viejo'], [], []); }
+    eq(rec.notes.length + t.A.RING.size(), 0, 'lo que ya estaba activo no entra en la cola');
+    t.adv(1000); t.T.audioTick(['viejo', 'nuevo'], ['b1'], []);
+    eq(t.A.RING.pending().length, 2, 'los nuevos sí');
+    const on = t.env.getEl('au-on'); on.checked = false; rec.cuts = 0; t.T.saveAudioCfg();
+    ok(rec.cuts >= 0 && t.A.RING.size() === 0, 'OFF: cola vacía'); eq(t.env.getEl('au-bar').hidden, true, 'OFF: barra fuera');
+    rec.notes = []; on.checked = true; t.T.saveAudioCfg();
+    for (let i = 0; i < 3; i++) { t.adv(10000); t.T.audioTick(['viejo', 'nuevo'], ['b1'], []); }
+    eq(rec.notes.length + t.A.RING.size(), 0, 'ON otra vez: lo que ya estaba activo no suena (detector rearmado)');
+    const cj = D.src('control.js');
+    ok(/if \(s\.on !== old\.on\) \{ AU\.stop\(\); AU\.RING\.clear\(\); audioRearm\(\); \}/.test(cj), 'OFF corta el sonido en curso (stop), vacía la cola y rearma');
+  });
+
+  test('17 · Nada viaja: repetición, intervalo, cola y confirmaciones solo en este Dashboard', () => {
+    const t = dashboard({ [KEY]: JSON.stringify({ on: true, repeat: true, every: 20 }) });
+    t.env.getEl('au-on').checked = true; t.env.getEl('au-rep').checked = true; t.env.getEl('au-every').value = '20'; t.T.saveAudioCfg();
+    eq(t.read(KEY).every, 20); eq(t.read(KEY).repeat, true);
+    ok(!/repeat|every|audio|au-/i.test(JSON.stringify(t.read('showtime.config') || {})), 'configuración del Panel (la que viaja) limpia');
+    ['datos.js', 'emision.js', 'live.js', 'remote.js', 'mando.js', 'vistas.js', 'core.js'].forEach(f => ok(!/RING|audioConfirm|au-bar|audioAlerts|ShowtimeAudio/.test(D.src(f)), f + ': sin rastro de la cola local'));
+    ok(!/audio\.js/.test(D.src('live.html') + D.src('remote.html')), 'Live, Producción, Mando, Confidence, Backstage y Staff no cargan audio.js');
+    const E2 = E.cleanProdMsg({ type: 'chat', from: 'p', text: 'x', urgent: true, repeat: true, confirmed: true });
+    eq(Object.keys(E2).sort().join(), 'from,text,type,urgent', 'el mensaje de Producción no admite campos de la cola');
   });
 
   (async () => {

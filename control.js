@@ -800,7 +800,7 @@
     }
     renderGestor();
     meteoTick();
-    if (!FEST) return;
+    if (!FEST) { audioTick(null); return; }   // sin evento: nada que vigilar (y la cola sigue con los urgentes)
     logFoto();
     const mNow = Math.floor(C.nowAbs(d));
     if (LAST_MIN !== null && mNow !== LAST_MIN) { compute(); if (LIVE.some(b => b.alargar && b.rf === null)) renderTable(); }   // el estimado en directo (Alargar)
@@ -808,9 +808,9 @@
     const mst = renderMeteo();
     const nowMins = C.nowAbs(d), nowInt = Math.floor(nowMins);
     renderLive(nowMins, nowInt);
-    audioTick(C.callList(LIVE, nowInt, Dt.callMinsOf(FEST, CONFIG), new Set(Dt.getCallDone())).map(C.callKey),   // misma ventana CALL que la tarjeta
-      LIVE.filter(b => xtraOver(b, nowInt) !== null).map(b => b.key),                                            // Tiempo extra pasado de su fin previsto
-      mst && mst.c.on ? mst.pending.map(a => a.kind) : []);                                                       // avisos meteo pendientes (sin «Visto»)
+    audioTick(C.callList(LIVE, nowInt, Dt.callMinsOf(FEST, CONFIG), new Set(Dt.getCallDone())).map(b => ({ key: C.callKey(b), label: b.name })),   // misma ventana CALL que la tarjeta
+      LIVE.filter(b => xtraOver(b, nowInt) !== null).map(b => ({ key: b.key, label: b.name })),                                            // Tiempo extra pasado de su fin previsto
+      mst && mst.c.on ? mst.pending.map(a => ({ key: a.kind, label: a.text })) : []);                                                       // avisos meteo pendientes (sin «Visto»)
     renderDrift(nowInt);
     renderFlash();
     markRows(nowInt);
@@ -1814,6 +1814,7 @@
     Dt.setOriginal(ORIG);
     Dt.setFestival(FEST);
     CONFIG = Dt.setConfig({ day: 'all' });
+    audioRearm();   // abrir / crear / demo: la primera lectura del evento nuevo no suena (dec. 146)
     $('add-escenario').value = ''; if ($('add-jornada')) $('add-jornada').value = '';
     compute(); renderAll();
     toast(msg);
@@ -2193,6 +2194,7 @@
     if (fresh) loadNew(base, 'Evento creado');   // evento nuevo: la referencia es el evento vacío, así lo importado cuenta como «sin exportar» y se puede deshacer
     // La vista actual («Ver: Shows» / «Ver: Soundchecks») escondería parte de lo importado: se pasa a «Ver: Todo» para ver la foto completa
     if (hidden) CONFIG = Dt.setConfig({ mode: 'all' });
+    audioRearm();   // importar: lo que ya estaba activo en las entradas nuevas no suena (dec. 146; antes de pintar: renderAll lee el estado)
     commitFestival(r.state, msg);
     // Confirmación clara (2,5 s, en verde) y la tabla arriba para ver el evento recién importado
     toast(importSummary(IMP_LAST, r.added) + (hidden ? tx(' · Ver: Todo') : '') + (fresh && !name ? tx(' · ponle nombre en Configuración') : ''), false, 2500);
@@ -2950,26 +2952,77 @@
   // ── Avisos de audio locales (dec. 145): suenan solo en ESTE Dashboard. Preferencias en localStorage («showtime.audioAlerts»):
   //    nunca en la configuración del festival, ni en el JSON, ni en la emisión. Sin Web Audio, no suena y no falla.
   //    AU y AU_EDGE se declaran arriba (el primer tick puede llegar antes de esta línea).
-  function audioTick(callKeys, overKeys, meteoKeys) {
+  //    Dec. 146: el detector se rearma EN SILENCIO al arrancar, al abrir / importar / reemplazar el evento, al cambiar de jornada
+  //    o de vista del motor y al apagar o encender «Activar»: la primera lectura de después solo arma. Suena solo una
+  //    transición real de inactivo → activo. Cola única (AU.RING): un tono detrás de otro; con «Repetir hasta confirmar»,
+  //    los avisos nuevos vuelven cada N s hasta su ✓ en la barra (o hasta que su estado termina: se retiran solos).
+  let AU_SIG = null;   // evento | jornada | vista del motor de la última lectura
+  function audioRearm() { if (AU_EDGE) ['call', 'overrun', 'meteo'].forEach(k => { AU_EDGE[k] = AU.edge(); }); }
+  const auItems = list => (list || []).map(x => typeof x === 'string' ? { key: x, label: x } : x);
+  /** Una lectura del estado. null = sin evento. Ítems: [{ key, label }] (o claves sueltas). */
+  function audioTick(calls, overs, meteos) {
     if (!AU_EDGE) return;
-    [['call', callKeys], ['overrun', overKeys], ['meteo', meteoKeys]].forEach(([k, keys]) => { if (AU_EDGE[k](keys).length) AU.alert(k); });   // solo lo que ENTRA ahora
+    const sig = FEST && calls ? (window.ShowtimeLog ? window.ShowtimeLog.eventKey(FEST) : '') + '|' + (CONFIG.day || 'all') + '|' + C.engineMode(CONFIG.mode) : null;
+    if (sig !== AU_SIG) { AU_SIG = sig; audioRearm(); }   // otro evento, otra jornada o sin evento: se vuelve a armar en silencio
+    const p = AU.load(), now = Date.now();
+    [['call', calls], ['overrun', overs], ['meteo', meteos]].forEach(([k, raw]) => {
+      const items = auItems(raw), fresh = new Set(AU_EDGE[k](items.map(x => x.key)));   // solo lo que ENTRA ahora
+      if (AU.enabled(p, k)) items.filter(x => fresh.has(String(x.key))).forEach(x => AU.RING.add({ id: k + ':' + x.key, kind: k, key: x.key, label: x.label, repeat: p.repeat }, now));
+      AU.RING.retain(k, items.map(x => x.key));   // estado terminado (OK de CALL, ■, «Visto», fuera de ventana): se retira solo
+    });
+    audioStep(now);
   }
-  function audioUrgent() { if (AU) AU.alert('urgent'); }
+  function audioStep(now) { if (AU) { AU.RING.step(now || Date.now(), AU.load().every); renderAuBar(); } }
+  /** Urgente recibido de Producción (solo Producción lo marca): a la cola; con repetición, hasta su ✓. */
+  function audioUrgent(m) {
+    if (!AU) return;
+    const p = AU.load(); if (!AU.enabled(p, 'urgent')) return;
+    AU.RING.add({ id: 'urgent:' + m.id, kind: 'urgent', key: m.id, label: m.from, repeat: p.repeat }, Date.now());
+    audioStep();
+  }
+  const AU_ICON = { call: 'i-clock', overrun: 'i-stretch', meteo: 'i-csun', urgent: 'i-urg' };
+  const AU_NAME = { call: 'CALL', overrun: 'Sobretiempo', meteo: 'Meteo', urgent: 'Urgente' };
+  /** Barra de confirmación (bajo la cabecera): un aviso repetitivo por pastilla, cada uno con su ✓. Sin «confirmar todo». */
+  function renderAuBar() {
+    const bar = $('au-bar'); if (!bar || !AU) return;
+    const list = AU.RING.pending();
+    const h = list.map(x => { const n = tx(AU_NAME[x.kind]), t = n + (x.label ? ' · ' + x.label : '');
+      return '<span class="au-item au-' + x.kind + '" title="' + esc(t) + '"><svg class="ic" aria-hidden="true"><use href="#' + AU_ICON[x.kind] + '"/></svg><b>' + esc(n) + '</b>' + (x.label ? '<span class="au-lbl">' + esc(x.label) + '</span>' : '') +
+        '<button class="au-ok" type="button" data-au-ok="' + esc(x.id) + '" title="' + esc(tx('Confirmar aviso')) + '" aria-label="' + esc(tx('Confirmar aviso') + ': ' + t) + '"><svg class="ic"><use href="#i-check"/></svg></button></span>'; }).join('');
+    if (bar.dataset.h !== h) { bar.innerHTML = h; bar.dataset.h = h; }
+    bar.hidden = !list.length;
+  }
+  /** ✓ de un aviso: solo lo silencia y lo saca de la cola local. No da el OK de CALL, ni «Visto» a meteo, ni lee el chat. */
+  function audioConfirm(id) { if (AU && AU.RING.confirm(String(id))) renderAuBar(); }
+  $('au-bar').addEventListener('click', e => { const b = e.target && e.target.closest ? e.target.closest('[data-au-ok]') : null; if (b) audioConfirm(b.dataset.auOk); });
   function fillAudioCfg() {
     const on = $('au-on'); if (!on) return;
-    const p = AU ? AU.load() : null;
-    on.checked = !!(p && p.on); on.disabled = !AU;
-    document.querySelectorAll('#cfg-s-audio [data-au]').forEach(el => { el.checked = !!(p && p[el.dataset.au]); el.disabled = !p || !p.on; });
+    const p = AU ? AU.load() : null, live = !!(p && p.on);
+    on.checked = live; on.disabled = !AU;
+    document.querySelectorAll('#cfg-s-audio [data-au]').forEach(el => { el.checked = !!(p && p[el.dataset.au]); el.disabled = !live; });
+    if ($('au-rep')) { $('au-rep').checked = !!(p && p.repeat); $('au-rep').disabled = !live; }
+    if ($('au-every')) { $('au-every').value = String(p ? p.every : 10); $('au-every').disabled = !live || !(p && p.repeat); }
   }
   function saveAudioCfg() {
     if (!AU) return;
-    const p = AU.load(); p.on = $('au-on').checked;
+    const old = AU.load(), p = Object.assign({}, old); p.on = $('au-on').checked;
     document.querySelectorAll('#cfg-s-audio [data-au]').forEach(el => { p[el.dataset.au] = el.checked; });
-    if (AU.save(p).on) AU.unlock();   // el cambio es un gesto: desbloquea ya
-    fillAudioCfg();
+    if ($('au-rep')) p.repeat = $('au-rep').checked;
+    if ($('au-every')) p.every = Number($('au-every').value);
+    const s = AU.save(p);
+    if (s.on !== old.on) { AU.stop(); AU.RING.clear(); audioRearm(); }   // apagar: silencio al momento y cola vacía; volver a encender no suena lo que ya estaba
+    if (s.on) AU.unlock();   // el cambio es un gesto: desbloquea ya
+    AU.KINDS.forEach(k => { if (!s[k]) AU.RING.dropKind(k); });   // casilla desmarcada: fuera sus avisos pendientes
+    if (!s.repeat) AU.RING.dropRepeats();                          // sin repetición: no queda nada esperando ✓
+    fillAudioCfg(); renderAuBar();
   }
   $('au-on').addEventListener('change', saveAudioCfg);
   document.querySelectorAll('#cfg-s-audio [data-au]').forEach(el => el.addEventListener('change', saveAudioCfg));
+  if ($('au-rep')) $('au-rep').addEventListener('change', saveAudioCfg);
+  if ($('au-every')) $('au-every').addEventListener('change', saveAudioCfg);
+  /** Muestra de cada tono: suena aunque «Activar» esté apagado; corta la muestra anterior; no toca nada más. */
+  function audioPreview(kind) { if (!AU || !AU.preview(kind)) return false; AU.RING.hold(Date.now(), AU.toneSecs(kind)); return true; }
+  document.querySelectorAll('#cfg-s-audio [data-au-pv]').forEach(el => el.addEventListener('click', e => { if (e && e.preventDefault) e.preventDefault(); audioPreview(el.dataset.auPv); }));
 
   // Mensajes de Producción (llegan cifrados desde su Live): OK de CALL, mensajes a las pantallas y chat.
   function emProdMessage(raw) {
@@ -2995,7 +3048,7 @@
       logEvent('msg', 'Aviso ' + (msg.perm ? 'permanente' : 'puntual') + ': «' + msg.text + '» · ' + who, { src: 'produccion' });
     } else if (msg.type === 'chat') {
       const cm = Dt.addChat(msg.text, prodName(msg.from), msg.from, false, msg.urgent === true);   // urgente: lo marca SOLO Producción (dec. 145)
-      if (cm && cm.urgent === true) audioUrgent();
+      if (cm && cm.urgent === true) audioUrgent(cm);
       renderChat();
       if (!$('m-chat').classList.contains('open') && !chatPopOn) $('chat-on').hidden = false;   // sin leer
       if (CONFIG && CONFIG.prodChatPopup !== false) toast(tx('Chat · {p}: {t}', { p: prodName(msg.from), t: msg.text.slice(0, 100) }));
@@ -3559,5 +3612,5 @@
   });
   window.ShowtimePanel = { reload: () => { loadState(); renderAll(); }, _test: { winState: () => Array.from(WIN.entries()).map(([id, x]) => ({ id, name: x.name, vista: x.vista, zona: x.zona, filas: x.filas || null, standby: !!x.standby, fs: x.fs })), setWinVista, setWinRows, resetWinLayout, setWinStandby, closeLive, openGestor, gestorVisible, emProdMessage, emRegenProd, hitoChips, emUrl, prodBigTitle, fileKind, handleFile, emCommand, importSummary, hidesSome, tipoPill, setWake, wakeState: () => ({ on: wakeOn, lock: !!wakeLock }), showSplash, hideSplash, setStandby, standbyOn, room: () => emRoom,
     emSnapshot, emCloseDay, emDay, qrDevices, rmZones, setRmZone: z => { RM_ZONE = z; renderCast(); }, setRoom: r => { emRoom = r; }, fakeEm: (em, st) => { EM = em; EMST = st; }, emStateHtml, renderCastBar, renderHubLed, mtIn, mtOut, cfSimState, renderCfSim, cfSim: () => CFSIM,
-    dayStep, monthLabel, spotItems, spotDays, spotEntries, fmtDayFull, refreshStale, net: () => NET, setNet: o => { NET = netNorm(o); }, netNorm, emLink, emBrokers, emUrl, netHtml, renderCast, audioTick, fillAudioCfg, saveAudioCfg } };   // _test: solo para tests/control.test.js
+    dayStep, monthLabel, spotItems, spotDays, spotEntries, fmtDayFull, refreshStale, net: () => NET, setNet: o => { NET = netNorm(o); }, netNorm, emLink, emBrokers, emUrl, netHtml, renderCast, audioTick, fillAudioCfg, saveAudioCfg, audioPreview, audioConfirm, audioRearm, renderAuBar, loadNew, impDoImport } };   // _test: solo para tests/control.test.js
 })();
