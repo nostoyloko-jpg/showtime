@@ -362,7 +362,7 @@
 
   test('Teclado en pantalla: los docks de Producción suben con --kb (visualViewport) y el campo enfocado queda visible', () => {
     const css = D.src('live.css'), js = D.src('live.js');
-    ok(/\.mdock\{[^}]*bottom:calc\(14px \+ var\(--kb,0px\)\)/.test(css), 'menú de mensajes sube con el teclado');
+    ok(/\.mdock\{[^}]*bottom:calc\(14px \+ var\(--sa-b\) \+ var\(--kb,0px\)\)/.test(css), 'menú de mensajes sube con el teclado (y respeta el borde seguro)');
     ok(/\.cdock\{[^}]*bottom:calc\(66px \+ var\(--sa-b\) \+ var\(--kb,0px\)\)/.test(css) || /\.cdock\{[^}]*bottom:calc\(66px \+ var\(--kb,0px\)\)/.test(css), 'chat sube con el teclado');
     ok(/\.pnote\{bottom:calc\(76px \+ var\(--sa-b\) \+ var\(--kb,0px\)\)\}/.test(css), 'aviso sube con el teclado');
     ok(/visualViewport/.test(js) && /setProperty\('--kb'/.test(js), 'mide el teclado con visualViewport');
@@ -578,17 +578,16 @@
     ['tarea', 'hito'].forEach(m => ok(/Banda|BANDA/.test(vista(m)), m + ': la Live no filtra por tipo'));
   });
 
-  test('Dec. 118: Manager y Backstage en Studio vuelven al diseño clásico original; Confidence y Stage, sin cambios', () => {
+  test('Dec. 118/119: Manager y Backstage en Studio con el diseño clásico; acabado fino solo donde se ve (Stage y el botón de Confidence)', () => {
     const css = require('fs').readFileSync(require('path').join(__dirname, '..', 'live.css'), 'utf8');
     ok(/body:not\(\[data-lv\]\):is\(\[data-vista="manager"\],\[data-vista="backstage"\]\)\{\s*--bg:#0d0f14; --bg2:#0a0c10; --panel:rgba\(255,255,255,\.03\);[^}]*--accent:#e94560;[^}]*--call:#ffb347;/.test(css), 'colores clásicos solo en Manager y Backstage sin Stage');
-    const studio = css.slice(css.indexOf('/* ── Studio: acabado de la base'), css.indexOf('/* ── Manager y Backstage en Studio'));
-    const reglas = studio.split('\n').filter(l => /\{/.test(l));
-    eq(reglas.length, 14, 'las 14 reglas del acabado Studio');
-    const W = ':where(body[data-lv],body:not([data-vista="manager"]):not([data-vista="backstage"])) ';
-    ok(reglas.every(l => l.split('{')[0].split(W).slice(1).length >= 1 && l.split('{')[0].split(W)[0] === '' && l.split('{')[0].split(W).slice(1).every(x => !/:where|body/.test(x))), 'todas filtradas con :where (sin sumar especificidad)');
-    ok(/:where\(body\[data-lv\],body:not\(\[data-vista="manager"\]\):not\(\[data-vista="backstage"\]\)\) \.mdock,/.test(css), 'docks de mensajes igual');
-    ok(/body\[data-lv="stage"\] \.tpanel-h::before,body\[data-lv="stage"\] \.tpanel-h::after\{display:none\}/.test(css), 'Stage intacto');
+    ok(/:where\(body\[data-lv="stage"\]\) \.tpanel-h\{display:flex;align-items:center;gap:10px;letter-spacing:\.18em;position:relative\}/.test(css), 'Stage: cabeceras');
+    ok(/:where\(body\[data-lv="stage"\]\) #panel-next \.tpanel-h\{color:var\(--muted\)\}/.test(css), 'Stage: SIGUIENTE en blanco');
+    ok(/:where\(body\[data-vista="confidence"\]:not\(\[data-lv\]\)\) \.iconbtn\{background:linear-gradient/.test(css), 'Confidence en Studio: botón de pantalla completa');
+    ok(!/tpanel-h::before\{content/.test(css) && !/body\[data-lv="stage"\] \.tpanel-h::before/.test(css), 'sin iconos que luego se esconden (nada que deshacer)');
+    ok(!/Neutro|Raycast/.test(css.slice(0, 400)), 'cabecera del archivo al día');
   });
+
 
   (async () => {
     let pass = 0, fail = 0;

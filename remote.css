@@ -26,7 +26,7 @@ button:disabled{opacity:.32;cursor:default}
 .rx.stale,.rx.end{color:#ff8a82} .rx.stale .rx-dot,.rx.end .rx-dot{background:var(--red);animation:pulse 1.1s ease-in-out infinite}
 @keyframes pulse{50%{opacity:.25}}
 .rh-mid{display:flex;align-items:baseline;gap:12px;margin-top:2px}
-.clk{font-size:34px;font-weight:900;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+.clk{font-size:34px;font-weight:900;letter-spacing:-.01em}
 .evn{font-size:13px;color:var(--muted);font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 main{padding:12px 12px 0;display:flex;flex-direction:column;gap:12px}
@@ -48,7 +48,7 @@ main{padding:12px 12px 0;display:flex;flex-direction:column;gap:12px}
 /* Zonas */
 .zones{display:flex;gap:6px;overflow-x:auto;padding-bottom:10px;margin-bottom:2px;scrollbar-width:none}
 .zones::-webkit-scrollbar{display:none}
-.zchip{flex:0 0 auto;height:40px;padding:0 14px;border-radius:20px;border:1px solid var(--line);background:transparent;font-weight:800;font-size:14px;color:var(--muted);display:inline-flex;align-items:center;gap:7px}
+.zchip{flex:0 0 auto;padding:0 14px;border-radius:20px;border:1px solid var(--line);background:transparent;font-weight:800;font-size:14px;color:var(--muted);display:inline-flex;align-items:center;gap:7px}
 .zchip::before{content:'';width:9px;height:9px;border-radius:50%;background:var(--zc,#888)}
 .zchip.on{background:#fff;color:#000;border-color:#fff}
 
@@ -58,7 +58,7 @@ main{padding:12px 12px 0;display:flex;flex-direction:column;gap:12px}
 .nav .ic{width:24px;height:24px}
 .binfo{flex:1;min-width:0;padding:4px 2px}
 .bpos{font-size:11px;letter-spacing:.12em;color:var(--dim);font-weight:800}
-.bpos .link{background:none;border:0;color:#7dd3fc;font-weight:800;letter-spacing:.06em;text-decoration:underline;padding:0}
+.bpos .link{background:none;border:0;color:#7dd3fc;font-weight:800;letter-spacing:.06em;text-decoration:underline}
 .bkind{font-size:12px;letter-spacing:.18em;font-weight:900;color:var(--muted);margin-top:6px}
 .bname{font-size:30px;font-weight:900;line-height:1.05;margin:2px 0 4px;overflow-wrap:anywhere;border-left:5px solid var(--bc,#888);padding-left:10px}
 .btime{font-size:15px;color:var(--muted);font-variant-numeric:tabular-nums}
@@ -154,7 +154,7 @@ body.busy .act:not(:disabled),body.busy .tbtn{opacity:.5}
 .mzones>span{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);font-weight:800}
 .zrow{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
 .zrow::-webkit-scrollbar{display:none}
-.zrow button{flex:0 0 auto;height:38px;padding:0 12px;border-radius:19px;border:1px solid var(--line);background:transparent;font-weight:800;font-size:13px;color:var(--muted);display:inline-flex;align-items:center;gap:6px}
+.zrow button{flex:0 0 auto;padding:0 12px;border-radius:19px;border:1px solid var(--line);background:transparent;font-weight:800;font-size:13px;color:var(--muted);display:inline-flex;align-items:center;gap:6px}
 .zrow button[data-z]:not([data-z="*"])::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--zc,#888)}
 .zrow button.on{background:#fff;color:#000;border-color:#fff}
 

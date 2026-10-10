@@ -10,3 +10,9 @@ Claude outputs/
 # Comprimidos (resúmenes, copias): nunca al repositorio
 *.zip
 *.zip
+
+# Documentos internos y código de otros proyectos: siguen en la carpeta, pero no se publican (dec. 119)
+GEMINI.md
+contexto-claude-chat.md
+*.docx
+parches/

@@ -24,7 +24,6 @@
 
   // ── Bloqueos del menú Retrasos (los mismos que usa el Panel) ──────────
   function blockOf(config, scope) { const b = ((config && config.delayBlock) || {})[scope] || {}; const o = {}; CATS.forEach(k => { o[k] = b[k] === true; }); return o; }
-  function isBlocked(config, kind, zoneId) { return !!(blockOf(config, 'all')[kind] || blockOf(config, zoneId || '')[kind]); }
 
   function allBlocks(state, now) { return state ? C.buildBlocks(state, Number.isFinite(now) ? { mode: 'all', day: 'all', now: now } : { mode: 'all', day: 'all' }) : []; }
   function nEnt(n, adj) { return n + (n === 1 ? ' entrada ' + adj : ' entradas ' + adj + 's'); }
@@ -305,7 +304,7 @@
     return { cls: 'ok', text: nm + ' · ' + tx('En hora'), title: tx('Sin retraso acumulado ni desfase en vivo') };
   }
 
-  const API = { withBlk, OPS, delayPill, isBlocked, targets, suggest, actionsFor, startedBySchedule, findBlock, realPlan, onTimePlan, stretchPlan, editStartPlan, bisWindow, bisState, bisMinutes, BIS_OPTS, BIS_DEFAULT, delayPlan, delayStamp, checkCmd, zoneDenied, chatSign };
+  const API = { withBlk, OPS, delayPill, targets, suggest, actionsFor, startedBySchedule, findBlock, realPlan, onTimePlan, stretchPlan, editStartPlan, bisWindow, bisState, bisMinutes, BIS_OPTS, BIS_DEFAULT, delayPlan, delayStamp, checkCmd, zoneDenied, chatSign };
   if (isNode) module.exports = API;
   else root.ShowtimeMando = API;
 })(typeof window !== 'undefined' ? window : globalThis);

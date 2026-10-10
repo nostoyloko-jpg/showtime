@@ -615,8 +615,6 @@
     if (flag === 'lock') a.showtimeFija = true; else if (flag === 'free') a.showtimeLibre = true;
     return { ok: true, state: next, changed: JSON.stringify(state.artists[i]) !== JSON.stringify(a) };
   }
-  /** ¿Se mueve con los retrasos? Rojo individual > verde individual > categoría. */
-  function movesWithDelay(b, cats) { return b.fija ? false : b.libre ? true : typeof cats === 'function' ? !!cats(b) : !!(cats && cats[b.kind]); }
 
   /** Changeover mínimo de una zona: el suyo o, si no tiene, el del evento. */
   function coMinFor(state, stageId) {
@@ -1174,7 +1172,7 @@
 
   const API = {
     DEFAULT_CUTOFF, DEFAULT_CALL_MINS, DEFAULT_DURATION, DEFAULT_CO_MIN, isFija, setFija, coMinFor,
-    MARGIN_WARN, UNNAMED, isUnnamed, eventName, scopeToJornada, jornadaOver, isLibre, setDelayFlag, movesWithDelay, setReal, jornadaOfAbs, activeJornada, legacyCallKey, callIsDone, callKeyName, driftByZone, delayByZone, addRetraso, retrasosOf, blockedIn, movesBy, setAlargar, hitoMargins, MAX_NEXT, ARTIST_COLORS, TIPO_COLORS,
+    MARGIN_WARN, UNNAMED, isUnnamed, eventName, scopeToJornada, jornadaOver, isLibre, setDelayFlag, setReal, jornadaOfAbs, activeJornada, legacyCallKey, callIsDone, callKeyName, driftByZone, delayByZone, addRetraso, retrasosOf, blockedIn, movesBy, setAlargar, hitoMargins, MAX_NEXT, ARTIST_COLORS, TIPO_COLORS,
     pad2, parseHM, fmtHM, dayIndex, isoOfDay, shiftDate, toAbs, adjustEnd, nowAbs,
     cutoffMins, festivalDateOf, entersMode, festivalDays, TIPOS, tipoOf, isBand, isAll, isKindMode, engineMode, entriesOf, tasksNow, hitosOf,
     getEscenario, artistColor, callAbsFor, buildBlocks,

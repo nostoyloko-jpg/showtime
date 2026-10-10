@@ -1,6 +1,6 @@
 /* Showtime — live.css · Pantalla Live
-   Fondo SIEMPRE oscuro. Estilos (mismos nombres que Stage Master):
-   Clásico (sin atributo) · Escenario (alto contraste) · Neutro · Raycast  →  body[data-lv="…"]
+   Fondo SIEMPRE oscuro. Dos modos: Studio (sin atributo) y Stage (alto contraste)  →  body[data-lv="stage"].
+   En Studio, Manager y Backstage usan el diseño clásico (dec. 118) y Confidence el de Studio.
    Los colores de artista y escenario son datos: no se tocan. */
 
 :root{
@@ -70,7 +70,7 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .jfin-clk{font-variant-numeric:tabular-nums;font-weight:800;font-size:clamp(48px,14vw,160px);line-height:1;color:#fff;letter-spacing:-.02em}
 .jfin-box b{font-size:clamp(20px,4.4vw,44px);letter-spacing:.14em;color:var(--call,#ffb347)}
 .jfin-box span{font-size:clamp(14px,2.2vw,20px);color:rgba(255,255,255,.62)}
-#banner{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:150;max-width:80vw;background:var(--call);color:#000;
+#banner{position:fixed;left:50%;transform:translateX(-50%);z-index:150;max-width:80vw;background:var(--call);color:#000;
   font-weight:900;letter-spacing:.06em;padding:8px 18px;border-radius:8px;font-size:clamp(12px,1.5vw,20px);text-align:center;box-shadow:0 4px 18px rgba(0,0,0,.5)}
 #banner[hidden]{display:none}
 body[data-lv="stage"] .tbadge{color:#fff;border-color:rgba(255,214,0,.6)}
@@ -137,10 +137,10 @@ canvas{position:absolute;inset:0;width:100%;height:100%}
 .iconbtn{width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;border:1px solid var(--btn-line);background:var(--btn-bg);color:var(--btn-text);cursor:pointer;padding:0;touch-action:manipulation}
 .iconbtn:hover:not(:disabled){filter:brightness(1.35)}
 .iconbtn:disabled{opacity:.3;cursor:default}
-#close{position:fixed;top:14px;right:14px;z-index:100;opacity:.55}
+#close{position:fixed;z-index:100;opacity:.55}
 #close:hover{opacity:1}
 #close[hidden]{display:none}
-#zoomctl{position:fixed;right:14px;bottom:14px;z-index:200;display:flex;align-items:center;gap:6px;background:rgba(10,11,14,.88);border:1px solid rgba(255,255,255,.15);border-radius:9px;padding:5px 8px;backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%)}
+#zoomctl{position:fixed;z-index:200;display:flex;align-items:center;gap:6px;background:rgba(10,11,14,.88);border:1px solid rgba(255,255,255,.15);border-radius:9px;padding:5px 8px;backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%)}
 #zlbl{font-size:11px;color:rgba(255,255,255,.75);min-width:52px;text-align:center}
 #offlbl{font-size:11px;color:var(--call);text-align:center;font-weight:700}
 #offlbl:empty{display:none}
@@ -160,24 +160,16 @@ canvas{position:absolute;inset:0;width:100%;height:100%}
   .striph{height:16px;bottom:-8px}
 }
 
-/* ── Studio: acabado de la base (iconos de cabecera, pastillas, controles) ──
-   Manager y Backstage NO lo llevan en Studio: usan el diseño clásico original (dec. 118). Con :where() el filtro no suma
-   especificidad: Stage y Confidence quedan exactamente igual que antes. */
-:where(body[data-lv],body:not([data-vista="manager"]):not([data-vista="backstage"])) #top{border-bottom:1px solid rgba(255,255,255,.14)}
-:where(body[data-lv],body:not([data-vista="manager"]):not([data-vista="backstage"])) .tpanel{box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
-:where(body[data-lv],body:not([data-vista="manager"]):not([data-vista="backstage"])) #panel-next .tpanel-h{color:var(--muted)}
-:where(body[data-lv],body:not([data-vista="manager"]):not([data-vista="backstage"])) .tpanel-h{display:flex;align-items:center;gap:10px;letter-spacing:.18em;position:relative}
-:where(body[data-lv],body:not([data-vista="manager"]):not([data-vista="backstage"])) .tpanel-h::before{content:"";flex:0 0 auto;width:min(9cqw,3.4vh);height:min(9cqw,3.4vh);border-radius:24%;background:linear-gradient(145deg,var(--t1),var(--t2));box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 1px 2px rgba(0,0,0,.4)}
-:where(body[data-lv],body:not([data-vista="manager"]):not([data-vista="backstage"])) .tpanel-h::after{content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);width:min(9cqw,3.4vh);height:min(9cqw,3.4vh);background:#fff;-webkit-mask:var(--m) center/58% no-repeat;mask:var(--m) center/58% no-repeat}
-:where(body[data-lv],body:not([data-vista="manager"]):not([data-vista="backstage"])) #panel-now .tpanel-h{--t1:#ff7a7a;--t2:#e5484d;--m:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='7' y='2' width='6' height='10' rx='3'/%3E%3Cpath d='M4 8.5v1a6 6 0 0 0 12 0v-1'/%3E%3Cpath d='M10 15.5v3M7 18.5h6'/%3E%3C/svg%3E")}
-:where(body[data-lv],body:not([data-vista="manager"]):not([data-vista="backstage"])) #panel-next .tpanel-h{--t1:#60a5fa;--t2:#2563eb;--m:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 10h11M11 6l4 4-4 4'/%3E%3C/svg%3E")}
-:where(body[data-lv],body:not([data-vista="manager"]):not([data-vista="backstage"])) #panel-call .tpanel-h{--t1:#fbbf24;--t2:#d97706;--m:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5.5 13.5V9a4.5 4.5 0 0 1 9 0v4.5l1.5 2h-12z'/%3E%3Cpath d='M8.5 17.5a1.6 1.6 0 0 0 3 0'/%3E%3C/svg%3E")}
-:where(body[data-lv],body:not([data-vista="manager"]):not([data-vista="backstage"])) .trem{display:inline-block;padding:1px 8px;border-radius:6px;background:color-mix(in srgb,currentColor 14%,transparent);border:1px solid color-mix(in srgb,currentColor 32%,transparent)}
-:where(body[data-lv],body:not([data-vista="manager"]):not([data-vista="backstage"])) .tbar{background:rgba(255,255,255,.08);height:3px}
-:where(body[data-lv],body:not([data-vista="manager"]):not([data-vista="backstage"])) .iconbtn{background:linear-gradient(180deg,#1b1c20,#121316);border:1px solid rgba(255,255,255,.14);border-bottom-width:2px;border-radius:7px;box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 1px 2px rgba(0,0,0,.4)}
-:where(body[data-lv],body:not([data-vista="manager"]):not([data-vista="backstage"])) #zoomctl{background:rgba(0,0,0,.8);border-color:rgba(255,255,255,.14);border-radius:10px}
-:where(body[data-lv],body:not([data-vista="manager"]):not([data-vista="backstage"])) .callok{border-radius:7px}
-
+/* ── Acabado fino (dec. 119): lo que de verdad se ve del antiguo acabado Studio, sin reglas que lo deshagan después.
+   Stage: cabeceras con hueco para el icono, SIGUIENTE en blanco, esquinas de pastillas y botones.
+   Confidence en Studio: el botón de pantalla completa. Manager y Backstage en Studio: diseño clásico (dec. 118), sin acabado.
+   :where() no suma especificidad: el resultado es idéntico al de antes (comprobado elemento a elemento en Chromium). */
+:where(body[data-lv="stage"]) .tpanel-h{display:flex;align-items:center;gap:10px;letter-spacing:.18em;position:relative}
+:where(body[data-lv="stage"]) #panel-next .tpanel-h{color:var(--muted)}
+:where(body[data-lv="stage"]) .trem{display:inline-block;border-radius:6px}
+:where(body[data-lv="stage"]) .iconbtn{border-radius:7px}
+:where(body[data-lv="stage"]) #zoomctl{border-radius:10px}
+:where(body[data-vista="confidence"]:not([data-lv])) .iconbtn{background:linear-gradient(180deg,#1b1c20,#121316);border:1px solid rgba(255,255,255,.14);border-bottom-width:2px;border-radius:7px;box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 1px 2px rgba(0,0,0,.4)}
 
 /* ── Manager y Backstage en Studio: diseño clásico original (colores de antes de la dec. 111) ── */
 body:not([data-lv]):is([data-vista="manager"],[data-vista="backstage"]){
@@ -188,12 +180,6 @@ body:not([data-lv]):is([data-vista="manager"],[data-vista="backstage"]){
 /* ── Stage (alto contraste, para el sol): único modificador de la base Studio ── */
 /* En Stage, el acabado de Studio se retira donde resta legibilidad al sol: sin iconos de color en las cabeceras,
    tiempos sin pastilla, barra de progreso de 4 px y botones planos sobre negro */
-body[data-lv="stage"] .tpanel-h::before,body[data-lv="stage"] .tpanel-h::after{display:none}
-body[data-lv="stage"] .trem{padding:0;background:none;border:0}
-body[data-lv="stage"] .tbar{height:4px}
-body[data-lv="stage"] .iconbtn{background:var(--btn-bg);border:1px solid var(--btn-line);box-shadow:none}
-body[data-lv="stage"] .tpanel{box-shadow:none}
-body[data-lv="stage"] #top{border-bottom:2px solid var(--accent)}
 body[data-lv="stage"]{--bg:#000;--bg2:#000;--panel:#000;--panel-line:rgba(255,214,0,.45);--accent:#FFD600;--muted:#fff;--dim:rgba(255,255,255,.75);--call:#FFC107;
   --line:rgba(255,214,0,.3);--hover:rgba(255,214,0,.6);--btn-bg:#000;--btn-line:rgba(255,214,0,.6);--btn-text:#FFD600;font-weight:700}
 body[data-lv="stage"] #clk{color:#FFD600}
@@ -259,7 +245,7 @@ body[data-lv="stage"] .txtbtn{color:#fff}
 #flash-x{position:fixed;top:16px;right:16px;width:48px;height:48px}
 
 /* ── Modo Staff (2d-A): solo lectura desde el QR ─────────────────── */
-.rx{position:fixed;top:6px;left:12px;z-index:160;display:inline-flex;align-items:center;gap:8px;height:28px;padding:0 12px;border-radius:14px;
+.rx{position:fixed;left:12px;z-index:160;display:inline-flex;align-items:center;gap:8px;height:28px;padding:0 12px;border-radius:14px;
   font-size:12px;font-weight:800;letter-spacing:.1em;color:var(--text);background:rgba(10,12,16,.82);border:1px solid rgba(255,255,255,.16);
   -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);white-space:nowrap;pointer-events:none}
 .rx[hidden]{display:none}
@@ -311,7 +297,7 @@ body[data-vista="confidence"] .conf{display:flex}
 .cf-dig span{font-size:min(calc(100vw / var(--n) * 1.6),60vh);font-weight:900;line-height:.9;letter-spacing:-.03em;font-variant-numeric:tabular-nums;font-feature-settings:'tnum' 1;color:#fff}
 .cf-bar{flex:0 0 auto;height:3.4vh;min-height:14px;border-radius:99px;background:rgba(255,255,255,.12);overflow:hidden}
 #cf-fill{height:100%;width:100%;border-radius:99px;background:var(--cf);transition:width .25s linear,background .3s}
-.cf-foot{font-size:min(4.6vw,6vh);font-weight:800;text-align:center;color:rgba(255,255,255,.75);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.cf-foot{font-size:min(4.6vw,6vh);font-weight:800;text-align:center;color:rgba(255,255,255,.75);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cf-foot b{color:#fff}
 .cf-sep{margin:0 .6em;opacity:.45}
 .conf.lv-warn{--cf:#ffb347}
@@ -362,7 +348,7 @@ body.ro[data-vista="confidence"] .conf{padding-top:max(4vh,52px)}
 /* Confidence en el navegador del móvil: alto VISIBLE (sin la barra del navegador), para que no se corte abajo, y botón de pantalla completa */
 body[data-vista="confidence"]{height:100vh!important;height:100dvh!important;min-height:0!important;overflow:hidden!important}
 body[data-vista="confidence"] .conf{padding-bottom:max(4vh,calc(env(safe-area-inset-bottom,0px) + 14px))}
-.cf-full{display:none!important;position:fixed;right:14px;bottom:14px;z-index:220;opacity:.55}
+.cf-full{display:none!important;position:fixed;z-index:220;opacity:.55}
 .cf-full:hover{opacity:1}
 body[data-vista="confidence"] .cf-full{display:flex!important}
 /* Standby: el mismo botón de pantalla completa, en el mismo sitio, por encima del cartel; el reloj se aparta a su izquierda */
@@ -385,7 +371,7 @@ body:not([data-vista="manager"]) .mtpill{display:none}
 .cf-kind.sc{color:#c9b6ff}
 
 /* Producción: menú de mensajes a la izquierda (mismo comportamiento que el de la derecha) */
-.mdock{position:fixed;left:14px;bottom:calc(14px + var(--kb,0px));z-index:200;display:flex;flex-direction:column-reverse;align-items:flex-start;gap:6px;background:rgba(10,11,14,.88);border:1px solid rgba(255,255,255,.15);border-radius:9px;padding:4px;backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);opacity:.55;transition:opacity .2s}
+.mdock{position:fixed;z-index:200;display:flex;flex-direction:column-reverse;align-items:flex-start;gap:6px;background:rgba(10,11,14,.88);border:1px solid rgba(255,255,255,.15);border-radius:9px;padding:4px;backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);opacity:.55;transition:opacity .2s}
 .mdock[hidden]{display:none}
 .mdock:hover,.mdock.open{opacity:1}
 #mdbody{display:none;flex-direction:column;gap:8px;padding:4px 6px 6px;width:min(340px,80vw)}
@@ -398,7 +384,7 @@ body:not([data-vista="manager"]) .mtpill{display:none}
 #md-form{display:flex;gap:6px}
 #md-text{flex:1;min-width:0;height:32px;padding:0 10px;border-radius:6px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:#fff;font:inherit;font-size:13px}
 .md-send{background:var(--call);color:#111;font-weight:800}
-.pnote{position:fixed;left:50%;bottom:calc(76px + var(--kb,0px));transform:translateX(-50%);z-index:210;background:rgba(0,0,0,.88);border:1px solid rgba(255,255,255,.25);color:#fff;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:700}
+.pnote{position:fixed;left:50%;transform:translateX(-50%);z-index:210;background:rgba(0,0,0,.88);border:1px solid rgba(255,255,255,.25);color:#fff;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:700}
 .pnote.bad{border-color:#ff6363;color:#ff8a8a}
 .pnote[hidden]{display:none}
 /* Producción: modal «¿Dónde lo mandas?» */
@@ -414,7 +400,7 @@ body:not([data-vista="manager"]) .mtpill{display:none}
 .pm-opts small{font-size:12px;color:rgba(255,255,255,.6)}
 .pm-no{align-self:flex-end}
 /* Producción: chat (encima del menú de mensajes) */
-.cdock{position:fixed;left:14px;bottom:calc(66px + var(--kb,0px));z-index:205;display:flex;flex-direction:column-reverse;align-items:flex-start;gap:6px;background:rgba(10,11,14,.88);border:1px solid rgba(255,255,255,.15);border-radius:9px;padding:4px;backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);opacity:.55;transition:opacity .2s}
+.cdock{position:fixed;z-index:205;display:flex;flex-direction:column-reverse;align-items:flex-start;gap:6px;background:rgba(10,11,14,.88);border:1px solid rgba(255,255,255,.15);border-radius:9px;padding:4px;backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);opacity:.55;transition:opacity .2s}
 .cdock[hidden]{display:none}
 .cdock:hover,.cdock.open{opacity:1}
 #cdbtn{position:relative;border-color:transparent;background:transparent}
@@ -454,7 +440,7 @@ body.ro #banner{top:calc(50px + var(--sa-t))}   /* debajo de la píldora de cone
 #zoomctl.dock:has(#docktag:not(:empty)){opacity:1}
 /* Docks: los mismos bordes finos y radios en los cuatro estilos */
 .mdock,.cdock,#zoomctl{border-color:var(--hair2)}
-:where(body[data-lv],body:not([data-vista="manager"]):not([data-vista="backstage"])) .mdock,:where(body[data-lv],body:not([data-vista="manager"]):not([data-vista="backstage"])) .cdock{background:rgba(0,0,0,.8);border-color:rgba(255,255,255,.14);border-radius:10px}
+:where(body[data-lv="stage"]) .mdock,:where(body[data-lv="stage"]) .cdock{border-radius:10px}   /* después de su regla base (dec. 119) */
 body[data-lv="stage"] .mdock,body[data-lv="stage"] .cdock{background:#000;border-color:#FFD600}
 body[data-lv="stage"] .md-send{background:#FFD600;color:#000}
 /* Móvil en vertical: el dock de la derecha abierto no se sale de la pantalla ni tapa los de la izquierda */

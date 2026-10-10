@@ -548,7 +548,7 @@
     const css = D.src('control.css').replace(/\/\*[\s\S]*?\*\//g, '');
     eq((css.match(/:root\{--glass-bg:/g) || []).length, 1, 'una sola definición del cristal');
     eq((css.match(/body\[data-ps="stage"\]\{--glass-bg:/g) || []).length, 1, 'una sola versión de Stage');
-    eq((css.match(/[;{]backdrop-filter:var\(--glass-blur\)/g) || []).length, 2, 'cristal en un solo sitio (más la cabecera del panel)');
+    eq((css.match(/[;{]backdrop-filter:blur\(24px\) saturate\(160%\)/g) || []).length, 1, 'cristal en un solo sitio (literal, para Safari; dec. 119 quitó la versión con var() que nada aplicaba)');
     eq((css.match(/@media \(max-width:1600px\)/g) || []).length, 1, 'un solo bloque de 1600 px');
     eq((css.match(/\.mbtn \.mlbl\{display:/g) || []).length, 1, 'las etiquetas de los menús se ocultan en un solo sitio (sin reglas que se contradicen)');
   });
@@ -963,7 +963,7 @@
     ok(/class="gv-row gv-hd"/.test(js) && /tx\('Nombre'\)/.test(js) && /tx\('Standby'\)/.test(js) && /\.gv-hd\{display:none\}/.test(css), 'cabecera NOMBRE · VISTA · ZONA · STANDBY en escritorio; oculta en móvil');
     ok(/\.gv-row select:disabled\{[^}]*border-color:transparent;background-color:transparent/.test(css), 'zona sin usar: «—» plano, sin caja');
     ok(/\.gv-foot \.gv-close\{background:#1c1e26;border:1px solid var\(--hair2\);color:#fff\}/.test(css) && /class="btn gv-close" data-gv="done"/.test(js), 'Cerrar en gris Raycast, sin rojo');
-    ok(/\.gv-qr\{[^}]*border-top:1px solid/.test(css) && !/dashed/.test(css.slice(css.indexOf('.gv-qr{'), css.indexOf('.gv-qr{')+200)), 'QR: hairline continua, sin marco de puntos');
+    ok(/\.gv-qr\{margin-top:0;padding-top:0;border-top:0\}/.test(css) && !/dashed/.test(css.slice(css.indexOf('.gv-qr{'), css.indexOf('.gv-qr{')+200)), 'QR dentro de su tarjeta (dec. 110): sin línea ni marco de puntos');
     ok(/data-gv="all" data-on="1">' \+ tx\('⏸ Todas en standby'\)/.test(js) && /data-gv="all" data-on="0">' \+ tx\('▶ Reanudar todas'\)/.test(js), 'cabecera: todas en standby / reanudar');
     ok(/data-gv="new">' \+ tx\('\+ Abrir ventana Live'\)/.test(js) && /data-gv="done"/.test(js), 'pie: abrir a la izquierda, cerrar a la derecha');
     const t = panel(), msgs = [];
@@ -1798,6 +1798,26 @@ const miss = [...found].filter(k => !I.txHas(k) && !/^(OK|CALL|SC|Live|Raycast|S
     ['.cpick', '.cseg', '.czone', '.csub'].forEach(sel => { ok(css.indexOf(sel) >= 0, 'sigue: ' + sel); ok(js.indexOf(sel.slice(1)) >= 0, sel + ' lo usa el Hub'); });
     ok(/\.imp-prev tr\.st-ok/.test(css) && /'<tr class="st-' \+ r\.status/.test(js), '.st-ok/.st-warn/.st-err: filas del importador');
     ok(/\.lvon\.on/.test(css) && /id="lv-standby-on"/.test(html), '.lvon: «ABIERTA» del Standby');
+  });
+
+  test('Dec. 119: ninguna declaración CSS pisada por otra regla posterior con el mismo selector (control, live, remote)', () => {
+    const MODERN = /dvh|svh|lvh|dvw|svw|cq[whib]|color-mix|env\(/i;
+    const top = css => {   // reglas de primer nivel (sin @media / @supports / @keyframes)
+      const c = css.replace(/\/\*[\s\S]*?\*\//g, '').replace(/"[^"]*"|'[^']*'/g, '""'), out = []; let d = 0, start = 0, sel = '', bs = 0;
+      for (let i = 0; i < c.length; i++) {
+        if (c[i] === '{') { if (d === 0) { sel = c.slice(start, i).trim(); bs = i + 1; } d++; }
+        else if (c[i] === '}') { d--; if (d === 0) { if (sel[0] !== '@') out.push({ sels: sel.split(',').map(x => x.trim().replace(/\s+/g, ' ')), body: c.slice(bs, i) }); start = i + 1; } }
+        else if (d === 0 && c[i] === ';') start = i + 1;
+      }
+      return out.map(r => { const ds = []; let p = 0, s0 = 0; const b = r.body + ';';
+        for (let i = 0; i < b.length; i++) { if (b[i] === '(') p++; else if (b[i] === ')') p--; else if (b[i] === ';' && p === 0) { const seg = b.slice(s0, i); const k = seg.indexOf(':'); if (k > 0) ds.push({ k: seg.slice(0, k).trim().toLowerCase(), imp: /!important/i.test(seg), v: seg.slice(k + 1) }); s0 = i + 1; } }
+        return { sels: r.sels, ds }; });
+    };
+    const pisadas = css => { const R = top(css), out = [];
+      R.forEach((r, i) => r.ds.forEach(d => { if (d.k.startsWith('--')) return;
+        if (r.sels.every(sl => R.slice(i + 1).some(r2 => r2.sels.indexOf(sl) >= 0 && r2.ds.some(d2 => d2.k === d.k && (d2.imp || !d.imp) && !MODERN.test(d2.v))))) out.push(r.sels.join(',').slice(0, 50) + ' {' + d.k + '}'); }));
+      return out; };
+    ['control.css', 'live.css', 'remote.css'].forEach(f => { const p = pisadas(D.src(f)); eq(p.length, 0, f + ': ' + p.slice(0, 5).join(' · ')); });
   });
 
   // ── Ejecutor ─────────────────────────────────────────────────────────

@@ -497,8 +497,6 @@
     });
     return { records: recs, ignored };
   }
-  /** Compatibilidad: solo los registros. */
-  function tableRecords(rows, map, ctx) { return tableRead(rows, map, ctx).records; }
 
   // ── Texto libre ─────────────────────────────────────────────────────
   // Hora con separador (21:00, 21.00, 21h, 21h30, 9pm, 9:00 PM). Sin separador NO cuenta (no confundir «Blink 182»).
@@ -1000,7 +998,7 @@
     return C.newFestival({ nombre: C.UNNAMED, fechaInicio: fi, fechaFin: ff, dayCutoff: C.DEFAULT_CUTOFF }).state;
   }
 
-  const API = { norm, parseTime, parseRange, parseDate, detect, splitRow, parseTable, guessHeader, guessColumns, tableRecords,
+  const API = { norm, parseTime, parseRange, parseDate, detect, splitRow, parseTable, guessHeader, guessColumns,
     textRecords, findTimes, interpret, preview, apply, contextOf, read, KEYS, KEY_LABEL, headerKey, durMinutes, joinQuotedLines, tableRead, mergeSheets, splitGlued, proposeTipo, tipoFromText, TIPO_KEYS, TIPO_LABEL, provisionalState };
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
   else root.ShowtimeImport = API;
