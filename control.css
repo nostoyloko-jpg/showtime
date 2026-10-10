@@ -814,6 +814,7 @@ tr.k-hito td.ti::after{display:none}
 
 /* ── Modo foco: para operar en directo a 1-2 m de la mesa ── */
 body.focus #tbl .c-jor,body.focus #tbl td.f,body.focus #tbl .c-tp,body.focus #tbl td.tp,body.focus #tbl .c-n,body.focus #tbl td.n,body.focus #tbl th.mo,body.focus #tbl td.mo{display:none}
+body.focus #tbl thead th.c-name{padding-left:128px}   /* «NOMBRE» sobre el texto de los nombres, no sobre las píldoras (dec. 125) */
 body.focus #tbl thead th{font-size:12px;padding-top:9px;padding-bottom:9px}
 body.focus #tbl tbody td{padding:9px 7px;font-size:16px}
 body.focus #tbl tbody td input[type=text]{height:40px;font-size:16px}
@@ -988,9 +989,8 @@ td input:focus,td select:focus,.imp-src textarea:focus,.imp-prev td input[type=t
 .spot-i .sm{margin-left:auto;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .spot-i>kbd{margin-left:6px}
 .spot-slot{flex:0 0 62px;width:62px;display:flex;align-items:center}
-.spot-pill{display:inline-flex;align-items:center;justify-content:center;min-width:62px;height:20px;padding:0 6px;border-radius:5px;font:800 10px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;letter-spacing:.1em;color:var(--pc);background:color-mix(in srgb,var(--pc) 16%,transparent);border:1px solid color-mix(in srgb,var(--pc) 55%,transparent)}
+.spot-pill{display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;text-align:center;width:100%;box-sizing:border-box;min-width:62px;height:20px;padding:0 6px;border-radius:5px;font:800 10px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;letter-spacing:.1em;color:var(--pc);background:color-mix(in srgb,var(--pc) 16%,transparent);border:1px solid color-mix(in srgb,var(--pc) 55%,transparent)}
 .spot-pill.tp-show{--pc:#ff5d73}.spot-pill.tp-sc{--pc:#b79cff}.spot-pill.tp-tarea{--pc:#7dd3fc}.spot-pill.tp-hito{--pc:#ffc533}
-.spot-pill .pl-l{display:none}.spot-pill .pl-s{display:inline}   /* en la paleta, «SC»: «SOUNDCHECK» se salía de la píldora (dec. 123) */
 .spot-ic{width:16px;height:16px;color:var(--dim,#8a8f98)}
 .spot-foot{display:flex;flex-wrap:wrap;gap:14px;padding:9px 14px;border-top:1px solid var(--hair);font-size:12px;color:var(--muted)}
 .spot-empty{padding:18px 10px;color:var(--muted);font-size:13px}
@@ -1178,12 +1178,16 @@ body[data-ps="stage"] .net-l{color:#fff}
 body[data-ps="stage"] .net-st.ok i{background:#3ddc97}
 body[data-ps="stage"] .ntip{background:#000;border:1.5px solid rgba(255,214,0,.7)}
 /* ── Jornadas de temporada (dec. 124): flechas ◀ / ▶ junto a «Día» y cabeceras de mes en el menú ── */
-.dstep{display:inline-flex;align-items:center;gap:2px}
-.dstep-b{display:inline-flex;align-items:center;justify-content:center;width:26px;height:30px;padding:0;border:0;border-radius:6px;background:transparent;color:var(--muted);cursor:pointer}
+.dstep{display:inline-flex;align-items:stretch;border:1px solid var(--hair2);border-radius:8px;background:var(--field)}   /* control agrupado (dec. 125); sin overflow:hidden, que recortaría el menú desplegable */
+.dstep-b{display:inline-flex;align-items:center;justify-content:center;width:28px;padding:0;border:0;border-radius:0;background:transparent;color:var(--muted);cursor:pointer}
+.dstep-b.prev{border-right:1px solid var(--hair2);border-radius:7px 0 0 7px}
+.dstep-b.next{border-left:1px solid var(--hair2);border-radius:0 7px 7px 0}
+.dstep .menu#m-days{border:0;border-radius:0;background:transparent}
+.dstep .mbtn,.dstep .mbtn:hover,.dstep .menu.open .mbtn{border:0;border-radius:0;height:30px}
 .dstep-b .ic{width:14px;height:14px}
 .dstep-b.prev .ic{transform:rotate(90deg)}
 .dstep-b.next .ic{transform:rotate(-90deg)}
-.dstep-b:hover:not(:disabled){color:var(--text);background:rgba(255,255,255,.06)}
+.dstep-b:hover:not(:disabled){color:#fff;background:rgba(255,255,255,.08)}
 .dstep-b:disabled{opacity:.3;cursor:default}
 .dmonth{position:sticky;top:0;z-index:1;display:flex;align-items:center;gap:8px;padding:8px 10px 4px;background:var(--modal-bg,#0d0e11);color:var(--dim);font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;white-space:nowrap}
 .dmonth::before,.dmonth::after{content:"";flex:1;height:1px;background:var(--hair2,rgba(255,255,255,.13))}

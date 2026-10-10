@@ -3319,12 +3319,18 @@
       return { group: tx('Jornadas'), label: fmtDayFull(d), ic: 'i-clock', sub: sum || tx('Sin actividad'), search: spotDateWords(d) + ' jornada dia day', run: () => spotSetDay(d) };
     });
   }
+  /** Píldora corta de la paleta (caben en 62 px): SC · SHOW · TAREA/TASK · MARC/KT. «Hito» no se usa en pantalla: el término oficial es Marcador (dec. 125b). */
+  function spotPillTxt(k) {
+    if (k === 'sc') return 'SC';
+    if (k === 'hito') return tx('MARC');
+    return tx(PILL_TXT[k] || '');
+  }
   /** Todas las entradas (shows, soundchecks, tareas y marcadores), también por su fecha («18 jul», «viernes»). */
   function spotEntries() {
     if (!FEST) return [];
     return C.buildBlocks(FEST, { mode: 'all', day: 'all' }).map(b => ({
       group: tx('Entradas'), label: b.name || tx('(sin nombre)'), sub: fmtDay(b.jornada) + ' · ' + C.fmtHM(b.si) + ' · ' + (b.stage || tx('Sin zona')),
-      pill: '<span class="spot-pill tp-' + b.kind + '" aria-hidden="true">' + pillTxt(b.kind) + '</span>', kbd: '',
+      pill: '<span class="spot-pill tp-' + b.kind + '" aria-hidden="true">' + esc(spotPillTxt(b.kind)) + '</span>', kbd: '',
       search: (b.name || '') + ' ' + (b.stage || '') + ' ' + spotDateWords(b.jornada),
       run: () => spotJump(b)
     }));

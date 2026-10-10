@@ -1892,6 +1892,21 @@ const miss = [...found].filter(k => !I.txHas(k) && !/^(OK|CALL|SC|Live|Raycast|S
     eq(JSON.stringify(t2.T.dayStep()), JSON.stringify({ prev: '2026-07-10', next: '2026-07-12' }));
   });
 
+  test('Dec. 125: «NOMBRE» alineado en Foco, flechas de día en un control agrupado y píldoras cortas en ⌘K', () => {
+    const css = D.src('control.css'), js = D.src('control.js'), html = D.src('index.html');
+    ok(/<th class="c-name"[^>]*>Nombre<\/th>/.test(html) && /body\.focus #tbl thead th\.c-name\{padding-left:128px\}/.test(css), 'cabecera NOMBRE sobre el texto (128 px medidos: píldora 106 + hueco + relleno)');
+    ok(/\.dstep\{display:inline-flex;align-items:stretch;border:1px solid var\(--hair2\);border-radius:8px;background:var\(--field\)\}/.test(css), 'grupo con borde y fondo');
+    ok(!/\.dstep\{[^}]*overflow:hidden/.test(css), 'sin overflow:hidden: el menú de días no se recorta');
+    ok(/\.dstep-b\.prev\{border-right:1px solid var\(--hair2\);/.test(css) && /\.dstep-b\.next\{border-left:1px solid var\(--hair2\);/.test(css), 'separadores');
+    ok(/\.dstep \.menu#m-days\{border:0;border-radius:0;background:transparent\}/.test(css), 'el menú, integrado');
+    ok(/function spotPillTxt\(k\) \{\s*if \(k === 'sc'\) return 'SC';\s*if \(k === 'hito'\) return tx\('MARC'\);\s*return tx\(PILL_TXT\[k\] \|\| ''\);/.test(js) && /esc\(spotPillTxt\(b\.kind\)\)/.test(js), '⌘K: SC y MARC (KT en inglés)');
+    ok(/\.spot-pill\{[^}]*text-align:center;width:100%;box-sizing:border-box;/.test(css), 'la píldora llena su hueco de 62 px');
+    ok(/\.dstep-b:hover:not\(:disabled\)\{color:#fff;background:rgba\(255,255,255,\.08\)\}/.test(css), 'flechas: realce al pasar');
+    const tEn = dashboard({ 'showtime.config': JSON.stringify({ lang: 'en' }) });
+    eq(tEn.env.win.ShowtimeI18n.tx('MARC'), 'KT', 'EN: KT');
+    ok(/\.spot-pill\{[^}]*white-space:nowrap/.test(css) && !/\.spot-pill \.pl-l/.test(css), 'sin saltos de línea; fuera el truco de CSS anterior');
+  });
+
   // ── Ejecutor ─────────────────────────────────────────────────────────
   (async () => {
     let pass = 0, fail = 0;

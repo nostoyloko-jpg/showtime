@@ -361,6 +361,7 @@
       ". Clic: pasar a rojo": ". Click: switch to red",
       "TAREA": "TASK",
       "MARCADOR": "KEY TIME",
+      "MARC": "KT",
       "SHOW": "SHOW",
       "Cambiado desde la última importación/exportación": "Changed since the last import/export",
       "Empieza antes de la hora de corte: cuenta como la jornada anterior": "Starts before the cut-off time: counts as the previous day",
