@@ -634,25 +634,20 @@ body[data-ps="stage"] .qr-big-box{background:#000;border-color:rgba(255,214,0,.4
 /* Avisos de audio (dec. 145): casillas en columna; con el interruptor apagado, atenuadas */
 .form.au{grid-template-columns:auto minmax(0,1fr)}
 .form.au .au-k:has(input:disabled){opacity:.45;cursor:default}
-/* Dec. 146: muestra de cada tono (botón pequeño en la misma fila) y «Repetir hasta confirmar» con su intervalo */
-.au-row{display:flex;align-items:center;gap:8px;min-width:0}
-.au-pv{width:22px;height:22px;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;padding:0;border-radius:6px;border:1px solid var(--line);background-color:transparent;color:var(--muted);cursor:pointer}
+/* Dec. 146/147: una fila por tipo — casilla · ▷ muestra · Repetir · intervalo (columnas alineadas) */
+.au-row{display:grid;grid-template-columns:minmax(0,1fr) 22px auto 64px;align-items:center;gap:8px;min-width:0}
+.au-pv{width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;padding:0;border-radius:6px;border:1px solid var(--line);background-color:transparent;color:var(--muted);cursor:pointer}
 .au-pv:hover{color:var(--text);background-color:rgba(255,255,255,.08)}
 .au-pv .ic{width:11px;height:11px}
-.au-row select.mini{width:auto;height:26px}
-/* Barra de avisos pendientes de confirmar: bajo la cabecera, antes de retrasos y avisos generales */
-.aubar{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;padding:6px 16px;background-color:rgba(255,138,0,.10);border-bottom:1px solid rgba(255,138,0,.55)}
-.aubar[hidden]{display:none}
-.au-item{display:inline-flex;align-items:center;gap:6px;max-width:360px;min-width:0;padding:3px 4px 3px 9px;border-radius:999px;border:1px solid rgba(255,138,0,.6);background-color:rgba(0,0,0,.35);color:var(--text);font-size:12px;font-weight:700}
-.au-item > .ic{width:14px;height:14px;color:#ff8a00}
-.au-item b{font-weight:800;letter-spacing:.04em}
-.au-lbl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;font-weight:600;color:var(--muted)}
-.au-ok{width:24px;height:24px;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;padding:0;border-radius:999px;border:1px solid #ff8a00;background-color:#ff8a00;color:#000;cursor:pointer}
-.au-ok:hover{filter:brightness(1.15)}
-.au-ok .ic{width:14px;height:14px}
-body[data-ps="stage"] .aubar{background-color:#000;border-bottom:1.5px solid #FFD600}
-body[data-ps="stage"] .au-item{border-color:#FFD600;color:#fff}
-body[data-ps="stage"] .au-ok{background-color:#FFD600;border-color:#FFD600}
+.form .chk.au-rp{font-weight:600;color:var(--muted)!important;font-size:12px}
+.form.au .au-rp:has(input:disabled){opacity:.45;cursor:default}
+.au-row select.mini{width:64px;height:26px;margin-left:0}
+/* ✓ local que silencia la repetición, dentro del aviso que ya existe (EN ESCENA, mensaje urgente del chat) */
+.au-ack{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;padding:0;margin-left:6px;vertical-align:-3px;border-radius:999px;border:1px solid #ff8a00;background-color:transparent;color:#ff8a00;cursor:pointer}
+.au-ack:hover{background-color:#ff8a00;color:#000}
+.au-ack .ic{width:11px;height:11px}
+body[data-ps="stage"] .au-ack{border-color:#FFD600;color:#FFD600}
+body[data-ps="stage"] .au-ack:hover{background-color:#FFD600;color:#000}
 .form.mt input,.form.mt select{min-width:0;max-width:100%}
 
 /* «⋯» (Duplicar · Borrar) siempre visible: pegado al borde derecho aunque la tabla no quepa */

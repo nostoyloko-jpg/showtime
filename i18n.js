@@ -1546,11 +1546,13 @@
       "Urgente": "Urgent",
       "Marcar como urgente": "Mark as urgent",
       "Escuchar el tono": "Play the tone",
-      "Repetir hasta confirmar": "Repeat until confirmed",
-      "Los avisos nuevos se repiten hasta confirmarlos en la barra del Dashboard": "New alerts repeat until you confirm them in the Dashboard bar",
-      "Cada cuánto se repiten": "How often they repeat",
-      "Avisos de audio pendientes de confirmar": "Audio alerts waiting for confirmation",
-      "Confirmar aviso": "Confirm alert"
+      "Repetir": "Repeat",
+      "Cada cuánto se repite": "How often it repeats",
+      "Se repite hasta pulsar OK en la tarjeta CALL": "Repeats until you press OK on the CALL card",
+      "Se repite hasta pulsar ✓ en EN ESCENA o terminar la banda": "Repeats until you press ✓ in ON STAGE or the band finishes",
+      "Se repite hasta pulsar «Visto» en el aviso del tiempo": "Repeats until you press “Seen” on the weather alert",
+      "Se repite hasta pulsar ✓ en el mensaje urgente del chat": "Repeats until you press ✓ on the urgent chat message",
+      "Silenciar el aviso de audio": "Silence the audio alert"
     },
     core: {
       "Artista no encontrado.": "Artist not found.",

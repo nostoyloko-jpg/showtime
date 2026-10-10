@@ -6,8 +6,10 @@
  *  - El navegador solo deja sonar tras un gesto: el contexto se crea/reanuda en el primer clic o tecla.
  *  - Suena al ENTRAR en un estado (CALL, sobretiempo, alerta meteo pendiente), nunca al cargar ni en cada tick:
  *    el primer vistazo arma el detector sin sonar. Lo que sale del estado y vuelve a entrar, vuelve a sonar.
- *  - Dec. 146: muestra de cada tono (preview, también con el interruptor apagado) y «Repetir hasta confirmar»
- *    (apagado por defecto): UNA cola local; los tonos suenan de uno en uno, nunca a la vez (makeRing).
+ *  - Dec. 146: muestra de cada tono (preview, también con el interruptor apagado) y UNA cola local: los tonos suenan
+ *    de uno en uno, nunca a la vez (makeRing). Sin interfaz propia.
+ *  - Dec. 147: «Repetir» e intervalo POR TIPO (rep / every), apagado por defecto. La repetición se para desde el aviso
+ *    que ya existe (OK de CALL, «Visto» de meteo) o con un ✓ local dentro del aviso (sobretiempo, mensaje urgente).
  *
  *  Ordenador:  node --test tests/audio.test.js
  */
@@ -17,17 +19,28 @@
   const KEY = 'showtime.audioAlerts';
   const KINDS = ['call', 'overrun', 'meteo', 'urgent'];
   const EVERY = [5, 10, 20, 30];   // segundos entre repeticiones (dec. 146)
-  const DEFAULTS = Object.freeze({ on: false, call: true, overrun: true, meteo: true, urgent: true, repeat: false, every: 10 });
+  const EVERY_DEF = 10;
+  const perKind = v => KINDS.reduce((o, k) => (o[k] = v, o), {});
+  const DEFAULTS = Object.freeze({ on: false, call: true, overrun: true, meteo: true, urgent: true, rep: Object.freeze(perKind(false)), every: Object.freeze(perKind(EVERY_DEF)) });
+  const isObj = x => !!x && typeof x === 'object' && !Array.isArray(x);
 
-  /** Preferencias limpias: cualquier cosa rara (JSON roto, tipos que no son booleanos, campos que faltan) → valor por defecto. */
+  /** Preferencias limpias: cualquier cosa rara (JSON roto, tipos que no son booleanos, campos que faltan) → valor por defecto.
+   *  rep / every: uno por tipo (dec. 147). Los «repeat» / «every» globales de la v20261158 se ignoran (Repetir vuelve a apagado). */
   function normPrefs(p) {
-    const o = Object.assign({}, DEFAULTS);
-    if (p && typeof p === 'object' && !Array.isArray(p)) {
-      ['on', 'repeat'].concat(KINDS).forEach(k => { if (typeof p[k] === 'boolean') o[k] = p[k]; });
-      if (EVERY.indexOf(p.every) >= 0) o.every = p.every;
+    const o = { on: DEFAULTS.on, call: true, overrun: true, meteo: true, urgent: true, rep: perKind(false), every: perKind(EVERY_DEF) };
+    if (isObj(p)) {
+      ['on'].concat(KINDS).forEach(k => { if (typeof p[k] === 'boolean') o[k] = p[k]; });
+      KINDS.forEach(k => {
+        if (isObj(p.rep) && typeof p.rep[k] === 'boolean') o.rep[k] = p.rep[k];
+        if (isObj(p.every) && EVERY.indexOf(p.every[k]) >= 0) o.every[k] = p.every[k];
+      });
     }
     return o;
   }
+  /** ¿Se repite este tipo? Interruptor general, su casilla y su «Repetir». */
+  function repeats(p, kind) { const o = normPrefs(p); return enabled(o, kind) && o.rep[kind] === true; }
+  /** Segundos entre repeticiones de este tipo. */
+  function everyOf(p, kind) { return normPrefs(p).every[kind] || EVERY_DEF; }
   function store() { try { return root.localStorage || null; } catch (e) { return null; } }
   function load() {
     const s = store(); if (!s) return normPrefs(null);
@@ -123,17 +136,21 @@
       retain(kind, keys) { const k = new Set((keys || []).map(String)); const n = items.length; items = items.filter(x => x.kind !== kind || k.has(x.key)); return n !== items.length; },
       confirm(id) { const n = items.length; items = items.filter(x => x.id !== id); return n !== items.length; },
       dropKind(kind) { items = items.filter(x => x.kind !== kind); },
-      dropRepeats() { items = items.filter(x => !x.repeat); },
+      dropRepeats(kind) { items = items.filter(x => !x.repeat || (kind && x.kind !== kind)); },
       clear() { items = []; busyUntil = 0; },
+      /** ¿Este aviso sigue repitiéndose? (para pintar su ✓ local dentro del aviso existente) */
+      repeating(id) { return items.some(x => x.id === id && x.repeat); },
       pending() { return items.filter(x => x.repeat).map(x => ({ id: x.id, kind: x.kind, label: x.label })); },
       size() { return items.length; },
       /** Toca como mucho UN tono si no hay otro sonando. Devuelve el id que sonó o null. */
+      /** every: segundos (número) o función kind → segundos (intervalo por tipo, dec. 147). */
       step(now, every) {
         if (now < busyUntil) return null;
         const it = items.find(x => x.nextAt <= now); if (!it) return null;
         const secs = playFn(it.kind) || 0;
         busyUntil = now + (secs ? Math.ceil(secs * 1000) + 250 : 0);
-        if (it.repeat) it.nextAt = now + (EVERY.indexOf(every) >= 0 ? every : DEFAULTS.every) * 1000;
+        const ev = typeof every === 'function' ? every(it.kind) : every;
+        if (it.repeat) it.nextAt = now + (EVERY.indexOf(ev) >= 0 ? ev : EVERY_DEF) * 1000;
         else items = items.filter(x => x !== it);
         return it.id;
       },
@@ -152,7 +169,7 @@
     ['pointerdown', 'keydown', 'touchstart'].forEach(t => doc.addEventListener(t, go, { capture: true, passive: true }));
   }
 
-  const API = { KEY, KINDS, EVERY, DEFAULTS, normPrefs, load, save, enabled, edge, supported, unlock, play, stop, preview, toneSecs, alert, armGestures, makeRing, RING, TONES };
+  const API = { KEY, KINDS, EVERY, EVERY_DEF, DEFAULTS, normPrefs, load, save, enabled, repeats, everyOf, edge, supported, unlock, play, stop, preview, toneSecs, alert, armGestures, makeRing, RING, TONES };
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
   root.ShowtimeAudio = API;
 })(typeof window !== 'undefined' ? window : globalThis);

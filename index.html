@@ -13,8 +13,8 @@
 <meta name="apple-mobile-web-app-title" content="Showtime">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
-<link rel="stylesheet" href="control.css?v=20261158">
-<link rel="stylesheet" href="marca.css?v=20261158">
+<link rel="stylesheet" href="control.css?v=20261159">
+<link rel="stylesheet" href="marca.css?v=20261159">
 </head>
 <body>
 <div id="splash" class="splash" hidden></div>
@@ -212,9 +212,6 @@
   </div>
 </header>
 
-<!-- Avisos de audio pendientes de confirmar (dec. 146): solo este Dashboard; uno por pastilla con su ✓ -->
-<div id="au-bar" class="aubar" role="region" aria-label="Avisos de audio pendientes de confirmar" aria-live="assertive" data-i18n-aria hidden></div>
-
 <section class="tools">
   <div id="drift" class="drift" aria-live="polite"></div>
 </section>
@@ -396,11 +393,10 @@
     <div class="cfg-b">
     <div class="form au">
       <span></span><label class="chk" title="Los avisos solo se reproducen en este dispositivo." data-i18n data-i18n-title><input id="au-on" type="checkbox" role="switch"> Activar</label>
-      <span></span><span class="au-row"><label class="chk au-k" data-i18n><input data-au="call" type="checkbox"> CALL</label><button class="au-pv" type="button" data-au-pv="call" title="Escuchar el tono" aria-label="Escuchar el tono" data-i18n-title data-i18n-aria><svg class="ic"><use href="#i-play"/></svg></button></span>
-      <span></span><span class="au-row"><label class="chk au-k" data-i18n><input data-au="overrun" type="checkbox"> Sobretiempo</label><button class="au-pv" type="button" data-au-pv="overrun" title="Escuchar el tono" aria-label="Escuchar el tono" data-i18n-title data-i18n-aria><svg class="ic"><use href="#i-play"/></svg></button></span>
-      <span></span><span class="au-row"><label class="chk au-k" data-i18n><input data-au="meteo" type="checkbox"> Alerta meteorológica</label><button class="au-pv" type="button" data-au-pv="meteo" title="Escuchar el tono" aria-label="Escuchar el tono" data-i18n-title data-i18n-aria><svg class="ic"><use href="#i-play"/></svg></button></span>
-      <span></span><span class="au-row"><label class="chk au-k" data-i18n><input data-au="urgent" type="checkbox"> Mensajes urgentes de Producción</label><button class="au-pv" type="button" data-au-pv="urgent" title="Escuchar el tono" aria-label="Escuchar el tono" data-i18n-title data-i18n-aria><svg class="ic"><use href="#i-play"/></svg></button></span>
-      <span></span><span class="au-row"><label class="chk au-k" title="Los avisos nuevos se repiten hasta confirmarlos en la barra del Dashboard" data-i18n data-i18n-title><input id="au-rep" type="checkbox"> Repetir hasta confirmar</label><select id="au-every" class="mini" title="Cada cuánto se repiten" aria-label="Cada cuánto se repiten" data-i18n-title data-i18n-aria><option value="5">5 s</option><option value="10">10 s</option><option value="20">20 s</option><option value="30">30 s</option></select></span>
+      <span></span><span class="au-row"><label class="chk au-k" data-i18n><input id="au-call" data-au="call" type="checkbox"> CALL</label><button id="au-pv-call" class="au-pv" type="button" data-au-pv="call" title="Escuchar el tono" aria-label="Escuchar el tono" data-i18n-title data-i18n-aria><svg class="ic"><use href="#i-play"/></svg></button><label class="chk au-rp" title="Se repite hasta pulsar OK en la tarjeta CALL" data-i18n data-i18n-title><input id="au-rep-call" type="checkbox"> Repetir</label><select id="au-ev-call" class="mini" title="Cada cuánto se repite" aria-label="Cada cuánto se repite" data-i18n-title data-i18n-aria><option value="5">5 s</option><option value="10">10 s</option><option value="20">20 s</option><option value="30">30 s</option></select></span>
+      <span></span><span class="au-row"><label class="chk au-k" data-i18n><input id="au-overrun" data-au="overrun" type="checkbox"> Sobretiempo</label><button id="au-pv-overrun" class="au-pv" type="button" data-au-pv="overrun" title="Escuchar el tono" aria-label="Escuchar el tono" data-i18n-title data-i18n-aria><svg class="ic"><use href="#i-play"/></svg></button><label class="chk au-rp" title="Se repite hasta pulsar ✓ en EN ESCENA o terminar la banda" data-i18n data-i18n-title><input id="au-rep-overrun" type="checkbox"> Repetir</label><select id="au-ev-overrun" class="mini" title="Cada cuánto se repite" aria-label="Cada cuánto se repite" data-i18n-title data-i18n-aria><option value="5">5 s</option><option value="10">10 s</option><option value="20">20 s</option><option value="30">30 s</option></select></span>
+      <span></span><span class="au-row"><label class="chk au-k" data-i18n><input id="au-meteo" data-au="meteo" type="checkbox"> Meteo</label><button id="au-pv-meteo" class="au-pv" type="button" data-au-pv="meteo" title="Escuchar el tono" aria-label="Escuchar el tono" data-i18n-title data-i18n-aria><svg class="ic"><use href="#i-play"/></svg></button><label class="chk au-rp" title="Se repite hasta pulsar «Visto» en el aviso del tiempo" data-i18n data-i18n-title><input id="au-rep-meteo" type="checkbox"> Repetir</label><select id="au-ev-meteo" class="mini" title="Cada cuánto se repite" aria-label="Cada cuánto se repite" data-i18n-title data-i18n-aria><option value="5">5 s</option><option value="10">10 s</option><option value="20">20 s</option><option value="30">30 s</option></select></span>
+      <span></span><span class="au-row"><label class="chk au-k" data-i18n><input id="au-urgent" data-au="urgent" type="checkbox"> Urgente</label><button id="au-pv-urgent" class="au-pv" type="button" data-au-pv="urgent" title="Escuchar el tono" aria-label="Escuchar el tono" data-i18n-title data-i18n-aria><svg class="ic"><use href="#i-play"/></svg></button><label class="chk au-rp" title="Se repite hasta pulsar ✓ en el mensaje urgente del chat" data-i18n data-i18n-title><input id="au-rep-urgent" type="checkbox"> Repetir</label><select id="au-ev-urgent" class="mini" title="Cada cuánto se repite" aria-label="Cada cuánto se repite" data-i18n-title data-i18n-aria><option value="5">5 s</option><option value="10">10 s</option><option value="20">20 s</option><option value="30">30 s</option></select></span>
     </div>
   </div>
   </details>
@@ -526,21 +522,21 @@
 <datalist id="zones-dl"></datalist>
 <div id="toast" class="toast" hidden></div>
 
-<script src="i18n.js?v=20261158"></script>
-<script src="core.js?v=20261158"></script>
-<script src="meteo.js?v=20261158"></script>
-<script src="datos.js?v=20261158"></script>
-<script src="importar.js?v=20261158"></script>
-<script src="xlsx.js?v=20261158"></script>
-<script src="qr.js?v=20261158"></script>
-<script src="emision.js?v=20261158"></script>
-<script src="mando.js?v=20261158"></script>
-<script src="vistas.js?v=20261158"></script>
-<script src="log.js?v=20261158"></script>
-<script src="print.js?v=20261158"></script>
-<script src="marca.js?v=20261158"></script>
-<script src="audio.js?v=20261158"></script>
-<script src="control.js?v=20261158"></script>
-<script src="pwa.js?v=20261158"></script>
+<script src="i18n.js?v=20261159"></script>
+<script src="core.js?v=20261159"></script>
+<script src="meteo.js?v=20261159"></script>
+<script src="datos.js?v=20261159"></script>
+<script src="importar.js?v=20261159"></script>
+<script src="xlsx.js?v=20261159"></script>
+<script src="qr.js?v=20261159"></script>
+<script src="emision.js?v=20261159"></script>
+<script src="mando.js?v=20261159"></script>
+<script src="vistas.js?v=20261159"></script>
+<script src="log.js?v=20261159"></script>
+<script src="print.js?v=20261159"></script>
+<script src="marca.js?v=20261159"></script>
+<script src="audio.js?v=20261159"></script>
+<script src="control.js?v=20261159"></script>
+<script src="pwa.js?v=20261159"></script>
 </body>
 </html>
