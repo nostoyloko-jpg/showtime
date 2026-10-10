@@ -767,6 +767,7 @@ td.est{font-variant-numeric:tabular-nums}
 /* Números que cambian en directo: sin saltos */
 .v-meta,.v-rem,.dchip,.mchip,.gapbtn,td.f .real,.estt,.drift{font-variant-numeric:tabular-nums}
 #mods[hidden]{display:none}
+#view-lbl{display:inline-block;min-width:96px;text-align:left}   /* dec. 130: ancho fijo (cabe «Soundchecks», 95 px medidos): el menú Ver no cambia de tamaño ni empuja a los vecinos al cambiar de vista */
 .wake{white-space:nowrap}
 .bright{padding-left:12px;border-left:1px solid var(--hair2);align-self:stretch}
 #tbl tbody tr:hover td.ti::after,#tbl tbody tr:focus-within td.ti::after{opacity:0}

@@ -1938,6 +1938,10 @@ const miss = [...found].filter(k => !I.txHas(k) && !/^(OK|CALL|SC|Live|Raycast|S
     eq(t2.env.getEl('fest-name').title, t2.env.getEl('fest-name').textContent, 'nombre entero al pasar el ratón');
   });
 
+  test('Dec. 130: «Ver» con ancho fijo (sin salto de los menús vecinos al cambiar de vista)', () => {
+    ok(/#view-lbl\{display:inline-block;min-width:96px;text-align:left\}/.test(D.src('control.css')));
+  });
+
   // ── Ejecutor ─────────────────────────────────────────────────────────
   (async () => {
     let pass = 0, fail = 0;
