@@ -951,15 +951,15 @@
     eq(m.hidden, true, 'pulsar fuera (en el fondo) cierra el gestor');
     ok(/backdropClose\(\$\('imp'\)/.test(D.src('control.js')), 'la importación también');
   });
-  test('Gestor: rejilla de 6 columnas, píldora con micro-LED, cabecera y pie; en móvil, tres filas; «+ Abrir» abre Manager', async () => {
+  test('Gestor: rejilla de 7 columnas (dec. 137: ↺ por ventana), píldora con micro-LED, cabecera y pie; en móvil, tres filas; «+ Abrir» abre Manager', async () => {
     const css = D.src('control.css'), js = D.src('control.js');
-    ok(/\.gv-row\{display:grid;grid-template-columns:minmax\(96px,1fr\) 118px 180px 128px 108px 36px;grid-template-areas:"name vista zona fs sb x"/.test(css), 'rejilla fija: nombre, vista, zona, pantalla, standby, ✕');
-    ok(/\.modal-box\.wide\{max-width:780px\}/.test(css), 'modal ancho: cabe la rejilla sin scroll');
-    ok(/@media \(max-width:700px\)\{ \.gv-row\{grid-template-columns:minmax\(0,1fr\) minmax\(0,1fr\) auto;grid-template-areas:"name name x" "vista zona sb" "fs fs fs"\}/.test(css), 'móvil: tres filas, sin scroll');
+    ok(/\.gv-row\{display:grid;grid-template-columns:minmax\(120px,1fr\) 118px 180px 150px 105px 32px 32px;grid-template-areas:"name vista zona fs sb rst x";gap:8px/.test(css), 'rejilla fija: nombre, vista, zona, pantalla, standby, ✕');
+    ok(/\.modal-box\.wide\{max-width:min\(880px,94vw\)\}/.test(css), 'modal ancho: cabe la rejilla sin scroll');
+    ok(/@media \(max-width:700px\)\{ \.gv-row\{grid-template-columns:minmax\(0,1fr\) minmax\(0,1fr\) auto auto;grid-template-areas:"name name rst x" "vista zona sb sb" "fs fs fs fs"\}/.test(css), 'móvil: tres filas, sin scroll');
     ok(/\.gv-sb\{height:34px;[^}]*border-radius:999px/.test(css) && /\.gv-led\{/.test(css), 'standby como píldora con micro-LED');
     ok(/\.gv-sb\.on \.gv-led\{[^}]*box-shadow/.test(css), 'LED encendido con resplandor');
     ok(/\.gv-row select:hover,\.gv-row select:focus\{background-image:url/.test(css) && /background-image:url\("data:image\/svg\+xml,[^"]*6f747e/.test(css), 'flecha sutil en reposo, más brillante en hover y focus');
-    ok(/\.gv-row input,\.gv-row select\{height:32px/.test(css) && /\.gv-sb\{height:34px/.test(css) && /\.gv-x\{width:36px;height:32px/.test(css), 'altura: 32px en campos y ✕, 34px en la píldora');
+    ok(/\.gv-row input,\.gv-row select\{height:32px/.test(css) && /\.gv-sb\{height:34px/.test(css) && /\.gv-x\{width:32px;height:32px/.test(css), 'altura: 32px en campos y ✕, 34px en la píldora');
     ok(/class="gv-row gv-hd"/.test(js) && /tx\('Nombre'\)/.test(js) && /tx\('Standby'\)/.test(js) && /\.gv-hd\{display:none\}/.test(css), 'cabecera NOMBRE · VISTA · ZONA · STANDBY en escritorio; oculta en móvil');
     ok(/\.gv-row select:disabled\{[^}]*border-color:transparent;background-color:transparent/.test(css), 'zona sin usar: «—» plano, sin caja');
     ok(/\.gv-foot \.gv-close\{background:#1c1e26;border:1px solid var\(--hair2\);color:#fff\}/.test(css) && /class="btn gv-close" data-gv="done"/.test(js), 'Cerrar en gris Raycast, sin rojo');
@@ -2047,12 +2047,23 @@ const miss = [...found].filter(k => !I.txHas(k) && !/^(OK|CALL|SC|Live|Raycast|S
   test('Dec. 136: todas las ventanas con el mismo acabado — degradado, tarjetas, campos de alto contraste; Pegar horario en 4 tarjetas', () => {
     const css = D.src('control.css'), html = D.src('index.html');
     ok(/\.spot-box\{[^}]*background:linear-gradient\(180deg,#16181f,#0e1015\);border:1px solid rgba\(255,255,255,\.14\);box-shadow:0 24px 64px rgba\(0,0,0,\.85\),inset 0 1px 0 rgba\(255,255,255,\.08\)\}/.test(css), '⌘K, igual que las ventanas');
-    ok(css.indexOf(':where(body:not([data-ps="stage"])) :is(.modal-box,.imp-box) :is(input[type=text],input[type=number],input[type=date],input[type=time],input[type=search],input:not([type]),select,textarea){background-color:#08090c;border:1px solid rgba(255,255,255,.12)}') >= 0, 'campos: fondo #08090c y borde nítido (background-color, dec. 112); Stage conserva su negro y amarillo');
+    ok(css.indexOf(':where(body:not([data-ps="stage"])) :is(.modal-box,.imp-box) :is(input[type=text],input[type=number],input[type=date],input[type=time],input[type=search],input:not([type]),select,textarea):where(:not(:disabled)){background-color:#08090c;border:1px solid rgba(255,255,255,.12)}') >= 0, 'campos: fondo #08090c y borde nítido (background-color, dec. 112); Stage conserva su negro y amarillo');
     ok(/,select,textarea\):focus\{outline:none;border-color:rgba\(255,255,255,\.42\);box-shadow:0 0 0 3px rgba\(255,255,255,\.07\)\}/.test(css), 'halo blanco al escribir');
     const imp = html.slice(html.indexOf('<div id="imp"'), html.indexOf('<datalist id="zones-dl"'));
     eq((imp.match(/<div class="mcard-h"[^>]*>([^<]+)<\/div>/g) || []).map(x => x.replace(/<[^>]+>/g, '')).join(' · '), 'Horario a importar · Opciones de importación · Columnas del archivo · Vista previa', 'Pegar horario: 4 tarjetas en orden');
     ok(/class="mcard imp-card imp-srccard">[\s\S]*id="imp-text"/.test(imp) && /class="mcard imp-card imp-prevcard"><div class="mcard-h"[^>]*>Vista previa<\/div><div class="imp-prevwrap"><table id="imp-prev"/.test(imp), 'texto y vista previa en su tarjeta; los id no cambian');
     ok(/\.imp-prevcard\{flex:1;min-height:0;display:flex;flex-direction:column\}/.test(css), 'la vista previa sigue ocupando el alto que sobra');
+  });
+
+  test('Dec. 137: Gestor — ↺ por ventana (antes de ✕) y «↺ Reset» igual en los dos idiomas; el de arriba sigue siendo para todas', () => {
+    const js = D.src('control.js');
+    ok(/'<button class="gv-x gv-rst" type="button" data-gv="reset-one"[^']*'[^\n]*<use href="#i-undo"\/><\/svg><\/button>' \+\s*'<button class="gv-x" type="button" data-gv="close"/.test(js), '↺ justo antes de ✕');
+    ok(/if \(b\.dataset\.gv === 'reset-one'\) \{ resetWinLayout\(id\); toast\('Pantalla Live restablecida: valores de fábrica'\); \}/.test(js), 'solo esa ventana');
+    ok(/if \(b\.dataset\.gv === 'reset'\) \{ openIds\(\)\.forEach\(id => resetWinLayout\(id\)\);/.test(js), 'el de arriba, todas');
+    ok(/<span>' \+ tx\('Standby'\) \+ '<\/span><span><\/span><span><\/span><\/div>'/.test(js), 'cabecera con 7 huecos');
+    const I = require('../i18n.js');
+    eq(I.tx('↺ Reset', null, 'es'), '↺ Reset'); eq(I.tx('↺ Reset', null, 'en'), '↺ Reset'); ok(!I.txHas('↺ Restablecer'), 'fuera el texto anterior');
+    eq(I.tx('Restablecer esta ventana', null, 'en'), 'Reset this window');
   });
 
   // ── Ejecutor ─────────────────────────────────────────────────────────

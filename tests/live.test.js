@@ -613,9 +613,9 @@
     ok(/document\.querySelectorAll\('\.vsplit'\)\.forEach\(sp => sp\.addEventListener\('dblclick', resetTopCols\)\);/.test(js), 'doble clic en cualquier tirador');
     ok(/function resetTopCols\(\) \{\s*try \{ localStorage\.removeItem\(P\.topCols\); \} catch \(e\) \{\}\s*\['clkbox', 'panel-now', 'panel-next', 'panel-call'\]\.forEach/.test(js), 'borra los anchos guardados y los de la ventana');
     ok(/\[P\.topCols, P\.topH, P\.stripH, P\.infoW, P\.rowH, P\.zoom\]\.forEach\(k => \{ try \{ localStorage\.removeItem\(k\); \}/.test(js), 'Restablecer: anchos, alto de arriba, filas, ancho de info y zoom');
-    ok(/<button id="resetbtn" class="txtbtn"[^>]*>↺ Restablecer<\/button>/.test(h) && /\$\('resetbtn'\)\.addEventListener\('click', resetLayout\)/.test(js), 'botón en el dock');
+    ok(/<button id="resetbtn" class="txtbtn"[^>]*>↺ Reset<\/button>/.test(h) && /\$\('resetbtn'\)\.addEventListener\('click', resetLayout\)/.test(js), 'botón en el dock');
     ok(/else if \(m\.type === 'resetLayout'\) resetLayout\(\);/.test(js), 'y desde el gestor del Dashboard');
-    eq(require('../i18n.js').tx('↺ Restablecer', null, 'en'), '↺ Reset');
+    eq(require('../i18n.js').tx('↺ Reset', null, 'es'), '↺ Reset'); eq(require('../i18n.js').tx('↺ Reset', null, 'en'), '↺ Reset', 'mismo texto en los dos idiomas (dec. 137)');
   });
   test('Dec. 132: el cartel del reposo y del Standby lleva el logo del evento (si no hay, el de Showtime) y se repinta si cambia', () => {
     const js = D.src('live.js'), css = D.src('live.css');

@@ -1605,6 +1605,7 @@
       '<select class="gv-zona" aria-label="' + tx('Zona') + '"></select>' +
       '<span class="gv-fs" aria-live="polite"></span>' +
       '<button class="gv-sb" type="button" data-gv="standby" aria-pressed="false"><i class="gv-led" aria-hidden="true"></i><span>Standby</span></button>' +
+      '<button class="gv-x gv-rst" type="button" data-gv="reset-one" title="' + esc(tx('Reset: anchos, alturas y zoom de fábrica para esta ventana')) + '" aria-label="' + esc(tx('Restablecer esta ventana')) + '"><svg class="ic"><use href="#i-undo"/></svg></button>' +
       '<button class="gv-x" type="button" data-gv="close" title="' + tx('Cerrar esta ventana') + '" aria-label="' + tx('Cerrar esta ventana') + '"><svg class="ic"><use href="#i-x"/></svg></button>' +
       '</div>';
   }
@@ -1639,8 +1640,8 @@
     const ids = openIds(), sig = ids.join('|');
     if (sig !== gvSig) {
       gvSig = sig;
-      const head = '<div class="gv-top"><div class="gv-seg"><button type="button" class="gv-segb" data-gv="all" data-on="1">' + tx('⏸ Todas en standby') + '</button><button type="button" class="gv-segb" data-gv="all" data-on="0">' + tx('▶ Reanudar todas') + '</button><button type="button" class="gv-segb" data-gv="reset" title="' + esc(tx('Anchos, alturas, filas y zoom de fábrica en todas las ventanas Live abiertas')) + '">' + tx('↺ Restablecer') + '</button></div></div>';
-      const hd = '<div class="gv-row gv-hd" aria-hidden="true"><span>' + tx('Nombre') + '</span><span>' + tx('Vista') + '</span><span class="gv-hz">' + tx('Zona / Filas') + '</span><span>' + tx('Pantalla') + '</span><span>' + tx('Standby') + '</span><span></span></div>';
+      const head = '<div class="gv-top"><div class="gv-seg"><button type="button" class="gv-segb" data-gv="all" data-on="1">' + tx('⏸ Todas en standby') + '</button><button type="button" class="gv-segb" data-gv="all" data-on="0">' + tx('▶ Reanudar todas') + '</button><button type="button" class="gv-segb" data-gv="reset" title="' + esc(tx('Anchos, alturas, filas y zoom de fábrica en todas las ventanas Live abiertas')) + '">' + tx('↺ Reset') + '</button></div></div>';
+      const hd = '<div class="gv-row gv-hd" aria-hidden="true"><span>' + tx('Nombre') + '</span><span>' + tx('Vista') + '</span><span class="gv-hz">' + tx('Zona / Filas') + '</span><span>' + tx('Pantalla') + '</span><span>' + tx('Standby') + '</span><span></span><span></span></div>';
       const rows = ids.length ? hd + ids.map(gvRowHtml).join('') : '<p class="mnote gv-empty">' + tx('No hay ventanas Live abiertas desde este Dashboard.') + '</p>';
       // Mismo acabado que el panel de Pantallas y Emisión: cabecera en gris pizarra y cada bloque en su tarjeta
       const loc = '<div class="gv-sec"><svg class="ic"><use href="#i-screen"/></svg><b>' + tx('Monitores locales (HDMI / Mac)') + '</b></div>';
@@ -1702,6 +1703,7 @@
     const id = row.dataset.id;
     if (b.dataset.gv === 'standby') setWinStandby(id, !(WIN.get(id) && WIN.get(id).standby));
     if (b.dataset.gv === 'close') closeLive(id);
+    if (b.dataset.gv === 'reset-one') { resetWinLayout(id); toast('Pantalla Live restablecida: valores de fábrica'); }   // dec. 137: solo esta ventana
   });
   document.addEventListener('click', e => {
     if (e.target.closest('#lv-standby')) { e.preventDefault(); e.stopPropagation(); closeMenus(); setStandby(!standbyOn()); return; }
