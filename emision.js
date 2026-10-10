@@ -40,7 +40,7 @@
   const LOCAL_PORT = 8765;
   // Versión publicada: va en los enlaces de los QR para que el móvil no abra una copia vieja guardada en su caché
   // (súbela junto con los ?v= de index.html / live.html / remote.html).
-  const BUILD = '20261156';
+  const BUILD = '20261157';
   const CHUNK = 24000;           // bytes por trozo (los repetidores públicos limitan el tamaño de mensaje)
   const BEAT_MS = 10000;         // latido del Mac
   const PRESENCE_MS = 20000;     // latido de cada dispositivo (vista, zona, tipo): telemetría del gestor de pantallas
@@ -307,7 +307,7 @@
   /** Enlace de Producción: la Live de Manager (solo lectura) + «id» del productor, que activa sus mandos (OK de CALL, mensajes). */
   function productionUrl(room, base, prodId) { return (base || publicBase()) + 'live.html?vista=manager&b=' + BUILD + '#sala=' + room.sala + '&k=' + room.k + '&p=' + room.p + '&q=' + room.q + '&id=' + encodeURIComponent(prodId); }
   /** Mensajes de Producción (productor → Dashboard). Entrada NO fiable: se valida todo y se devuelve un objeto limpio o null.
-   *  { type:'call', from, key } · { type:'flash', from, text, to } · { type:'aviso', from, text, perm } · { type:'chat', from, text } */
+   *  { type:'call', from, key } · { type:'flash', from, text, to } · { type:'aviso', from, text, perm } · { type:'chat', from, text, urgent } */
   const PROD_VISTAS = ['manager', 'backstage'];   // Producción NUNCA manda a Confidence (monitor de los músicos)
   function cleanProdMsg(m) {
     if (!m || typeof m !== 'object') return null;
@@ -331,7 +331,7 @@
     if (m.type === 'chatsync') return { type: 'chatsync', from };   // «pásame el chat» (al conectar o al abrir el chat)
     if (m.type === 'chat' || (m.type === undefined && typeof m.text === 'string')) {
       const text = typeof m.text === 'string' ? m.text.replace(/\s+/g, ' ').trim().slice(0, 300) : '';
-      return text ? { type: 'chat', from, text } : null;
+      return text ? { type: 'chat', from, text, urgent: m.urgent === true } : null;   // urgente: solo true literal (dec. 145)
     }
     return null;
   }
@@ -543,11 +543,11 @@
     const f = await seal(Object.assign({}, this.K, { aes: this.K.prod }), K_PROD_MSG, enc.encode(JSON.stringify(msg)));
     return this.links.filter(l => l.publish(topic(this.K.sala, 'prodx'), f)).length > 0;
   };
-  /** Chat que llega al productor: se valida entero (entrada no fiable) → [{ id, at, from, pid, text, sm }] */
+  /** Chat que llega al productor: se valida entero (entrada no fiable) → [{ id, at, from, pid, text, sm, urgent }] */
   function cleanChatLog(m) {
     if (!m || m.type !== 'chatlog' || !Array.isArray(m.list)) return null;
     return m.list.filter(x => x && typeof x.id === 'string' && typeof x.text === 'string' && Number.isFinite(x.at)).slice(-CHAT_SEND)
-      .map(x => ({ id: x.id.slice(0, 40), at: x.at, from: typeof x.from === 'string' ? x.from.slice(0, 80) : '', pid: typeof x.pid === 'string' ? x.pid.slice(0, 40) : '', text: x.text.slice(0, 300), sm: x.sm === true }));
+      .map(x => ({ id: x.id.slice(0, 40), at: x.at, from: typeof x.from === 'string' ? x.from.slice(0, 80) : '', pid: typeof x.pid === 'string' ? x.pid.slice(0, 40) : '', text: x.text.slice(0, 300), sm: x.sm === true, urgent: x.urgent === true }));
   }
   const CHAT_SEND = 60;   // últimos mensajes que se mandan (cada envío cabe de sobra en los repetidores)
   /** Clave de mando nueva sin cortar la emisión (el QR de Staff sigue valiendo). */

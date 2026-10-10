@@ -13,8 +13,8 @@
 <meta name="apple-mobile-web-app-title" content="Showtime">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
-<link rel="stylesheet" href="control.css?v=20261156">
-<link rel="stylesheet" href="marca.css?v=20261156">
+<link rel="stylesheet" href="control.css?v=20261157">
+<link rel="stylesheet" href="marca.css?v=20261157">
 </head>
 <body>
 <div id="splash" class="splash" hidden></div>
@@ -43,6 +43,8 @@
   <symbol id="i-folder" viewBox="0 0 20 20"><path d="M2.5 5.5a1 1 0 0 1 1-1h4l1.7 2h7.3a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1h-13a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
   <symbol id="i-refresh" viewBox="0 0 20 20"><path d="M15.5 7.5A6 6 0 0 0 4.6 7M4.5 12.5A6 6 0 0 0 15.4 13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M15.8 3.8v3.9h-3.9M4.2 16.2v-3.9h3.9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-stop" viewBox="0 0 20 20"><rect x="5.5" y="5.5" width="9" height="9" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+  <symbol id="i-urg" viewBox="0 0 20 20"><path d="M10 2.6l8.2 14.6H1.8z" fill="currentColor"/><path d="M10 7.6v4.6" stroke="#000" stroke-width="2" stroke-linecap="round"/><circle cx="10" cy="14.6" r="1.15" fill="#000"/></symbol>
+  <symbol id="i-sound" viewBox="0 0 20 20"><path d="M3.5 7.5h3l4-3.5v12l-4-3.5h-3z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M13.5 7.2a4 4 0 0 1 0 5.6M15.6 5.1a7 7 0 0 1 0 9.8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
   <symbol id="i-alert" viewBox="0 0 20 20"><path d="M10 3.5l7 12.5H3z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M10 8.5v3.5M10 14.2v.1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
   <symbol id="i-chev" viewBox="0 0 20 20"><path d="M6 8l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-check" viewBox="0 0 20 20"><path d="M4.5 10.5l3.5 3.5 7.5-8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
@@ -386,6 +388,18 @@
     </div>
   </div>
   </details>
+  <details class="cfg-s" id="cfg-s-audio">
+    <summary class="cfg-sum"><svg class="ic"><use href="#i-sound"/></svg><h3 data-i18n>Avisos de audio</h3><svg class="ic chev"><use href="#i-chev"/></svg></summary>
+    <div class="cfg-b">
+    <div class="form au">
+      <span></span><label class="chk" title="Los avisos solo se reproducen en este dispositivo." data-i18n data-i18n-title><input id="au-on" type="checkbox" role="switch"> Activar</label>
+      <span></span><label class="chk au-k" data-i18n><input data-au="call" type="checkbox"> CALL</label>
+      <span></span><label class="chk au-k" data-i18n><input data-au="overrun" type="checkbox"> Sobretiempo</label>
+      <span></span><label class="chk au-k" data-i18n><input data-au="meteo" type="checkbox"> Alerta meteorológica</label>
+      <span></span><label class="chk au-k" data-i18n><input data-au="urgent" type="checkbox"> Mensajes urgentes de Producción</label>
+    </div>
+  </div>
+  </details>
   <details class="cfg-s" id="cfg-s-meteo">
     <summary class="cfg-sum"><svg class="ic"><use href="#i-csun"/></svg><h3 data-i18n>Meteo</h3><svg class="ic chev"><use href="#i-chev"/></svg></summary>
     <div class="cfg-b">
@@ -508,20 +522,21 @@
 <datalist id="zones-dl"></datalist>
 <div id="toast" class="toast" hidden></div>
 
-<script src="i18n.js?v=20261156"></script>
-<script src="core.js?v=20261156"></script>
-<script src="meteo.js?v=20261156"></script>
-<script src="datos.js?v=20261156"></script>
-<script src="importar.js?v=20261156"></script>
-<script src="xlsx.js?v=20261156"></script>
-<script src="qr.js?v=20261156"></script>
-<script src="emision.js?v=20261156"></script>
-<script src="mando.js?v=20261156"></script>
-<script src="vistas.js?v=20261156"></script>
-<script src="log.js?v=20261156"></script>
-<script src="print.js?v=20261156"></script>
-<script src="marca.js?v=20261156"></script>
-<script src="control.js?v=20261156"></script>
-<script src="pwa.js?v=20261156"></script>
+<script src="i18n.js?v=20261157"></script>
+<script src="core.js?v=20261157"></script>
+<script src="meteo.js?v=20261157"></script>
+<script src="datos.js?v=20261157"></script>
+<script src="importar.js?v=20261157"></script>
+<script src="xlsx.js?v=20261157"></script>
+<script src="qr.js?v=20261157"></script>
+<script src="emision.js?v=20261157"></script>
+<script src="mando.js?v=20261157"></script>
+<script src="vistas.js?v=20261157"></script>
+<script src="log.js?v=20261157"></script>
+<script src="print.js?v=20261157"></script>
+<script src="marca.js?v=20261157"></script>
+<script src="audio.js?v=20261157"></script>
+<script src="control.js?v=20261157"></script>
+<script src="pwa.js?v=20261157"></script>
 </body>
 </html>

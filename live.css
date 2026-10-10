@@ -418,6 +418,11 @@ body:not([data-vista="manager"]) .mtpill{display:none}
 .cd-m.pend{opacity:.5}
 .cd-m small{display:block;font-size:10.5px;font-weight:700;color:rgba(255,255,255,.55);margin-bottom:2px}
 #cd-form{display:flex;gap:6px}
+/* Urgente (dec. 145): solo Producción lo marca; el mismo triángulo que en Dashboard y Mando */
+.cd-urg{flex:0 0 auto;color:rgba(255,255,255,.45)}
+.cd-urg.on{color:#ff8a00;border-color:#ff8a00;background-color:rgba(255,138,0,.16)}
+.cd-m.urg{box-shadow:inset 0 0 0 1px rgba(255,138,0,.7)}
+.urg-i{width:12px;height:12px;display:inline-block;color:#ff8a00;vertical-align:-2px;margin-right:4px}
 #cd-text{flex:1;min-width:0;height:32px;padding:0 10px;border-radius:6px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:#fff;font:inherit;font-size:13px}
 
 /* ═══ Tanda 2 · móvil, zonas seguras, táctil y coherencia de los docks ═══════════════════════════════ */

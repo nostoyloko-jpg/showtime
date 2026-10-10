@@ -1537,6 +1537,15 @@
       "¡choque con entrada en rojo!": "clash with a red entry!",
       "El horario ha cambiado desde el resumen: revísalo y confirma otra vez": "The schedule changed since the summary: check it and confirm again"
     },
+    audio: {
+      "Avisos de audio": "Audio alerts",
+      "Los avisos solo se reproducen en este dispositivo.": "Alerts only play on this device.",
+      "Activar": "Enable",
+      "Alerta meteorológica": "Weather alert",
+      "Mensajes urgentes de Producción": "Urgent messages from Production",
+      "Urgente": "Urgent",
+      "Marcar como urgente": "Mark as urgent"
+    },
     core: {
       "Artista no encontrado.": "Artist not found.",
       "El nombre no puede quedar vacío.": "The name can’t be empty.",

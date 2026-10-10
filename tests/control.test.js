@@ -12,7 +12,7 @@
   const noI18n = h => h.replace(/ data-i18n(?:-[a-z]+)?(?:="[^"]*")?/g, '');
   const srcRaw = D.src;
   D.src = f => (f === 'index.html' ? noI18n(srcRaw(f)) : srcRaw(f));
-  const MODULOS = ['i18n.js', 'core.js', 'meteo.js', 'datos.js', 'importar.js', 'xlsx.js', 'qr.js', 'emision.js', 'mando.js', 'vistas.js', 'log.js', 'marca.js', 'control.js'];
+  const MODULOS = ['i18n.js', 'core.js', 'meteo.js', 'datos.js', 'importar.js', 'xlsx.js', 'qr.js', 'emision.js', 'mando.js', 'vistas.js', 'log.js', 'marca.js', 'audio.js', 'control.js'];
 
   const tests = [];
   function test(name, fn) { tests.push([name, fn]); }
@@ -1943,14 +1943,14 @@ const miss = [...found].filter(k => !I.txHas(k) && !/^(OK|CALL|SC|Live|Raycast|S
     ok(/#view-lbl\{display:inline-block;min-width:96px;text-align:left\}/.test(D.src('control.css')));
   });
 
-  test('Dec. 131: Configuración en 9 secciones plegables (<details>), Evento abierto; ajuste de reposo de las pantallas remotas', () => {
+  test('Dec. 131/145: Configuración en 10 secciones plegables (<details>), Evento abierto; ajuste de reposo de las pantallas remotas', () => {
     const html = D.src('index.html'), css = D.src('control.css'), js = D.src('control.js');
     const cfg = html.slice(html.indexOf('<aside id="cfg"'), html.indexOf('</aside>', html.indexOf('<aside id="cfg"')));
     const ids = (cfg.match(/<details class="cfg-s" id="cfg-s-(\w+)"/g) || []).map(x => x.match(/cfg-s-(\w+)/)[1]);
-    eq(ids.join(' '), 'lang fest stages live net styles screens msg meteo', 'las 9, en orden');
+    eq(ids.join(' '), 'lang fest stages live net styles screens msg audio meteo', 'las 10 (dec. 145 añade «Avisos de audio»), en orden');
     ok(!/<section class="cfg-s"/.test(cfg), 'ya no hay <section>');
     eq((cfg.match(/<details class="cfg-s" id="cfg-s-\w+" open>/g) || []).join(), '<details class="cfg-s" id="cfg-s-fest" open>', 'solo Evento abierto de entrada');
-    eq((cfg.match(/<summary class="cfg-sum"><svg class="ic"><use href="#i-[a-z]+"\/><\/svg><h3[^>]*>[^<]+<\/h3><svg class="ic chev"><use href="#i-chev"\/><\/svg><\/summary>/g) || []).length, 9, 'cabecera: icono SVG (sin emojis, dec. 43), título y chevron');
+    eq((cfg.match(/<summary class="cfg-sum"><svg class="ic"><use href="#i-[a-z]+"\/><\/svg><h3[^>]*>[^<]+<\/h3><svg class="ic chev"><use href="#i-chev"\/><\/svg><\/summary>/g) || []).length, 10, 'cabecera: icono SVG (sin emojis, dec. 43), título y chevron');
     eq((cfg.match(/<details /g) || []).length, (cfg.match(/<\/details>/g) || []).length, 'bien cerradas');
     ok(/\.cfg-sum::-webkit-details-marker\{display:none\}/.test(css) && /\.cfg-sum\{[^}]*cursor:pointer;list-style:none;/.test(css) && /\.cfg-sum::marker\{content:''\}/.test(css), 'sin el triángulo del navegador');
     ok(/\.cfg-sum \.chev\{[^}]*transform:rotate\(-90deg\)/.test(css) && /\.cfg-s\[open\] > \.cfg-sum \.chev\{transform:none\}/.test(css), 'chevron que gira al abrir');

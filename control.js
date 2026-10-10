@@ -29,6 +29,9 @@
   const LIVE_NAMES_KEY = 'showtime.liveNames';   // { id: nombre } de las ventanas abiertas, para recordar el nombre tras recargar
   const VISTA_OPCIONES = [['manager', 'Manager'], ['confidence', 'Confidence'], ['backstage', 'Backstage']];
   const Vs = window.ShowtimeVistas;
+  const AU = window.ShowtimeAudio || null;   // avisos de audio locales (dec. 145, audio.js)
+  const AU_EDGE = AU ? { call: AU.edge(), overrun: AU.edge(), meteo: AU.edge() } : null;   // el primer tick solo arma: nunca suena al cargar
+  if (AU) AU.armGestures(document);   // el navegador solo deja sonar tras un clic o una tecla
   let MSG_TO = null;                  // destino de los mensajes flash: null = todas las pantallas; si no, lista de vistas
   let MSG_ZONES = null;               // zonas de las pantallas Confidence que lo reciben: null = todas
   function zoneLabel(id) { const z = FEST && C.getEscenario(FEST, id); return z ? z.nombre : tx('Sin zona'); }
@@ -802,9 +805,12 @@
     const mNow = Math.floor(C.nowAbs(d));
     if (LAST_MIN !== null && mNow !== LAST_MIN) { compute(); if (LIVE.some(b => b.alargar && b.rf === null)) renderTable(); }   // el estimado en directo (Alargar)
     LAST_MIN = mNow;
-    renderMeteo();
+    const mst = renderMeteo();
     const nowMins = C.nowAbs(d), nowInt = Math.floor(nowMins);
     renderLive(nowMins, nowInt);
+    audioTick(C.callList(LIVE, nowInt, Dt.callMinsOf(FEST, CONFIG), new Set(Dt.getCallDone())).map(C.callKey),   // misma ventana CALL que la tarjeta
+      LIVE.filter(b => xtraOver(b, nowInt) !== null).map(b => b.key),                                            // Tiempo extra pasado de su fin previsto
+      mst && mst.c.on ? mst.pending.map(a => a.kind) : []);                                                       // avisos meteo pendientes (sin «Visto»)
     renderDrift(nowInt);
     renderFlash();
     markRows(nowInt);
@@ -1060,7 +1066,7 @@
     $('cfg-style-panel').value = panelStyle();
     $('cfg-style-live').value = CONFIG.style;
     if ($('cfg-bis-win')) $('cfg-bis-win').value = String(CONFIG.bisWindow || 10);
-    fillMsgCfg();
+    fillMsgCfg(); fillAudioCfg();
     fillScreensCfg();
     fillMeteoCfg();
   }
@@ -2907,7 +2913,7 @@
   function hhmmOf(ms) { const d = new Date(ms); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
   function renderChat() {
     const list = Dt.getChat();
-    const html = list.slice(-100).map(m => '<div class="chat-list-item' + (m.sm ? ' sm' : '') + '"><div class="chat-list-item-from">' + esc(m.sm ? 'Stage Manager' : m.from) +
+    const html = list.slice(-100).map(m => '<div class="chat-list-item' + (m.sm ? ' sm' : '') + (m.urgent === true ? ' urg' : '') + '"><div class="chat-list-item-from">' + (m.urgent === true ? urgIcon() : '') + esc(m.sm ? 'Stage Manager' : m.from) +
       '<small>' + hhmmOf(m.at) + '</small></div><div class="chat-list-item-text">' + esc(m.text) + '</div></div>').join('');
     // la lista del menú y la de la ventana (si existe) muestran lo mismo
     [['chat-list', 'chat-empty', 'chat-off'], ['chat-list2', 'chat-empty2', 'chat-off2']].forEach(([l, e, o]) => {
@@ -2938,6 +2944,33 @@
   $('m-chat').querySelector('.mbtn').addEventListener('click', () => { $('chat-on').hidden = true; renderChat(); });
   setInterval(() => { if (Dt.getChat().length) emPushChat(); }, 20000);   // quien se conecta tarde lo recibe en poco tiempo
 
+  /** Indicador de mensaje urgente (el mismo triángulo SVG en Producción, Dashboard y Mando). Solo se muestra: aquí no se marca. */
+  function urgIcon() { const t = esc(tx('Urgente')); return '<svg class="ic urg-i" role="img" aria-label="' + t + '"><title>' + t + '</title><use href="#i-urg"/></svg>'; }
+
+  // ── Avisos de audio locales (dec. 145): suenan solo en ESTE Dashboard. Preferencias en localStorage («showtime.audioAlerts»):
+  //    nunca en la configuración del festival, ni en el JSON, ni en la emisión. Sin Web Audio, no suena y no falla.
+  //    AU y AU_EDGE se declaran arriba (el primer tick puede llegar antes de esta línea).
+  function audioTick(callKeys, overKeys, meteoKeys) {
+    if (!AU_EDGE) return;
+    [['call', callKeys], ['overrun', overKeys], ['meteo', meteoKeys]].forEach(([k, keys]) => { if (AU_EDGE[k](keys).length) AU.alert(k); });   // solo lo que ENTRA ahora
+  }
+  function audioUrgent() { if (AU) AU.alert('urgent'); }
+  function fillAudioCfg() {
+    const on = $('au-on'); if (!on) return;
+    const p = AU ? AU.load() : null;
+    on.checked = !!(p && p.on); on.disabled = !AU;
+    document.querySelectorAll('#cfg-s-audio [data-au]').forEach(el => { el.checked = !!(p && p[el.dataset.au]); el.disabled = !p || !p.on; });
+  }
+  function saveAudioCfg() {
+    if (!AU) return;
+    const p = AU.load(); p.on = $('au-on').checked;
+    document.querySelectorAll('#cfg-s-audio [data-au]').forEach(el => { p[el.dataset.au] = el.checked; });
+    if (AU.save(p).on) AU.unlock();   // el cambio es un gesto: desbloquea ya
+    fillAudioCfg();
+  }
+  $('au-on').addEventListener('change', saveAudioCfg);
+  document.querySelectorAll('#cfg-s-audio [data-au]').forEach(el => el.addEventListener('change', saveAudioCfg));
+
   // Mensajes de Producción (llegan cifrados desde su Live): OK de CALL, mensajes a las pantallas y chat.
   function emProdMessage(raw) {
     const msg = Em && Em.cleanProdMsg ? Em.cleanProdMsg(raw) : null;
@@ -2961,7 +2994,8 @@
       toast(tx(msg.perm ? '{w} · aviso permanente: «{t}»' : '{w} · aviso puntual: «{t}»', { w: whoUi, t: msg.text }));
       logEvent('msg', 'Aviso ' + (msg.perm ? 'permanente' : 'puntual') + ': «' + msg.text + '» · ' + who, { src: 'produccion' });
     } else if (msg.type === 'chat') {
-      Dt.addChat(msg.text, prodName(msg.from), msg.from, false);
+      const cm = Dt.addChat(msg.text, prodName(msg.from), msg.from, false, msg.urgent === true);   // urgente: lo marca SOLO Producción (dec. 145)
+      if (cm && cm.urgent === true) audioUrgent();
       renderChat();
       if (!$('m-chat').classList.contains('open') && !chatPopOn) $('chat-on').hidden = false;   // sin leer
       if (CONFIG && CONFIG.prodChatPopup !== false) toast(tx('Chat · {p}: {t}', { p: prodName(msg.from), t: msg.text.slice(0, 100) }));
@@ -3525,5 +3559,5 @@
   });
   window.ShowtimePanel = { reload: () => { loadState(); renderAll(); }, _test: { winState: () => Array.from(WIN.entries()).map(([id, x]) => ({ id, name: x.name, vista: x.vista, zona: x.zona, filas: x.filas || null, standby: !!x.standby, fs: x.fs })), setWinVista, setWinRows, resetWinLayout, setWinStandby, closeLive, openGestor, gestorVisible, emProdMessage, emRegenProd, hitoChips, emUrl, prodBigTitle, fileKind, handleFile, emCommand, importSummary, hidesSome, tipoPill, setWake, wakeState: () => ({ on: wakeOn, lock: !!wakeLock }), showSplash, hideSplash, setStandby, standbyOn, room: () => emRoom,
     emSnapshot, emCloseDay, emDay, qrDevices, rmZones, setRmZone: z => { RM_ZONE = z; renderCast(); }, setRoom: r => { emRoom = r; }, fakeEm: (em, st) => { EM = em; EMST = st; }, emStateHtml, renderCastBar, renderHubLed, mtIn, mtOut, cfSimState, renderCfSim, cfSim: () => CFSIM,
-    dayStep, monthLabel, spotItems, spotDays, spotEntries, fmtDayFull, refreshStale, net: () => NET, setNet: o => { NET = netNorm(o); }, netNorm, emLink, emBrokers, emUrl, netHtml, renderCast } };   // _test: solo para tests/control.test.js
+    dayStep, monthLabel, spotItems, spotDays, spotEntries, fmtDayFull, refreshStale, net: () => NET, setNet: o => { NET = netNorm(o); }, netNorm, emLink, emBrokers, emUrl, netHtml, renderCast, audioTick, fillAudioCfg, saveAudioCfg } };   // _test: solo para tests/control.test.js
 })();

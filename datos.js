@@ -18,7 +18,7 @@
     callDone: 'showtime.callDone',     // [callKey, ...] avisos marcados con OK
     original: 'showtime.original',     // copia del festival tal como se importó (para marcar cambios)
     flash:    'showtime.flash',        // mensaje flash activo en la Pantalla Live: { id, text, at (ms) } o null
-    chat:     'showtime.chat',         // chat Producción ↔ Stage Manager: [{ id, at, from, pid, text, sm }] (NO va en la emisión general: solo a los enlaces de Producción)
+    chat:     'showtime.chat',         // chat Producción ↔ Stage Manager: [{ id, at, from, pid, text, sm, urgent }] (NO va en la emisión general: solo a los enlaces de Producción)
     avisos:   'showtime.avisos',       // avisos escritos a mano (cinta de Backstage + barra del Dashboard): [{ id, text, at, ms (0 = permanente), from }]
     standby:  'showtime.standby',      // Standby (Modo Cartel) de las Confidence, puesto desde el Dashboard: { on, at (ms) } o null — va también por QR
     scope:    'showtime.scope',        // «Solo hoy» (dec. 105), SOLO en los QR: { day, closed } — la jornada que emite el Panel y si la ha cerrado
@@ -141,7 +141,8 @@
   }
   function getAvisos() { return normAvisos(read(K.avisos, []), Date.now()); }
   const CHAT_MAX = 300;
-  function getChat() { const a = read(K.chat, []); return Array.isArray(a) ? a.filter(x => x && typeof x.text === 'string') : []; }
+  /** urgent: booleano estricto (dec. 145). Mensajes viejos o raros → false. */
+  function getChat() { const a = read(K.chat, []); return Array.isArray(a) ? a.filter(x => x && typeof x.text === 'string').map(x => Object.assign({}, x, { urgent: x.urgent === true })) : []; }
 
   /** Minutos de aviso efectivos: los de la configuración o, si no hay, los del festival. */
   function callMinsOf(festival, config) {
@@ -299,12 +300,12 @@
     return a;
   }
   /** Mensaje de chat (solo el Dashboard lo guarda: los del productor llegan por la emisión y los del Stage Manager se escriben aquí). */
-  function addChat(text, from, pid, sm) {
+  function addChat(text, from, pid, sm, urgent) {
     if (READONLY) return null;
     const t = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 300);
     if (!t) return null;
     const now = Date.now();
-    const m = { id: now.toString(36) + Math.random().toString(36).slice(2, 6), at: now, from: String(from || '').slice(0, 80), pid: String(pid || '').slice(0, 40), text: t, sm: !!sm };
+    const m = { id: now.toString(36) + Math.random().toString(36).slice(2, 6), at: now, from: String(from || '').slice(0, 80), pid: String(pid || '').slice(0, 40), text: t, sm: !!sm, urgent: urgent === true };
     const list = getChat().concat([m]).slice(-CHAT_MAX);
     write(K.chat, list); send({ type: 'chat', chat: list });
     return m;

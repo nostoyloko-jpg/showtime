@@ -203,6 +203,9 @@ body.has-chat{padding-bottom:calc(176px + var(--safe-b))}   /* se puede bajar ha
 .cmsg.me{align-self:flex-end;background:#10261e;border-color:rgba(16,185,129,.5)}
 .cmsg.sm{border-color:rgba(233,69,96,.55)}
 .cmsg.pend{opacity:.55}
+/* Urgente (dec. 145): solo se muestra; el mando no lo marca */
+.cmsg.urg{border-color:rgba(255,138,0,.8)}
+.urg-i{width:13px;height:13px;display:inline-block;color:#ff8a00;vertical-align:-2px;margin-right:4px}
 .cmsg b{display:block;font-size:11px;letter-spacing:.06em;color:var(--muted);font-weight:800}
 .cmsg b small{font-weight:600;margin-left:6px;color:var(--dim)}
 .cmsg span{font-size:15px;overflow-wrap:anywhere}

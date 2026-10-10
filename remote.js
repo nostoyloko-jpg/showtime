@@ -328,13 +328,15 @@
     else if (fresh.length && !CHAT_OPEN && fresh.some(x => x.pid !== myPid)) $('chat-dot').hidden = false;
     renderChat();
   }
+  /** Indicador de urgente (dec. 145): solo se muestra; el mando no puede marcarlo. */
+  function urgIcon() { const t = esc(tx('Urgente')); return '<svg class="ic urg-i" role="img" aria-label="' + t + '"><title>' + t + '</title><use href="#i-urg"/></svg>'; }
   function renderChat() {
     const box = $('chat-list'); if (!box) return;
     const sig = LOCK ? (zones()[0] || {}).name || tx('Zona') : 'Stage Manager';
     $('chat-sig').textContent = '[' + sig + ']';
-    const items = CHAT.map(x => ({ from: x.sm ? 'Stage Manager' : x.from, at: x.at, text: x.text, me: x.pid === myPid, sm: x.sm, pend: false }))
+    const items = CHAT.map(x => ({ from: x.sm ? 'Stage Manager' : x.from, at: x.at, text: x.text, me: x.pid === myPid, sm: x.sm, urgent: x.urgent === true, pend: false }))
       .concat(CHAT_PEND.map(p => ({ from: '[' + sig + '] ' + (myName() || 'Stage Manager'), at: p.at, text: p.text, me: true, pend: true })));
-    const h = items.length ? items.map(x => '<div class="cmsg' + (x.me ? ' me' : '') + (x.sm ? ' sm' : '') + (x.pend ? ' pend' : '') + '"><b>' + esc(x.from) + '<small>' + hhmm(x.at) + '</small></b><span>' + esc(x.text) + '</span></div>').join('')
+    const h = items.length ? items.map(x => '<div class="cmsg' + (x.me ? ' me' : '') + (x.sm ? ' sm' : '') + (x.pend ? ' pend' : '') + (x.urgent ? ' urg' : '') + '"><b>' + (x.urgent ? urgIcon() : '') + esc(x.from) + '<small>' + hhmm(x.at) + '</small></b><span>' + esc(x.text) + '</span></div>').join('')
       : '<p class="csh-empty">' + tx('Sin mensajes todavía. Lo que escribas lo ven el Dashboard y Producción.') + '</p>';
     if (box.dataset.h !== h) { box.innerHTML = h; box.dataset.h = h; box.scrollTop = box.scrollHeight; }
   }

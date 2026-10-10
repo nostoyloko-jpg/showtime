@@ -631,6 +631,9 @@ body[data-ps="stage"] .qr-big-box{background:#000;border-color:rgba(255,214,0,.4
 .mt-attr{grid-column:1/-1;margin-top:10px;font-size:10.5px;color:var(--dim);opacity:.8}
 .mt-attr a{color:var(--dim)}
 .form.mt{grid-template-columns:auto minmax(0,1fr)}
+/* Avisos de audio (dec. 145): casillas en columna; con el interruptor apagado, atenuadas */
+.form.au{grid-template-columns:auto minmax(0,1fr)}
+.form.au .au-k:has(input:disabled){opacity:.45;cursor:default}
 .form.mt input,.form.mt select{min-width:0;max-width:100%}
 
 /* «⋯» (Duplicar · Borrar) siempre visible: pegado al borde derecho aunque la tabla no quepa */
@@ -703,6 +706,9 @@ td.est small{white-space:normal;max-width:96px;line-height:1.2}
 .avx .ic{width:11px;height:11px}
 /* Chat con Producción (Dashboard) */
 .chat-list-item.sm{border-left-color:var(--call);background:rgba(255,197,51,.06)}
+/* Mensaje urgente de Producción (dec. 145): triángulo SVG + borde ámbar intenso */
+.chat-list-item.urg{border-left-color:#ff8a00}
+.urg-i{width:13px;height:13px;color:#ff8a00;vertical-align:-2px;margin-right:4px;flex:0 0 auto}
 .chat-list-item-from small{font-weight:600;color:var(--dim);margin-left:6px}
 .chat-form{display:flex;gap:6px}
 .chat-form input{flex:1;min-width:0;height:32px;padding:0 10px;border-radius:8px;border:1px solid var(--line2);background-color:rgba(255,255,255,.05);color:var(--text);font:inherit;font-size:13px}

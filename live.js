@@ -990,11 +990,16 @@
   const hhmm = ms => { const d = new Date(ms); return pad2(d.getHours()) + ':' + pad2(d.getMinutes()); };
   function renderChat() {
     const box = $('cd-list'); if (!box) return;
-    const row = (m, pend) => '<div class="cd-m' + (m.pid === PRODID ? ' me' : '') + (m.sm ? ' sm' : '') + (pend ? ' pend' : '') + '"><small>' +
-      esc(m.pid === PRODID ? tx('Tú') : m.sm ? 'Stage Manager' : m.from) + ' · ' + (pend ? tx('enviando…') : hhmm(m.at)) + '</small>' + esc(m.text) + '</div>';
+    const row = (m, pend) => '<div class="cd-m' + (m.pid === PRODID ? ' me' : '') + (m.sm ? ' sm' : '') + (pend ? ' pend' : '') + (m.urgent === true ? ' urg' : '') + '"><small>' +
+      (m.urgent === true ? urgIcon() : '') + esc(m.pid === PRODID ? tx('Tú') : m.sm ? 'Stage Manager' : m.from) + ' · ' + (pend ? tx('enviando…') : hhmm(m.at)) + '</small>' + esc(m.text) + '</div>';
     box.innerHTML = CHAT.length || CHAT_PEND.length ? CHAT.map(m => row(m)).join('') + CHAT_PEND.map(m => row(m, true)).join('') : '<div class="cd-empty">' + tx('Sin mensajes todavía') + '</div>';
     box.scrollTop = box.scrollHeight;
   }
+  /** Indicador de urgente (dec. 145): el mismo triángulo SVG que en el Dashboard y el Mando. */
+  function urgIcon() { const t = esc(tx('Urgente')); return '<svg class="ic urg-i" role="img" aria-label="' + t + '"><title>' + t + '</title><use href="#i-urg"/></svg>'; }
+  /** Conmutador «urgente» del chat de Producción: el único sitio donde se marca. No toca el texto. */
+  function urgOn() { const b = $('cd-urg'); return !!b && b.getAttribute('aria-pressed') === 'true'; }
+  function urgSet(on) { const b = $('cd-urg'); if (!b) return; b.setAttribute('aria-pressed', String(!!on)); b.classList.toggle('on', !!on); }
   /** Llega el chat entero desde el Dashboard. */
   function chatIn(m) {
     const list = _EM && _EM.cleanChatLog ? _EM.cleanChatLog(m) : null;
@@ -1023,14 +1028,16 @@
         if (PROD_R) PROD_R.sendProdMessage({ type: 'chatsync', from: PRODID }).catch(() => {}); }
     };
     $('cdbtn').addEventListener('click', () => set(!dock.classList.contains('open')));
+    $('cd-urg').addEventListener('click', () => { urgSet(!urgOn()); input.focus(); });
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && dock.classList.contains('open') && $('pmodal').hidden) set(false); });
     $('cd-form').addEventListener('submit', async e => {
       e.preventDefault();
       const text = input.value.replace(/\s+/g, ' ').trim(); if (!text) return;
-      const p = { text, at: Date.now(), pid: PRODID, from: '' };
-      CHAT_PEND.push(p); input.value = ''; renderChat();
-      let r; try { r = await PROD_R.sendProdMessage({ type: 'chat', from: PRODID, text }); } catch (err) { r = { ok: false }; }
-      if (!r || !r.ok) { CHAT_PEND = CHAT_PEND.filter(x => x !== p); input.value = text; renderChat(); prodNote('No se pudo enviar: sin conexión', true); }
+      const urgent = urgOn();   // booleano estricto; el texto va tal cual
+      const p = { text, at: Date.now(), pid: PRODID, from: '', urgent };
+      CHAT_PEND.push(p); input.value = ''; urgSet(false); renderChat();   // cada mensaje decide: el conmutador vuelve a «no urgente»
+      let r; try { r = await PROD_R.sendProdMessage({ type: 'chat', from: PRODID, text, urgent }); } catch (err) { r = { ok: false }; }
+      if (!r || !r.ok) { CHAT_PEND = CHAT_PEND.filter(x => x !== p); input.value = text; urgSet(urgent); renderChat(); prodNote('No se pudo enviar: sin conexión', true); }
     });
     renderChat();
   }
