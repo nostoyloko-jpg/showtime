@@ -441,7 +441,7 @@ td.mo,th.mo{width:34px}
 .morep .delbtn{width:auto;padding:0 10px;gap:6px;font:inherit;font-size:12px;font-weight:700;color:var(--muted)}
 .morep .delb:hover{color:#ff6b62;border-color:rgba(255,107,98,.45);background:rgba(255,107,98,.08)}
 .more.open .morebtn,.more:hover .morebtn{color:var(--text)}
-#mods{white-space:nowrap}
+#mods{display:inline-block;width:8px;height:8px;flex:0 0 8px;margin:0 2px;padding:0;border:0;border-radius:50%;background:var(--call);box-shadow:0 0 6px rgba(255,197,51,.6);cursor:help}   /* dec. 128: punto ámbar, sin texto (12 px con el margen) */
 /* Zona tecleable (lista de zonas existentes; escribir una nueva la crea) */
 td.stage input[type=text]{width:var(--escw,140px);min-width:120px;max-width:260px;border-left:4px solid var(--sc,#555);font-weight:700;font-size:12px}
 #add-escenario{width:var(--escw,140px);min-width:120px}
@@ -716,8 +716,6 @@ td.est small{white-space:normal;max-width:96px;line-height:1.2}
 #btn-undo.btn.ghost{border-color:transparent;color:var(--muted);flex:0 0 auto}
 #btn-undo.btn.ghost:not(:disabled){color:var(--text)}
 #btn-undo.btn.ghost:hover:not(:disabled){border-color:var(--hair2)}
-.chip.mods{height:20px;padding:0 7px 0 6px;gap:5px;font-size:11px;font-weight:700;color:var(--muted);border:1px solid var(--hair2);background:var(--chip);border-radius:999px;display:inline-flex;align-items:center;white-space:nowrap;cursor:default;font-variant-numeric:tabular-nums;flex:0 0 auto}
-.chip.mods::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--mod);flex:0 0 auto}   /* punto: cambios sin exportar (dec. 127) */
 .bar .clock{font-size:18px;font-weight:800;color:#fff;font-variant-numeric:tabular-nums;letter-spacing:.02em;min-width:88px;text-align:right}
 body[data-ps="stage"] .bar .clock{color:#FFD600}
 /* Sin reposo: interruptor con micro-LED */
@@ -768,7 +766,7 @@ td.est .arr{margin:0 5px;color:var(--dim);font-weight:400}
 td.est{font-variant-numeric:tabular-nums}
 /* Números que cambian en directo: sin saltos */
 .v-meta,.v-rem,.dchip,.mchip,.gapbtn,td.f .real,.estt,.drift{font-variant-numeric:tabular-nums}
-.chip.mods[hidden]{display:none}
+#mods[hidden]{display:none}
 .wake{white-space:nowrap}
 .bright{padding-left:12px;border-left:1px solid var(--hair2);align-self:stretch}
 #tbl tbody tr:hover td.ti::after,#tbl tbody tr:focus-within td.ti::after{opacity:0}

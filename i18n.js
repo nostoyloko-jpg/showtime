@@ -315,6 +315,7 @@
       "Evento sin nombre": "Untitled event",
       "Sin evento": "No event",
       "{n} sin exportar": "{n} not exported",
+      "Cambios sin exportar a JSON (⌘S)": "Changes not exported to JSON (⌘S)",
       "{n} banda(s) nueva(s)": "{n} new band(s)",
       "{n} borrada(s)": "{n} deleted",
       "{n} casilla(s) cambiada(s)": "{n} field(s) changed",
