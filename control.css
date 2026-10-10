@@ -97,9 +97,9 @@ td input{height:30px;border-radius:5px;border:1px solid transparent;background-c
 td input:hover{border-color:var(--line2)}
 td input:focus{outline:none;background-color:var(--field)}
 td.t input{width:68px;text-align:center;font-weight:700}
-td.n{position:relative;width:96px}
-td.n input{width:96px;min-width:0}
-td.n input:focus{position:absolute;right:3px;left:auto;top:50%;transform:translateY(-50%);width:320px;z-index:6;box-shadow:0 6px 20px rgba(0,0,0,.5)}   /* Notas: se ensancha al escribir */
+td.n{position:relative;width:200px;min-width:160px;max-width:260px}   /* Notas legibles en modo normal (dec. 120); en Foco la columna se oculta */
+td.n input{width:200px;min-width:160px;max-width:260px}
+td.n input:focus{position:absolute;right:3px;left:auto;top:50%;transform:translateY(-50%);width:320px;max-width:none;z-index:6;box-shadow:0 6px 20px rgba(0,0,0,.5)}   /* Notas: se ensancha al escribir */
 td select{height:30px;width:118px}
 td.mod input,td.mod select{border-color:rgba(255,197,51,.6);background-color:rgba(255,197,51,.08)}
 td input.bad{border-color:var(--err)!important;background-color:rgba(255,107,107,.12)!important}
@@ -888,7 +888,7 @@ body[data-ps="stage"] .modal{background:rgba(0,0,0,.85)}
 body[data-ps="stage"] .modal-box,body[data-ps="stage"] .imp-box{--modal-bg:#000;border-color:rgba(255,214,0,.55)}
 
 /* ── Modo Foco: micro-píldora del tipo (en vez del cuadradito de color, ambiguo a distancia) ── */
-.tpill{display:none;flex:0 0 auto;align-items:center;justify-content:center;min-width:62px;height:22px;padding:0 7px;border-radius:6px;font:800 11px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;letter-spacing:.1em;color:var(--pc);background:rgba(255,255,255,.05);border:1px solid var(--pc);background:color-mix(in srgb,var(--pc) 16%,transparent);border:1px solid color-mix(in srgb,var(--pc) 55%,transparent)}
+.tpill{display:none;flex:0 0 106px;width:106px;box-sizing:border-box;text-align:center;align-items:center;justify-content:center;height:22px;padding:0 7px;border-radius:6px;font:800 11px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;letter-spacing:.1em;color:var(--pc);background:rgba(255,255,255,.05);border:1px solid var(--pc);background:color-mix(in srgb,var(--pc) 16%,transparent);border:1px solid color-mix(in srgb,var(--pc) 55%,transparent)}
 .tpill.tp-show{--pc:#ff5d73}
 .tpill.tp-sc{--pc:#b79cff}
 .tpill.tp-tarea{--pc:#7dd3fc}

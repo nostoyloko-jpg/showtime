@@ -1820,6 +1820,15 @@ const miss = [...found].filter(k => !I.txHas(k) && !/^(OK|CALL|SC|Live|Raycast|S
     ['control.css', 'live.css', 'remote.css'].forEach(f => { const p = pisadas(D.src(f)); eq(p.length, 0, f + ': ' + p.slice(0, 5).join(' · ')); });
   });
 
+  test('Dec. 120: píldoras de tipo con el mismo ancho (los nombres arrancan en la misma vertical en Foco) y Notas legibles en modo normal', () => {
+    const css = D.src('control.css');
+    ok(/\.tpill\{display:none;flex:0 0 106px;width:106px;box-sizing:border-box;text-align:center;align-items:center;justify-content:center;/.test(css), 'píldora de 106 px fijos');
+    ok(!/\.tpill\{[^}]*min-width/.test(css), 'sin ancho mínimo que varíe según el texto');
+    ok(/td\.n\{position:relative;width:200px;min-width:160px;max-width:260px\}/.test(css) && /td\.n input\{width:200px;min-width:160px;max-width:260px\}/.test(css), 'Notas a 200 px (160–260)');
+    ok(/td\.n input:focus\{[^}]*width:320px;max-width:none;/.test(css), 'al escribir se sigue ensanchando a 320 px');
+    ok(/body\.focus #tbl \.c-n,body\.focus #tbl td\.n,/.test(css), 'en Foco, Notas sigue oculta');
+  });
+
   // ── Ejecutor ─────────────────────────────────────────────────────────
   (async () => {
     let pass = 0, fail = 0;
