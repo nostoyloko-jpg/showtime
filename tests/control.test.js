@@ -1163,13 +1163,13 @@
     const html = D.src('index.html');
     const hub = html.slice(html.indexOf('id="m-hub"'), html.indexOf('<button id="wake"'));
     ok(/Pantallas y Emisión/.test(hub) && /id="hub-led" class="hubled"/.test(hub), 'botón con su LED');
-    const b1 = hub.indexOf('Señales locales'), b2 = hub.indexOf('Emisión inalámbrica');
-    ok(b1 > 0 && b2 > b1, 'bloque 1 arriba, bloque 2 abajo');
+    const b1 = hub.indexOf('id="hub-local"'), b2 = hub.indexOf('id="hub-qr"');
+    ok(b1 > 0 && b2 > b1, 'pestaña 1 (HDMI) y pestaña 2 (QR), dec. 132');
     const loc = hub.slice(b1, b2);
     ok(/data-vista="manager"/.test(loc) && /id="lv-zone"/.test(loc) && /data-vista="confidence"/.test(loc) && /data-vista="backstage"/.test(loc), 'Manager · Confidence con zona · Backstage, cada una con Abrir');
     ok(/id="lv-standby"/.test(loc) && /id="lv-gestor"/.test(loc), 'Standby y gestor');
     const em = hub.slice(b2);
-    ok(/id="cast-bar"/.test(em) && />Backstage \/ Staff</.test(em) && /data-tab="remote"/.test(em) && /data-tab="produccion"/.test(em) && /id="cast-sec"/.test(em), 'barra de emisión, 3 pestañas y seguridad');
+    ok(/id="cast-bar"/.test(em) && />Camerinos \/ Staff</.test(em) && /data-tab="remote"/.test(em) && /data-tab="produccion"/.test(em) && /id="cast-sec"/.test(em), 'barra de emisión, 3 pestañas y seguridad');
     ok(/\.mpanel\.hub\{[^}]*width:480px/.test(D.src('control.css')), 'panel de 480 px');
     const t = dashboard();
     eq(t.env.getEl('hub-led').classList.contains('on'), false, 'sin emisión ni Live: gris');
@@ -1186,10 +1186,10 @@
     ok(/\.hub-card,\.gv-card\{background:rgba\(255,255,255,\.025\);border:1px solid var\(--hair2\);border-radius:10px;padding:4px 6px;margin-bottom:12px\}/.test(css), 'tarjeta común');
     ok(/\.hub-list>\*\+\*\{border-top:1px solid var\(--hair\)\}/.test(css), 'separadores de 1 px entre filas');
     const hub = html.slice(html.indexOf('id="m-hub"'), html.indexOf('<button id="wake"'));
-    eq((hub.match(/class="hub-card/g) || []).length, 3, 'tres tarjetas: señales locales, acciones locales y emisión');
+    eq((hub.match(/class="hub-card/g) || []).length, 3, 'tres tarjetas: pantallas HDMI, acciones locales y emisión');
     const c1 = hub.indexOf('hub-card hub-list"'), c2 = hub.indexOf('hub-card hub-list hub-acts"'), c3 = hub.indexOf('hub-card hub-cast"');
     ok(c1 > 0 && c2 > c1 && c3 > c2, 'en ese orden');
-    ok(/data-vista="manager"[\s\S]*data-vista="backstage"/.test(hub.slice(c1, c2)) && /id="lv-standby"[\s\S]*id="lv-gestor"/.test(hub.slice(c2, c3)) && /id="cast-bar"[\s\S]*class="ctabs"[\s\S]*id="cast-sec"/.test(hub.slice(c3)), 'cada cosa en su tarjeta');
+    ok(/data-vista="manager"[\s\S]*data-vista="backstage"/.test(hub.slice(c1, c2)) && /id="lv-standby"[\s\S]*id="lv-gestor"/.test(hub.slice(c2, c3)) && /id="cast-bar"[\s\S]*id="cast-net"[\s\S]*class="ctabs"[\s\S]*id="cast-sec"/.test(hub.slice(c3)), 'cada cosa en su tarjeta');
     ok(/box\.innerHTML = loc \+ '<div class="gv-card">' \+ head/.test(js) && /<div class="gv-card"><div id="gv-qrl"/.test(js), 'gestor: Monitores locales y Dispositivos QR en tarjetas');
   });
   test('Pantallas y Emisión: Confidence se abre con la zona del selector; la barra de emisión dice sala y dispositivos', async () => {
@@ -1738,7 +1738,7 @@ const miss = [...found].filter(k => !I.txHas(k) && !/^(OK|CALL|SC|Live|Raycast|S
     ok(/falta la IP del Mac/.test(t.env.getEl('cast-staff').innerHTML), 'aviso en vez de QR');
     T.fakeEm(null, null);
     const html = D.src('index.html');
-    ok(/<div class="hub-card hub-cast">\s*<div id="cast-net"/.test(html), 'selector en el Hub'); ok(/id="cfg-s-net"[\s\S]*?id="cfg-net"/.test(html), 'y en Configuración › Emisión');
+    ok(/<div class="hub-card hub-cast">\s*<div id="cast-bar" class="cast-bar"><\/div>\s*<div id="cast-net"/.test(html), 'selector en el Hub (bajo Empezar / Parar, dec. 132)'); ok(/id="cfg-s-net"[\s\S]*?id="cfg-net"/.test(html), 'y en Configuración › Emisión');
     const js = D.src('control.js');
     ok(/brokers: emBrokers\(\)/.test(js), 'el Emisor usa el transporte elegido');
     ok((js.match(/emLink\(Em\.(staff|remote|production)Url\(/g) || []).length === 5 && !/[^(]Em\.(staff|remote|production)Url\(/.test(js.replace(/emLink\(Em\./g, '')), 'todos los QR pasan por emLink');
@@ -1794,8 +1794,9 @@ const miss = [...found].filter(k => !I.txHas(k) && !/^(OK|CALL|SC|Live|Raycast|S
     const css = D.src('control.css'), html = D.src('index.html'), js = D.src('control.js');
     ['#m-cast', '.lvpanel', '.lvh', '.lvzones', '.lvz', '.lvnow', '.csoon', '.cbtns', '.focusitem', '.fbox', '.hub-h2', '.add-msg', '.cfg-files', '.filebar', '.gv-qrh', '.lvx', '.realc']
       .forEach(sel => ok(!new RegExp(sel.replace('.', '\\.') + '(?![\\w-])').test(css), 'fuera: ' + sel));
+    ok(!/\.cseg\b/.test(css) && !/cseg/.test(js), 'fuera: .cseg (dec. 132: el QR de Staff y el mando eligen con un desplegable)');
     // Se quedan porque se usan (aunque estaban en la lista inicial)
-    ['.cpick', '.cseg', '.czone', '.csub'].forEach(sel => { ok(css.indexOf(sel) >= 0, 'sigue: ' + sel); ok(js.indexOf(sel.slice(1)) >= 0, sel + ' lo usa el Hub'); });
+    ['.cpick', '.czone', '.csub'].forEach(sel => { ok(css.indexOf(sel) >= 0, 'sigue: ' + sel); ok(js.indexOf(sel.slice(1)) >= 0, sel + ' lo usa el Hub'); });
     ok(/\.imp-prev tr\.st-ok/.test(css) && /'<tr class="st-' \+ r\.status/.test(js), '.st-ok/.st-warn/.st-err: filas del importador');
     ok(/\.lvon\.on/.test(css) && /id="lv-standby-on"/.test(html), '.lvon: «ABIERTA» del Standby');
   });
@@ -1957,6 +1958,48 @@ const miss = [...found].filter(k => !I.txHas(k) && !/^(OK|CALL|SC|Live|Raycast|S
     ok(/if \(s\) s\.open = true;/.test(js), 'openConfig(sección) la abre (p. ej. «Configuración › Meteo»)');
     ok(/<select id="sc-park" data-sc="park\.mins" data-num><option value="5"[^>]*>5 minutos \(recomendado\)<\/option><option value="2"[^>]*>2 minutos<\/option><option value="10"[^>]*>10 minutos<\/option><option value="0"[^>]*>Nunca \(mantener siempre el último horario\)<\/option><\/select>/.test(html), 'selector de reposo en Pantallas y reposo');
     ok(/const \[g, k\] = el\.dataset\.sc\.split\('\.'\);/.test(js) && /el\.dataset\.num !== undefined\) \? Number\(el\.value\)/.test(js), 'se guarda como número en screens.park.mins (como el resto de ajustes de pantallas)');
+  });
+
+  test('Dec. 132: Hub en dos pestañas — Pantallas HDMI (Local) · Emisión y QR (Móviles); se recuerda la elegida; QR de un solo nivel', () => {
+    const html = D.src('index.html'), css = D.src('control.css'), js = D.src('control.js');
+    const hub = html.slice(html.indexOf('id="m-hub"'), html.indexOf('<button id="wake"'));
+    ok(/<div class="htabs" role="tablist">\s*<button class="htab on" type="button" role="tab" data-htab="local"[^>]*><svg class="ic"><use href="#i-screen"\/><\/svg><span[^>]*>Pantallas HDMI \(Local\)<\/span><\/button>\s*<button class="htab" type="button" role="tab" data-htab="qr"[^>]*><svg class="ic"><use href="#i-cast"\/><\/svg><span[^>]*>Emisión y QR \(Móviles\)<\/span><i id="htab-led"/.test(hub), 'dos pestañas arriba, con iconos SVG');
+    const loc = hub.slice(hub.indexOf('id="hub-local"'), hub.indexOf('id="hub-qr"')), qr = hub.slice(hub.indexOf('id="hub-qr"'));
+    ok(/data-vista="manager"[\s\S]*id="lv-zone"[\s\S]*data-vista="backstage"[\s\S]*id="lv-standby"[\s\S]*id="lv-gestor"/.test(loc) && !/cast-/.test(loc), 'HDMI: filas y pie de acciones locales; nada de QR');
+    ok(/id="hub-qr" role="tabpanel" hidden/.test(hub) && /id="cast-bar"[\s\S]*id="cast-net"[\s\S]*data-tab="staff"[\s\S]*data-tab="remote"[\s\S]*data-tab="produccion"[\s\S]*id="cast-sec"/.test(qr), 'QR: estado y Empezar/Parar, transporte, 3 botones y, al pie, jornada y claves');
+    ok(!/class="hub-h"/.test(hub), 'sin las cabeceras de bloque (las pestañas las sustituyen)');
+    ok(/\.htab\.on\{background:rgba\(255,255,255,\.1\);color:#fff\}/.test(css) && /\.hpane\[hidden\]\{display:none\}/.test(css), 'segmentado: activa con fondo translúcido y texto blanco');
+    ok(/<select class="cvsel" data-cvs="1"/.test(js) && /<select class="czone" data-rzs="1"/.test(js), 'Staff y mando eligen pantalla y zona con un desplegable (sin segundo nivel de botones)');
+    const t = panel(), el = id => t.env.getEl(id);
+    eq(el('hub-local').hidden, false, 'de entrada, HDMI'); eq(el('hub-qr').hidden, true);
+    t.env.fire('document', 'click', { stopPropagation() {}, target: { closest: q => q === '#m-hub .htab' ? { dataset: { htab: 'qr' } } : null } });
+    eq(el('hub-local').hidden, true, 'pestaña QR'); eq(el('hub-qr').hidden, false); eq(t.env.storage.get('showtime.hub.tab'), 'qr', 'se recuerda');
+    const t2 = panel({ 'showtime.hub.tab': 'qr' });
+    eq(t2.env.getEl('hub-qr').hidden, false, 'al volver a abrir el Dashboard, la misma pestaña');
+    // El desplegable del QR de Staff cambia la pantalla que abre el QR
+    t.T.setRoom({ sala: 'abcdEFGHIJKLMNOP', k: 'k', p: 'p' }); t.T.fakeEm({ push() {}, setZoneKeys: async () => {} }, { links: [{ name: 'A', state: 'on' }], viewers: 0, remotes: 0, devices: [] });
+    t.env.fire('document', 'change', { target: { matches: q => q === '#cast-staff [data-cvs]', value: 'backstage' } });
+    ok(/vista=backstage/.test(el('cast-staff').dataset.url || ''), 'QR de Staff → Backstage: ' + el('cast-staff').dataset.url);
+    t.T.fakeEm(null, null);
+  });
+  test('Dec. 132: logo del evento en Configuración › Evento — miniatura y Quitar; quitarlo se puede deshacer y queda sin exportar', () => {
+    const L = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+    const F = fest(), s = JSON.parse(JSON.stringify(F.s)); s.event.showtimeLogo = L;
+    const t = panel({ 'showtime.festival': JSON.stringify(s), 'showtime.original': JSON.stringify(s) });
+    t.env.fire('btn-cfg', 'click', {});
+    const h = t.env.getEl('cfg-fest').innerHTML;
+    ok(h.indexOf('<img id="f-logo-img" src="' + L + '"') > 0 && /data-act="logo-del"/.test(h) && /Cambiar imagen/.test(h), 'miniatura, Cambiar y Quitar');
+    ok(/accept="image\/png,image\/jpeg,image\/webp,image\/svg\+xml/.test(h), 'PNG, JPG, WebP y SVG');
+    t.env.fire('document', 'click', { target: { closest: q => q === '[data-act="logo-del"]' ? {} : null } });
+    return new Promise(r => setTimeout(r, 0)).then(() => {
+      eq('showtimeLogo' in t.read('showtime.festival').event, false, 'quitado');
+      eq(t.env.getEl('mods').hidden, false, 'cuenta como cambio sin exportar');
+      const t3 = panel({ 'showtime.festival': JSON.stringify(F.s) }); t3.env.fire('btn-cfg', 'click', {});
+      ok(/Subir imagen/.test(t3.env.getEl('cfg-fest').innerHTML) && !/f-logo-img/.test(t3.env.getEl('cfg-fest').innerHTML), 'sin logo: solo Subir imagen');
+      const js = D.src('control.js');
+      ok(/Math\.min\(1, 480 \/ img\.naturalWidth, 240 \/ img\.naturalHeight\)/.test(js) && /cv\.toDataURL\('image\/webp', 0\.86\)/.test(js), 'se reduce a 480×240 (WebP) al subir');
+      ok(/logo: C\.eventLogo\(FEST\)/.test(js), 'la hoja impresa recibe el logo');
+    });
   });
 
   // ── Ejecutor ─────────────────────────────────────────────────────────

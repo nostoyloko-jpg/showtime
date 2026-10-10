@@ -1046,7 +1046,7 @@
       const box = $('cfg-fest');
       const ae = document.activeElement;
       if (!(ae && box.contains(ae))) {
-        box.innerHTML = festForm(FEST.event) + '<div class="row end" style="margin-top:12px"><button id="f-save" class="btn primary">' + tx('Guardar datos del evento') + '</button></div>';
+        box.innerHTML = festForm(FEST.event) + '<div class="row end" style="margin-top:12px"><button id="f-save" class="btn primary">' + tx('Guardar datos del evento') + '</button></div>' + logoHtml();
         $('f-save').addEventListener('click', saveFest);
         box.querySelectorAll('input').forEach(i => i.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); saveFest(); } }));
       }
@@ -1121,6 +1121,52 @@
     renderCfSim();   // el botón [Flash] del simulador usa estos colores
   }
 
+  // ── Logo del evento (dec. 132): Configuración › Evento. Se reduce al subirlo y viaja en el .json y en la emisión ──
+  function logoHtml() {
+    const lg = C.eventLogo(FEST);
+    return '<div class="logo-blk"><div class="fsub">' + tx('Logo del evento (reposo, Standby y hojas impresas)') + '</div><div class="logo-row">'
+      + (lg ? '<span class="logo-th"><img id="f-logo-img" src="' + esc(lg) + '" alt="' + esc(tx('Logo del evento')) + '"></span>' : '')
+      + '<label class="btn" for="f-logo"><svg class="ic"><use href="#i-folder"/></svg>' + tx(lg ? 'Cambiar imagen' : 'Subir imagen') + '</label>'
+      + '<input id="f-logo" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml,.png,.jpg,.jpeg,.webp,.svg" hidden>'
+      + (lg ? '<button type="button" class="btn ghost" data-act="logo-del"><svg class="ic"><use href="#i-x"/></svg>' + tx('Quitar') + '</button>' : '')
+      + '</div><div class="note">' + tx('PNG, JPG, WebP o SVG. Se reduce a 480 × 240 px como máximo para que la emisión siga siendo ligera. Sin logo, el cartel de Showtime.') + '</div></div>';
+  }
+  /** Lee la imagen y la deja pequeña: SVG tal cual (si cabe); PNG/JPG/WebP reescalada a 480×240 como mucho (WebP, o PNG si el navegador no sabe). */
+  function readLogo(file) {
+    return new Promise((ok, ko) => {
+      if (!file) return ko(new Error('Sin archivo'));
+      const fr = new FileReader();
+      fr.onerror = () => ko(new Error('No se pudo leer la imagen.'));
+      fr.onload = () => {
+        const url = String(fr.result || '');
+        if (/^data:image\/svg\+xml;base64,/.test(url)) return ok(url);
+        if (!/^data:image\/(png|jpeg|webp|gif);base64,/.test(url)) return ko(new Error('Formato no válido: PNG, JPG, WebP o SVG.'));
+        const img = new Image();
+        img.onerror = () => ko(new Error('No se pudo leer la imagen.'));
+        img.onload = () => {
+          const k = Math.min(1, 480 / img.naturalWidth, 240 / img.naturalHeight), w = Math.max(1, Math.round(img.naturalWidth * k)), h = Math.max(1, Math.round(img.naturalHeight * k));
+          const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+          cv.getContext('2d').drawImage(img, 0, 0, w, h);
+          let out = cv.toDataURL('image/webp', 0.86);
+          if (!/^data:image\/webp/.test(out)) out = cv.toDataURL('image/png');   // navegador sin WebP: PNG
+          if (out.length > C.LOGO_MAX) out = cv.toDataURL('image/webp', 0.7);
+          ok(out);
+        };
+        img.src = url;
+      };
+      fr.readAsDataURL(file);
+    });
+  }
+  async function setLogo(file) {
+    try {
+      const url = file ? await readLogo(file) : '';
+      const r = C.setEventLogo(FEST, url);
+      if (!r.ok) { toast(r.error, true); return; }
+      if (r.changed) commitFestival(r.state, url ? 'Logo del evento cargado' : 'Logo del evento quitado', { skip: true });
+    } catch (e) { toast(e.message || 'No se pudo leer la imagen.', true); }
+  }
+  document.addEventListener('change', e => { if (e.target && e.target.id === 'f-logo') { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) setLogo(f); } });
+  document.addEventListener('click', e => { if (e.target.closest && e.target.closest('[data-act="logo-del"]')) setLogo(null); });
   function saveFest() {
     const r = C.updateEvent(FEST, readFestForm());
     if (!r.ok) { $('f-err').textContent = back(r.error); return; }
@@ -1471,6 +1517,7 @@
     const led = $('hub-led'); if (!led) return;
     const n = nOpen === undefined ? openIds().length : nOpen, on = !!EM || n > 0;
     led.classList.toggle('on', on);
+    if ($('htab-led')) $('htab-led').classList.toggle('on', !!EM);   // pestaña Emisión y QR: verde si se está emitiendo
     const parts = [];
     if (EM) parts.push(tx('Emitiendo por QR'));
     parts.push(n ? (n === 1 ? tx('1 Pantalla Live abierta') : tx('{n} Pantallas Live abiertas', { n: n })) : tx('Ninguna Pantalla Live abierta'));
@@ -1858,7 +1905,7 @@
       const rows = P.rowsOf(FEST, { day: PR.day, zone: PR.zone, kinds: prKinds() });
       if (!rows.length) { toast('No hay bloques con estos filtros', true); return false; }
       const dl = PR.day === 'all' ? days : [PR.day];
-      const doc = P.html({ rows, days: dl, title: C.eventName(FEST, tx), format: PR.fmt, orient: PR.fmt === 'gantt' ? 'landscape' : PR.orient, notes: PR.notes, call: PR.call, now: new Date(), full: prKinds().length === 4 });   // idioma: el activo de Showtime
+      const doc = P.html({ rows, days: dl, title: C.eventName(FEST, tx), logo: C.eventLogo(FEST), format: PR.fmt, orient: PR.fmt === 'gantt' ? 'landscape' : PR.orient, notes: PR.notes, call: PR.call, now: new Date(), full: prKinds().length === 4 });   // idioma: el activo de Showtime
       P.launch(doc);
       toast('Hoja lista: en la impresión, elige «Guardar como PDF»');
     } }], { wide: true });
@@ -3051,15 +3098,15 @@
   }
   function castPickHtml() {
     const zs = castZones();
-    return '<div class="cpick"><div class="cseg">' + Vs.VISTAS.map(v => '<button type="button" data-cv="' + v + '" class="' + (CAST_VISTA === v ? 'on' : '') + '">' + Vs.VISTA_TXT[v] + '</button>').join('') + '</div>'
+    return '<div class="cpick"><select class="cvsel" data-cvs="1" aria-label="' + esc(tx('Pantalla que abre el QR')) + '">' + Vs.VISTAS.map(v => '<option value="' + v + '"' + (CAST_VISTA === v ? ' selected' : '') + '>' + Vs.VISTA_TXT[v] + '</option>').join('') + '</select>'
       + (CAST_VISTA === 'confidence' ? '<select class="czone" data-cz="1">' + zs.map(z => '<option value="' + esc(z.id) + '"' + (z.id === CAST_ZONA ? ' selected' : '') + '>' + esc(z.name) + '</option>').join('') + '</select>' : '')
       + '<span class="csub">' + esc(tx(Vs.VISTA_SUB[CAST_VISTA])) + '</span></div>';
   }
   /** Mando por zona: «Todas las zonas» (el general) o el de una zona (solo si el evento tiene varias). */
   function rmPickHtml() {
     const zs = rmZones(); if (zs.length < 2) return '';
-    return '<div class="cpick"><div class="cseg"><button type="button" data-rz="" class="' + (RM_ZONE ? '' : 'on') + '">' + tx('Todas las zonas') + '</button>'
-      + zs.map(z => '<button type="button" data-rz="' + esc(z.id) + '" class="' + (RM_ZONE === z.id ? 'on' : '') + '"><i style="background:' + esc(safeColor(z.color, '#888')) + '"></i>' + esc(z.name) + '</button>').join('') + '</div>'
+    return '<div class="cpick"><select class="czone" data-rzs="1" aria-label="' + esc(tx('Zona del mando')) + '"><option value=""' + (RM_ZONE ? '' : ' selected') + '>' + tx('Todas las zonas') + '</option>'
+      + zs.map(z => '<option value="' + esc(z.id) + '"' + (RM_ZONE === z.id ? ' selected' : '') + '>' + esc(z.name) + '</option>').join('') + '</select>'
       + '<span class="csub">' + esc(RM_ZONE ? tx('Solo ve y controla {z} (shows, pruebas, tiempos y su Confidence). Chat de Producción incluido.', { z: zoneLabel(RM_ZONE) }) : tx('Mando general: todas las zonas. Chat de Producción incluido.')) + '</span></div>';
   }
   function paneHtml(kind) {
@@ -3161,9 +3208,23 @@
       if (btn) btn.click();
     }
   });
-  document.addEventListener('click', e => { const b = e.target.closest('#cast-staff [data-cv]'); if (!b) return; CAST_VISTA = b.dataset.cv; renderCast(); });
-  document.addEventListener('click', e => { const b = e.target.closest('#cast-remote [data-rz]'); if (!b) return; RM_ZONE = b.dataset.rz || null; renderCast(); });
-  document.addEventListener('change', e => { if (e.target.matches('#cast-staff [data-cz]')) { CAST_ZONA = e.target.value; renderCast(); } });
+  document.addEventListener('change', e => {
+    if (e.target.matches('#cast-staff [data-cvs]')) { CAST_VISTA = Vs.normVista(e.target.value); renderCast(); }
+    else if (e.target.matches('#cast-remote [data-rzs]')) { RM_ZONE = e.target.value || null; renderCast(); }
+    else if (e.target.matches('#cast-staff [data-cz]')) { CAST_ZONA = e.target.value; renderCast(); }
+  });
+  // ── Pestañas del Hub (dec. 132): Pantallas HDMI (Local) · Emisión y QR (Móviles). La elegida se recuerda en este equipo ──
+  const HUB_TAB_KEY = 'showtime.hub.tab';
+  function hubTab() { try { return localStorage.getItem(HUB_TAB_KEY) === 'qr' ? 'qr' : 'local'; } catch (e) { return 'local'; } }
+  function setHubTab(tab) {
+    const t = tab === 'qr' ? 'qr' : 'local';
+    try { localStorage.setItem(HUB_TAB_KEY, t); } catch (e) {}
+    document.querySelectorAll('#m-hub .htab').forEach(b => { const on = b.dataset.htab === t; b.classList.toggle('on', on); b.setAttribute('aria-selected', String(on)); });
+    if ($('hub-local')) $('hub-local').hidden = t !== 'local';
+    if ($('hub-qr')) $('hub-qr').hidden = t !== 'qr';
+  }
+  setHubTab(hubTab());
+  document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('#m-hub .htab'); if (!b) return; e.stopPropagation(); setHubTab(b.dataset.htab); });
   // Cada cambio guardado (en este Panel o llegado de la Live, p. ej. un OK de CALL) sale hacia los móviles
   const EM_KEYS = [Dt.KEYS.festival, Dt.KEYS.config, Dt.KEYS.callDone, Dt.KEYS.flash, Dt.KEYS.avisos, Dt.KEYS.meteo, Dt.KEYS.standby];
   Dt.onWrite(k => { if (EM && EM_KEYS.indexOf(k) >= 0) EM.push(); });

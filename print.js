@@ -121,7 +121,8 @@
     '.sheet{display:flex;flex-direction:column;overflow:visible;padding:12mm 14mm 11mm}',
     '.sheet+.sheet{break-before:page}',
     '.sheet.portrait{width:210mm;height:296mm}.sheet.landscape{width:297mm;height:209mm;padding:10mm 12mm 9mm}',
-    '.hd{border-bottom:1.5px solid #0f172a;padding-bottom:6px;margin-bottom:8px;flex:0 0 auto}',
+    '.hd{border-bottom:1.5px solid #0f172a;padding-bottom:6px;margin-bottom:8px;flex:0 0 auto;display:flex;align-items:flex-end;justify-content:space-between;gap:6mm}',
+    '.hd-t{min-width:0}.hd-logo{flex:0 0 auto;display:block;max-height:13mm;max-width:46mm;object-fit:contain}',
     '.brand{font-size:6.5pt;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#334155}',
     'h1{font-size:15pt;line-height:1.1;margin:3px 0 4px;letter-spacing:-.01em;color:#0f172a}',
     '.meta{font-size:7.5pt;color:#334155;letter-spacing:.02em}',
@@ -563,14 +564,17 @@
   }
 
   /** Una hoja de cronograma (apaisada) para un día. */
-  function ganttSheet(list, d, idx, total, title, printed, lang) {
+  /** Logo del evento para la cabecera (dec. 132): solo imágenes en Base64 (PNG, JPG, WebP, SVG); cualquier otra cosa se ignora. */
+  const LOGO_OK = /^data:image\/(png|jpeg|webp|svg\+xml);base64,[A-Za-z0-9+/]+=*$/;
+  function logoTag(logo) { return typeof logo === 'string' && LOGO_OK.test(logo) ? '<img class="hd-logo" src="' + logo + '" alt="">' : ''; }
+  function ganttSheet(list, d, idx, total, title, printed, lang, logo) {
     const t = T(lang);
     const L = layoutGantt(list, 273, 164, lang);
     const bloques = list.filter(r => !r.aviso).length;
     const meta = [d ? dayLabel(d, lang) : t.allDays, (L ? L.lanes.length : 0) + ' ' + t.stages, bloques + ' ' + t.blocks].join(' · ');
     const footerLeft = t.footer + ' · ' + title + ' · ' + (d ? dayLabel(d, lang) : t.allDays);
     return '<section class="sheet landscape">' +
-      '<div class="hd"><div class="brand">' + esc(t.brandGantt) + '</div><h1>' + esc(title) + '</h1><div class="meta">' + esc(meta) + '</div></div>' +
+      '<div class="hd"><div class="hd-t"><div class="brand">' + esc(t.brandGantt) + '</div><h1>' + esc(title) + '</h1><div class="meta">' + esc(meta) + '</div></div>' + logoTag(logo) + '</div>' +
       (L ? '<div class="tbl">' + ganttSvg(L) + '</div>' : '<p class="empty">' + esc(t.emptyGantt) + '</p>') +
       '<footer class="sheet-foot"><span>' + esc(footerLeft) + '</span><span>' + esc(t.printed) + esc(printed) + '</span><span>' + esc(t.page) + (idx + 1) + '/' + total + '</span></footer>' +
       '</section>';
@@ -593,7 +597,7 @@
     const title = o.title || 'Evento';
     const sheets = days.map((d, idx) => {
       const list = rows.filter(r => !d || r.jornada === d);
-      if (gantt) return ganttSheet(list, d, idx, days.length, title, printed, lang);
+      if (gantt) return ganttSheet(list, d, idx, days.length, title, printed, lang, o.logo);
       const dens = densityFor(list.length);
       const zones = [];
       list.forEach(r => { if (!r.aviso && zones.indexOf(r.zone) < 0) zones.push(r.zone); });
@@ -631,7 +635,7 @@
       const footerLeft = t.footer + ' · ' + title + ' · ' + (d ? dayLabel(d, lang) : t.allDays);
       const footerRight = t.page + (idx + 1) + '/' + days.length;
       return '<section class="sheet ' + (land ? 'landscape' : 'portrait') + ' ' + dens.cls + '">' +
-        '<div class="hd"><div class="brand">' + esc(t.brand) + '</div><h1>' + esc(title) + '</h1><div class="meta">' + esc(metaParts.join(' · ')) + '</div></div>' +
+        '<div class="hd"><div class="hd-t"><div class="brand">' + esc(t.brand) + '</div><h1>' + esc(title) + '</h1><div class="meta">' + esc(metaParts.join(' · ')) + '</div></div>' + logoTag(o.logo) + '</div>' +
         (list.length
           ? '<div class="tbl"><table>' + cg + '<thead>' + head + '</thead><tbody>' + body + '</tbody></table></div>'
           : '<p class="empty">' + esc(t.empty) + '</p>') +

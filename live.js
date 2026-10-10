@@ -28,6 +28,7 @@
   function pset(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
 
   // ── Estado (declarado ANTES de cualquier uso: `let` no se eleva) ──────
+  let POSTER_LOGO = '', PARKED = false;   // cartel con logo (dec. 132) y reposo (dec. 131)
   let FEST = null, CONFIG = null, BLOCKS = [], HITOS = [], ALLB = [], MARG = {}, CALL_MINS = 15, CALL_DONE = new Set(), DEMO = false;
   const VIEW_TXT = { all: ['JORNADA COMPLETA', 'ENTRADAS'], show: ['SHOW', 'SHOWS'], sc: ['SOUNDCHECK', 'SOUNDCHECKS'] };
   let NOFEST = false, DAY_MISSING = '';   // estados que se ENSEÑAN, nunca se corrigen solos
@@ -66,6 +67,9 @@
     if (DEMO) { if (!FEST || !FEST.__demo) { FEST = C.demoFestival(Math.floor(C.nowAbs())); FEST.__demo = true; } }
     else FEST = stored;
     NOFEST = !FEST;
+    // El logo del evento cambió con el cartel puesto (Standby o reposo): se repinta el cartel (dec. 132)
+    const lg = C.eventLogo ? C.eventLogo(FEST) : '';
+    if (lg !== POSTER_LOGO) { POSTER_LOGO = lg; if (STANDBY) setTimeout(renderStandby, 0); if (PARKED) { PARKED = false; setTimeout(() => setPark(true), 0); } }
 
     CONFIG = Dt.getConfig();
     if (window.ShowtimeI18n) window.ShowtimeI18n.setLang(CONFIG.lang);   // el idioma lo manda el Panel (también por la emisión)
@@ -1026,12 +1030,17 @@
   // ── Reposo / Modo Parking (dec. 131) ─────────────────────────────────
   // Pantalla fija por QR (Manager, Backstage) que se queda sin emisión: en vez del aviso rojo toda la noche, el cartel de Showtime con la
   // hora local en grande y «ESPERANDO EMISIÓN». Cuándo, lo decide Vs.parkState. Se quita sola con el primer paquete. No toca los datos.
-  let PARKED = false, parkClk = null;
+  let parkClk = null;   // PARKED, arriba (lo mira load())
+  /** Cartel del reposo y del Standby (dec. 132): el logo del evento si lo hay; si no, el de Showtime. */
+  function posterHtml() {
+    const lg = C.eventLogo ? C.eventLogo(FEST) : '';
+    return lg ? '<div class="evlogo"><img src="' + esc(lg) + '" alt="' + esc(C.eventName(FEST, tx)) + '"></div>' : Mk.banner({ version: (window.ShowtimeEmision || {}).BUILD || '', footer: true });
+  }
   function setPark(on) {
     const el = $('park'); if (!el || !Mk || on === PARKED) return;
     PARKED = on; document.body.classList.toggle('park-on', on);
     if (!on) { el.hidden = true; el.innerHTML = ''; clearInterval(parkClk); parkClk = null; return; }
-    el.innerHTML = '<div class="park-in">' + Mk.banner({ version: (window.ShowtimeEmision || {}).BUILD || '', footer: true }) +
+    el.innerHTML = '<div class="park-in">' + posterHtml() +
       '<div id="park-clk" class="park-clk"></div><div class="park-pill"><svg class="ic"><use href="#i-clock"/></svg>' + esc(tx('ESPERANDO EMISIÓN')) + '</div></div>';
     el.hidden = false;
     // Hora local (sigue sin internet) y, cada minuto, un leve desplazamiento del bloque: una tele encendida toda la noche no se «quema»
@@ -1106,7 +1115,7 @@
     if ($('stbbtn')) $('stbbtn').setAttribute('aria-pressed', String(STANDBY));
     document.body.classList.toggle('standby-on', STANDBY);
     if (!STANDBY) { el.hidden = true; el.innerHTML = ''; clearInterval(stbClk); stbClk = null; document.title = 'Showtime · ' + Vs.VISTA_TXT[VISTA]; return; }
-    el.innerHTML = Mk.banner({ version: (window.ShowtimeEmision || {}).BUILD || '', footer: true }) +
+    el.innerHTML = posterHtml() +
       '<div id="stb-clk" class="stb-clk"></div><div class="stb-bar"><button id="stb-x" class="stb-x" type="button">' + tx('Salir del Standby (S)') + '</button></div>';
     el.hidden = false;
     document.title = 'Showtime · Standby';

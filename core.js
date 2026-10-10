@@ -661,6 +661,22 @@
   function isUnnamed(nombre) { const n = String(nombre == null ? '' : nombre).trim(); return !n || n === UNNAMED; }
   /** Nombre para enseñar: el del evento o, sin nombre, «Evento sin nombre» pasado por `t` (el traductor de cada pantalla). */
   function eventName(state, t) { const n = state && state.event && state.event.nombre; return isUnnamed(n) ? (t ? t(UNNAMED) : UNNAMED) : String(n).trim(); }
+  // ── Logo del evento (dec. 132): imagen pequeña en Base64 dentro del evento (`event.showtimeLogo`, prefijo de Showtime: dec. 3).
+  //    Viaja en el .json y en la emisión, así que tiene tope: el Dashboard la reduce al subirla (máx. 480×240) y aquí se rechaza
+  //    lo que pase de LOGO_MAX caracteres (~60 KB). Solo PNG, JPG, WebP o SVG; se pinta siempre como <img> (un SVG no ejecuta nada).
+  const LOGO_MAX = 80000;
+  const LOGO_RE = /^data:image\/(png|jpeg|webp|svg\+xml);base64,[A-Za-z0-9+/]+=*$/;
+  function validLogo(v) { return typeof v === 'string' && v.length <= LOGO_MAX && LOGO_RE.test(v); }
+  /** Logo del evento si es válido; si no, ''. */
+  function eventLogo(state) { const v = state && state.event && state.event.showtimeLogo; return validLogo(v) ? v : ''; }
+  /** Pone (dataUrl) o quita ('' / null) el logo. Cuenta como cambio del evento (sin exportar, Deshacer). */
+  function setEventLogo(state, dataUrl) {
+    if (!state || !state.event) return { ok: false, error: 'Primero crea o abre un evento' };
+    if (dataUrl && !validLogo(dataUrl)) return { ok: false, error: dataUrl.length > LOGO_MAX ? 'La imagen es demasiado grande para emitirla (máx. ~60 KB). Prueba con una más sencilla o en SVG.' : 'Formato no válido: PNG, JPG, WebP o SVG.' };
+    const next = clone(state);
+    if (dataUrl) next.event.showtimeLogo = dataUrl; else delete next.event.showtimeLogo;
+    return { ok: true, state: next, changed: (state.event.showtimeLogo || '') !== (next.event.showtimeLogo || '') };
+  }
   function newFestival(ev) {
     const r = checkEvent(ev || {});
     if (!r.ok) return r;
@@ -1174,7 +1190,7 @@
 
   const API = {
     DEFAULT_CUTOFF, DEFAULT_CALL_MINS, DEFAULT_DURATION, DEFAULT_CO_MIN, isFija, setFija, coMinFor,
-    MARGIN_WARN, UNNAMED, isUnnamed, eventName, scopeToJornada, jornadaOver, isLibre, setDelayFlag, setReal, jornadaOfAbs, activeJornada, legacyCallKey, callIsDone, callKeyName, driftByZone, delayByZone, addRetraso, retrasosOf, blockedIn, movesBy, setAlargar, hitoMargins, MAX_NEXT, ARTIST_COLORS, TIPO_COLORS,
+    MARGIN_WARN, UNNAMED, isUnnamed, eventName, LOGO_MAX, validLogo, eventLogo, setEventLogo, scopeToJornada, jornadaOver, isLibre, setDelayFlag, setReal, jornadaOfAbs, activeJornada, legacyCallKey, callIsDone, callKeyName, driftByZone, delayByZone, addRetraso, retrasosOf, blockedIn, movesBy, setAlargar, hitoMargins, MAX_NEXT, ARTIST_COLORS, TIPO_COLORS,
     pad2, parseHM, fmtHM, dayIndex, isoOfDay, shiftDate, toAbs, adjustEnd, nowAbs,
     cutoffMins, festivalDateOf, entersMode, festivalDays, MAX_DAYS, TIPOS, tipoOf, isBand, isAll, isKindMode, engineMode, entriesOf, tasksNow, hitosOf,
     getEscenario, artistColor, callAbsFor, buildBlocks,

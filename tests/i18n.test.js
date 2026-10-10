@@ -201,9 +201,9 @@
     ok(I.keys('en').every(k => !/CALLED|Mark as called/.test(I.tx(k, null, 'en'))), 'ni rastro de CALLED');
   });
   test('Centro de Pantallas y Emisión: «Backstage / Staff» en los dos idiomas; fila Backstage «Camerinos y catering» / «Backstage & catering»', () => {
-    eq(I.tx('Backstage / Staff', null, 'es'), 'Backstage / Staff'); eq(I.tx('Backstage / Staff', null, 'en'), 'Backstage / Staff');
+    // dec. 132: el botón del QR vuelve a «Camerinos / Staff» en español (pedido por L.A.); en inglés, «Backstage / Staff»
+    eq(I.tx('Camerinos / Staff', null, 'es'), 'Camerinos / Staff'); eq(I.tx('Camerinos / Staff', null, 'en'), 'Backstage / Staff');
     eq(I.tx('Camerinos y catering', null, 'en'), 'Backstage & catering');
-    ok(!I.txHas('Camerinos / Staff'), 'la clave vieja ya no existe');
   });
   test('Ajustes 10-oct: ON TIME · ALL CLEAR; [Production]; avisos del tiempo con unidades (los del log antiguo siguen traduciéndose)', () => {
     eq(I.tx('EN HORA · SIN INCIDENCIAS', null, 'en'), 'ON TIME · ALL CLEAR');

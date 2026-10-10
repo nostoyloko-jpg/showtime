@@ -845,6 +845,22 @@
       artists: [{ id: 7, nombre: 'Comida', showtimeTipo: 'tarea', fecha: '2026-07-10', inicio: '14:00', fin: '15:00' }] }), { mode: 'all', day: 'all' });
     eq(b[0].color, '#6b7280', 'la Live también la pinta en gris');
   });
+
+  test('Dec. 132: logo del evento (event.showtimeLogo) — poner, quitar, tope de tamaño, formatos; cuenta como «sin exportar» y sobrevive a «Guardar datos»', () => {
+    const L = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+    let s = C.newFestival({ nombre: 'X', fechaInicio: '2026-10-10' }).state;
+    eq(C.eventLogo(s), '', 'sin logo');
+    const r = C.setEventLogo(s, L); ok(r.ok && r.changed); eq(C.eventLogo(r.state), L); eq(s.event.showtimeLogo, undefined, 'no toca el original');
+    eq(C.diffSummary(s, r.state).festival, 1, 'cambio sin exportar');
+    eq(C.eventLogo(C.updateEvent(r.state, { nombre: 'Y', fechaInicio: '2026-10-10' }).state), L, 'guardar los datos del evento no lo borra');
+    const q = C.setEventLogo(r.state, ''); ok(q.ok && q.changed); eq('showtimeLogo' in q.state.event, false, 'quitado');
+    ok(!C.setEventLogo(s, 'data:text/html;base64,PHNjcmlwdD4=').ok, 'solo imágenes');
+    ok(!C.setEventLogo(s, 'https://x/y.png').ok, 'nada de enlaces externos');
+    ok(C.setEventLogo(s, 'data:image/svg+xml;base64,PHN2Zy8+').ok, 'SVG sí (se pinta como <img>)');
+    const big = 'data:image/png;base64,' + 'A'.repeat(C.LOGO_MAX); ok(!C.setEventLogo(s, big).ok && /demasiado grande/.test(C.setEventLogo(s, big).error), 'tope ~60 KB');
+    eq(C.eventLogo({ event: { showtimeLogo: big } }), '', 'un .json con un logo enorme o raro: se ignora');
+    ok(!C.setEventLogo(null, L).ok);
+  });
   let pass = 0; const fails = [];
   tests.forEach(([name, fn]) => {
     try { fn(); pass++; } catch (e) { fails.push([name, e.message]); }

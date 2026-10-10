@@ -430,6 +430,17 @@
     eq(P.printedAt(new Date(2026, 0, 5, 7, 3)), '05/01/2026');
   });
 
+  test('Dec. 132: el logo del evento va en la cabecera de cada hoja (tabla y cronograma); sin logo o con algo raro, nada', () => {
+    const L = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+    const rows = P.rowsOf(fest().s, {}).slice(0, 3);
+    const tab = P.html({ rows, days: [J1], title: 'X', orient: 'portrait', logo: L }), gan = P.html({ rows, days: [J1], title: 'X', format: 'gantt', logo: L });
+    ok(tab.indexOf('<img class="hd-logo" src="' + L + '"') > 0 && gan.indexOf('<img class="hd-logo" src="' + L + '"') > 0, 'tabla y cronograma');
+    ok(/<div class="hd"><div class="hd-t"><div class="brand">/.test(tab), 'título a la izquierda, logo a la derecha');
+    ok(P.html({ rows, days: [J1], title: 'X' }).indexOf('hd-logo"') < 0, 'sin logo: como siempre');
+    ok(P.html({ rows, days: [J1], title: 'X', logo: 'javascript:alert(1)' }).indexOf('<img class="hd-logo"') < 0, 'solo imágenes en Base64');
+    ok(P.html({ rows, days: [J1], title: 'X', logo: 'data:text/html;base64,PHNjcmlwdD4=' }).indexOf('<img class="hd-logo"') < 0);
+  });
+
   let fail = 0;
   if (!NT) for (const [name, fn] of tests) {
     try { fn(); console.log('  ✓ ' + name); }

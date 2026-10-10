@@ -243,6 +243,13 @@ tfoot input.bad,tfoot select.bad{border-color:var(--err)!important;background-co
 .cfg-s h3{font-size:11px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:#8a8f98;margin:0}
 .cfg-s.flash{animation:flash 1.2s ease-out}
 .cfg .form{grid-template-columns:auto 1fr}
+/* Logo del evento (dec. 132) */
+.logo-blk{margin-top:14px;padding-top:12px;border-top:1px solid var(--hair)}
+.logo-blk .fsub{font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:var(--dim)}
+.logo-row{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:8px 0 6px}
+.logo-row label.btn{cursor:pointer}
+.logo-th{display:inline-flex;align-items:center;justify-content:center;height:48px;max-width:150px;padding:4px 8px;border-radius:8px;background:#07080a;border:1px solid var(--hair2)}
+.logo-th img{display:block;max-height:40px;max-width:134px;object-fit:contain}
 
 /* ── Stage (dec. 111): único modificador de la base Studio — negro y amarillo #FFD600 para el sol ── */
 body[data-ps="stage"]{--field:#000;--foot:#0a0a00;--head:#0a0a00;--btnbg:#000;--bg:#000;--bg2:#000;--panel:#000;--line:rgba(255,214,0,.25);--line2:rgba(255,214,0,.5);--text:#fff;--accent:#FFD600;--on-accent:#000;--muted:#fff;--dim:rgba(255,255,255,.75);--call:#FFC107;font-weight:600}
@@ -266,6 +273,7 @@ body[data-ps="stage"] thead th,body[data-ps="stage"] tfoot tr.add td,body[data-p
 body[data-ps="stage"]{--glass-bg:#000;--glass-line:rgba(255,214,0,.55);--glass-blur:none}
 body[data-ps="stage"] .cfg-h{background:#000}
 body[data-ps="stage"] .cfg-sum{color:#FFD600}
+body[data-ps="stage"] .htab.on{background:#FFD600;color:#000}
 body[data-ps="stage"] .mpanel,body[data-ps="stage"] .cfg,body[data-ps="stage"] .modal-box,body[data-ps="stage"] .qr-big-box{background-image:none}
 
 /* ── Pegar horario ── */
@@ -543,10 +551,7 @@ body[data-ps="stage"] .qr-big-box{background:#000;border-color:rgba(255,214,0,.4
 .msg-to{font-size:12px;color:var(--muted);margin-top:6px;font-weight:700}
 /* QR de Staff por pantalla (2e-A) */
 .cpick{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;padding:0 6px 8px}
-.cseg{display:inline-flex;padding:2px;border-radius:8px;background:rgba(255,255,255,.05);gap:2px}
-.cseg button{height:28px;padding:0 10px;border:0;border-radius:6px;background:transparent;color:var(--muted);font:inherit;font-size:12.5px;font-weight:800;cursor:pointer}
-.cseg button.on{background:rgba(255,255,255,.12);color:var(--text)}
-.czone{height:30px;max-width:150px}
+.czone,.cvsel{height:30px;max-width:150px}
 .csub{flex-basis:100%;font-size:11.5px;color:var(--dim)}
 /* Configuración › Pantallas Live y vistas (2e-A) */
 .form .fsub{grid-column:1/-1;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:800;margin-top:6px}
@@ -1046,11 +1051,10 @@ td input:focus,td select:focus,.imp-src textarea:focus,.imp-prev td input[type=t
 .gq-ago{font-size:12px;color:var(--dim);text-align:right;font-variant-numeric:tabular-nums}
 @media (max-width:700px){ .gq-row{grid-template-columns:12px minmax(0,1fr) auto;grid-template-areas:"dot v ago" ". d d"} .gq-dot{grid-area:dot} .gq-v{grid-area:v} .gq-d{grid-area:d} .gq-ago{grid-area:ago} }
 /* «Solo hoy» (dec. 105) en Emisión › Staff */
-.cscope{display:flex;flex-direction:column;align-items:stretch;gap:6px;margin-top:8px;padding:6px 8px;border-radius:8px;background:rgba(255,255,255,.04);font-size:12px;color:var(--muted)}
+.cscope{display:flex;flex:1 1 auto;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px;margin-top:8px;padding:4px 4px 4px 8px;border-radius:8px;background:rgba(255,255,255,.04);font-size:12px;color:var(--muted)}
 .cscope.closed{background:rgba(255,179,71,.12);color:#ffcf8a}
 .cscope .btn{height:26px;padding:0 10px;font-size:12px}
 /* Mando por zona (dec. 102) */
-.cseg button i{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:1px}
 
 /* Origen de mensajes y avisos (dec. 106) */
 .dchip .byl{font-weight:800;margin-right:2px}
@@ -1094,9 +1098,19 @@ td input:focus,td select:focus,.imp-src textarea:focus,.imp-prev td input[type=t
 .hubled{width:8px;height:8px;border-radius:50%;background:#4a4d57;flex:0 0 auto;transition:background .2s,box-shadow .2s}
 .hubled.on{background:#10b981;box-shadow:0 0 7px #10b981}
 #m-hub .mpanel.hub{left:auto;right:0;width:480px;max-width:calc(100vw - 24px);max-height:calc(100vh - 70px);overflow-y:auto;padding:8px 10px 10px}
-.hub-h{display:flex;align-items:baseline;gap:8px}
-.hub-h .ic{align-self:center}
-.hub-h small{font-size:11.5px}
+/* dec. 132: dos pestañas arriba (segmentado): Pantallas HDMI (Local) · Emisión y QR (Móviles) */
+.htabs{display:flex;gap:2px;padding:3px;margin:0 0 10px;border-radius:9px;background:rgba(255,255,255,.04);border:1px solid var(--hair)}
+.htab{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:7px;height:32px;padding:0 8px;border:0;border-radius:7px;background:transparent;color:var(--muted);font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap}
+.htab:hover{color:var(--text)}
+.htab.on{background:rgba(255,255,255,.1);color:#fff}
+.htab .ic{width:15px;height:15px;flex:0 0 auto}
+.htled{width:6px;height:6px;border-radius:50%;background:#4a4d57;flex:0 0 auto}
+.htled.on{background:#10b981;box-shadow:0 0 5px #10b981}
+.hpane[hidden]{display:none}
+.hpane .hub-card:last-child,.hpane .mnote:last-child{margin-bottom:0}
+/* QR dentro del Hub: más compacto (Ampliar lo enseña en grande) */
+.mpanel.hub .cqr{flex-basis:168px;width:168px;height:168px}
+.mpanel.hub .cpane>.mnote,.mpanel.hub .cpane>.cwarn{font-size:11.5px;line-height:1.35;margin:6px 6px 2px}
 .hub-row{display:flex;align-items:center;gap:8px;min-height:44px;padding:4px 6px;border-radius:8px}
 .hub-row:hover{background:rgba(255,255,255,.04)}
 .hub-row[data-vista]{cursor:pointer;user-select:none;-webkit-user-select:none;transition:background .12s}
@@ -1117,16 +1131,15 @@ td input:focus,td select:focus,.imp-src textarea:focus,.imp-prev td input[type=t
 .cb-led.on{background:#10b981;box-shadow:0 0 6px #10b981}
 .cb-led.on.wait{background:#ffb347;box-shadow:0 0 6px #ffb347}
 .cast-bar .btn{height:30px;flex:0 0 auto}
-.cast-sec{display:flex;flex-direction:column;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid var(--hair)}
+.cast-sec{display:flex;flex-direction:row;flex-wrap:wrap;align-items:center;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid var(--hair)}   /* dec. 132: jornada y claves en una línea discreta */
 .cast-sec[hidden]{display:none}
 .cast-sec .cscope{margin-top:0}
-.cast-sec>.btn{align-self:flex-start}
+.cast-sec>.btn{height:26px;padding:0 10px;font-size:12px}
 .mpanel.hub .ctab{white-space:nowrap;font-size:12px;gap:5px;padding:0 6px}
 
 /* ═══ Tarjetas agrupadas (estilo Raycast / Ajustes de macOS): Pantallas y Emisión y gestor de pantallas ═══ */
 .hub-h,.gv-sec{font-size:11px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:#8a8f98;margin:0 0 8px;padding:2px 4px 0}
 .hub-h b,.gv-sec b,#modal-body .gv-sec b{font-weight:700;color:#8a8f98}
-.hub-h small{letter-spacing:0;text-transform:none;font-weight:500;color:var(--dim)}
 .hub-h .ic,.gv-sec .ic{width:14px;height:14px;opacity:.75;color:#8a8f98}
 .hub-card,.gv-card{background:rgba(255,255,255,.025);border:1px solid var(--hair2);border-radius:10px;padding:4px 6px;margin-bottom:12px}
 .hub-list>*+*{border-top:1px solid var(--hair)}

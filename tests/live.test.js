@@ -588,6 +588,13 @@
     ok(!/Neutro|Raycast/.test(css.slice(0, 400)), 'cabecera del archivo al día');
   });
 
+  test('Dec. 132: el cartel del reposo y del Standby lleva el logo del evento (si no hay, el de Showtime) y se repinta si cambia', () => {
+    const js = D.src('live.js'), css = D.src('live.css');
+    ok(/const lg = C\.eventLogo \? C\.eventLogo\(FEST\) : '';\s*return lg \? '<div class="evlogo"><img src="' \+ esc\(lg\) \+ '"/.test(js) && /: Mk\.banner\(\{ version:/.test(js), 'logo o cartel de Showtime');
+    eq((js.match(/posterHtml\(\)/g) || []).length, 3, 'una definición y dos usos: reposo y Standby');
+    ok(/if \(lg !== POSTER_LOGO\) \{ POSTER_LOGO = lg; if \(STANDBY\) setTimeout\(renderStandby, 0\);/.test(js), 'cambia el logo con el cartel puesto: se repinta');
+    ok(/\.evlogo img\{display:block;max-width:100%;max-height:100%;object-fit:contain\}/.test(css), 'centrado, sin deformar');
+  });
   test('Dec. 131: reposo en Staff — cartel, hora local y «ESPERANDO EMISIÓN», decidido por Vs.parkState y quitado solo al volver', () => {
     const h = D.src('live.html'), js = D.src('live.js'), css = D.src('live.css');
     ok(/<div id="park" class="standby park" role="status" hidden><\/div>/.test(h), 'capa del reposo en live.html');
