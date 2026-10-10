@@ -620,6 +620,7 @@
     const n = visibleCount();
     if (n !== stripCount) buildStrips(n);
     const r = pickView(nowInt, n);
+    applyInfoWidth(r.list);   // dec. 144: el separador, según las filas en pantalla
     const labels = r.labels;
     r.list.forEach((b, i) => {
       setInfo(i, b, r.ended ? (i === 0 ? tx('FIN DE JORNADA') : '') : lblUi(labels[i]));
@@ -779,8 +780,9 @@
     } catch (e) {}
     return String(txt).length * size * 0.62;   // respaldo si no hay canvas
   }
-  /** Ancho automático: el nombre (o el horario) más largo de la jornada + margen, entre 280 px y 55 vw. */
-  function autoInfoWidth() {
+  /** Ancho automático: según el nombre y horario más largos de las filas VISIBLES en pantalla (dec. 144)
+   *  para no inflar el panel por tareas lejanas de la jornada y dejar el máximo espacio a las barras. */
+  function autoInfoWidth(list) {
     const el = document.querySelector('.aname') || document.body;
     const cs = getComputedStyle(el), fam = (cs && cs.fontFamily) || 'sans-serif';
     // dec. 141: el nombre y el horario se miden al tamaño que les toca POR EL ALTO DE LA FILA (lo que dice el CSS), no a un mínimo fijo
@@ -791,21 +793,26 @@
     const nameSz = Math.max(14, realSz, fixedRows() ? Math.min(80, 0.3 * rowH) : Math.min(56, 0.24 * rowH));
     const timeSz = Math.max(11, fixedRows() ? Math.min(30, 0.13 * rowH) : Math.min(24, 0.12 * rowH));
     let need = 0;
-    (BLOCKS || []).forEach(b => {
+    const curList = (list && list.length ? list : (C.pickBlocks && BLOCKS && BLOCKS.length ? C.pickBlocks(BLOCKS, Math.floor(C.nowAbs()) + Math.round(TIME_OFFSET), visibleCount()).list : BLOCKS)) || [];
+    // Solo las filas que caben en pantalla: visibleCount() cuenta TODAS las que quedan (la lista hace scroll) y una tarea lejana seguía inflando el panel
+    const onScreen = VISTA === 'backstage' ? 2 : fixedRows() || ($('bot') ? Math.ceil($('bot').clientHeight / Math.max(1, curRowH())) : visibleCount());
+    const visible = curList.slice(0, Math.max(Math.min(visibleCount(), onScreen), 1)).filter(Boolean);
+    (visible.length ? visible : BLOCKS || []).forEach(b => {
       need = Math.max(need, measureTxt(String(b.name || '').toUpperCase(), 900, nameSz, fam));
       if (b.si !== null && b.si !== undefined && b.sf !== null && b.sf !== undefined) need = Math.max(need, measureTxt(C.fmtHM(b.si) + '–' + C.fmtHM(b.sf), 500, timeSz, fam));
     });
     const hi = window.innerWidth * 0.55;   // tope: que quepa el nombre más largo; el resto, para la línea de tiempo
     return Math.round(Math.max(INFO_MIN, Math.min(need + INFO_PAD, hi)));
   }
-  /** Aplica el ancho: el manual guardado, o el automático. En móvil vertical manda el CSS (36 vw). */
-  function applyInfoWidth() {
+  /** Aplica el ancho: el manual guardado, o el automático según las filas visibles. En móvil vertical manda el CSS (36 vw). */
+  function applyInfoWidth(list) {
     const root = document.documentElement;
     const phonePortrait = typeof window.matchMedia === 'function' && window.matchMedia('(max-width:700px) and (orientation:portrait)').matches;
     try {
       if (phonePortrait) { root.style.removeProperty('--info-w'); return; }
       const saved = parseInt(pget(P.infoW, 0), 10);
-      root.style.setProperty('--info-w', (saved >= 120 ? saved : autoInfoWidth()) + 'px');
+      const targetW = (saved >= 120 ? saved : autoInfoWidth(list)) + 'px';
+      if (root.style.getPropertyValue('--info-w') !== targetW) root.style.setProperty('--info-w', targetW);
     } catch (e) {}
   }
   /** Doble clic en el tirador: borra el ancho manual y vuelve al automático al instante. */

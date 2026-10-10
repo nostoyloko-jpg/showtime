@@ -667,6 +667,14 @@
   });
 
 
+  test('Dec. 144: separador ceñido dinámicamente a las filas visibles (no se infla por tareas lejanas de la jornada)', () => {
+    const js = D.src('live.js');
+    ok(/function autoInfoWidth\(list\)/.test(js), 'autoInfoWidth acepta la lista de filas');
+    ok(/const visible = curList\.slice\(0, Math\.max\(Math\.min\(visibleCount\(\), onScreen\), 1\)\)\.filter\(Boolean\);/.test(js), 'mide exclusivamente las filas visibles');
+    ok(/const onScreen = VISTA === 'backstage' \? 2 : fixedRows\(\) \|\| /.test(js), 'las que caben en pantalla (no todas las que quedan: la lista hace scroll)');
+    ok(/applyInfoWidth\(r\.list\);/.test(js), 'tick actualiza el ancho con las filas en pantalla');
+  });
+
   (async () => {
     let pass = 0, fail = 0;
     for (const [name, fn] of tests) { try { await fn(); pass++; } catch (e) { fail++; console.log('  ✗ ' + name + '\n      ' + (e && e.message || e)); } }
