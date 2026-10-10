@@ -1846,6 +1846,28 @@ const miss = [...found].filter(k => !I.txHas(k) && !/^(OK|CALL|SC|Live|Raycast|S
     ok(!/title="[^"]*" autocomplete/.test(html.match(/<td class="n[^"]*">[\s\S]*?<\/td>/) ? html.match(/<td class="n[^"]*">[\s\S]*?<\/td>/)[0] : ''), 'la celda de Notas no lleva title');
   });
 
+  test('Dec. 123: ⌘K busca por fecha — grupo Jornadas (resumen del día) y todas las entradas (shows, soundchecks, tareas y marcadores)', () => {
+    let s = festDosDias();
+    const j = C.jornadaOfAbs(s, nAbs), m = C.shiftDate(j, 1), P = s.escenarios[0].id;   // j = viernes 10/07/2026 · m = sábado 11/07
+    s = C.addArtist(s, 'all', { tipo: 'tarea', jornada: m, nombre: 'Carga camión', escenarioId: P, inicio: '10:00', fin: '11:00' }).state;
+    s = C.addArtist(s, 'all', { tipo: 'hito', jornada: m, nombre: 'Curfew', escenarioId: '', inicio: '23:30' }).state;
+    const t = conMando(s), T = t.T;
+    eq(T.spotItems('').filter(x => x.group === 'Jornadas' || x.group === 'Entradas').length, 0, 'sin texto: solo vistas y acciones');
+    const days = T.spotDays();
+    eq(days.length, 2, 'una por jornada'); eq(days[0].label, 'Viernes, 10 de julio de 2026'); eq(days[1].label, 'Sábado, 11 de julio de 2026');
+    eq(days[0].sub, '3 shows'); eq(days[1].sub, '1 show · 1 tarea · 1 marcador');
+    ['viernes', 'friday', '10/07', '10/7', '2026-07-10', 'julio', 'july', 'jul', '10 jul'].forEach(q => ok(T.spotItems(q).some(x => x.group === 'Jornadas' && /Viernes/.test(x.label)), 'jornada por «' + q + '»'));
+    ok(!T.spotItems('sabado').some(x => x.group === 'Jornadas' && /Viernes/.test(x.label)), 'el sábado no saca el viernes');
+    const sab = T.spotItems('11 jul').filter(x => x.group === 'Entradas').map(x => x.label).sort();
+    eq(sab.join(','), 'Carga camión,Curfew,Mañana', 'por fecha salen también tareas y marcadores de ese día');
+    ok(T.spotItems('carga').some(x => x.group === 'Entradas' && /tp-tarea/.test(x.pill)), 'una tarea, por su nombre, con su píldora');
+    ok(T.spotItems('curfew').some(x => /tp-hito/.test(x.pill || '')), 'un marcador');
+    const it = T.spotItems('sábado').find(x => x.group === 'Jornadas');
+    it.run(); eq(t.read('showtime.config').day, m, 'elegir la jornada la pone en el Panel');
+    // Orden: jornadas, entradas y luego acciones
+    const g = T.spotItems('jul').map(x => x.group); ok(g.indexOf('Jornadas') < g.indexOf('Entradas'), 'jornadas primero');
+  });
+
   // ── Ejecutor ─────────────────────────────────────────────────────────
   (async () => {
     let pass = 0, fail = 0;

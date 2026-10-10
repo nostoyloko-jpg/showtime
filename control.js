@@ -3255,11 +3255,42 @@
   function spotNorm(v) { return String(v || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); }
   function spotSetDay(d) { CONFIG = Dt.setConfig({ day: d }); compute(); renderAll(); }
   function spotSetMode(m) { CONFIG = Dt.setConfig({ mode: m }); compute(); renderAll(); }
-  function spotBands() {
+  // ── Fechas en la paleta (dec. 123): «18», «18/07», «18/7», «julio», «july», «jul», «viernes», «friday», «2026-07-18» ──
+  const SPOT_WD = { es: ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'], en: ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] };
+  const SPOT_MO = { es: ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'],
+    en: ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'] };
+  function spotIsoDate(iso) { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || '')); return m ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])) : null; }
+  /** Fecha completa en el idioma del Panel: «Viernes, 18 de julio de 2026» / «Friday, July 18, 2026». */
+  function fmtDayFull(iso) {
+    const d = spotIsoDate(iso); if (!d) return iso || '—';
+    return cap(d.toLocaleDateString(LOCALE(), { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }));
+  }
+  /** Todas las formas de escribir esa fecha, en español y en inglés (para buscar). */
+  function spotDateWords(iso) {
+    const d = spotIsoDate(iso); if (!d) return '';
+    const dd = d.getUTCDate(), mm = d.getUTCMonth(), wd = d.getUTCDay();
+    return [iso, dd, pad2(dd), dd + '/' + (mm + 1), pad2(dd) + '/' + pad2(mm + 1), dd + '/' + pad2(mm + 1), SPOT_WD.es[wd], SPOT_WD.en[wd],
+      SPOT_MO.es[mm], SPOT_MO.en[mm], SPOT_MO.es[mm].slice(0, 3), SPOT_MO.en[mm].slice(0, 3), fmtDay(iso), fmtDayFull(iso)].join(' ');
+  }
+  /** Grupo «Jornadas»: una por cada día del evento (y los que tengan entradas), con su resumen de actividad. */
+  function spotDays() {
     if (!FEST) return [];
-    return C.buildBlocks(FEST, { mode: 'all', day: 'all' }).filter(b => C.isBand(b)).map(b => ({
-      group: tx('Bandas'), label: b.name || tx('(sin nombre)'), sub: fmtDay(b.jornada) + ' · ' + C.fmtHM(b.si) + ' · ' + (b.stage || tx('Sin zona')),
-      pill: '<span class="spot-pill tp-' + b.kind + '" aria-hidden="true">' + pillTxt(b.kind) + '</span>', kbd: '', search: (b.name || '') + ' ' + (b.stage || '') + ' ' + fmtDay(b.jornada),
+    const set = new Set(C.eventDays(FEST)); C.festivalDays(FEST, 'all').forEach(x => set.add(x));
+    const all = C.buildBlocks(FEST, { mode: 'all', day: 'all' });
+    const KIND = [['show', '{n} show', '{n} shows'], ['sc', '{n} soundcheck', '{n} soundchecks'], ['tarea', '{n} tarea', '{n} tareas'], ['hito', '{n} marcador', '{n} marcadores']];
+    return Array.from(set).sort().map(d => {
+      const bl = all.filter(b => b.jornada === d);
+      const sum = KIND.map(([k, one, many]) => { const n = bl.filter(b => b.kind === k).length; return n ? tx(n === 1 ? one : many, { n }) : ''; }).filter(Boolean).join(' · ');
+      return { group: tx('Jornadas'), label: fmtDayFull(d), ic: 'i-clock', sub: sum || tx('Sin actividad'), search: spotDateWords(d) + ' jornada dia day', run: () => spotSetDay(d) };
+    });
+  }
+  /** Todas las entradas (shows, soundchecks, tareas y marcadores), también por su fecha («18 jul», «viernes»). */
+  function spotEntries() {
+    if (!FEST) return [];
+    return C.buildBlocks(FEST, { mode: 'all', day: 'all' }).map(b => ({
+      group: tx('Entradas'), label: b.name || tx('(sin nombre)'), sub: fmtDay(b.jornada) + ' · ' + C.fmtHM(b.si) + ' · ' + (b.stage || tx('Sin zona')),
+      pill: '<span class="spot-pill tp-' + b.kind + '" aria-hidden="true">' + pillTxt(b.kind) + '</span>', kbd: '',
+      search: (b.name || '') + ' ' + (b.stage || '') + ' ' + spotDateWords(b.jornada),
       run: () => spotJump(b)
     }));
   }
@@ -3288,13 +3319,14 @@
       { group: 'Acciones', label: 'Atajos y ayuda', ic: 'i-dots', kbd: '⇧⌘7', sub: 'Lista de atajos', search: 'ayuda atajos teclas', run: () => openHelp() }
     ];
   }
-  /** Lo que coincide con lo escrito (todas las palabras). Sin texto: vistas y acciones; con texto, también bandas. */
+  /** Lo que coincide con lo escrito (todas las palabras). Sin texto: vistas y acciones; con texto, también jornadas y entradas. */
   function spotItems(q) {
     const words = spotNorm(q).trim().split(/\s+/).filter(Boolean);
     const hit = txt => words.every(w => spotNorm(txt).indexOf(w) >= 0);
-    const bands = words.length ? spotBands().filter(b => hit(b.search)).slice(0, 12) : [];
+    const days = words.length ? spotDays().filter(d => hit(d.search)).slice(0, 8) : [];
+    const ents = words.length ? spotEntries().filter(b => hit(b.search)).slice(0, 12) : [];
     const acts = spotActions().filter(a => !words.length || hit(a.label + ' ' + a.search));
-    return bands.concat(acts);
+    return days.concat(ents, acts);
   }
   function spotRender() {
     SPOT.items = spotItems(SPOT.q);
@@ -3353,5 +3385,5 @@
   });
   window.ShowtimePanel = { reload: () => { loadState(); renderAll(); }, _test: { winState: () => Array.from(WIN.entries()).map(([id, x]) => ({ id, name: x.name, vista: x.vista, zona: x.zona, standby: !!x.standby, fs: x.fs })), setWinVista, setWinStandby, closeLive, openGestor, gestorVisible, emProdMessage, emRegenProd, hitoChips, emUrl, prodBigTitle, fileKind, handleFile, emCommand, importSummary, hidesSome, tipoPill, setWake, wakeState: () => ({ on: wakeOn, lock: !!wakeLock }), showSplash, hideSplash, setStandby, standbyOn, room: () => emRoom,
     emSnapshot, emCloseDay, emDay, qrDevices, rmZones, setRmZone: z => { RM_ZONE = z; renderCast(); }, setRoom: r => { emRoom = r; }, fakeEm: (em, st) => { EM = em; EMST = st; }, emStateHtml, renderCastBar, renderHubLed, mtIn, mtOut, cfSimState, renderCfSim, cfSim: () => CFSIM,
-    refreshStale, net: () => NET, setNet: o => { NET = netNorm(o); }, netNorm, emLink, emBrokers, emUrl, netHtml, renderCast } };   // _test: solo para tests/control.test.js
+    spotItems, spotDays, spotEntries, fmtDayFull, refreshStale, net: () => NET, setNet: o => { NET = netNorm(o); }, netNorm, emLink, emBrokers, emUrl, netHtml, renderCast } };   // _test: solo para tests/control.test.js
 })();

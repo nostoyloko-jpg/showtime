@@ -88,6 +88,14 @@
   const UI_EN = {
     /*UI-EN-BEGIN*/
     panel: {
+      "Entradas": "Entries",
+      "{n} show": "{n} show",
+      "{n} shows": "{n} shows",
+      "{n} soundcheck": "{n} soundcheck",
+      "{n} soundchecks": "{n} soundchecks",
+      "{n} tarea": "{n} task",
+      "{n} marcador": "{n} key time",
+      "Sin actividad": "No activity",
       "Pantalla Live actualizada a la versión nueva": "Live screen updated to the new version",
       "El {dia} no tiene {what}.": "{dia} has no {what}.",
       "tareas": "tasks",
