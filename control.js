@@ -67,7 +67,8 @@
   }
   function modeName(m) { return (m || CONFIG.mode) === 'sc' ? 'soundcheck' : 'show'; }
   function viewOf(m) { return VIEW[m || CONFIG.mode] || VIEW.show; }
-  function viewLabel() { return tx(viewOf().short || viewOf().title) + (focusOn() ? ' · ' + tx('Foco') : ''); }
+  /** Solo la vista activa (dec. 129): el Modo Foco ya se ve en su botón con LED, no se repite en «Ver». */
+  function viewLabel() { return tx(viewOf().short || viewOf().title); }
   // ── Modo foco (para operar en directo a 1-2 m): menos columnas, filas y letra más grandes. Preferencia de este equipo ──
   const FOCUS_KEY = 'showtime.panel.focus';
   function focusOn() { try { return localStorage.getItem(FOCUS_KEY) === '1'; } catch (e) { return false; } }

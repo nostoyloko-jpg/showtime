@@ -369,7 +369,7 @@
     ok(!body.classList.contains('focus'), 'apagado de entrada');
     t.env.fire('btn-focus', 'click', {});
     ok(body.classList.contains('focus'), 'encendido'); eq(t.env.storage.get('showtime.panel.focus'), '1');
-    ok(/· Foco$/.test(t.env.getEl('view-lbl').textContent), 'se ve en «Ver»: ' + t.env.getEl('view-lbl').textContent);
+    ok(!/Foco/.test(t.env.getEl('view-lbl').textContent) && t.env.getEl('view-lbl').textContent === dashboard().env.getEl('view-lbl').textContent, '«Ver» dice solo la vista, sin «· Foco» (dec. 129): ' + t.env.getEl('view-lbl').textContent);
     t.env.fire('document', 'keydown', { key: 'F', metaKey: true, shiftKey: true, preventDefault() {} });
     ok(!body.classList.contains('focus'), '⇧⌘F lo apaga'); eq(t.env.storage.has('showtime.panel.focus'), false);
     const t2 = dashboard({ 'showtime.panel.focus': '1' });
