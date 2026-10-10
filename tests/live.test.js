@@ -617,6 +617,16 @@
     ok(/else if \(m\.type === 'resetLayout'\) resetLayout\(\);/.test(js), 'y desde el gestor del Dashboard');
     eq(require('../i18n.js').tx('↺ Reset', null, 'es'), '↺ Reset'); eq(require('../i18n.js').tx('↺ Reset', null, 'en'), '↺ Reset', 'mismo texto en los dos idiomas (dec. 137)');
   });
+
+  test('Dec. 138: EN ESCENA sin morralla — tarea en 2 líneas (sin «TAREA» ni «después») y hueco con la zona como título', () => {
+    const js = D.src('live.js');
+    const task = js.slice(js.indexOf('function taskHtml'), js.indexOf('function changeoverHtml'));
+    ok(!/despues|tx\('TAREA'\)|metaHtml/.test(task), 'tarea: fuera «TAREA», la línea de meta de siempre y «después»');
+    ok(/'<div class="tmeta tkline">' \+ \(b\.stage \? '<span class="tstage" style="color:#7dd3fc">'/.test(task) && /tx\('quedan \{n\} min', \{ n: p\.remaining \}\)/.test(task), 'línea 2: zona en cian · horario · quedan');
+    const co = js.slice(js.indexOf('function changeoverHtml'), js.indexOf('function nextHtml'));
+    ok(/<div class="tname" style="color:var\(--c\)">' \+ esc\(co\.stage\.toUpperCase\(\)\) \+ '<\/div><div class="tmeta">— ' \+ tx\('Sin actividad'\) \+ ' —<\/div>/.test(co), 'hueco: la zona en grande y «— Sin actividad —» debajo');
+    ok(!/despuesHtml/.test(js), 'fuera la función que ya nadie usa');
+  });
   test('Dec. 132: el cartel del reposo y del Standby lleva el logo del evento (si no hay, el de Showtime) y se repinta si cambia', () => {
     const js = D.src('live.js'), css = D.src('live.css');
     ok(/const lg = C\.eventLogo \? C\.eventLogo\(FEST\) : '';\s*return lg \? '<div class="evlogo"><img src="' \+ esc\(lg\) \+ '"/.test(js) && /: Mk\.banner\(\{ version:/.test(js), 'logo o cartel de Showtime');

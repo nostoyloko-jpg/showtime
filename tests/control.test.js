@@ -2066,6 +2066,14 @@ const miss = [...found].filter(k => !I.txHas(k) && !/^(OK|CALL|SC|Live|Raycast|S
     eq(I.tx('Restablecer esta ventana', null, 'en'), 'Reset this window');
   });
 
+  test('Dec. 138: En escena del Dashboard — mismo criterio que la Live (tarea en 2 líneas, hueco con la zona como título, sin «después»)', () => {
+    const js = D.src('control.js'), a = js.indexOf('hueco sin cambio real (decisión 76)'), blk = js.slice(a, js.indexOf('rows.sort((a, b) => a.o - b.o);', a));
+    ok(/'<div class="v-name" style="color:' \+ col \+ '">' \+ esc\(co\.stage\) \+ '<\/div><div class="v-meta">— ' \+ tx\('Sin actividad'\) \+ ' —<\/div>'/.test(blk), 'hueco: zona y «— Sin actividad —»');
+    ok(/'<div class="v-row tarea"><div class="v-name">' \+ esc\(b\.name\) \+ '<\/div>'/.test(blk) && !/tx\('Tarea'\) \+ ' · '/.test(blk), 'tarea: sin «Tarea ·»');
+    const idleAndTask = blk.slice(0, blk.indexOf("rows.push({ o: order(co.stageId), h: '<div class=\"v-row co' + (co.standby")) + blk.slice(blk.indexOf('C.tasksNow('));
+    ok(!/tx\('después'\)/.test(idleAndTask), 'sin «después» en el hueco ni en la tarea (CHANGEOVER y STANDBY lo conservan)');
+  });
+
   // ── Ejecutor ─────────────────────────────────────────────────────────
   (async () => {
     let pass = 0, fail = 0;

@@ -465,17 +465,12 @@
       '<div class="tbar"><div style="width:' + p.pct + '%;background:' + col + '"></div></div></div>';
   }
 
-  // «después: BANDA · hh:mm» (la próxima banda de la zona)
-  function despuesHtml(nb) {
-    return nb ? '<div class="tmeta entra">' + tx('después') + ' <b>' + esc(nb.name.toUpperCase()) + '</b>&nbsp;&nbsp;&middot;&nbsp;&nbsp;' + C.fmtHM(nb.si) + '</div>' : '';
-  }
-
   // EN ESCENA: tarea en curso (operativa del día, solo en Jornada completa). Manda sobre el hueco de su zona (decisión 76)
   function taskHtml(b, nowInt) {
     const p = C.progress(b, nowInt);
-    return '<div class="trow tarea"><div class="tname fit">' + esc(b.name.toUpperCase()) + '</div>' + metaHtml(b, '#7dd3fc') +
-      despuesHtml(C.nextBandIn(BLOCKS, b.stageId, nowInt)) +
-      '<div class="trem" style="color:#7dd3fc">' + tx('quedan {n} min', { n: p.remaining }) + '</div></div>';
+    // dec. 138: dos líneas — nombre / zona · horario · quedan (sin «TAREA» ni «después»: la columna SIGUIENTE ya lo dice)
+    return '<div class="trow tarea"><div class="tname fit">' + esc(b.name.toUpperCase()) + '</div>' +
+      '<div class="tmeta tkline">' + (b.stage ? '<span class="tstage" style="color:#7dd3fc">' + esc(b.stage.toUpperCase()) + '</span> · ' : '') + '<span class="nw">' + C.fmtHM(b.si) + '–' + C.fmtHM(C.blockEnd(b)) + '</span> · <span class="nw">' + tx('quedan {n} min', { n: p.remaining }) + '</span></div></div>';
   }
 
   // EN ESCENA: hueco de una zona. CHANGEOVER solo entre dos bandas distintas seguidas; STANDBY si el regidor lo marca;
@@ -484,8 +479,10 @@
     const col = safeColor(co.stageColor || co.next.color, '#888');
     const sb = co.standby, idle = !sb && co.kind === 'idle';
     const stage = co.stage ? '<div class="tmeta"><span class="tstage" style="color:' + col + '">' + esc(co.stage.toUpperCase()) + '</span></div>' : '';
-    if (idle) return '<div class="trow co idle" style="--c:' + col + '"><div class="tname">' + tx('— SIN ACTIVIDAD —') + '</div>' + stage +
-      despuesHtml(co.next) + '</div>';
+    // dec. 138: la zona como título y «— Sin actividad —» debajo, atenuado (sin «después»: lo dice SIGUIENTE)
+    if (idle) return co.stage
+      ? '<div class="trow co idle" style="--c:' + col + '"><div class="tname" style="color:var(--c)">' + esc(co.stage.toUpperCase()) + '</div><div class="tmeta">— ' + tx('Sin actividad') + ' —</div></div>'
+      : '<div class="trow co idle" style="--c:' + col + '"><div class="tname">' + tx('— SIN ACTIVIDAD —') + '</div></div>';
     return '<div class="trow co' + (sb ? ' sb' : '') + '" style="--c:' + col + '">' +
       '<div class="tname"><svg class="ic"><use href="' + (sb ? '#i-pause' : '#i-swap') + '"/></svg>' + (sb ? 'STANDBY' : 'CHANGEOVER') + '</div>' + stage +
       '<div class="tmeta entra">' + tx(sb ? 'después' : 'entra') + ' <b>' + esc(co.next.name.toUpperCase()) + '</b>&nbsp;&nbsp;&middot;&nbsp;&nbsp;' + C.fmtHM(co.next.si) + '</div>' +

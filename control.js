@@ -738,8 +738,10 @@
     C.changeoversNow(LIVE, nowMins, TAREAS).forEach(co => {
       const col = safeColor(co.stageColor || co.next.color, '#888');
       if (!co.standby && co.kind === 'idle') {      // hueco sin cambio real (decisión 76)
-        rows.push({ o: order(co.stageId), h: '<div class="v-row co idle" style="--c:' + col + '"><div class="v-name" style="color:var(--muted)">' + tx('— SIN ACTIVIDAD —') + (co.stage ? ' · ' + esc(co.stage) : '') + '</div>' +
-          '<div class="v-meta">' + tx('después') + ' <b>' + esc(co.next.name) + '</b> · ' + C.fmtHM(co.next.si) + '</div>' + (co.prev ? '' : bisFor(co.stageId)) + '</div>' });
+        // dec. 138: la zona como título y «— Sin actividad —» debajo (sin «después»: lo dice SIGUIENTE)
+        rows.push({ o: order(co.stageId), h: '<div class="v-row co idle" style="--c:' + col + '">' + (co.stage
+          ? '<div class="v-name" style="color:' + col + '">' + esc(co.stage) + '</div><div class="v-meta">— ' + tx('Sin actividad') + ' —</div>'
+          : '<div class="v-name" style="color:var(--muted)">' + tx('— SIN ACTIVIDAD —') + '</div>') + (co.prev ? '' : bisFor(co.stageId)) + '</div>' });
         return;
       }
       rows.push({ o: order(co.stageId), h: '<div class="v-row co' + (co.standby ? ' sb' : '') + '" style="--c:' + col + '"><div class="v-name" style="color:' + (co.standby ? 'var(--muted)' : col) + '">' +
@@ -755,10 +757,9 @@
     });
     // Tareas en curso (operativa del día): debajo de los escenarios, sin cuenta de cambio
     C.tasksNow(LIVE, nowInt).forEach(b => {
-      const p = C.progress(b, nowInt), nb = C.nextBandIn(LIVE, b.stageId, nowInt);
-      rows.push({ o: b.stageId ? order(b.stageId) : 1000, h: '<div class="v-row tarea"><div class="v-name">' + tx('Tarea') + ' · ' + esc(b.name) + '</div>' +
-        '<div class="v-meta">' + C.fmtHM(b.si) + '–' + C.fmtHM(C.blockEnd(b)) + (b.stage ? ' · ' + esc(b.stage) : '') + ' · ' + tx('quedan {n} min', { n: p.remaining }) + '</div>' +
-        (nb ? '<div class="v-meta">' + tx('después') + ' <b>' + esc(nb.name) + '</b> · ' + C.fmtHM(nb.si) + '</div>' : '') + '</div>' });
+      const p = C.progress(b, nowInt);   // dec. 138: dos líneas — nombre / zona · horario · quedan (sin «Tarea ·» ni «después»)
+      rows.push({ o: b.stageId ? order(b.stageId) : 1000, h: '<div class="v-row tarea"><div class="v-name">' + esc(b.name) + '</div>' +
+        '<div class="v-meta">' + (b.stage ? '<span class="tstage" style="color:#7dd3fc">' + esc(b.stage) + '</span> · ' : '') + C.fmtHM(b.si) + '–' + C.fmtHM(C.blockEnd(b)) + ' · ' + tx('quedan {n} min', { n: p.remaining }) + '</div></div>' });
     });
     rows.sort((a, b) => a.o - b.o);
     const r = C.pickBlocks(LIVE, nowInt, 1);
