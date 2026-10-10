@@ -309,6 +309,7 @@
       "soundchecks": "soundchecks",
       "Deshacer ({n})": "Undo ({n})",
       "Deshacer": "Undo",
+      "Deshacer (⌘Z)": "Undo (⌘Z)",
       "Deshacer ({n}): {what} (⌘Z)": "Undo ({n}): {what} (⌘Z)",
       "Nada que deshacer": "Nothing to undo",
       "Evento sin nombre": "Untitled event",

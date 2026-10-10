@@ -236,13 +236,15 @@
     $('empty').hidden = has;
     $('btn-export').disabled = !has;
     $('btn-undo').disabled = !UNDO.length;
-    $('btn-undo').querySelector('span').textContent = UNDO.length ? tx('Deshacer ({n})', { n: UNDO.length }) : tx('Deshacer');
     $('btn-undo').title = UNDO.length ? tx('Deshacer ({n}): {what} (⌘Z)', { n: UNDO.length, what: UNDO[UNDO.length - 1].m }) : tx('Nada que deshacer');
     $('fest-name').textContent = has ? C.eventName(FEST, tx) : tx('Sin evento');
+    $('fest-name').title = $('fest-name').textContent;   // si un nombre muy largo se recorta con «…», entero al pasar el ratón
     const d = has && ORIG ? C.diffSummary(ORIG, FEST) : { total: 0 };
     $('mods').hidden = !d.total;
-    $('mods').textContent = tx('{n} sin exportar', { n: d.total });
-    $('mods').title = d.total ? [d.added && tx('{n} banda(s) nueva(s)', { n: d.added }), d.removed && tx('{n} borrada(s)', { n: d.removed }), d.fields && tx('{n} casilla(s) cambiada(s)', { n: d.fields }), d.festival && tx('datos del evento o zonas')].filter(Boolean).join(' · ') : '';
+    // Indicador compacto (dec. 127): punto + número; la frase entera y el detalle, al pasar el ratón y para lectores de pantalla
+    $('mods').textContent = String(d.total);
+    $('mods').title = d.total ? [tx('{n} sin exportar', { n: d.total }), d.added && tx('{n} banda(s) nueva(s)', { n: d.added }), d.removed && tx('{n} borrada(s)', { n: d.removed }), d.fields && tx('{n} casilla(s) cambiada(s)', { n: d.fields }), d.festival && tx('datos del evento o zonas')].filter(Boolean).join(' · ') : '';
+    $('mods').setAttribute('aria-label', $('mods').title);
     renderTools();
     renderWarn();
     if (!$('cfg').hidden) renderConfig();

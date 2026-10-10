@@ -1920,6 +1920,24 @@ const miss = [...found].filter(k => !I.txHas(k) && !/^(OK|CALL|SC|Live|Raycast|S
     t.env.fire('document', 'click', row('backstage')); await new Promise(r => setImmediate(r)); eq(n, 1, 'clic en la fila: abre');
   });
 
+  test('Dec. 127: barra superior — Deshacer solo icono, «sin exportar» compacto, nombre del evento hasta 260 px y esquina derecha blindada', () => {
+    const css = D.src('control.css'), html = D.src('index.html'), js = D.src('control.js');
+    ok(/<button id="btn-undo" class="btn ghost icon" title="Deshacer \(⌘Z\)" aria-label="Deshacer"[^>]*><svg class="ic"><use href="#i-undo"\/><\/svg><\/button>/.test(html), 'Deshacer: solo icono, con título y etiqueta accesible');
+    ok(!/btn-undo'\)\.querySelector\('span'\)/.test(js) && !/#btn-undo span/.test(css), 'sin el texto «Deshacer» ni sus reglas');
+    ok(/\.chip\.mods::before\{content:'';width:6px;height:6px;border-radius:50%;background:var\(--mod\)/.test(css), 'punto de cambios sin exportar');
+    ok(/\.fest\{font-weight:600;[^}]*max-width:260px/.test(css) && /#fest-name\{max-width:260px\}/.test(css) && !/\.fest\{display:none\}/.test(css), 'el nombre del evento se ve (hasta 260 px)');
+    ok(/\.bright\{display:flex;align-items:center;gap:8px;flex-shrink:0;margin-left:auto\}/.test(css) && !/\.bright\{[^}]*margin-left:6px/.test(css), 'esquina derecha sin comprimir');
+    ok(/@media \(max-width:1520px\)\{ \.mbtn \.mtxt\{display:none\} \.menus\.mcenter \.mbtn\{padding:0 8px\} \.dstep \.mbtn\{padding:0 10px\} \}/.test(css), 'portátil: menús del centro solo con icono');
+    ok(/title="Chat con Producción"[^>]*><svg class="ic"><use href="#i-chat"\/>/.test(html) && /<symbol id="i-chat"/.test(html), 'Chat con su propio icono (no se confunde con Mensajes sin texto)');
+    const F = fest(), t = panel({ 'showtime.festival': JSON.stringify(F.s), 'showtime.original': JSON.stringify(F.s) });
+    const m = t.env.getEl('mods'); ok(m.hidden, 'sin cambios: oculto');
+    const s = JSON.parse(JSON.stringify(F.s)); s.artists[0].nombre = 'Otro nombre';
+    const t2 = panel({ 'showtime.festival': JSON.stringify(s), 'showtime.original': JSON.stringify(F.s) }), m2 = t2.env.getEl('mods');
+    ok(!m2.hidden, 'con cambios: visible'); eq(m2.textContent, '1', 'solo el número');
+    ok(/^1 sin exportar · /.test(m2.title), 'la frase entera y el detalle, al pasar el ratón: ' + m2.title);
+    eq(t2.env.getEl('fest-name').title, t2.env.getEl('fest-name').textContent, 'nombre entero al pasar el ratón');
+  });
+
   // ── Ejecutor ─────────────────────────────────────────────────────────
   (async () => {
     let pass = 0, fail = 0;

@@ -425,10 +425,11 @@ td.est.live .estt b:last-child{animation:estlive 1.2s ease-in-out infinite}
 .errbox .ic{width:14px;height:14px;vertical-align:-2px;margin-right:6px}
 /* Barra en una sola línea: el nombre del evento se recorta antes que nada */
 .bar{flex-wrap:nowrap}
-#fest-name{max-width:22vw}
+#fest-name{max-width:260px}
 .fest{flex:0 1 auto;min-width:60px}
-@media (max-width:1380px){ .mbtn .mtxt{display:none} }
-@media (max-width:1180px){ #btn-undo span{display:none} .menus{margin-left:0} .mbtn .mlbl{display:none} }
+/* Portátil (dec. 127): menús del centro solo con icono y LED, para que el nombre del evento y la esquina derecha quepan */
+@media (max-width:1520px){ .mbtn .mtxt{display:none} .menus.mcenter .mbtn{padding:0 8px} .dstep .mbtn{padding:0 10px} }
+@media (max-width:1180px){ .menus{margin-left:0} .mbtn .mlbl{display:none} }
 .rowbtns .delbtn{width:28px}
 /* Directo (▶ ■ Tiempo extra) al principio de la fila; Duplicar/Borrar en el desplegable «⋯» del final */
 th.lv,td.lv{width:1%;white-space:nowrap}
@@ -702,20 +703,21 @@ td.est small{white-space:normal;max-width:96px;line-height:1.2}
 /* ── Barra superior en 3 bloques ── */
 .bar{gap:6px;padding:8px 14px;border-bottom:1px solid var(--hair)}
 .brand{color:var(--text);opacity:.9;letter-spacing:.26em;font-size:13px;margin-right:2px}
-.fest{font-weight:600;color:var(--muted);font-size:13px;max-width:200px;overflow:hidden}
+.fest{font-weight:600;color:var(--muted);font-size:13px;max-width:260px;overflow:hidden}
 .fest span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .menus.mleft{margin-left:2px}
 .menus.mcenter{margin-left:0}
 .bsep{flex:0 0 1px;align-self:stretch;margin:6px 6px;background:var(--hair2)}
-.bright{display:flex;align-items:center;gap:10px}
+.bright{display:flex;align-items:center;gap:8px;flex-shrink:0;margin-left:auto}   /* dec. 127: ⚙, idioma y reloj nunca se comprimen ni salen de la pantalla */
 .btn.ghost{background:transparent;border:1px solid var(--hair2);border-bottom-width:1px;height:32px}
 .btn.ghost:hover:not(:disabled){background:rgba(255,255,255,.06);filter:none}
 .btn.icon{width:32px;padding:0;justify-content:center}
 #btn-cfg.btn{font-size:inherit}
-#btn-undo.btn.ghost{border-color:transparent;color:var(--muted)}
+#btn-undo.btn.ghost{border-color:transparent;color:var(--muted);flex:0 0 auto}
 #btn-undo.btn.ghost:not(:disabled){color:var(--text)}
 #btn-undo.btn.ghost:hover:not(:disabled){border-color:var(--hair2)}
-.chip.mods{height:22px;padding:0 8px;font-size:11px;font-weight:600;color:var(--muted);border:1px solid var(--hair2);background:var(--chip);border-radius:999px;display:inline-flex;align-items:center;white-space:nowrap}
+.chip.mods{height:20px;padding:0 7px 0 6px;gap:5px;font-size:11px;font-weight:700;color:var(--muted);border:1px solid var(--hair2);background:var(--chip);border-radius:999px;display:inline-flex;align-items:center;white-space:nowrap;cursor:default;font-variant-numeric:tabular-nums;flex:0 0 auto}
+.chip.mods::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--mod);flex:0 0 auto}   /* punto: cambios sin exportar (dec. 127) */
 .bar .clock{font-size:18px;font-weight:800;color:#fff;font-variant-numeric:tabular-nums;letter-spacing:.02em;min-width:88px;text-align:right}
 body[data-ps="stage"] .bar .clock{color:#FFD600}
 /* Sin reposo: interruptor con micro-LED */
@@ -768,14 +770,12 @@ td.est{font-variant-numeric:tabular-nums}
 .v-meta,.v-rem,.dchip,.mchip,.gapbtn,td.f .real,.estt,.drift{font-variant-numeric:tabular-nums}
 .chip.mods[hidden]{display:none}
 .wake{white-space:nowrap}
-.bright{padding-left:12px;margin-left:6px;border-left:1px solid var(--hair2);align-self:stretch}
+.bright{padding-left:12px;border-left:1px solid var(--hair2);align-self:stretch}
 #tbl tbody tr:hover td.ti::after,#tbl tbody tr:focus-within td.ti::after{opacity:0}
 tr.k-hito td.ti::after{display:none}
 .bar .mbtn{padding:0 8px}
 .bar .brand{letter-spacing:.2em}
-@media (max-width:1560px){ .fest{display:none} }
 @media (max-width:1480px){ .bar .mbtn{padding:0 6px} .bright{gap:8px;padding-left:10px} }
-@media (max-width:1620px){ #btn-undo span{display:none} }
 
 /* ── Zona: el nombre entero (p. ej. «Secundario»), sin cortes feos ── */
 #tbl td.stage input[type=text]{width:var(--escw,140px);min-width:110px;max-width:220px;text-overflow:ellipsis}
