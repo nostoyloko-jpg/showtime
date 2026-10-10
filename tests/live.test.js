@@ -606,6 +606,17 @@
     ok(/const TASK_COL = '#7dd3fc';/.test(js) && /const col = task \? TASK_COL : safeColor\(block\.color, '#888'\);/.test(js), 'tarea: cian fijo, no el color de la zona');
     const t = arrancar({ storage: {} }); eq(t.env.getEl('evn-name').textContent, 'SIN EVENTO');
   });
+
+  test('Dec. 135: las 4 columnas de arriba al 25 %; doble clic en un tirador las iguala; ↺ Restablecer deja la pantalla de fábrica', () => {
+    const js = D.src('live.js'), css = D.src('live.css'), h = D.src('live.html');
+    ok(/#clkbox\{flex:1 1 0;min-width:0;[^}]*padding:0 16px;border:1px solid transparent;/.test(css) && /\.tpanel\{flex:1 1 0;[^}]*min-width:0;/.test(css), 'reloj y paneles con el mismo reparto (y el mismo relleno + borde, si no el reloj sale 17 px más estrecho)');
+    ok(/document\.querySelectorAll\('\.vsplit'\)\.forEach\(sp => sp\.addEventListener\('dblclick', resetTopCols\)\);/.test(js), 'doble clic en cualquier tirador');
+    ok(/function resetTopCols\(\) \{\s*try \{ localStorage\.removeItem\(P\.topCols\); \} catch \(e\) \{\}\s*\['clkbox', 'panel-now', 'panel-next', 'panel-call'\]\.forEach/.test(js), 'borra los anchos guardados y los de la ventana');
+    ok(/\[P\.topCols, P\.topH, P\.stripH, P\.infoW, P\.rowH, P\.zoom\]\.forEach\(k => \{ try \{ localStorage\.removeItem\(k\); \}/.test(js), 'Restablecer: anchos, alto de arriba, filas, ancho de info y zoom');
+    ok(/<button id="resetbtn" class="txtbtn"[^>]*>↺ Restablecer<\/button>/.test(h) && /\$\('resetbtn'\)\.addEventListener\('click', resetLayout\)/.test(js), 'botón en el dock');
+    ok(/else if \(m\.type === 'resetLayout'\) resetLayout\(\);/.test(js), 'y desde el gestor del Dashboard');
+    eq(require('../i18n.js').tx('↺ Restablecer', null, 'en'), '↺ Reset');
+  });
   test('Dec. 132: el cartel del reposo y del Standby lleva el logo del evento (si no hay, el de Showtime) y se repinta si cambia', () => {
     const js = D.src('live.js'), css = D.src('live.css');
     ok(/const lg = C\.eventLogo \? C\.eventLogo\(FEST\) : '';\s*return lg \? '<div class="evlogo"><img src="' \+ esc\(lg\) \+ '"/.test(js) && /: Mk\.banner\(\{ version:/.test(js), 'logo o cartel de Showtime');

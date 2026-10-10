@@ -705,6 +705,8 @@
   (function initTopCols() {
     const clk = $('clkbox'), now = $('panel-now'), nxt = $('panel-next'), cal = $('panel-call');
     const w = pget(P.topCols, null);
+    // dec. 135: doble clic en cualquier tirador → fuera los anchos a mano: las 4 columnas al 25 %
+    document.querySelectorAll('.vsplit').forEach(sp => sp.addEventListener('dblclick', resetTopCols));
     if (w) { if (w.clk) clk.style.flex = '0 0 ' + w.clk + 'px'; if (w.now) now.style.flex = '0 0 ' + w.now + 'px'; if (w.nxt) nxt.style.flex = '0 0 ' + w.nxt + 'px'; }
     document.querySelectorAll('.vsplit').forEach(sp => {
       sp.addEventListener('pointerdown', e => {
@@ -727,6 +729,23 @@
     });
   })();
 
+  /** Las 4 columnas de arriba (reloj · en escena · siguiente · CALL) vuelven a medir lo mismo. */
+  function resetTopCols() {
+    try { localStorage.removeItem(P.topCols); } catch (e) {}
+    ['clkbox', 'panel-now', 'panel-next', 'panel-call'].forEach(id => { const el = $(id); if (el) el.style.flex = ''; });
+    requestAnimationFrame(tick);
+  }
+  /** ↺ Restablecer (dec. 135): anchos, alturas, filas y zoom de fábrica en ESTA ventana (y lo guardado para las Live de este Mac). */
+  function resetLayout() {
+    [P.topCols, P.topH, P.stripH, P.infoW, P.rowH, P.zoom].forEach(k => { try { localStorage.removeItem(k); } catch (e) {} });
+    resetTopCols();
+    document.documentElement.style.removeProperty('--top-h');
+    STRIP_H = {};
+    if (ROWS) setRows(null, true);
+    zIdx = 3; setZoom(0); setTimeOffset(0);
+    applyInfoWidth(); setRowH(0);
+    try { localStorage.removeItem(P.rowH); localStorage.removeItem(P.stripH); localStorage.removeItem(P.zoom); } catch (e) {}   // setRowH/setZoom los reescriben: se dejan en fábrica
+  }
   // Divisor horizontal: alto de la parte de arriba
   (function initHSplit() {
     const sp = $('hsplit');
@@ -799,6 +818,7 @@
   $('rmax').addEventListener('click', () => stepRowH(1));
   $('rmin').addEventListener('click', () => stepRowH(-1));
   $('rlbl').addEventListener('click', () => setRowH(0));
+  if ($('resetbtn')) $('resetbtn').addEventListener('click', resetLayout);
 
   // Controles plegables: el cursor encima un momento los despliega; al irse, se pliegan. Al tocar, abre/cierra.
   (function initDock() {
@@ -1256,6 +1276,7 @@
     if (m.type === 'standby') setStandby(!!m.on);
     else if (m.type === 'setVista' && m.vista) setVista(m.vista, m.zona == null ? null : String(m.zona));
     else if (m.type === 'setRows') setRows(m.filas);
+    else if (m.type === 'resetLayout') resetLayout();
   });
 
   // Idioma: al cambiar (llega con la configuración del Panel, aquí o por la emisión) se repinta todo lo que escribe el JS, sin recargar

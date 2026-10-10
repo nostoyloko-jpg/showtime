@@ -1578,6 +1578,13 @@
     try { x.w.postMessage({ app: 'showtime', type: 'setRows', filas: x.filas }, '*'); } catch (e) {}
     tick();
   }
+  /** ↺ Restablecer UNA ventana (dec. 135): anchos, alturas, filas y zoom de fábrica. */
+  function resetWinLayout(id) {
+    const x = WIN.get(id); if (!x || !liveOpen(id)) return;
+    x.filas = null;
+    try { x.w.postMessage({ app: 'showtime', type: 'resetLayout' }, '*'); } catch (e) {}
+    tick();
+  }
   // ── Standby / Modo Cartel: TODAS las Confidence (las de este Mac y las que van por QR) enseñan el cartel y la hora ──
   // Es un estado del evento (como los mensajes): viaja a las Live del Mac y va en la emisión. Manager y Backstage no cambian.
   function standbyOn() { const s = Dt.getStandby && Dt.getStandby(); return !!(s && s.on); }
@@ -1632,7 +1639,7 @@
     const ids = openIds(), sig = ids.join('|');
     if (sig !== gvSig) {
       gvSig = sig;
-      const head = '<div class="gv-top"><div class="gv-seg"><button type="button" class="gv-segb" data-gv="all" data-on="1">' + tx('⏸ Todas en standby') + '</button><button type="button" class="gv-segb" data-gv="all" data-on="0">' + tx('▶ Reanudar todas') + '</button></div></div>';
+      const head = '<div class="gv-top"><div class="gv-seg"><button type="button" class="gv-segb" data-gv="all" data-on="1">' + tx('⏸ Todas en standby') + '</button><button type="button" class="gv-segb" data-gv="all" data-on="0">' + tx('▶ Reanudar todas') + '</button><button type="button" class="gv-segb" data-gv="reset" title="' + esc(tx('Anchos, alturas, filas y zoom de fábrica en todas las ventanas Live abiertas')) + '">' + tx('↺ Restablecer') + '</button></div></div>';
       const hd = '<div class="gv-row gv-hd" aria-hidden="true"><span>' + tx('Nombre') + '</span><span>' + tx('Vista') + '</span><span class="gv-hz">' + tx('Zona / Filas') + '</span><span>' + tx('Pantalla') + '</span><span>' + tx('Standby') + '</span><span></span></div>';
       const rows = ids.length ? hd + ids.map(gvRowHtml).join('') : '<p class="mnote gv-empty">' + tx('No hay ventanas Live abiertas desde este Dashboard.') + '</p>';
       // Mismo acabado que el panel de Pantallas y Emisión: cabecera en gris pizarra y cada bloque en su tarjeta
@@ -1688,6 +1695,7 @@
   $('modal-body').addEventListener('click', e => {
     const b = e.target.closest && e.target.closest('[data-gv]'); if (!b) return;
     if (b.dataset.gv === 'all') { openIds().forEach(id => setWinStandby(id, b.dataset.on === '1')); return; }
+    if (b.dataset.gv === 'reset') { openIds().forEach(id => resetWinLayout(id)); toast('Pantallas Live restablecidas: anchos, alturas, filas y zoom de fábrica'); return; }
     if (b.dataset.gv === 'new') { openLive('manager', null); return; }
     if (b.dataset.gv === 'done') { closeModal(); return; }
     const row = b.closest('.gv-row'); if (!row) return;
@@ -3508,7 +3516,7 @@
     if (mod && !e.shiftKey && !e.altKey && k === 'o') { e.preventDefault(); $('file').click(); return; }
     if (mod && !e.shiftKey && !e.altKey && k === 'n') { e.preventDefault(); askNew(); return; }
   });
-  window.ShowtimePanel = { reload: () => { loadState(); renderAll(); }, _test: { winState: () => Array.from(WIN.entries()).map(([id, x]) => ({ id, name: x.name, vista: x.vista, zona: x.zona, filas: x.filas || null, standby: !!x.standby, fs: x.fs })), setWinVista, setWinRows, setWinStandby, closeLive, openGestor, gestorVisible, emProdMessage, emRegenProd, hitoChips, emUrl, prodBigTitle, fileKind, handleFile, emCommand, importSummary, hidesSome, tipoPill, setWake, wakeState: () => ({ on: wakeOn, lock: !!wakeLock }), showSplash, hideSplash, setStandby, standbyOn, room: () => emRoom,
+  window.ShowtimePanel = { reload: () => { loadState(); renderAll(); }, _test: { winState: () => Array.from(WIN.entries()).map(([id, x]) => ({ id, name: x.name, vista: x.vista, zona: x.zona, filas: x.filas || null, standby: !!x.standby, fs: x.fs })), setWinVista, setWinRows, resetWinLayout, setWinStandby, closeLive, openGestor, gestorVisible, emProdMessage, emRegenProd, hitoChips, emUrl, prodBigTitle, fileKind, handleFile, emCommand, importSummary, hidesSome, tipoPill, setWake, wakeState: () => ({ on: wakeOn, lock: !!wakeLock }), showSplash, hideSplash, setStandby, standbyOn, room: () => emRoom,
     emSnapshot, emCloseDay, emDay, qrDevices, rmZones, setRmZone: z => { RM_ZONE = z; renderCast(); }, setRoom: r => { emRoom = r; }, fakeEm: (em, st) => { EM = em; EMST = st; }, emStateHtml, renderCastBar, renderHubLed, mtIn, mtOut, cfSimState, renderCfSim, cfSim: () => CFSIM,
     dayStep, monthLabel, spotItems, spotDays, spotEntries, fmtDayFull, refreshStale, net: () => NET, setNet: o => { NET = netNorm(o); }, netNorm, emLink, emBrokers, emUrl, netHtml, renderCast } };   // _test: solo para tests/control.test.js
 })();

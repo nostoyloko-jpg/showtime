@@ -79,7 +79,7 @@ body[data-lv="stage"] .tbadge{color:#fff;border-color:rgba(255,214,0,.6)}
 .tbar>div{height:100%;border-radius:2px;transition:width 1s linear}
 
 /* Reloj medido contra su propia celda (cq*), con tope en vh. */
-#clkbox{flex:0 0 26%;min-width:110px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;padding-right:10px;container-type:inline-size;overflow:hidden}
+#clkbox{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;padding:0 16px;border:1px solid transparent;container-type:inline-size;overflow:hidden}
 #clk{font-size:min(30cqw,13vh);font-weight:900;line-height:.9;letter-spacing:-.02em;white-space:nowrap}
 #dat{font-size:min(5.5cqw,2vh);color:var(--dim);letter-spacing:.2em;text-transform:uppercase;margin-top:8px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 #evn{font-size:min(5.5cqw,1.9vh);font-weight:800;color:var(--text);letter-spacing:.08em;margin-top:6px;text-transform:uppercase;white-space:normal;line-height:1.2;max-width:100%;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}   /* dec. 134: solo el nombre, blanco, hasta 2 líneas */

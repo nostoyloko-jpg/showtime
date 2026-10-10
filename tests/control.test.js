@@ -2032,6 +2032,18 @@ const miss = [...found].filter(k => !I.txHas(k) && !/^(OK|CALL|SC|Live|Raycast|S
     ok(/zs\.disabled = !conf && !mgr;/.test(js), 'Backstage: deshabilitado con «—»');
   });
 
+  test('Dec. 135: Gestor › ↺ Restablecer manda a cada ventana Live abierta que vuelva a su pantalla de fábrica', async () => {
+    const t = panel(), msgs = [];
+    const w = { closed: false, focus() {}, postMessage(m) { msgs.push(m); }, close() {} };
+    t.env.win.open = () => w;
+    t.env.fire('document', 'click', { target: { closest: q => q === '#m-hub [data-vista]' ? { dataset: { vista: 'manager' } } : null } });
+    await new Promise(r => setImmediate(r));
+    const [a] = t.T.winState(); t.T.setWinRows(a.id, '4');
+    t.T.resetWinLayout(a.id);
+    ok(msgs.some(m => m.type === 'resetLayout'), 'la ventana recibe la orden'); eq(t.T.winState()[0].filas, null, 'y vuelve a Auto');
+    ok(/data-gv="reset"/.test(D.src('control.js')) && /openIds\(\)\.forEach\(id => resetWinLayout\(id\)\)/.test(D.src('control.js')), 'botón en la cabecera del gestor: todas las abiertas');
+  });
+
   // ── Ejecutor ─────────────────────────────────────────────────────────
   (async () => {
     let pass = 0, fail = 0;
