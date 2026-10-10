@@ -903,8 +903,9 @@ body[data-ps="stage"] .imp-prev thead th{background:#000}
 /* ── Modales sólidos → cristal esmerilado (dec. 139). Se hicieron opacos porque en Safari el cristal translúcido dejaba ver
       la tabla de detrás. Ahora: fondo de pantalla oscurecido al 65 % y desenfocado, y la caja ahumada al 90 % con su propio desenfoque:
       lo de detrás solo se intuye. En Stage, todo opaco (negro y amarillo). ── */
-.modal{background:rgba(0,0,0,.65);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
-.modal-box,.imp-box,.spot-box{--modal-bg:#12141a;background-color:rgba(18,20,26,.9);background-image:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.02) 40%,transparent);-webkit-backdrop-filter:blur(32px) saturate(180%);backdrop-filter:blur(32px) saturate(180%);border:1px solid rgba(255,255,255,.16);box-shadow:0 24px 64px rgba(0,0,0,.85),inset 0 1px 0 rgba(255,255,255,.09)}
+.modal{background:rgba(0,0,0,.45);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)}
+/* dec. 142: cristal más translúcido (74 %) — se nota el cristal, no un bloque opaco */
+.modal-box,.imp-box,.spot-box{--modal-bg:#16191f;background-color:rgba(22,25,33,.74);background-image:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,.02) 40%,transparent);-webkit-backdrop-filter:blur(28px) saturate(190%);backdrop-filter:blur(28px) saturate(190%);border:1px solid rgba(255,255,255,.18);box-shadow:0 24px 64px rgba(0,0,0,.75),inset 0 1px 0 rgba(255,255,255,.12)}
 body[data-ps="stage"] .modal{background:rgba(0,0,0,.85)}
 body[data-ps="stage"] .modal-box,body[data-ps="stage"] .imp-box,body[data-ps="stage"] .spot-box{--modal-bg:#000;background:#000;-webkit-backdrop-filter:none;backdrop-filter:none;border-color:#FFD600}
 

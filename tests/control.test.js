@@ -818,10 +818,10 @@
     eq(s.escenarios.map(e => e.nombre).join(), 'principal');
     ok(s.artists.length === 2 && s.artists.every(a => a.escenarioId === s.escenarios[0].id));
   });
-  test('Ventanas de cristal esmerilado (dec. 139; antes opacas por Safari): fondo oscurecido y desenfocado, caja ahumada al 90 %; Stage opaco', () => {
+  test('Ventanas de cristal esmerilado (dec. 139 y 142; antes opacas por Safari): fondo oscurecido y desenfocado, caja al 74 %; Stage opaco', () => {
     const css = D.src('control.css'), tail = css.slice(css.lastIndexOf('/* ── Modales sólidos'));
-    ok(/\.modal\{background:rgba\(0,0,0,\.65\);-webkit-backdrop-filter:blur\(12px\);backdrop-filter:blur\(12px\)\}/.test(tail), 'fondo de pantalla al 65 % y desenfocado');
-    ok(/\.modal-box,\.imp-box,\.spot-box\{--modal-bg:#12141a;background-color:rgba\(18,20,26,\.9\);background-image:linear-gradient\(180deg,rgba\(255,255,255,\.08\),rgba\(255,255,255,\.02\) 40%,transparent\);-webkit-backdrop-filter:blur\(32px\) saturate\(180%\);backdrop-filter:blur\(32px\) saturate\(180%\);border:1px solid rgba\(255,255,255,\.16\);/.test(tail), 'Studio: cristal ahumado al 90 % (ventanas y ⌘K)');
+    ok(/\.modal\{background:rgba\(0,0,0,\.45\);-webkit-backdrop-filter:blur\(16px\);backdrop-filter:blur\(16px\)\}/.test(tail), 'fondo de pantalla al 45 % y desenfocado (dec. 142)');
+    ok(/\.modal-box,\.imp-box,\.spot-box\{--modal-bg:#16191f;background-color:rgba\(22,25,33,\.74\);background-image:linear-gradient\(180deg,rgba\(255,255,255,\.12\),rgba\(255,255,255,\.02\) 40%,transparent\);-webkit-backdrop-filter:blur\(28px\) saturate\(190%\);backdrop-filter:blur\(28px\) saturate\(190%\);border:1px solid rgba\(255,255,255,\.18\);/.test(tail) && !/\.modal-box,\.imp-box,\.spot-box\{[^}]*!important/.test(tail), 'Studio: cristal al 74 % (ventanas y ⌘K), sin !important para que Stage siga opaco');
     ok(/body\[data-ps="stage"\] \.modal-box,body\[data-ps="stage"\] \.imp-box,body\[data-ps="stage"\] \.spot-box\{--modal-bg:#000;background:#000;-webkit-backdrop-filter:none;backdrop-filter:none;border-color:#FFD600\}/.test(tail), 'Stage: negro opaco y borde amarillo (también ⌘K)');
     ok(css.indexOf('/* ── Modales sólidos') > css.indexOf('/* ── Cristal'), 'va después del cristal (gana)');
   });

@@ -342,7 +342,9 @@
     const q = new URLSearchParams(location.search);
     if (ROWS) q.set('filas', String(ROWS)); else q.delete('filas');
     try { history.replaceState(null, '', location.pathname + '?' + q.toString() + location.hash); } catch (e) {}
-    if (!quiet) { STRIP_H = {}; pset(P.stripH, STRIP_H); setRowH(ROW_H); requestAnimationFrame(() => { applyInfoWidth(); requestAnimationFrame(redraw); }); }   // con la letra nueva, el ancho del nombre se vuelve a medir
+    // dec. 141: cambiar las filas borra el ancho a mano del separador y aplica el automático para ese alto
+    try { localStorage.removeItem(P.infoW); } catch (e) {}
+    if (!quiet) { STRIP_H = {}; pset(P.stripH, STRIP_H); setRowH(ROW_H); }
     reportVista();
   }
   function setRowH(v) {
@@ -354,6 +356,7 @@
     $('rmin').disabled = curRowH() <= ROW_STEPS[0];
     $('rmax').disabled = curRowH() >= ROW_STEPS[ROW_STEPS.length - 1];
     buildStrips(visibleCount()); tick();
+    applyInfoWidth(); requestAnimationFrame(redraw);   // dec. 141: el separador se reajusta al alto nuevo (el ancho a mano, si lo hay, se respeta)
   }
   /** Una barra por cada entrada que queda (todo el horario, como siempre), al menos las que llenan el alto.
    *  Las que ya terminaron salen y las demás suben solas. Si no caben, la lista hace scroll. */
@@ -767,7 +770,7 @@
   // no el actual: así el resultado es estable y no se persigue a sí mismo.
   // INFO_PAD = relleno real del .info (36 px a cada lado en escritorio) + holgura. Si el nombre se ve a un tamaño
   // mayor que la referencia (p. ej. en Backstage, donde la altura de la fila lo agranda), se mide a ese tamaño.
-  const INFO_REF_NAME = 37, INFO_REF_TIME = 20, INFO_PAD = 80, INFO_MIN = 280;
+  const INFO_PAD = 80, INFO_MIN = 200;
   let INFO_CTX = null;
   function measureTxt(txt, weight, size, fam) {
     try {
@@ -780,14 +783,17 @@
   function autoInfoWidth() {
     const el = document.querySelector('.aname') || document.body;
     const cs = getComputedStyle(el), fam = (cs && cs.fontFamily) || 'sans-serif';
-    const realSz = el.matches && el.matches('.aname') ? (parseFloat(cs.fontSize) || 0) : 0;
-    // Filas fijas (dec. 140): el nombre se dibuja al 30 % del alto de la fila (máx. 80 px); se mide a ese tamaño para que quepa sin encogerse
-    const fixSz = fixedRows() && $('bot') ? Math.min(80, 0.3 * $('bot').clientHeight / fixedRows()) : 0;
-    const nameSz = Math.max(INFO_REF_NAME, realSz, fixSz);
+    // dec. 141: el nombre y el horario se miden al tamaño que les toca POR EL ALTO DE LA FILA (lo que dice el CSS), no a un mínimo fijo
+    // ni al tamaño que tienen ahora (ese depende del propio ancho y no dejaba encoger el separador con 4, 5 o 6 filas).
+    // Filas fijas: nombre al 30 % del alto (máx. 80 px), horario al 13 % (máx. 30). Automático: 24 % (máx. 56) y 12 % (máx. 24).
+    const rowH = fixedRows() && $('bot') ? $('bot').clientHeight / fixedRows() : curRowH();
+    const realSz = VISTA === 'backstage' && el.matches && el.matches('.aname') ? (parseFloat(cs.fontSize) || 0) : 0;   // Backstage tiene su propio tamaño
+    const nameSz = Math.max(14, realSz, fixedRows() ? Math.min(80, 0.3 * rowH) : Math.min(56, 0.24 * rowH));
+    const timeSz = Math.max(11, fixedRows() ? Math.min(30, 0.13 * rowH) : Math.min(24, 0.12 * rowH));
     let need = 0;
     (BLOCKS || []).forEach(b => {
       need = Math.max(need, measureTxt(String(b.name || '').toUpperCase(), 900, nameSz, fam));
-      if (b.si !== null && b.si !== undefined && b.sf !== null && b.sf !== undefined) need = Math.max(need, measureTxt(C.fmtHM(b.si) + '–' + C.fmtHM(b.sf), 500, INFO_REF_TIME, fam));
+      if (b.si !== null && b.si !== undefined && b.sf !== null && b.sf !== undefined) need = Math.max(need, measureTxt(C.fmtHM(b.si) + '–' + C.fmtHM(b.sf), 500, timeSz, fam));
     });
     const hi = window.innerWidth * 0.55;   // tope: que quepa el nombre más largo; el resto, para la línea de tiempo
     return Math.round(Math.max(INFO_MIN, Math.min(need + INFO_PAD, hi)));
