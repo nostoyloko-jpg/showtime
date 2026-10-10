@@ -620,6 +620,7 @@ body[data-ps="stage"] .qr-big-box{background:#000;border-color:rgba(255,214,0,.4
 .mt-al .ic{width:14px;height:14px;flex:0 0 auto}
 .mt-al span{flex:1;min-width:0}
 .mt-al small{color:var(--dim);font-weight:600}
+.mt-at{flex:0 0 auto;color:var(--dim);font-weight:600;font-variant-numeric:tabular-nums}
 .mt-foot{margin-top:8px;font-size:11px;color:var(--dim)}
 .mt-foot a{color:var(--muted)}
 .mt-foot .ic{width:11px;height:11px;margin-left:2px;vertical-align:-1px}

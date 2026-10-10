@@ -30,8 +30,10 @@
   const VISTA_OPCIONES = [['manager', 'Manager'], ['confidence', 'Confidence'], ['backstage', 'Backstage']];
   const Vs = window.ShowtimeVistas;
   // Dec. 152 · avisos meteo recién llegados (pista visual local «!»). Aquí arriba: loadNew() puede rearmar antes de llegar a renderMeteo.
-  let MT_SEEN = null;          // tipos de aviso de la lectura anterior; null = la próxima lectura solo arma (carga, importación, rearme)
-  const MT_NEW = new Set();    // tipos con «!» puesto (se quita con hover o toque; nunca por tiempo)
+  // Orden por llegada (dec. 152, L.A.): [{ id, at }] con la hora local de detección (solo en memoria: no se emite, ni va al log ni
+  // al evento). null = la próxima lectura solo fija la referencia, sin hora, «!» ni salto (carga, importación, rearme).
+  let MT_ORDER = null;
+  const MT_NEW = new Set();    // ids con «!» puesto (se quita con hover o toque; nunca por tiempo)
   let MT_SIG;                  // evento de la lectura anterior (cambiar de evento rearma)
   let CALL_UNDO = null;   // dec. 148: { add: [OK de CALL que vuelven], del: [claves que se quitan] } para el paso de Deshacer de una edición
   const AU = window.ShowtimeAudio || null;   // avisos de audio locales (dec. 145, audio.js)
@@ -2506,24 +2508,26 @@
   // Cambia el ancho (ventana, columnas) o la tarjeta pasa a verse: se vuelve a medir
   if (typeof ResizeObserver === 'function') { try { new ResizeObserver(() => fitMtAlerts()).observe($('v-meteo')); } catch (e) {} }
   window.addEventListener('resize', () => fitMtAlerts());
-  /** Dec. 152: la próxima lectura de avisos solo arma (nada se marca «!»): carga, importación, otro evento, Meteo apagado. */
-  function mtRearm() { MT_SEEN = null; MT_NEW.clear(); }
+  /** Dec. 152: la próxima lectura de avisos solo fija la referencia (sin hora, «!» ni salto): carga, importación, otro evento,
+   *  otra fuente, Meteo apagado. */
+  function mtRearm() { MT_ORDER = null; MT_NEW.clear(); }
+  /** Identidad estable de cada aviso de una lectura: su tipo (W.alerts da uno por tipo); si algún día hubiera dos del mismo
+   *  tipo, «tipo#2», «tipo#3»… en su orden. */
+  function mtIds(list) { const n = {}; return list.map(a => { n[a.kind] = (n[a.kind] || 0) + 1; return n[a.kind] > 1 ? a.kind + '#' + n[a.kind] : a.kind; }); }
+  const mtRowHead = id => ' data-id="' + esc(id) + '"><svg class="ic"><use href="#i-alert"/></svg>';
+  const mtFresh = () => '<span class="mt-fresh" role="img" aria-label="' + esc(tx('Aviso recién llegado')) + '">!</span>';
   /** Quita el «!» de un aviso (hover o toque). Solo la pista visual local: no es «Visto», no toca el estado meteo, los datos
-   *  compartidos ni el log. No vuelve a salir al repintar. */
-  function mtFreshOff(k) { if (!MT_NEW.delete(k)) return; renderMeteo(); }
-  /** Lleva el scroll interno UNA vez para dejar el aviso nuevo completo a la vista: al final de la lista (si el aviso nuevo
-   *  no estuviera entre los que se ven al final, lo justo para verlo entero). */
-  function mtJump(L, k) {
+   *  compartidos ni el log. Sin repintar la tarjeta (sin parpadeo): se quita ese elemento y el HTML guardado queda igual que
+   *  el que saldrá en el próximo repintado. No vuelve a salir. */
+  function mtFreshOff(id, al) {
+    if (!MT_NEW.delete(id)) return;
+    const b = al && al.querySelector && al.querySelector('.mt-fresh'); if (b && b.remove) b.remove();
+    MT_HTML = MT_HTML.split(mtRowHead(id) + mtFresh()).join(mtRowHead(id));
+  }
+  /** Un único scroll al final de la lista para que el aviso recién llegado (siempre el último) se vea entero. */
+  function mtJump(L) {
     if (!L || !L.children || L.children.length <= 2) return;
-    const it = Array.from(L.children).find(x => x.dataset && x.dataset.k === k);
-    const end = Math.max(0, (L.scrollHeight || 0) - (L.clientHeight || 0));
-    let s = end;
-    if (it && L.clientHeight > 0) {
-      const lr = L.getBoundingClientRect ? L.getBoundingClientRect() : null, ir = it.getBoundingClientRect ? it.getBoundingClientRect() : null;
-      const t0 = lr && ir ? ir.top - lr.top + (L.scrollTop || 0) : it.offsetTop, t1 = lr && ir ? ir.bottom - lr.top + (L.scrollTop || 0) : it.offsetTop + it.offsetHeight;
-      if (t0 < end) s = Math.max(0, Math.min(end, Math.ceil(t1 - L.clientHeight)));
-    }
-    L.scrollTop = s;
+    L.scrollTop = Math.max(0, (L.scrollHeight || 0) - (L.clientHeight || 0));
   }
   /** Tarjeta METEO (columna izquierda, bajo CALL). */
   function renderMeteo() {
@@ -2533,12 +2537,16 @@
     if (!c.on) { MT_HTML = ''; mtRearm(); return st; }
     const sig = (FEST && window.ShowtimeLog ? window.ShowtimeLog.eventKey(FEST) : '') + '|' + mtKey(c);   // otro evento u otra fuente: rearme
     if (sig !== MT_SIG) { MT_SIG = sig; mtRearm(); }
-    let jump = null;
-    if (st.sum) {   // dec. 152: aviso real nuevo = un tipo que no estaba en la lectura anterior (la primera lectura solo arma)
-      const kinds = st.list.map(a => a.kind);
-      if (MT_SEEN) kinds.forEach(k => { if (!MT_SEEN.has(k)) { MT_NEW.add(k); jump = k; } });
-      MT_NEW.forEach(k => { if (kinds.indexOf(k) < 0) MT_NEW.delete(k); });
-      MT_SEEN = new Set(kinds);
+    let jump = false;
+    const ids = mtIds(st.list), byId = {}; ids.forEach((id, i) => { byId[id] = st.list[i]; });
+    if (st.sum) {   // dec. 152: orden por llegada. Aviso real nuevo = una identidad que no estaba en la lectura anterior
+      if (!MT_ORDER) MT_ORDER = ids.map(id => ({ id, at: null }));   // primera lectura / rearme: solo referencia
+      else {
+        MT_ORDER = MT_ORDER.filter(e => byId[e.id]);   // el que se va sale de la lista (si vuelve, entrada nueva)
+        const now = Date.now();
+        ids.forEach(id => { if (!MT_ORDER.some(e => e.id === id)) { MT_ORDER.push({ id, at: now }); MT_NEW.add(id); jump = true; } });
+      }
+      MT_NEW.forEach(id => { if (!byId[id]) MT_NEW.delete(id); });
     }
     let h = '';
     const where = c.source === 'openmeteo' ? (c.place || (c.lat !== null ? c.lat + ', ' + c.lon : '')) : tx(MT_SRC[c.source]);
@@ -2563,8 +2571,9 @@
         (s.uv !== null || s.uvMax !== null ? '<span><svg class="ic"><use href="#i-sun"/></svg>UV <b>' + mtNum(s.uvMax !== null ? s.uvMax : s.uv) + '</b> ' + W.uvText(s.uvMax !== null ? s.uvMax : s.uv) + '</span>' : '') +
         (c.th.aqiOn && s.aqi !== null ? '<span><svg class="ic"><use href="#i-cloud"/></svg>' + tx('Aire') + ' <b>' + W.aqiText(s.aqi) + '</b></span>' : '') +
         '</div>';
-      const fresh = '<span class="mt-fresh" role="img" aria-label="' + esc(tx('Aviso recién llegado')) + '">!</span>';
-      if (st.list.length) h += '<div class="mt-alerts">' + st.list.map(a => '<div class="mt-al' + (st.pending.indexOf(a) >= 0 ? ' new' : '') + '" data-k="' + a.kind + '"><svg class="ic"><use href="#i-alert"/></svg>' + (MT_NEW.has(a.kind) ? fresh : '') + '<span>' + esc(a.text) + '</span>' +
+      const rows = (MT_ORDER || ids.map(id => ({ id, at: null }))).filter(e => byId[e.id]).map(e => ({ e, a: byId[e.id] }));
+      if (rows.length) h += '<div class="mt-alerts">' + rows.map(({ e, a }) => '<div class="mt-al' + (st.pending.indexOf(a) >= 0 ? ' new' : '') + '"' + mtRowHead(e.id) + (MT_NEW.has(e.id) ? mtFresh() : '') +
+        (e.at ? '<time class="mt-at" title="' + esc(tx('Detectado a las {h}', { h: W.hhmm(e.at) })) + '">' + W.hhmm(e.at) + '</time>' : '') + '<span>' + esc(a.text) + '</span>' +
         (st.pending.indexOf(a) >= 0 ? '<button class="chipx" data-act="mt-ack" data-k="' + a.kind + '">' + tx('Visto') + '</button>' : '<small>' + tx('visto') + '</small>') + '</div>').join('') + '</div>';
       h += '<div class="mt-foot">' + esc(tx(MT_SRC[s.src] || '')) + ' · ' + tx('dato {h} · previsión, no aviso oficial', { h: W.hhmm(s.at) }) + ' · <a href="' + W.AEMET_URL + '" target="_blank" rel="noopener">' + tx('Avisos AEMET') + '<svg class="ic"><use href="#i-ext"/></svg></a></div>';
     }
@@ -2574,7 +2583,7 @@
       fitMtAlerts();
       const L1 = $('v-meteo').querySelector && $('v-meteo').querySelector('.mt-alerts');
       if (L1 && top) L1.scrollTop = top;
-      if (L1 && jump) mtJump(L1, jump);   // dec. 152: solo cuando entra un aviso real nuevo; nunca por ticks, idioma, resize ni repintados
+      if (L1 && jump) mtJump(L1);   // dec. 152: solo cuando entra un aviso real nuevo; nunca por ticks, idioma, resize ni repintados
     } else fitMtAlerts();   // cada segundo: un cambio de estilo (Studio / Stage) o de letra también cambia el alto de los avisos
     return st;
   }
@@ -2588,14 +2597,15 @@
     }
     if (e.target.closest('[data-act="mt-cfg"]')) openConfig('meteo');
   });
-  // Dec. 152: el «!» se quita con el ratón encima del aviso o con un toque en una zona del aviso que no sea un botón o enlace
+  // Dec. 152: el «!» se quita con el ratón encima del aviso, o con un toque breve sin arrastre en una zona del aviso que no sea
+  // botón ni enlace. El toque es el «click» del propio navegador: no lo dispara pointerdown, ni un scroll, ni un pellizco.
   $('v-meteo').addEventListener('pointerover', e => {
-    if (e.pointerType && e.pointerType !== 'mouse') return;
-    const al = e.target.closest && e.target.closest('.mt-al'); if (al && al.dataset.k) mtFreshOff(al.dataset.k);
+    if (e.pointerType !== 'mouse') return;
+    const al = e.target.closest && e.target.closest('.mt-al'); if (al && al.dataset.id) mtFreshOff(al.dataset.id, al);
   });
   $('v-meteo').addEventListener('click', e => {
     if (!e.target.closest || e.target.closest('button, a')) return;
-    const al = e.target.closest('.mt-al'); if (al && al.dataset.k) mtFreshOff(al.dataset.k);
+    const al = e.target.closest('.mt-al'); if (al && al.dataset.id) mtFreshOff(al.dataset.id, al);
   });
 
   // Configuración › Meteo
@@ -3763,5 +3773,5 @@
   });
   window.ShowtimePanel = { reload: () => { loadState(); renderAll(); }, _test: { winState: () => Array.from(WIN.entries()).map(([id, x]) => ({ id, name: x.name, vista: x.vista, zona: x.zona, filas: x.filas || null, standby: !!x.standby, fs: x.fs })), setWinVista, setWinRows, resetWinLayout, setWinStandby, closeLive, openGestor, gestorVisible, emProdMessage, emRegenProd, hitoChips, emUrl, prodBigTitle, fileKind, handleFile, emCommand, importSummary, hidesSome, tipoPill, setWake, wakeState: () => ({ on: wakeOn, lock: !!wakeLock }), showSplash, hideSplash, setStandby, standbyOn, room: () => emRoom,
     emSnapshot, emCloseDay, emDay, qrDevices, rmZones, setRmZone: z => { RM_ZONE = z; renderCast(); }, setRoom: r => { emRoom = r; }, fakeEm: (em, st) => { EM = em; EMST = st; }, emStateHtml, renderCastBar, renderHubLed, mtIn, mtOut, cfSimState, renderCfSim, cfSim: () => CFSIM,
-    dayStep, monthLabel, spotItems, spotDays, spotEntries, fmtDayFull, refreshStale, net: () => NET, setNet: o => { NET = netNorm(o); }, netNorm, emLink, emBrokers, emUrl, netHtml, renderCast, audioTick, fillAudioCfg, saveAudioCfg, audioPreview, audioConfirm, audioRearm, audioUrgentAnswered, sendChat, fitMtAlerts, mtJump, mtFreshOff, mtRearm, setAppLang, mtNew: () => Array.from(MT_NEW), auMuteBtn, renderChat, callEditFix, applyEdit, undo, loadNew, impDoImport } };   // _test: solo para tests/control.test.js
+    dayStep, monthLabel, spotItems, spotDays, spotEntries, fmtDayFull, refreshStale, net: () => NET, setNet: o => { NET = netNorm(o); }, netNorm, emLink, emBrokers, emUrl, netHtml, renderCast, audioTick, fillAudioCfg, saveAudioCfg, audioPreview, audioConfirm, audioRearm, audioUrgentAnswered, sendChat, fitMtAlerts, mtJump, mtFreshOff, mtRearm, setAppLang, mtNew: () => Array.from(MT_NEW), mtIds, mtOrder: () => MT_ORDER && MT_ORDER.map(e => Object.assign({}, e)), auMuteBtn, renderChat, callEditFix, applyEdit, undo, loadNew, impDoImport } };   // _test: solo para tests/control.test.js
 })();
