@@ -13,8 +13,8 @@
 <meta name="apple-mobile-web-app-title" content="Showtime">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
-<link rel="stylesheet" href="control.css?v=20261143">
-<link rel="stylesheet" href="marca.css?v=20261143">
+<link rel="stylesheet" href="control.css?v=20261144">
+<link rel="stylesheet" href="marca.css?v=20261144">
 </head>
 <body>
 <div id="splash" class="splash" hidden></div>
@@ -51,6 +51,10 @@
   <symbol id="i-phone" viewBox="0 0 20 20"><rect x="6" y="2.5" width="8" height="15" rx="1.8" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M9 15h2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
   <symbol id="i-remote" viewBox="0 0 20 20"><rect x="5.5" y="2.5" width="9" height="15" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="7" r="1.8" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 11.5h4M8 14h4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
   <symbol id="i-expand" viewBox="0 0 20 20"><path d="M11.5 3.5h5v5M8.5 16.5h-5v-5M16.5 3.5l-5.5 5.5M3.5 16.5L9 11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 20 20"><g fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="10" cy="10" r="7"/><path d="M3 10h14M10 3c2 2.2 3 4.5 3 7s-1 4.8-3 7c-2-2.2-3-4.5-3-7s1-4.8 3-7z"/></g></symbol>
+  <symbol id="i-cal" viewBox="0 0 20 20"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="3.5" y="4.5" width="13" height="12" rx="1.5"/><path d="M3.5 8.5h13M7 3v3M13 3v3"/></g></symbol>
+  <symbol id="i-pin" viewBox="0 0 20 20"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M10 17.5s5.5-5 5.5-9.5a5.5 5.5 0 0 0-11 0c0 4.5 5.5 9.5 5.5 9.5z"/><circle cx="10" cy="8" r="2"/></g></symbol>
+  <symbol id="i-palette" viewBox="0 0 20 20"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M10 3a7 7 0 1 0 0 14c1 0 1.5-.7 1.5-1.4 0-1-.8-1.3-.8-2.1 0-.8.6-1.3 1.5-1.3H14a3 3 0 0 0 3-3C17 5.8 13.9 3 10 3z"/><circle cx="6.5" cy="9" r=".9"/><circle cx="9" cy="6" r=".9"/><circle cx="12.5" cy="6.5" r=".9"/></g></symbol>
   <symbol id="i-msg" viewBox="0 0 20 20"><path d="M4 5.5h12a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H9l-3.5 3v-3H4a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
   <symbol id="i-chat" viewBox="0 0 20 20"><path d="M3.5 4h9a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H7.5l-3 2.5V11h-1a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M15.5 8h1a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-1v2.5L12.5 15H9.5a1 1 0 0 1-1-1v-1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
   <symbol id="i-sun" viewBox="0 0 20 20"><circle cx="10" cy="10" r="3.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M10 2.5v2M10 15.5v2M2.5 10h2M15.5 10h2M4.7 4.7l1.4 1.4M13.9 13.9l1.4 1.4M4.7 15.3l1.4-1.4M13.9 6.1l1.4-1.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
@@ -266,40 +270,53 @@
 <div id="cfg-back" class="cfg-back" hidden></div>
 <aside id="cfg" class="cfg" aria-label="Configuración" hidden data-i18n-aria>
   <div class="cfg-h"><h2 data-i18n>Configuración</h2><button id="cfg-close" class="iconsq" title="Cerrar (Esc)" data-i18n-title><svg class="ic"><use href="#i-x"/></svg></button></div>
-  <section class="cfg-s" id="cfg-s-lang">
-    <h3 data-i18n="lang.label">Idioma</h3>
+  <details class="cfg-s" id="cfg-s-lang">
+    <summary class="cfg-sum"><svg class="ic"><use href="#i-globe"/></svg><h3 data-i18n="lang.label">Idioma</h3><svg class="ic chev"><use href="#i-chev"/></svg></summary>
+    <div class="cfg-b">
     <div class="dtog radio" id="cfg-lang" role="group" aria-label="Idioma" data-i18n-aria="lang.label" title="Idioma de Showtime: Panel, pantallas Live, Mando y hojas impresas" data-i18n-title="lang.title"><button type="button" data-l="es" data-i18n>🇪🇸 Español</button><button type="button" data-l="en" data-i18n>🇬🇧 English</button></div>
     <div class="note" data-i18n="lang.note">Lo manda este Panel: las pantallas Live y el Mando cambian solos (también por la emisión).</div>
-  </section>
-  <section class="cfg-s" id="cfg-s-fest">
-    <h3 data-i18n>Evento</h3>
+  </div>
+  </details>
+  <details class="cfg-s" id="cfg-s-fest" open>
+    <summary class="cfg-sum"><svg class="ic"><use href="#i-cal"/></svg><h3 data-i18n>Evento</h3><svg class="ic chev"><use href="#i-chev"/></svg></summary>
+    <div class="cfg-b">
     <div id="cfg-fest"></div>
-  </section>
-  <section class="cfg-s" id="cfg-s-stages">
-    <h3 data-i18n>Zonas</h3>
+  </div>
+  </details>
+  <details class="cfg-s" id="cfg-s-stages">
+    <summary class="cfg-sum"><svg class="ic"><use href="#i-pin"/></svg><h3 data-i18n>Zonas</h3><svg class="ic chev"><use href="#i-chev"/></svg></summary>
+    <div class="cfg-b">
     <div id="cfg-stages"></div>
-  </section>
-  <section class="cfg-s" id="cfg-s-live">
-    <h3 data-i18n="bis.cfgTitle">Directo</h3>
+  </div>
+  </details>
+  <details class="cfg-s" id="cfg-s-live">
+    <summary class="cfg-sum"><svg class="ic"><use href="#i-play"/></svg><h3 data-i18n="bis.cfgTitle">Directo</h3><svg class="ic chev"><use href="#i-chev"/></svg></summary>
+    <div class="cfg-b">
     <div class="form">
       <label for="cfg-bis-win" data-i18n="bis.cfgLabel">Ventana de Bis / Extender prueba</label><select id="cfg-bis-win"><option value="5" data-i18n>5 min</option><option value="10" data-i18n>10 min</option><option value="15" data-i18n>15 min</option></select>
       <div class="note" data-i18n="bis.cfgNote">Minutos tras el fin de un show (Bis) o de una prueba de sonido (Extender prueba) en los que se puede rescatar. Nunca más que el cambio hasta la siguiente de su zona; si la siguiente da ▶, se acaba.</div>
     </div>
-  </section>
-  <section class="cfg-s" id="cfg-s-net">
-    <h3 data-i18n>Emisión</h3>
+  </div>
+  </details>
+  <details class="cfg-s" id="cfg-s-net">
+    <summary class="cfg-sum"><svg class="ic"><use href="#i-cast"/></svg><h3 data-i18n>Emisión y red</h3><svg class="ic chev"><use href="#i-chev"/></svg></summary>
+    <div class="cfg-b">
     <div id="cfg-net" class="cast-net"></div>
-  </section>
-  <section class="cfg-s" id="cfg-s-styles">
-    <h3 data-i18n>Estilos</h3>
+  </div>
+  </details>
+  <details class="cfg-s" id="cfg-s-styles">
+    <summary class="cfg-sum"><svg class="ic"><use href="#i-palette"/></svg><h3 data-i18n>Aspecto</h3><svg class="ic chev"><use href="#i-chev"/></svg></summary>
+    <div class="cfg-b">
     <div class="form">
       <label for="cfg-style-panel" data-i18n>Este Dashboard</label><select id="cfg-style-panel"><option value="studio">Studio</option><option value="stage">Stage</option></select>
       <label for="cfg-style-live" data-i18n>Pantalla Live</label><select id="cfg-style-live"><option value="studio">Studio</option><option value="stage">Stage</option></select>
       <div class="note" data-i18n>Van por separado: el portátil y el monitor de escenario suelen tener luz distinta.</div>
     </div>
-  </section>
-  <section class="cfg-s" id="cfg-s-screens">
-    <h3 data-i18n>Pantallas Live y vistas</h3>
+  </div>
+  </details>
+  <details class="cfg-s" id="cfg-s-screens">
+    <summary class="cfg-sum"><svg class="ic"><use href="#i-screen"/></svg><h3 data-i18n>Pantallas y reposo</h3><svg class="ic chev"><use href="#i-chev"/></svg></summary>
+    <div class="cfg-b">
     <div class="form scr">
       <div class="fsub" data-i18n>Confidence · show</div>
       <label for="sc-sw" data-i18n>Ámbar a falta de</label><span class="nrow" data-i18n><input id="sc-sw" type="number" min="0" max="180" data-sc="conf.showWarn"> min</span>
@@ -342,11 +359,16 @@
       <label for="sc-tbg" data-i18n>Fondo</label><input id="sc-tbg" type="color" class="swatch" data-sc="ticker.bg">
       <label for="sc-tfg" data-i18n>Texto</label><input id="sc-tfg" type="color" class="swatch" data-sc="ticker.fg">
       <div id="sc-tprev" class="tkprev crawl"><div class="tkp-track"><span class="tkp-run"><span data-i18n>PRINCIPAL · RETRASO +10 MIN</span><i></i><span data-i18n>CURFEW 01:30</span><i></i></span><span class="tkp-run" aria-hidden="true"><span data-i18n>PRINCIPAL · RETRASO +10 MIN</span><i></i><span data-i18n>CURFEW 01:30</span><i></i></span></div></div>
+      <div class="fsub" data-i18n>Pantallas remotas (QR) sin emisión</div>
+      <label for="sc-park" data-i18n>Reposo por desconexión</label><select id="sc-park" data-sc="park.mins" data-num><option value="5" data-i18n>5 minutos (recomendado)</option><option value="2" data-i18n>2 minutos</option><option value="10" data-i18n>10 minutos</option><option value="0" data-i18n>Nunca (mantener siempre el último horario)</option></select>
+      <div class="note" data-i18n>Manager y Backstage abiertos por QR: si el Dashboard para la emisión pasan al cartel de Showtime con la hora a los 3 s; si se pierde la conexión, al cabo de este tiempo. Vuelven solas en cuanto llega la emisión. Confidence y Producción nunca.</div>
       <div class="note" data-i18n>Se aplican al momento en todas las Pantallas Live abiertas y en los dispositivos de Staff.</div>
     </div>
-  </section>
-  <section class="cfg-s" id="cfg-s-msg">
-    <h3 data-i18n>Mensajes</h3>
+  </div>
+  </details>
+  <details class="cfg-s" id="cfg-s-msg">
+    <summary class="cfg-sum"><svg class="ic"><use href="#i-msg"/></svg><h3 data-i18n>Mensajes</h3><svg class="ic chev"><use href="#i-chev"/></svg></summary>
+    <div class="cfg-b">
     <div class="form">
       <label for="cfg-msg-bg" data-i18n>Fondo</label><input id="cfg-msg-bg" type="color" class="swatch">
       <label for="cfg-msg-fg" data-i18n>Letra</label><input id="cfg-msg-fg" type="color" class="swatch">
@@ -355,9 +377,11 @@
       <div id="cfg-msg-prev" class="msg-prev"><span data-i18n>5 MINUTOS</span></div>
       <div class="note" data-i18n><button id="cfg-msg-reset" class="btn" type="button" data-i18n>Colores por defecto</button> Cada mensaje sale con los colores y la duración que haya al enviarlo.</div>
     </div>
-  </section>
-  <section class="cfg-s" id="cfg-s-meteo">
-    <h3 data-i18n>Meteo</h3>
+  </div>
+  </details>
+  <details class="cfg-s" id="cfg-s-meteo">
+    <summary class="cfg-sum"><svg class="ic"><use href="#i-csun"/></svg><h3 data-i18n>Meteo</h3><svg class="ic chev"><use href="#i-chev"/></svg></summary>
+    <div class="cfg-b">
     <div class="form mt">
       <span></span><label class="chk" title="Tarjeta METEO, Live Manager y cinta de Backstage" data-i18n data-i18n-title><input id="mt-on" type="checkbox"> Mostrar el tiempo</label>
       <label for="mt-src" data-i18n>Fuente</label><select id="mt-src"><option value="openmeteo" data-i18n>Open-Meteo · previsión</option><option value="url" data-i18n>URL JSON propia (estación del evento)</option><option value="manual" data-i18n>Manual</option></select>
@@ -402,7 +426,8 @@
       <span></span><div id="mt-st" class="mt-st"></div>
       <div class="mt-attr" data-i18n>Data by <a href="https://open-meteo.com/" target="_blank" rel="noopener" data-i18n>Open-Meteo.com</a> (CC BY 4.0) · Calidad del aire: Copernicus Atmosphere Monitoring Service</div>
     </div>
-  </section>
+  </div>
+  </details>
 </aside>
 
 <!-- QR en grande (Emisión): se queda abierto hasta cerrarlo, para escanearlo con calma -->
@@ -474,20 +499,20 @@
 <datalist id="zones-dl"></datalist>
 <div id="toast" class="toast" hidden></div>
 
-<script src="i18n.js?v=20261143"></script>
-<script src="core.js?v=20261143"></script>
-<script src="meteo.js?v=20261143"></script>
-<script src="datos.js?v=20261143"></script>
-<script src="importar.js?v=20261143"></script>
-<script src="xlsx.js?v=20261143"></script>
-<script src="qr.js?v=20261143"></script>
-<script src="emision.js?v=20261143"></script>
-<script src="mando.js?v=20261143"></script>
-<script src="vistas.js?v=20261143"></script>
-<script src="log.js?v=20261143"></script>
-<script src="print.js?v=20261143"></script>
-<script src="marca.js?v=20261143"></script>
-<script src="control.js?v=20261143"></script>
-<script src="pwa.js?v=20261143"></script>
+<script src="i18n.js?v=20261144"></script>
+<script src="core.js?v=20261144"></script>
+<script src="meteo.js?v=20261144"></script>
+<script src="datos.js?v=20261144"></script>
+<script src="importar.js?v=20261144"></script>
+<script src="xlsx.js?v=20261144"></script>
+<script src="qr.js?v=20261144"></script>
+<script src="emision.js?v=20261144"></script>
+<script src="mando.js?v=20261144"></script>
+<script src="vistas.js?v=20261144"></script>
+<script src="log.js?v=20261144"></script>
+<script src="print.js?v=20261144"></script>
+<script src="marca.js?v=20261144"></script>
+<script src="control.js?v=20261144"></script>
+<script src="pwa.js?v=20261144"></script>
 </body>
 </html>

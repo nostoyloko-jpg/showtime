@@ -1180,7 +1180,7 @@
   });
   test('Acabado: cabeceras en gris pizarra (sin rojo) y bloques en tarjetas, igual en Configuración, Pantallas y Emisión y el gestor', () => {
     const css = D.src('control.css'), html = D.src('index.html'), js = D.src('control.js');
-    ok(/\.cfg-s h3\{font-size:11px;letter-spacing:\.12em;text-transform:uppercase;font-weight:700;color:#8a8f98;margin-bottom:8px\}/.test(css), 'Configuración: eyebrow gris pizarra');
+    ok(/\.cfg-s h3\{font-size:11px;letter-spacing:\.12em;text-transform:uppercase;font-weight:700;color:#8a8f98;margin:0\}/.test(css), 'Configuración: eyebrow gris pizarra');
     ok(!/\.cfg-s h3\{[^}]*var\(--accent\)/.test(css), 'sin el rojo del acento');
     ok(/\.hub-h,\.gv-sec\{font-size:11px;letter-spacing:\.12em;text-transform:uppercase;font-weight:700;color:#8a8f98/.test(css), 'misma cabecera en el panel y en el gestor');
     ok(/\.hub-card,\.gv-card\{background:rgba\(255,255,255,\.025\);border:1px solid var\(--hair2\);border-radius:10px;padding:4px 6px;margin-bottom:12px\}/.test(css), 'tarjeta común');
@@ -1940,6 +1940,23 @@ const miss = [...found].filter(k => !I.txHas(k) && !/^(OK|CALL|SC|Live|Raycast|S
 
   test('Dec. 130: «Ver» con ancho fijo (sin salto de los menús vecinos al cambiar de vista)', () => {
     ok(/#view-lbl\{display:inline-block;min-width:96px;text-align:left\}/.test(D.src('control.css')));
+  });
+
+  test('Dec. 131: Configuración en 9 secciones plegables (<details>), Evento abierto; ajuste de reposo de las pantallas remotas', () => {
+    const html = D.src('index.html'), css = D.src('control.css'), js = D.src('control.js');
+    const cfg = html.slice(html.indexOf('<aside id="cfg"'), html.indexOf('</aside>', html.indexOf('<aside id="cfg"')));
+    const ids = (cfg.match(/<details class="cfg-s" id="cfg-s-(\w+)"/g) || []).map(x => x.match(/cfg-s-(\w+)/)[1]);
+    eq(ids.join(' '), 'lang fest stages live net styles screens msg meteo', 'las 9, en orden');
+    ok(!/<section class="cfg-s"/.test(cfg), 'ya no hay <section>');
+    eq((cfg.match(/<details class="cfg-s" id="cfg-s-\w+" open>/g) || []).join(), '<details class="cfg-s" id="cfg-s-fest" open>', 'solo Evento abierto de entrada');
+    eq((cfg.match(/<summary class="cfg-sum"><svg class="ic"><use href="#i-[a-z]+"\/><\/svg><h3[^>]*>[^<]+<\/h3><svg class="ic chev"><use href="#i-chev"\/><\/svg><\/summary>/g) || []).length, 9, 'cabecera: icono SVG (sin emojis, dec. 43), título y chevron');
+    eq((cfg.match(/<details /g) || []).length, (cfg.match(/<\/details>/g) || []).length, 'bien cerradas');
+    ok(/\.cfg-sum::-webkit-details-marker\{display:none\}/.test(css) && /\.cfg-sum\{[^}]*cursor:pointer;list-style:none;/.test(css) && /\.cfg-sum::marker\{content:''\}/.test(css), 'sin el triángulo del navegador');
+    ok(/\.cfg-sum \.chev\{[^}]*transform:rotate\(-90deg\)/.test(css) && /\.cfg-s\[open\] > \.cfg-sum \.chev\{transform:none\}/.test(css), 'chevron que gira al abrir');
+    ok(/\.cfg-s\{border-bottom:1px solid var\(--line\)\}/.test(css), 'filete entre secciones');
+    ok(/if \(s\) s\.open = true;/.test(js), 'openConfig(sección) la abre (p. ej. «Configuración › Meteo»)');
+    ok(/<select id="sc-park" data-sc="park\.mins" data-num><option value="5"[^>]*>5 minutos \(recomendado\)<\/option><option value="2"[^>]*>2 minutos<\/option><option value="10"[^>]*>10 minutos<\/option><option value="0"[^>]*>Nunca \(mantener siempre el último horario\)<\/option><\/select>/.test(html), 'selector de reposo en Pantallas y reposo');
+    ok(/const \[g, k\] = el\.dataset\.sc\.split\('\.'\);/.test(js) && /el\.dataset\.num !== undefined\) \? Number\(el\.value\)/.test(js), 'se guarda como número en screens.park.mins (como el resto de ajustes de pantallas)');
   });
 
   // ── Ejecutor ─────────────────────────────────────────────────────────

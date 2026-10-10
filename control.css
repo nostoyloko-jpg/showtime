@@ -229,9 +229,18 @@ tfoot input.bad,tfoot select.bad{border-color:var(--err)!important;background-co
 .cfg[hidden]{display:none}
 .cfg-h{position:sticky;top:0;z-index:2;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line)}
 .cfg-h h2{font-size:17px}
-.cfg-s{padding:16px 0;border-bottom:1px solid var(--line)}
+.cfg-s{border-bottom:1px solid var(--line)}   /* dec. 131: secciones plegables (<details>), separadas por un filete */
+.cfg-sum{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 2px;cursor:pointer;list-style:none;user-select:none;-webkit-user-select:none;color:#8a8f98;border-radius:6px}
+.cfg-sum::-webkit-details-marker{display:none}
+.cfg-sum::marker{content:''}
+.cfg-sum .ic{width:15px;height:15px;flex:0 0 auto}
+.cfg-sum .chev{margin-left:auto;width:12px;height:12px;transform:rotate(-90deg);transition:transform .15s}
+.cfg-s[open] > .cfg-sum .chev{transform:none}
+.cfg-sum:hover,.cfg-sum:hover h3{color:var(--text)}
+.cfg-sum:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.cfg-b{padding:2px 0 16px}
 /* Cabeceras de sección (eyebrow): gris pizarra frío, sin el rojo del acento (el rojo es para alertas) */
-.cfg-s h3{font-size:11px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:#8a8f98;margin-bottom:8px}
+.cfg-s h3{font-size:11px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:#8a8f98;margin:0}
 .cfg-s.flash{animation:flash 1.2s ease-out}
 .cfg .form{grid-template-columns:auto 1fr}
 
@@ -256,6 +265,7 @@ body[data-ps="stage"] thead th,body[data-ps="stage"] tfoot tr.add td,body[data-p
 /* Escenario (alto contraste, para el sol): sin transparencias ni brillos */
 body[data-ps="stage"]{--glass-bg:#000;--glass-line:rgba(255,214,0,.55);--glass-blur:none}
 body[data-ps="stage"] .cfg-h{background:#000}
+body[data-ps="stage"] .cfg-sum{color:#FFD600}
 body[data-ps="stage"] .mpanel,body[data-ps="stage"] .cfg,body[data-ps="stage"] .modal-box,body[data-ps="stage"] .qr-big-box{background-image:none}
 
 /* ── Pegar horario ── */

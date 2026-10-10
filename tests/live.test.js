@@ -588,6 +588,16 @@
     ok(!/Neutro|Raycast/.test(css.slice(0, 400)), 'cabecera del archivo al día');
   });
 
+  test('Dec. 131: reposo en Staff — cartel, hora local y «ESPERANDO EMISIÓN», decidido por Vs.parkState y quitado solo al volver', () => {
+    const h = D.src('live.html'), js = D.src('live.js'), css = D.src('live.css');
+    ok(/<div id="park" class="standby park" role="status" hidden><\/div>/.test(h), 'capa del reposo en live.html');
+    ok(/setPark\(Vs\.parkState\(\{ vista: VISTA, prod: !!PRODID, state: s,/.test(js), 'la decide parkState con la vista y si es Producción');
+    ok(/setInterval\(checkPark, 1000\)/.test(js) && /lastSt = st; endedAt = s === 'end' \? \(endedAt \|\| Date\.now\(\)\) : 0; checkPark\(\);/.test(js), 'se revisa cada segundo y con cada estado');
+    ok(/tx\('ESPERANDO EMISIÓN'\)/.test(js) && /Mk\.banner\(/.test(js) && /Mk\.hhmm\(d\)/.test(js), 'cartel, hora local y pastilla');
+    ok(/\.standby\.park\{z-index:450;background:#07080a;/.test(css) && /body\.park-on \.rx\{display:none\}/.test(css), 'fondo #07080a, por encima de todo, sin el aviso rojo');
+    eq(require('../i18n.js').tx('ESPERANDO EMISIÓN', null, 'en'), 'WAITING FOR BROADCAST', 'en inglés');
+  });
+
 
   (async () => {
     let pass = 0, fail = 0;

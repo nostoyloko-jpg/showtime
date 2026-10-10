@@ -11,8 +11,8 @@
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <title>Showtime · Pantalla Live</title>
-<link rel="stylesheet" href="live.css?v=20261143">
-<link rel="stylesheet" href="marca.css?v=20261143">
+<link rel="stylesheet" href="live.css?v=20261144">
+<link rel="stylesheet" href="marca.css?v=20261144">
 </head>
 <body>
 
@@ -93,6 +93,8 @@
 
 <!-- Standby / Modo Cartel: el cartel de Showtime a pantalla completa y la hora (descansos, pausas técnicas, antes de puertas). Tecla S. -->
 <div id="standby" class="standby" hidden></div>
+<!-- Reposo / Modo Parking (dec. 131): Manager y Backstage por QR sin emisión → cartel, hora local y «ESPERANDO EMISIÓN»; vuelve sola -->
+<div id="park" class="standby park" role="status" hidden></div>
 
 <!-- Mensaje flash (2c-C): enorme, parpadea; se cierra solo (duración en Configuración → Mensajes) o con el botón -->
 <div id="flash" role="alert" hidden><div class="fl-box"><div id="flash-by" class="fl-by" hidden></div><div id="flash-txt"></div><div class="fl-bar"><div id="flash-prog"></div></div></div><button id="flash-x" class="iconbtn" title="Cerrar mensaje" data-i18n-title><svg class="ic"><use href="#i-x"/></svg></button></div>
@@ -151,15 +153,15 @@
   </div>
 </div>
 
-<script src="i18n.js?v=20261143"></script>
-<script src="core.js?v=20261143"></script>
-<script src="meteo.js?v=20261143"></script>
-<script src="datos.js?v=20261143"></script>
-<script src="cripto.js?v=20261143"></script>
-<script src="emision.js?v=20261143"></script>
-<script src="vistas.js?v=20261143"></script>
-<script src="marca.js?v=20261143"></script>
-<script src="live.js?v=20261143"></script>
-<script src="pwa.js?v=20261143"></script>
+<script src="i18n.js?v=20261144"></script>
+<script src="core.js?v=20261144"></script>
+<script src="meteo.js?v=20261144"></script>
+<script src="datos.js?v=20261144"></script>
+<script src="cripto.js?v=20261144"></script>
+<script src="emision.js?v=20261144"></script>
+<script src="vistas.js?v=20261144"></script>
+<script src="marca.js?v=20261144"></script>
+<script src="live.js?v=20261144"></script>
+<script src="pwa.js?v=20261144"></script>
 </body>
 </html>

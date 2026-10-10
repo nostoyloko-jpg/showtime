@@ -1025,6 +1025,7 @@
     renderConfig();
     if (section) {
       const s = $('cfg-s-' + section);
+      if (s) s.open = true;   // secciones plegables (dec. 131): la que se pide se abre
       if (s) { s.scrollIntoView({ block: 'start' }); s.classList.remove('flash'); void s.offsetWidth; s.classList.add('flash'); }
       const f = s && s.querySelector('input,select');
       if (f) f.focus();

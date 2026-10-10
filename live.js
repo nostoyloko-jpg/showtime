@@ -991,8 +991,16 @@
     const Em = window.ShowtimeEmision, params = Em && Em.parseHash(location.hash), rx = $('rx');
     rx.hidden = false;
     const ago = s => s < 60 ? s + ' s' : s < 3600 ? Math.floor(s / 60) + ' min' : Math.floor(s / 3600) + ' h';
+    // Reposo (dec. 131): desde cuándo no llega nada y desde cuándo está parada la emisión; se revisa cada segundo
+    const startedAt = Date.now(); let lastSt = null, endedAt = 0;
+    function checkPark() {
+      const s = lastSt ? lastSt.state : 'bad';
+      setPark(Vs.parkState({ vista: VISTA, prod: !!PRODID, state: s, lastMsg: lastSt && lastSt.lastMsg, startedAt, endedAt, now: Date.now(), mins: screensCfg().park && screensCfg().park.mins }));
+    }
+    setInterval(checkPark, 1000);
     function render(st) {
       const s = st ? st.state : 'bad';
+      lastSt = st; endedAt = s === 'end' ? (endedAt || Date.now()) : 0; checkPark();
       rx.className = 'rx ' + s;
       const t = st && st.lastMsg ? Math.round((Date.now() - st.lastMsg) / 1000) : 0;
       const nLinks = st ? st.links.filter(l => l.state === 'on').length : 0;
@@ -1013,6 +1021,22 @@
     // Al volver a encender la pantalla (o volver a la pestaña), se reconecta a fondo y se pide el estado: nada de conexiones «zombi»
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') R.wake(); });
     window.addEventListener('online', () => R.wake());   // la red vuelve (cambio de Wi-Fi)
+  }
+
+  // ── Reposo / Modo Parking (dec. 131) ─────────────────────────────────
+  // Pantalla fija por QR (Manager, Backstage) que se queda sin emisión: en vez del aviso rojo toda la noche, el cartel de Showtime con la
+  // hora local en grande y «ESPERANDO EMISIÓN». Cuándo, lo decide Vs.parkState. Se quita sola con el primer paquete. No toca los datos.
+  let PARKED = false, parkClk = null;
+  function setPark(on) {
+    const el = $('park'); if (!el || !Mk || on === PARKED) return;
+    PARKED = on; document.body.classList.toggle('park-on', on);
+    if (!on) { el.hidden = true; el.innerHTML = ''; clearInterval(parkClk); parkClk = null; return; }
+    el.innerHTML = '<div class="park-in">' + Mk.banner({ version: (window.ShowtimeEmision || {}).BUILD || '', footer: true }) +
+      '<div id="park-clk" class="park-clk"></div><div class="park-pill"><svg class="ic"><use href="#i-clock"/></svg>' + esc(tx('ESPERANDO EMISIÓN')) + '</div></div>';
+    el.hidden = false;
+    // Hora local (sigue sin internet) y, cada minuto, un leve desplazamiento del bloque: una tele encendida toda la noche no se «quema»
+    const upd = () => { const c = $('park-clk'), d = new Date(), t = Mk.hhmm(d); if (c && c.textContent !== t) { c.textContent = t; const k = d.getMinutes() % 4, box = el.firstChild; if (box) box.style.transform = 'translate(' + [0, 14, 0, -14][k] + 'px,' + [-10, 0, 10, 0][k] + 'px)'; } };
+    upd(); clearInterval(parkClk); parkClk = setInterval(upd, 1000);
   }
 
   // ── Vistas (2e-A) ───────────────────────────────────────────────────

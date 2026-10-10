@@ -28,8 +28,11 @@
   const DEFAULT_SCREENS = {
     conf: { showWarn: 10, showDanger: 5, blink: true, blinkSpeed: 1, coWarn: 5, coDanger: 1, overBg: '#000000', overNum: '#ff3b30' },
     back: { cards: true, lines: true, ticker: true },
-    ticker: { delays: true, hitos: true, meteo: true, mode: 'crawl', bg: '#000000', fg: '#ffb347', speed: 30 }
+    ticker: { delays: true, hitos: true, meteo: true, mode: 'crawl', bg: '#000000', fg: '#ffb347', speed: 30 },
+    park: { mins: 5 }   // dec. 131: reposo de las pantallas remotas sin emisión (0 = nunca)
   };
+  const PARK_MINS = [5, 2, 10, 0];   // 5 = recomendado · 0 = nunca (mantener siempre el último horario)
+  const PARK_END_MS = 3000;          // «Parar emisión» en el Dashboard → reposo a los 3 s
   /** Número con decimales (un decimal) entre lo y hi; lo que no sea número, al valor por defecto. */
   function num(v, d, lo, hi) { const n = Number(v); return v !== '' && v !== null && Number.isFinite(n) ? Math.round(Math.min(hi, Math.max(lo, n)) * 10) / 10 : d; }
   function int(v, d, lo, hi) { const n = Math.round(Number(v)); return Number.isFinite(n) && n >= lo && n <= hi ? n : d; }
@@ -49,8 +52,24 @@
       conf,
       back: { cards: bool(b.cards, true), lines: bool(b.lines, true), ticker: bool(b.ticker, true) },
       ticker: { delays: bool(t.delays, true), hitos: bool(t.hitos, true), meteo: bool(t.meteo, true), mode: t.mode === 'static' ? 'static' : 'crawl',
-        bg: hex(t.bg, D.ticker.bg), fg: hex(t.fg, D.ticker.fg), speed: num(t.speed, D.ticker.speed, 5, 120) }   // segundos por vuelta (libre: 5 a 120)
+        bg: hex(t.bg, D.ticker.bg), fg: hex(t.fg, D.ticker.fg), speed: num(t.speed, D.ticker.speed, 5, 120) },   // segundos por vuelta (libre: 5 a 120)
+      park: { mins: PARK_MINS.indexOf(Number((o.park || {}).mins)) >= 0 && (o.park || {}).mins !== '' && (o.park || {}).mins !== null ? Number(o.park.mins) : D.park.mins }
     };
+  }
+
+  /** Reposo / Modo Parking de una pantalla remota (dec. 131). Solo maquetación: decide si se tapa la vista con el cartel.
+   *  o: { vista, prod (Live de Producción), state ('connecting'|'live'|'stale'|'end'|'bad'), lastMsg, startedAt, endedAt, now, mins }
+   *  · Confidence nunca (no distrae al músico) y Producción tampoco (es el móvil de una persona, con su chat).
+   *  · Emisión parada en el Dashboard → a los 3 s. · Sin noticias (corte, Wi-Fi, Mac apagado o la tele se enciende sin emisión)
+   *    → a los «mins» minutos desde el último dato (o desde que se abrió). · «Nunca» (0) → jamás. · Enlace no válido → no (que se vea el aviso).
+   *  En cuanto vuelve un paquete (state 'live') se quita sola. */
+  function parkState(o) {
+    if (!o || o.prod || normVista(o.vista) !== o.vista || o.vista === 'confidence') return false;
+    const mins = PARK_MINS.indexOf(Number(o.mins)) >= 0 ? Number(o.mins) : DEFAULT_SCREENS.park.mins, now = Number(o.now) || Date.now();
+    if (!mins || o.state === 'live' || o.state === 'bad') return false;
+    if (o.state === 'end') return now - (Number(o.endedAt) || now) >= PARK_END_MS;
+    if (o.state === 'stale' || o.state === 'connecting') return now - (Number(o.lastMsg) || Number(o.startedAt) || now) >= mins * 60000;
+    return false;
   }
 
   // ── Mensajes flash por destino ───────────────────────────────────────
@@ -209,7 +228,7 @@
     if (by.k === 'zone' && by.n) return '[' + String(by.n) + ']';
     return '';
   }
-  const API = { byLabel, VISTAS, VISTA_TXT, VISTA_SUB, DEFAULT_SCREENS, normVista, nextVista, normProdVista, nextProdVista, normScreens, normTargets, normZones, flashFor, targetsTxt,
+  const API = { byLabel, VISTAS, VISTA_TXT, VISTA_SUB, DEFAULT_SCREENS, normVista, nextVista, normProdVista, nextProdVista, normScreens, parkState, PARK_MINS, PARK_END_MS, normTargets, normZones, flashFor, targetsTxt,
     level, fmtClock, confidence, tickerItems, backstageCalls, liveUrl, parseLive, pickScreen };
   if (isNode) module.exports = API;
   else root.ShowtimeVistas = API;

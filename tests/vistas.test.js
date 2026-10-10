@@ -285,6 +285,27 @@
     ok(V.tickerItems(s, null, at2('2026-07-11', '04:50'), null).some(x => x.text === 'EN HORA · SIN INCIDENCIAS'), 'sin retraso, sí está en hora');
   });
 
+  test('Dec. 131: reposo de las pantallas remotas — ajuste (5 · 2 · 10 · nunca) y cuándo entra cada vista', () => {
+    eq(V.normScreens().park.mins, 5, 'por defecto, 5 min'); eq(V.normScreens({ park: { mins: 0 } }).park.mins, 0, 'nunca');
+    eq(V.normScreens({ park: { mins: 10 } }).park.mins, 10); eq(V.normScreens({ park: { mins: 7 } }).park.mins, 5, 'un valor raro → 5');
+    eq(V.normScreens({ park: { mins: '' } }).park.mins, 5); eq(V.normScreens({ park: { mins: null } }).park.mins, 5);
+    const t0 = 1e12, P = o => V.parkState(Object.assign({ vista: 'backstage', state: 'stale', lastMsg: t0, startedAt: t0 - 9e5, now: t0, mins: 5 }, o));
+    ok(!P({ now: t0 + 4.9 * 60000 }), 'corte de 4,9 min: sigue el último horario');
+    ok(P({ now: t0 + 5 * 60000 }), 'a los 5 min: reposo');
+    ok(P({ vista: 'manager', now: t0 + 5 * 60000 }), 'Manager también');
+    ok(!P({ vista: 'confidence', now: t0 + 60 * 60000 }), 'Confidence NUNCA (el músico)');
+    ok(!P({ prod: true, now: t0 + 60 * 60000 }), 'Producción nunca (su móvil, con chat)');
+    ok(!P({ mins: 0, now: t0 + 600 * 60000 }), '«Nunca»: jamás');
+    ok(!P({ mins: 2, now: t0 + 119000 }) && P({ mins: 2, now: t0 + 120000 }), '2 min');
+    ok(!P({ mins: 10, now: t0 + 9.9 * 60000 }) && P({ mins: 10, now: t0 + 10 * 60000 }), '10 min');
+    ok(!P({ state: 'live', now: t0 + 60 * 60000 }), 'en directo: nunca');
+    ok(!P({ state: 'bad', now: t0 + 60 * 60000 }), 'enlace no válido: se ve el aviso, no el cartel');
+    ok(!P({ state: 'end', endedAt: t0, now: t0 + 2900 }) && P({ state: 'end', endedAt: t0, now: t0 + 3000 }), 'emisión parada en el Dashboard: a los 3 s');
+    ok(!P({ state: 'end', endedAt: t0, now: t0 + 3e6, mins: 0 }), '«Nunca» vale también con la emisión parada');
+    ok(!P({ state: 'connecting', lastMsg: 0, startedAt: t0, now: t0 + 4 * 60000 }) && P({ state: 'connecting', lastMsg: 0, startedAt: t0, now: t0 + 5 * 60000 }), 'tele que se enciende sin emisión: cuenta desde que se abrió');
+    eq(V.PARK_END_MS, 3000); eq(V.PARK_MINS.join(), '5,2,10,0');
+  });
+
   // ── Ejecutar ──────────────────────────────────────────────────────────
   let pass = 0; const fails = [];
   tests.forEach(([n, f]) => { try { f(); pass++; } catch (e) { fails.push([n, e.message]); } });
