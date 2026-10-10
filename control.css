@@ -613,7 +613,9 @@ body[data-ps="stage"] .qr-big-box{background:#000;border-color:rgba(255,214,0,.4
 .mt-alerts{display:flex;flex-direction:column;gap:4px;margin-top:8px;position:relative}
 /* dec. 151: desde el tercer aviso, scroll dentro de la lista; el alto (dos avisos completos) lo mide fitMtAlerts() */
 .mt-alerts.scroll{overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-gutter:stable}
-.mt-al{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--call);opacity:.75}
+.mt-al{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--call);opacity:.75;position:relative}
+/* dec. 152: «!» de aviso recién llegado, superpuesto sobre el icono (sin columna ni texto; no desplaza nada; sin animación) */
+.mt-fresh{position:absolute;left:8px;top:0;width:11px;height:11px;border-radius:50%;background:var(--call);color:var(--bg);font-size:9px;line-height:11px;font-weight:900;text-align:center;pointer-events:none}
 .mt-al.new{opacity:1}
 .mt-al .ic{width:14px;height:14px;flex:0 0 auto}
 .mt-al span{flex:1;min-width:0}

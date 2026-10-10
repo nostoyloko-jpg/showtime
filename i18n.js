@@ -1211,6 +1211,7 @@
       "Se queda en la cinta hasta que lo quite el Stage Manager": "Stays on the ticker until the Stage Manager removes it"
     },
     meteo: {
+      "Aviso recién llegado": "Newly arrived alert",
       "RÁFAGAS {_v} {w}": "GUSTS {_v} {w}",
       "Ráfagas {_v} {_n} {w} · umbral {_u}": "Gusts {_v} {_n} {w} · threshold {_u}",
       "VIENTO {_v} {w}": "WIND {_v} {w}",
@@ -1550,7 +1551,7 @@
       "Cada cuánto se repite": "How often it repeats",
       "Se repite hasta pulsar OK en la tarjeta CALL": "Repeats until you press OK on the CALL card",
       "Se repite hasta pulsar «Visto» en el aviso del tiempo": "Repeats until you press “Seen” on the weather alert",
-      "Se repite hasta abrir el Chat": "Repeats until you open the Chat",
+      "Se repite hasta responder en el Chat": "Repeats until you reply in the Chat",
       "Silenciar el sonido de sobretiempo": "Silence the overrun sound",
       "Se repite hasta silenciarlo en EN ESCENA o terminar la banda": "Repeats until you silence it in ON STAGE or the band finishes"
     },

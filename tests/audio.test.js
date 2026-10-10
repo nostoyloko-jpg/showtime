@@ -325,12 +325,15 @@
     t.adv(1000); t.T.audioTick([], [{ key: 'b9', label: 'Banda Z' }], []); ok(!t.A.RING.repeating('overrun:b9'), 'y no vuelve mientras siga en sobretiempo');
     eq(t.env.storage.get('showtime.festival'), fest, '✓ no termina la banda ni cambia el evento');
     ok(/<div class="v-name">' \+ nameKind\(b\) \+ \(xo !== null \? auMuteBtn\('overrun:' \+ b\.key, b\.name\) : ''\) \+ '<\/div>'/.test(D.src('control.js')), 'silenciar va en la línea del nombre de EN ESCENA');
-    // Urgente (dec. 151): sin ✓ en el mensaje; se para al abrir el Chat
+    // Urgente (dec. 152): sin ✓ en el mensaje; abrir el Chat NO lo para; responder en el Chat, sí
     t.T.renderChat(); const ch = t.env.innerLog.filter(([n]) => n === 'chat-list').slice(-1)[0][1];
     ok(!/data-au-ack=|au-ack/.test(ch) && /urg-i/.test(ch), 'Urgente: sin ✓ en el mensaje; el triángulo sigue');
     t.env.fire('chat-pop', 'click', { stopPropagation() {} });   // abre la ventana del Chat
-    ok(!t.A.RING.repeating('urgent:' + uid), 'Urgente: abrir el Chat → se para');
-    eq(t.env.storage.get('showtime.chat'), chat, 'el mensaje, su «urgent» y el chat no cambian'); eq(t.env.storage.get('showtime.callDone'), callDone, 'sin OK de CALL'); eq(t.env.storage.get('showtime.log'), log, 'el log no cambia');
+    ok(t.A.RING.repeating('urgent:' + uid), 'Urgente: abrir el Chat → sigue repitiéndose');
+    t.env.getEl('chat-text2').value = 'Recibido'; t.env.fire('chat-form2', 'submit', { preventDefault() {} });
+    ok(!t.A.RING.repeating('urgent:' + uid), 'Urgente: responder en el Chat → se para');
+    const chat2 = t.read('showtime.chat');
+    eq(JSON.stringify(chat2.slice(0, -1)), chat, 'el mensaje urgente, su «urgent» y el resto del chat no cambian (solo se añade la respuesta)'); eq(t.env.storage.get('showtime.callDone'), callDone, 'sin OK de CALL'); eq(t.env.storage.get('showtime.log'), log, 'el log no cambia');
     ok(!/data-au-ack|au-ack/.test(D.src('live.js') + D.src('remote.js') + D.src('live.html') + D.src('remote.html')), 'Producción y Mando sin control de audio (urgent lo marca solo Producción)');
   });
 
@@ -715,62 +718,86 @@
     eq(E.cleanProdMsg({ type: 'call', from: 'prod_001', key }).key, key, 'el protocolo no cambia');
   });
 
-  // ── Dec. 151 · urgentes: se silencian al abrir el Chat · Meteo: lista de avisos con scroll ──────────
-  test('34 · Urgentes: abrir el Chat (menú o ventana) silencia todos los que se repiten; sin ✓ en el mensaje; no toca texto, «urgent», log ni emisión', () => {
-    const rec = {}, t = dashboard({ [KEY]: JSON.stringify({ on: true, rep: { urgent: true } }) }, fakeAC2(rec));
+  // ── Dec. 152 · urgentes: se silencian al RESPONDER en el Chat (abrirlo ya no cuenta) ──────────
+  /** Dashboard con dos urgentes de Producción repitiéndose. */
+  function urgDash(rec) {
+    const t = dashboard({ [KEY]: JSON.stringify({ on: true, rep: { urgent: true } }) }, fakeAC2(rec || {}));
     t.env.fire('document', 'pointerdown', GEST); t.T.audioTick(null);
     t.adv(1000); t.T.emProdMessage({ type: 'chat', from: 'prod_001', text: '¡Corte en Carpa!', urgent: true });
     t.adv(1000); t.T.emProdMessage({ type: 'chat', from: 'prod_001', text: 'Y en Principal', urgent: true });
     const ids = t.read('showtime.chat').slice(-2).map(m => 'urgent:' + m.id);
-    ok(ids.every(id => t.A.RING.repeating(id)), 'los dos se repiten');
-    t.T.renderChat(); const h = t.env.innerLog.filter(([n]) => n === 'chat-list').slice(-1)[0][1];
-    ok(!/data-au-ack|au-ack|#i-check/.test(h) && (h.match(/urg-i/g) || []).length === 2, 'sin ✓ dentro de los mensajes; el triángulo sigue');
-    const chat = t.env.storage.get('showtime.chat'), log = t.env.storage.get('showtime.log'), snap = JSON.stringify(t.T.emSnapshot()), cfg = t.env.storage.get('showtime.config');
-    t.env.fire('chat-pop', 'click', { stopPropagation() {} });   // ventana flotante del Chat
-    ok(ids.every(id => !t.A.RING.repeating(id)), 'abrir el Chat: se silencian todos');
-    eq(t.env.storage.get('showtime.chat'), chat, 'texto y «urgent» intactos'); eq(t.env.storage.get('showtime.log'), log, 'log intacto');
-    eq(JSON.stringify(t.T.emSnapshot()), snap, 'emisión igual'); eq(t.env.storage.get('showtime.config'), cfg, 'configuración igual');
-    rec.notes = []; for (let i = 0; i < 3; i++) { t.adv(10000); t.T.audioTick(null); }
-    eq(rec.notes.length, 0, 'ya no vuelven a sonar');
-    // Con el Chat abierto, un urgente nuevo suena una vez y no queda repitiéndose
-    t.adv(1000); t.T.emProdMessage({ type: 'chat', from: 'prod_001', text: 'Otro', urgent: true });
-    const id3 = 'urgent:' + t.read('showtime.chat').slice(-1)[0].id;
-    eq(rec.notes.join(), '988,988,988,1319', 'suena una vez'); ok(!t.A.RING.repeating(id3), 'no se repite (el operador lo está viendo)');
-    // Menú Chat (en lugar de la ventana)
-    const t2 = dashboard({ [KEY]: JSON.stringify({ on: true, rep: { urgent: true } }) }, fakeAC2({}));
-    t2.T.audioTick(null); t2.adv(1000); t2.T.emProdMessage({ type: 'chat', from: 'prod_001', text: 'x', urgent: true });
-    const u = 'urgent:' + t2.read('showtime.chat').slice(-1)[0].id; ok(t2.A.RING.repeating(u), 'se repite');
-    const mc = t2.env.getEl('m-chat'); mc.id = 'm-chat';
-    t2.T.chatMenuClick(mc);   // clic, toque o Intro / Espacio sobre «Chat»
-    ok(!t2.A.RING.repeating(u) && t2.T.chatOpenNow(), 'abrir el menú a propósito silencia los pendientes');
-    t2.adv(1000); t2.T.emProdMessage({ type: 'chat', from: 'prod_001', text: 'y', urgent: true });
-    ok(!t2.A.RING.repeating('urgent:' + t2.read('showtime.chat').slice(-1)[0].id), 'con el menú Chat abierto a propósito, el nuevo no se repite');
+    const mc = t.env.getEl('m-chat'); mc.id = 'm-chat';
+    return { t, ids, mc, all: () => ids.every(id => t.A.RING.repeating(id)), none: () => ids.every(id => !t.A.RING.repeating(id)) };
+  }
+
+  test('34 · Urgentes: abrir, pasar el ratón, la ventana flotante, enfocar o escribir sin enviar NO silencian nada', () => {
+    const u = urgDash();
+    ok(u.all(), 'los dos se repiten');
+    u.mc.classList.add('open'); ok(u.all(), 'hover: el menú se despliega y siguen');
+    u.t.env.fire('m-chat', 'pointerenter', { pointerType: 'mouse' }); ok(u.all(), 'pointerenter: siguen');
+    u.t.env.fire('chat-pop', 'click', { stopPropagation() {} }); ok(u.all(), 'ventana flotante abierta: siguen');
+    u.t.env.fire('chat-x', 'click', {}); ok(u.all(), 'ventana cerrada: siguen');
+    u.t.env.fire('chat-text2', 'focus', {}); u.t.env.getEl('chat-text2').value = 'Vamos'; u.t.env.fire('chat-text2', 'input', {});
+    ok(u.all(), 'cuadro enfocado y texto escrito sin enviar: siguen');
+    const rec = {}; const v = urgDash(rec); rec.notes = [];
+    v.t.env.fire('chat-pop', 'click', { stopPropagation() {} });
+    for (let i = 0; i < 3; i++) { v.t.adv(10000); v.t.T.audioTick(null); }
+    ok(rec.notes.length > 0, 'con el Chat abierto siguen sonando');
     const cj = D.src('control.js');
-    ok(/if \(m\.id === 'm-chat'\) \{ chatMenuClick\(m\); return; \}/.test(cj) && /if \(on\) \{ CHAT_EXPLICIT = true; audioChatSeen\(\); \}/.test(cj), 'clic / teclado en «Chat» → silencia');
-    ok(/chatPopOn = true; \$\('chat-modal'\)\.hidden = false; audioChatSeen\(\);/.test(cj), 'abrir la ventana del Chat, también');
-    ok(/function audioChatSeen\(\) \{ if \(AU\) AU\.RING\.dropRepeats\('urgent'\); \}/.test(cj), 'solo toca la cola de audio local');
-    ok(!/auAckBtn/.test(cj) && !/\.au-ack/.test(D.src('control.css')), 'fuera el ✓ de los urgentes');
-    ok(/<input id="au-rep-urgent" type="checkbox">/.test(D.src('index.html')) && /title="Se repite hasta abrir el Chat" data-i18n data-i18n-title><input id="au-rep-urgent"/.test(D.src('index.html')), 'tooltip de «Repetir» en Urgente');
-    eq(require('../i18n.js').tx('Se repite hasta abrir el Chat', null, 'en'), 'Repeats until you open the Chat');
+    ok(!/CHAT_EXPLICIT|chatMenuClick|chatOpenNow|audioChatSeen/.test(cj), 'fuera la lógica de «abrir el Chat silencia» (ningún nombre lo sugiere)');
+    ok(/function setMenu\(m, on\) \{ m\.classList\.toggle\('open', on\); m\.querySelector\('\.mbtn'\)\.setAttribute\('aria-expanded', String\(on\)\); \}/.test(cj), 'setMenu como antes de la 151');
+    ok(/clearTimeout\(tOpen\); const on = !m\.classList\.contains\('open'\); closeMenus\(m\); setMenu\(m, on\);/.test(cj), 'clic en «Chat»: el de cualquier menú');
+    ok(/function openChatPop\(\) \{ closeMenus\(\); \$\('chat-on'\)\.hidden = true; chatPopOn = true; \$\('chat-modal'\)\.hidden = false; renderChat\(\); \$\('chat-text2'\)\.focus\(\); \}/.test(cj), 'abrir la ventana no toca el audio');
+    eq((cj.match(/audioUrgentAnswered\(\);/g) || []).length, 1, 'un solo sitio silencia: el envío canónico');
   });
 
-  test('34b · Pasar el ratón por encima de «Chat» NO silencia ni quita urgentes pendientes', () => {
-    const t = dashboard({ [KEY]: JSON.stringify({ on: true, rep: { urgent: true } }) }, fakeAC2({}));
-    t.T.audioTick(null); t.adv(1000); t.T.emProdMessage({ type: 'chat', from: 'prod_001', text: 'x', urgent: true });
-    const u = 'urgent:' + t.read('showtime.chat').slice(-1)[0].id;
-    const mc = t.env.getEl('m-chat'); mc.id = 'm-chat';
-    mc.classList.add('open');   // lo que hace el ratón encima: el menú se despliega (setMenu), sin clic
-    ok(t.A.RING.repeating(u) && t.A.RING.size() === 1, 'el urgente sigue repitiéndose y en la cola');
-    ok(!t.T.chatOpenNow(), 'desplegado por el ratón no cuenta como abierto');
-    t.adv(1000); t.T.emProdMessage({ type: 'chat', from: 'prod_001', text: 'y', urgent: true });
-    ok(t.A.RING.repeating('urgent:' + t.read('showtime.chat').slice(-1)[0].id), 'un urgente nuevo con el menú solo desplegado por el ratón sí se repite');
-    const cj = D.src('control.js');
-    ok(/m\.addEventListener\('pointerenter', e => \{ if \(e\.pointerType !== 'mouse'\) return; clearTimeout\(tClose\); tOpen = setTimeout\(\(\) => \{ closeMenus\(m\); setMenu\(m, true\); \}, 120\); \}\);/.test(cj), 'el ratón encima solo despliega (setMenu)');
-    ok(!/function setMenu\(m, on\) \{[^}]*audioChatSeen/.test(cj), 'setMenu no silencia nada');
-    eq((cj.match(/audioChatSeen\(\);/g) || []).length, 2, 'solo dos sitios silencian: el clic/teclado en «Chat» y la ventana flotante');
-    // Clic sobre un menú ya desplegado por el ratón: lo deja abierto y lo da por abierto a propósito
-    t.T.chatMenuClick(mc); ok(mc.classList.contains('open') && t.T.chatOpenNow() && !t.A.RING.repeating(u), 'clic tras el ratón: abierto y silenciado');
-    t.T.chatMenuClick(mc); ok(!mc.classList.contains('open') && !t.T.chatOpenNow(), 'otro clic: se cierra');
+  test('34b · Urgentes: un envío válido silencia TODOS los pendientes (menú o ventana); vacío o fallido no; solo audio local', () => {
+    const u = urgDash(), t = u.t;
+    const chat0 = t.read('showtime.chat'), log = t.env.storage.get('showtime.log'), cfg = t.env.storage.get('showtime.config');
+    t.env.getEl('chat-text').value = '   '; t.env.fire('chat-form', 'submit', { preventDefault() {} });
+    ok(u.all(), 'mensaje vacío: no se envía y siguen'); eq(t.read('showtime.chat').length, chat0.length, 'nada añadido');
+    const Dt = t.env.win.ShowtimeDatos, add = Dt.addChat;
+    Dt.addChat = () => null; t.env.getEl('chat-text').value = 'Hola'; t.env.fire('chat-form', 'submit', { preventDefault() {} });
+    ok(u.all() && t.env.getEl('chat-text').value === 'Hola', 'envío rechazado: siguen y el texto se queda');
+    Dt.addChat = () => { throw new Error('almacén lleno'); };
+    try { t.T.sendChat(t.env.getEl('chat-text')); } catch (e) {}
+    ok(u.all(), 'envío que falla con error: siguen');
+    Dt.addChat = add;
+    t.env.getEl('chat-text').value = 'Recibido, voy'; t.env.fire('chat-form', 'submit', { preventDefault() {} });
+    ok(u.none(), 'envío válido desde el menú Chat: se silencian todos');
+    const chat1 = t.read('showtime.chat');
+    eq(JSON.stringify(chat1.slice(0, -1)), JSON.stringify(chat0), 'mensajes y «urgent» intactos'); ok(chat1.slice(0, -1).filter(m => m.urgent).length === 2, 'siguen marcados como urgentes');
+    eq(chat1.slice(-1)[0].text, 'Recibido, voy'); eq(chat1.slice(-1)[0].urgent, false, 'la respuesta no es urgente');
+    eq(t.env.storage.get('showtime.log'), log, 'log intacto'); eq(t.env.storage.get('showtime.config'), cfg, 'configuración igual');
+    t.T.renderChat(); eq((t.env.innerLog.filter(([n]) => n === 'chat-list').slice(-1)[0][1].match(/urg-i/g) || []).length, 2, 'se siguen viendo como urgentes');
+    // La ventana flotante usa el mismo envío
+    const w = urgDash();
+    w.t.env.fire('chat-pop', 'click', { stopPropagation() {} });
+    w.t.env.getEl('chat-text2').value = 'OK'; w.t.env.fire('chat-form2', 'submit', { preventDefault() {} });
+    ok(w.none(), 'envío válido desde la ventana flotante: se silencian todos');
+    ok(/function audioUrgentAnswered\(\) \{ if \(AU\) AU\.RING\.dropRepeats\('urgent'\); \}/.test(D.src('control.js')), 'solo toca la cola de audio local');
+    ok(/title="Se repite hasta responder en el Chat" data-i18n data-i18n-title><input id="au-rep-urgent"/.test(D.src('index.html')), 'tooltip de «Repetir» en Urgente');
+    eq(require('../i18n.js').tx('Se repite hasta responder en el Chat', null, 'en'), 'Repeats until you reply in the Chat');
+    ok(!/abrir el Chat/.test(D.src('index.html') + D.src('i18n.js')), 'fuera «hasta abrir el Chat»');
+  });
+
+  test('34c · Urgentes: tras responder, uno nuevo vuelve a sonar y repetir; con el Chat abierto, también repite', () => {
+    const rec = {}, u = urgDash(rec), t = u.t;
+    t.env.fire('chat-pop', 'click', { stopPropagation() {} });   // Chat abierto todo el rato
+    t.env.getEl('chat-text2').value = 'Recibido'; t.env.fire('chat-form2', 'submit', { preventDefault() {} });
+    ok(u.none(), 'respondido: silencio');
+    rec.notes = []; for (let i = 0; i < 3; i++) { t.adv(10000); t.T.audioTick(null); }
+    eq(rec.notes.length, 0, 'los respondidos no vuelven');
+    t.adv(1000); t.T.emProdMessage({ type: 'chat', from: 'prod_001', text: 'Otro', urgent: true });
+    const id3 = 'urgent:' + t.read('showtime.chat').slice(-1)[0].id;
+    eq(rec.notes.join(), '988,988,988,1319', 'el nuevo suena'); ok(t.A.RING.repeating(id3), 'y se repite aunque el Chat esté abierto');
+    rec.notes = []; t.adv(10000); t.T.audioTick(null); ok(rec.notes.length > 0, 'vuelve a sonar a los 10 s');
+    t.env.getEl('chat-text2').value = 'Voy'; t.env.fire('chat-form2', 'submit', { preventDefault() {} });
+    ok(!t.A.RING.repeating(id3), 'hasta la siguiente respuesta válida');
+    // Sin «Repetir»: suena una vez, como siempre
+    const r2 = {}, t2 = dashboard({ [KEY]: JSON.stringify({ on: true }) }, fakeAC2(r2));
+    t2.env.fire('document', 'pointerdown', GEST); t2.T.audioTick(null); t2.adv(1000); t2.T.emProdMessage({ type: 'chat', from: 'prod_001', text: 'x', urgent: true });
+    ok(!t2.A.RING.repeating('urgent:' + t2.read('showtime.chat').slice(-1)[0].id), 'sin «Repetir» no se repite');
   });
 
   test('35 · Meteo: siempre dos avisos completos (aunque ocupen dos líneas); desde el tercero, scroll dentro; sin altura fija', () => {
@@ -804,6 +831,116 @@
     const h = (t2.env.innerLog.filter(([n]) => n === 'v-meteo').slice(-1)[0] || ['', ''])[1], i = h.indexOf('<div class="mt-alerts">');
     ok(i > 0, 'resumen arriba y la lista debajo'); eq((h.slice(i).match(/class="mt-al[ "]/g) || []).length, 5, 'los 5 avisos en la lista');
     ok(h.indexOf('class="mt-foot"') > i, 'el pie, debajo y fuera de la lista');
+  });
+
+  // ── Dec. 152 · Meteo: el aviso nuevo se enfoca una vez y lleva un «!» local ──────────
+  /** Lista de avisos de mentira con medidas de navegador: alturas, hueco de 4 px, alto visible y scroll. */
+  function mtLista(alts, kinds, visible) {
+    const cls = new Set(); let y = 0, st = 0;
+    const L = { style: {}, classList: { toggle: (c, on) => on ? cls.add(c) : cls.delete(c), has: c => cls.has(c) }, sets: 0,
+      get scrollTop() { return st; }, set scrollTop(v) { L.sets++; st = Math.max(0, Math.min(v, L.scrollHeight - L.clientHeight)); },
+      getBoundingClientRect: () => ({ top: 100, bottom: 100 + L.clientHeight }) };
+    L.children = alts.map((h, i) => { const it = { dataset: { k: kinds ? kinds[i] : 'k' + i }, top: y, h,
+      getBoundingClientRect: () => ({ top: 100 + it.top - st, bottom: 100 + it.top + it.h - st }) }; y += h + 4; return it; });
+    L.scrollHeight = y - 4; L.clientHeight = visible || 0;
+    const seen = it => it.top >= st && it.top + it.h <= st + L.clientHeight;
+    return { L, seen };
+  }
+  const MT_TH = { wind: 40, gust: 50, rain: 2, heat: 30, storm: true, uvOn: true, uv: 8 };
+  const mtCfg = man => ({ on: true, source: 'manual', manual: Object.assign({ temp: 20, rain: 0, wind: 45, gust: 60, uv: 2, at: Date.UTC(2026, 6, 10, 12, 0, 0) }, man), th: MT_TH });
+  /** Dashboard con Meteo manual: ráfagas y viento (dos avisos). set(man) cambia los valores como el regidor en Configuración. */
+  function mtDash(man) {
+    const Wm = require('../meteo.js');
+    const meteo = m => { const c = Wm.normMeteo(mtCfg(m)); return JSON.stringify({ snap: Wm.manualSnap(c.manual), err: '', errAt: null, key: c.source + '|' + c.lat + '|' + c.lon + '|' + c.url }); };
+    const F = festCall(Date.UTC(2026, 6, 10, 12, 0, 0));
+    const t = dashboard({ 'showtime.festival': JSON.stringify(F), 'showtime.config': JSON.stringify({ mode: 'all', meteo: mtCfg(man) }), 'showtime.meteo': meteo(man) });
+    t.env.win.ShowtimePanel.reload();
+    const last = () => (t.env.innerLog.filter(([n]) => n === 'v-meteo').slice(-1)[0] || ['', ''])[1];
+    const kinds = () => (last().match(/class="mt-al[ "][^>]*data-k="([a-z]+)"/g) || []).map(x => x.match(/data-k="([a-z]+)"/)[1]);
+    const fresh = () => (last().match(/data-k="([a-z]+)"><svg class="ic"><use href="#i-alert"\/><\/svg><span class="mt-fresh"/g) || []).map(x => x.match(/data-k="([a-z]+)"/)[1]);
+    const set = m => { t.env.storage.set('showtime.config', JSON.stringify({ mode: 'all', meteo: mtCfg(m) })); t.env.storage.set('showtime.meteo', meteo(m)); t.env.win.ShowtimePanel.reload(); };
+    /** Coloca una lista de mentira como la que el navegador pinta (mismos tipos y orden). */
+    const lista = (alts, visible) => { const r = mtLista(alts, kinds(), visible); t.env.getEl('v-meteo').querySelector = () => r.L; return r; };
+    return { t, last, kinds, fresh, set, lista };
+  }
+
+  test('35b · Meteo: el alto deja ver dos avisos consecutivos completos aunque un tercero o posterior sea más alto (texto largo)', () => {
+    const t = dashboard({});
+    let r = mtLista([18, 18, 60]);
+    eq(t.T.fitMtAlerts(r.L), 82, 'el par más alto: 18 + 4 + 60 (el 3.º, de varias líneas, entra entero)');
+    r = mtLista([18, 18, 40, 18, 18]);
+    eq(t.T.fitMtAlerts(r.L), 62, 'el par 2.º–3.º (18 + 4 + 40) manda; con cualquier scroll caben dos seguidos');
+    r = mtLista([34, 34, 34, 34, 34]); eq(t.T.fitMtAlerts(r.L), 72, 'iguales: como antes');
+    r = mtLista([18.4, 18.4, 18.4]); eq(t.T.fitMtAlerts(r.L), 41, 'con decimales, hacia arriba (nunca 1 px cortado)');
+    ok(!/max-height:\s*\d/.test(D.src('control.css').match(/\.mt-[a-z]+[^{]*\{[^}]*\}/g).join('')), 'sin alturas fijas en CSS');
+  });
+
+  test('36 · Meteo: un aviso real nuevo (3.º) lleva la lista al final UNA vez, con el aviso nuevo entero; repintar respeta el scroll manual', () => {
+    const m = mtDash({});
+    eq(m.kinds().join(), 'gust,wind', 'dos avisos'); eq(m.fresh().length, 0, 'carga inicial: ningún «!»');
+    let r = m.lista([18, 18, 18], 40);   // así se pintará con el aviso de lluvia
+    m.set({ rain: 8 });
+    eq(m.kinds().join(), 'gust,wind,rain', 'entra la lluvia (3.º)'); eq(m.fresh().join(), 'rain', '«!» solo en el aviso nuevo');
+    eq(r.L.scrollTop, r.L.scrollHeight - r.L.clientHeight, 'scroll al final'); ok(r.seen(r.L.children[2]), 'el aviso nuevo, entero a la vista');
+    const sets = r.L.sets;
+    r.L.scrollTop = 0; const manual = r.L.sets;   // el regidor sube a mano
+    for (let i = 0; i < 3; i++) { m.t.adv(1000); m.t.env.win.ShowtimePanel.reload(); }
+    eq(r.L.scrollTop, 0, 'ticks y repintados: el scroll manual se respeta'); eq(r.L.sets, manual, 'nadie toca el scroll');
+    const n0 = m.t.env.innerLog.filter(([n]) => n === 'v-meteo').length;
+    m.t.T.setAppLang('en'); m.t.env.fire('window', 'resize', {});
+    ok(m.t.env.innerLog.filter(([n]) => n === 'v-meteo').length > n0 && /Newly arrived alert/.test(m.last()), 'cambio de idioma: repinta (en inglés)');
+    eq(r.L.scrollTop, 0, 'idioma y resize: tampoco'); m.t.T.setAppLang('es');
+    r.L.scrollTop = 10; m.set({ rain: 9 }); eq(r.L.scrollTop, 10, 'empeora un aviso que ya estaba (mismo tipo): no es nuevo, no salta');
+    eq(m.fresh().join(), 'rain', 'y el «!» sigue donde estaba'); ok(sets > 0);
+    // Otro aviso real nuevo: su propio salto único
+    r = m.lista([18, 18, 18, 18], 40); m.set({ rain: 9, temp: 38 });
+    const ks = m.kinds(), i = ks.indexOf('heat'); ok(i >= 0 && ks.length === 4, 'entra el calor: ' + ks.join());
+    ok(r.seen(r.L.children[i]), 'el nuevo, entero a la vista'); eq(m.fresh().sort().join(), 'heat,rain', '«!» en los dos recién llegados (el anterior aún no se ha quitado)');
+  });
+
+  test('36b · Meteo: el aviso nuevo nunca queda cortado al saltar (más alto que los demás, o no es el último en el orden)', () => {
+    const t = dashboard({});
+    let r = mtLista([18, 18, 18, 60], ['gust', 'wind', 'rain', 'heat']); r.L.clientHeight = t.T.fitMtAlerts(r.L);
+    t.T.mtJump(r.L, 'heat'); ok(r.seen(r.L.children[3]), 'el último, alto: entero (' + r.L.scrollTop + ')'); eq(r.L.scrollTop, r.L.scrollHeight - r.L.clientHeight, 'al final');
+    r = mtLista([18, 18, 18, 18, 18], ['gust', 'wind', 'rain', 'heat', 'uv']); r.L.clientHeight = t.T.fitMtAlerts(r.L);
+    t.T.mtJump(r.L, 'wind'); ok(r.seen(r.L.children[1]), 'nuevo en medio del orden: se ve entero (no se pierde por ir al final)');
+    t.T.mtJump(r.L, 'uv'); ok(r.seen(r.L.children[4]) && r.L.scrollTop === r.L.scrollHeight - r.L.clientHeight, 'el último: al final');
+    r = mtLista([18, 18], ['gust', 'wind'], 40); t.T.mtJump(r.L, 'wind'); eq(r.L.sets, 0, 'con dos o menos: no hay scroll que mover');
+  });
+
+  test('37 · Meteo «!»: no sale en la carga, importación ni rearme; hover o toque lo quitan sin «Visto»; no vuelve al repintar', () => {
+    const m = mtDash({ rain: 8 });
+    eq(m.fresh().length, 0, 'carga inicial con tres avisos: ningún «!»');
+    m.t.T.mtRearm(); m.set({ rain: 8, temp: 38 }); eq(m.fresh().length, 0, 'tras rearme (abrir / importar), lo que llega solo arma');
+    const cj = D.src('control.js');
+    ok(/audioRearm\(\); mtRearm\(\);   \/\/ abrir \/ crear \/ demo/.test(cj) && /audioRearm\(\); mtRearm\(\);   \/\/ importar/.test(cj), 'abrir / crear / demo e importar rearman');
+    ok(/if \(!c\.on\) \{ MT_HTML = ''; mtRearm\(\); return st; \}/.test(cj), 'Meteo apagado: rearme');
+    m.set({ rain: 8, temp: 38, uv: 10 }); eq(m.fresh().join(), 'uv', 'el siguiente nuevo sí');
+    const h = m.last();
+    ok(/<span class="mt-fresh" role="img" aria-label="Aviso recién llegado">!<\/span>/.test(h), 'etiqueta accesible localizada, sin texto visible más que «!»');
+    eq(require('../i18n.js').tx('Aviso recién llegado', null, 'en'), 'Newly arrived alert');
+    ok(/<svg class="ic"><use href="#i-alert"\/><\/svg><span class="mt-fresh"/.test(h), 'aparte del icono habitual de gravedad, que no cambia');
+    const css = D.src('control.css');
+    ok(/\.mt-al\{[^}]*position:relative\}/.test(css) && /\.mt-fresh\{position:absolute;[^}]*pointer-events:none\}/.test(css) && !/\.mt-fresh\{[^}]*(animation|transition)/.test(css), 'superpuesto (absoluto): sin columna, sin mover nada, sin animación');
+    ok(!/mt-fresh[^\n]*setTimeout|setTimeout[^\n]*mtFreshOff/.test(cj), 'sin temporizador');
+    const AK = 'showtime.meteoAck', acks = m.t.env.storage.get(AK), log = m.t.env.storage.get('showtime.log'), met = m.t.env.storage.get('showtime.meteo');
+    const al = k => ({ dataset: { k } });
+    const tgt = (k, onBtn) => ({ target: { closest: q => q === 'button, a' ? (onBtn ? {} : null) : q === '.mt-al' ? al(k) : q === '[data-act="mt-ack"]' ? null : null } });
+    m.t.env.fire('v-meteo', 'pointerover', Object.assign({ pointerType: 'touch' }, tgt('uv'))); eq(m.fresh().join(), 'uv', 'pointerover táctil: no cuenta como hover');
+    m.t.env.fire('v-meteo', 'click', tgt('uv', true)); eq(m.fresh().join(), 'uv', 'toque en su botón «Visto» o enlace: no quita el «!» por esta vía');
+    m.t.env.fire('v-meteo', 'pointerover', Object.assign({ pointerType: 'mouse' }, tgt('uv'))); eq(m.fresh().length, 0, 'hover: se quita al momento');
+    const m2 = mtDash({}); m2.set({ rain: 8 }); eq(m2.fresh().join(), 'rain');
+    const acks2 = m2.t.env.storage.get(AK), log2 = m2.t.env.storage.get('showtime.log'), met2 = m2.t.env.storage.get('showtime.meteo');
+    m2.t.env.fire('v-meteo', 'click', tgt('rain')); eq(m2.fresh().length, 0, 'toque en el aviso (zona no accionable): se quita');
+    eq(m2.t.env.storage.get(AK), acks2, 'no es «Visto»'); eq(m2.t.env.storage.get('showtime.log'), log2, 'nada en el log'); eq(m2.t.env.storage.get('showtime.meteo'), met2, 'estado meteo igual');
+    ok(/class="mt-al new"[^>]*data-k="rain"[\s\S]*?data-act="mt-ack" data-k="rain"/.test(m2.last()), 'el aviso sigue pendiente, con su «Visto»');
+    for (let i = 0; i < 3; i++) { m2.t.adv(1000); m2.t.env.win.ShowtimePanel.reload(); }
+    eq(m2.fresh().length, 0, 'no vuelve al repintar');
+    eq(m.t.env.storage.get(AK), acks, 'hover: no es «Visto»'); eq(m.t.env.storage.get('showtime.log'), log, 'hover: nada en el log'); eq(m.t.env.storage.get('showtime.meteo'), met, 'hover: estado meteo igual');
+    // Contraprueba: «Visto» de verdad sí escribe (los eq de arriba no pasan por casualidad)
+    m2.t.env.fire('document', 'click', { target: { closest: q => q === '[data-act="mt-ack"]' ? { dataset: { k: 'rain' } } : null } });
+    ok(m2.t.env.storage.get(AK) !== acks2 && m2.t.env.storage.get('showtime.log') !== log2, '«Visto» sí guarda y apunta en el log');
+    eq(m.t.env.errors.length + m2.t.env.errors.length, 0, 'sin errores');
   });
 
   (async () => {

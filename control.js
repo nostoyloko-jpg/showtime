@@ -29,7 +29,10 @@
   const LIVE_NAMES_KEY = 'showtime.liveNames';   // { id: nombre } de las ventanas abiertas, para recordar el nombre tras recargar
   const VISTA_OPCIONES = [['manager', 'Manager'], ['confidence', 'Confidence'], ['backstage', 'Backstage']];
   const Vs = window.ShowtimeVistas;
-  let CHAT_EXPLICIT = false;   // dec. 151: el menú Chat se abrió a propósito (clic, toque o teclado), no solo con el ratón encima
+  // Dec. 152 · avisos meteo recién llegados (pista visual local «!»). Aquí arriba: loadNew() puede rearmar antes de llegar a renderMeteo.
+  let MT_SEEN = null;          // tipos de aviso de la lectura anterior; null = la próxima lectura solo arma (carga, importación, rearme)
+  const MT_NEW = new Set();    // tipos con «!» puesto (se quita con hover o toque; nunca por tiempo)
+  let MT_SIG;                  // evento de la lectura anterior (cambiar de evento rearma)
   let CALL_UNDO = null;   // dec. 148: { add: [OK de CALL que vuelven], del: [claves que se quitan] } para el paso de Deshacer de una edición
   const AU = window.ShowtimeAudio || null;   // avisos de audio locales (dec. 145, audio.js)
   const AU_EDGE = AU ? { call: AU.edge(), overrun: AU.edge(), meteo: AU.edge() } : null;   // el primer tick solo arma: nunca suena al cargar
@@ -1337,16 +1340,14 @@
 
   // ── Menús de la barra (cristal): hover o clic; se cierran al salir el cursor o con Esc ──
   const MENUS = Array.from(document.querySelectorAll('.menus .menu, #m-hub'));
-  function setMenu(m, on) { m.classList.toggle('open', on); m.querySelector('.mbtn').setAttribute('aria-expanded', String(on)); if (!on && m.id === 'm-chat') CHAT_EXPLICIT = false; }
+  function setMenu(m, on) { m.classList.toggle('open', on); m.querySelector('.mbtn').setAttribute('aria-expanded', String(on)); }
   function closeMenus(except) { MENUS.forEach(m => { if (m !== except) setMenu(m, false); }); }
   MENUS.forEach(m => {
     let tOpen = 0, tClose = 0;
     m.addEventListener('pointerenter', e => { if (e.pointerType !== 'mouse') return; clearTimeout(tClose); tOpen = setTimeout(() => { closeMenus(m); setMenu(m, true); }, 120); });
     m.addEventListener('pointerleave', e => { if (e.pointerType !== 'mouse') return; clearTimeout(tOpen); tClose = setTimeout(() => setMenu(m, false), 350); });
     m.querySelector('.mbtn').addEventListener('click', () => {
-      clearTimeout(tOpen);
-      if (m.id === 'm-chat') { chatMenuClick(m); return; }
-      const on = !m.classList.contains('open'); closeMenus(m); setMenu(m, on);
+      clearTimeout(tOpen); const on = !m.classList.contains('open'); closeMenus(m); setMenu(m, on);
     });
     // Las acciones cierran el menú (los toggles de Retrasos no: se marcan varios seguidos)
     m.querySelectorAll('.mitem').forEach(it => it.addEventListener('click', () => setMenu(m, false)));
@@ -1828,7 +1829,7 @@
     Dt.setOriginal(ORIG);
     Dt.setFestival(FEST);
     CONFIG = Dt.setConfig({ day: 'all' });
-    audioRearm();   // abrir / crear / demo: la primera lectura del evento nuevo no suena (dec. 146)
+    audioRearm(); mtRearm();   // abrir / crear / demo: la primera lectura del evento nuevo no suena (dec. 146) ni marca «!» (dec. 152)
     $('add-escenario').value = ''; if ($('add-jornada')) $('add-jornada').value = '';
     compute(); renderAll();
     toast(msg);
@@ -2208,7 +2209,7 @@
     if (fresh) loadNew(base, 'Evento creado');   // evento nuevo: la referencia es el evento vacío, así lo importado cuenta como «sin exportar» y se puede deshacer
     // La vista actual («Ver: Shows» / «Ver: Soundchecks») escondería parte de lo importado: se pasa a «Ver: Todo» para ver la foto completa
     if (hidden) CONFIG = Dt.setConfig({ mode: 'all' });
-    audioRearm();   // importar: lo que ya estaba activo en las entradas nuevas no suena (dec. 146; antes de pintar: renderAll lee el estado)
+    audioRearm(); mtRearm();   // importar: lo que ya estaba activo en las entradas nuevas no suena (dec. 146; antes de pintar: renderAll lee el estado) ni marca «!»
     commitFestival(r.state, msg);
     // Confirmación clara (2,5 s, en verde) y la tabla arriba para ver el evento recién importado
     toast(importSummary(IMP_LAST, r.added) + (hidden ? tx(' · Ver: Todo') : '') + (fresh && !name ? tx(' · ponle nombre en Configuración') : ''), false, 2500);
@@ -2484,18 +2485,20 @@
     });
     return h;
   }
-  /** Dec. 151 · avisos del tiempo: siempre DOS avisos completos a la vista (aunque ocupen dos líneas) y, desde el tercero,
-   *  scroll dentro de la lista. El alto se mide con los dos primeros avisos tal y como se pintan (idioma, estilo y ancho
-   *  reales), nunca con una cifra fija. El resumen y el pie no se tocan. L: la lista (por defecto, la de la tarjeta). */
+  /** Dec. 151/152 · avisos del tiempo: siempre DOS avisos consecutivos completos a la vista (aunque ocupen dos líneas) y,
+   *  desde el tercero, scroll dentro de la lista. El alto es el del par consecutivo más alto, medido tal y como se pinta
+   *  (idioma, estilo y ancho reales), nunca una cifra fija: así ningún aviso posterior más alto queda cortado al llegar a él.
+   *  El resumen y el pie no se tocan. L: la lista (por defecto, la de la tarjeta). */
   function fitMtAlerts(L) {
     L = L || ($('v-meteo').querySelector && $('v-meteo').querySelector('.mt-alerts'));
     if (!L || !L.children) return null;
     const items = Array.from(L.children);
     L.classList.toggle('scroll', items.length > 2);   // primero el hueco de la barra: así se mide con el ancho que tendrá
     if (items.length <= 2) { L.style.maxHeight = ''; return null; }
-    const a = items[0], b = items[1];
-    // medidas con decimales (getBoundingClientRect): con offsetTop/offsetHeight, redondeados, el 2.º aviso podía quedar 1 px cortado
-    const h = a.getBoundingClientRect && b.getBoundingClientRect ? b.getBoundingClientRect().bottom - a.getBoundingClientRect().top : b.offsetTop + b.offsetHeight - a.offsetTop;
+    // medidas con decimales (getBoundingClientRect): con offsetTop/offsetHeight, redondeados, un aviso podía quedar 1 px cortado
+    const top = x => x.getBoundingClientRect ? x.getBoundingClientRect().top : x.offsetTop, bot = x => x.getBoundingClientRect ? x.getBoundingClientRect().bottom : x.offsetTop + x.offsetHeight;
+    let h = 0;
+    for (let i = 0; i + 1 < items.length; i++) h = Math.max(h, bot(items[i + 1]) - top(items[i]));
     if (!(h > 0)) return null;   // tarjeta oculta: se medirá cuando se vea
     L.style.maxHeight = Math.ceil(h) + 'px';
     return Math.ceil(h);
@@ -2503,12 +2506,40 @@
   // Cambia el ancho (ventana, columnas) o la tarjeta pasa a verse: se vuelve a medir
   if (typeof ResizeObserver === 'function') { try { new ResizeObserver(() => fitMtAlerts()).observe($('v-meteo')); } catch (e) {} }
   window.addEventListener('resize', () => fitMtAlerts());
+  /** Dec. 152: la próxima lectura de avisos solo arma (nada se marca «!»): carga, importación, otro evento, Meteo apagado. */
+  function mtRearm() { MT_SEEN = null; MT_NEW.clear(); }
+  /** Quita el «!» de un aviso (hover o toque). Solo la pista visual local: no es «Visto», no toca el estado meteo, los datos
+   *  compartidos ni el log. No vuelve a salir al repintar. */
+  function mtFreshOff(k) { if (!MT_NEW.delete(k)) return; renderMeteo(); }
+  /** Lleva el scroll interno UNA vez para dejar el aviso nuevo completo a la vista: al final de la lista (si el aviso nuevo
+   *  no estuviera entre los que se ven al final, lo justo para verlo entero). */
+  function mtJump(L, k) {
+    if (!L || !L.children || L.children.length <= 2) return;
+    const it = Array.from(L.children).find(x => x.dataset && x.dataset.k === k);
+    const end = Math.max(0, (L.scrollHeight || 0) - (L.clientHeight || 0));
+    let s = end;
+    if (it && L.clientHeight > 0) {
+      const lr = L.getBoundingClientRect ? L.getBoundingClientRect() : null, ir = it.getBoundingClientRect ? it.getBoundingClientRect() : null;
+      const t0 = lr && ir ? ir.top - lr.top + (L.scrollTop || 0) : it.offsetTop, t1 = lr && ir ? ir.bottom - lr.top + (L.scrollTop || 0) : it.offsetTop + it.offsetHeight;
+      if (t0 < end) s = Math.max(0, Math.min(end, Math.ceil(t1 - L.clientHeight)));
+    }
+    L.scrollTop = s;
+  }
   /** Tarjeta METEO (columna izquierda, bajo CALL). */
   function renderMeteo() {
     const card = $('card-meteo');
     const st = meteoState(), c = st.c;
     card.hidden = !c.on;
-    if (!c.on) { MT_HTML = ''; return st; }
+    if (!c.on) { MT_HTML = ''; mtRearm(); return st; }
+    const sig = (FEST && window.ShowtimeLog ? window.ShowtimeLog.eventKey(FEST) : '') + '|' + mtKey(c);   // otro evento u otra fuente: rearme
+    if (sig !== MT_SIG) { MT_SIG = sig; mtRearm(); }
+    let jump = null;
+    if (st.sum) {   // dec. 152: aviso real nuevo = un tipo que no estaba en la lectura anterior (la primera lectura solo arma)
+      const kinds = st.list.map(a => a.kind);
+      if (MT_SEEN) kinds.forEach(k => { if (!MT_SEEN.has(k)) { MT_NEW.add(k); jump = k; } });
+      MT_NEW.forEach(k => { if (kinds.indexOf(k) < 0) MT_NEW.delete(k); });
+      MT_SEEN = new Set(kinds);
+    }
     let h = '';
     const where = c.source === 'openmeteo' ? (c.place || (c.lat !== null ? c.lat + ', ' + c.lon : '')) : tx(MT_SRC[c.source]);
     if (!st.sum) {
@@ -2532,7 +2563,8 @@
         (s.uv !== null || s.uvMax !== null ? '<span><svg class="ic"><use href="#i-sun"/></svg>UV <b>' + mtNum(s.uvMax !== null ? s.uvMax : s.uv) + '</b> ' + W.uvText(s.uvMax !== null ? s.uvMax : s.uv) + '</span>' : '') +
         (c.th.aqiOn && s.aqi !== null ? '<span><svg class="ic"><use href="#i-cloud"/></svg>' + tx('Aire') + ' <b>' + W.aqiText(s.aqi) + '</b></span>' : '') +
         '</div>';
-      if (st.list.length) h += '<div class="mt-alerts">' + st.list.map(a => '<div class="mt-al' + (st.pending.indexOf(a) >= 0 ? ' new' : '') + '"><svg class="ic"><use href="#i-alert"/></svg><span>' + esc(a.text) + '</span>' +
+      const fresh = '<span class="mt-fresh" role="img" aria-label="' + esc(tx('Aviso recién llegado')) + '">!</span>';
+      if (st.list.length) h += '<div class="mt-alerts">' + st.list.map(a => '<div class="mt-al' + (st.pending.indexOf(a) >= 0 ? ' new' : '') + '" data-k="' + a.kind + '"><svg class="ic"><use href="#i-alert"/></svg>' + (MT_NEW.has(a.kind) ? fresh : '') + '<span>' + esc(a.text) + '</span>' +
         (st.pending.indexOf(a) >= 0 ? '<button class="chipx" data-act="mt-ack" data-k="' + a.kind + '">' + tx('Visto') + '</button>' : '<small>' + tx('visto') + '</small>') + '</div>').join('') + '</div>';
       h += '<div class="mt-foot">' + esc(tx(MT_SRC[s.src] || '')) + ' · ' + tx('dato {h} · previsión, no aviso oficial', { h: W.hhmm(s.at) }) + ' · <a href="' + W.AEMET_URL + '" target="_blank" rel="noopener">' + tx('Avisos AEMET') + '<svg class="ic"><use href="#i-ext"/></svg></a></div>';
     }
@@ -2540,7 +2572,9 @@
       const L0 = $('v-meteo').querySelector && $('v-meteo').querySelector('.mt-alerts'), top = L0 ? L0.scrollTop : 0;   // dec. 151: al repintar, la lista sigue donde estaba
       MT_HTML = h; $('v-meteo').innerHTML = h;
       fitMtAlerts();
-      const L1 = top && $('v-meteo').querySelector('.mt-alerts'); if (L1) L1.scrollTop = top;
+      const L1 = $('v-meteo').querySelector && $('v-meteo').querySelector('.mt-alerts');
+      if (L1 && top) L1.scrollTop = top;
+      if (L1 && jump) mtJump(L1, jump);   // dec. 152: solo cuando entra un aviso real nuevo; nunca por ticks, idioma, resize ni repintados
     } else fitMtAlerts();   // cada segundo: un cambio de estilo (Studio / Stage) o de letra también cambia el alto de los avisos
     return st;
   }
@@ -2553,6 +2587,15 @@
       return;
     }
     if (e.target.closest('[data-act="mt-cfg"]')) openConfig('meteo');
+  });
+  // Dec. 152: el «!» se quita con el ratón encima del aviso o con un toque en una zona del aviso que no sea un botón o enlace
+  $('v-meteo').addEventListener('pointerover', e => {
+    if (e.pointerType && e.pointerType !== 'mouse') return;
+    const al = e.target.closest && e.target.closest('.mt-al'); if (al && al.dataset.k) mtFreshOff(al.dataset.k);
+  });
+  $('v-meteo').addEventListener('click', e => {
+    if (!e.target.closest || e.target.closest('button, a')) return;
+    const al = e.target.closest('.mt-al'); if (al && al.dataset.k) mtFreshOff(al.dataset.k);
   });
 
   // Configuración › Meteo
@@ -3024,14 +3067,14 @@
     EM.sendProd({ type: 'chatlog', list: Dt.getChat().slice(-Em.CHAT_SEND) }).catch(e => console.error(e));
   }
   function sendChat(inp) {
-    if (!Dt.addChat(inp.value, 'Stage Manager', '', true)) return;
-    inp.value = ''; renderChat(); emPushChat();
+    if (!Dt.addChat(inp.value, 'Stage Manager', '', true)) return;   // vacío o solo lectura: no se envía y nada cambia
+    inp.value = ''; audioUrgentAnswered(); renderChat(); emPushChat();
   }
   $('chat-form').addEventListener('submit', e => { e.preventDefault(); sendChat($('chat-text')); });
   $('chat-form2').addEventListener('submit', e => { e.preventDefault(); sendChat($('chat-text2')); });
   /** Ventana flotante del chat: se abre centrada; Esc, ✕ o clic fuera la cierran. */
   let chatPopOn = false;   // estado propio (no depende del atributo hidden)
-  function openChatPop() { closeMenus(); $('chat-on').hidden = true; chatPopOn = true; $('chat-modal').hidden = false; audioChatSeen(); renderChat(); $('chat-text2').focus(); }
+  function openChatPop() { closeMenus(); $('chat-on').hidden = true; chatPopOn = true; $('chat-modal').hidden = false; renderChat(); $('chat-text2').focus(); }
   function closeChatPop() { chatPopOn = false; $('chat-modal').hidden = true; }
   $('chat-pop').addEventListener('click', e => { e.stopPropagation(); openChatPop(); });
   $('chat-x').addEventListener('click', closeChatPop);
@@ -3076,26 +3119,18 @@
     audioStep(now);
   }
   function audioStep(now) { if (AU) { const p = AU.load(); AU.RING.step(now || Date.now(), k => AU.everyOf(p, k)); } }
-  /** Urgente recibido de Producción (solo Producción lo marca): a la cola; con «Repetir», hasta su ✓ local en el chat. */
+  /** Urgente recibido de Producción (solo Producción lo marca): a la cola; con «Repetir», hasta que se responde en el Chat
+   *  (dec. 152). Con el Chat abierto también se repite: abrirlo no responde. */
   function audioUrgent(m) {
     if (!AU) return;
     const p = AU.load(); if (!AU.enabled(p, 'urgent')) return;
-    // dec. 151: con el Chat ya abierto (menú o ventana) el operador lo está viendo: suena una vez y no queda repitiéndose
-    AU.RING.add({ id: 'urgent:' + m.id, kind: 'urgent', key: m.id, label: m.from, repeat: AU.repeats(p, 'urgent') && !chatOpenNow() }, Date.now());
+    AU.RING.add({ id: 'urgent:' + m.id, kind: 'urgent', key: m.id, label: m.from, repeat: AU.repeats(p, 'urgent') }, Date.now());
     audioStep();
   }
-  /** ¿Está el Chat abierto a propósito? (menú abierto con clic, toque o teclado, o su ventana flotante). Pasar el ratón no cuenta. */
-  function chatOpenNow() { return ($('m-chat').classList.contains('open') && CHAT_EXPLICIT) || chatPopOn; }
-  /** Clic, toque o teclado (Intro / Espacio) sobre «Chat». Si ya estaba abierto solo por pasar el ratón, el clic lo deja abierto
-   *  (es la confirmación de que se quiere ver); si ya estaba abierto a propósito, lo cierra, como siempre. */
-  function chatMenuClick(m) {
-    const was = m.classList.contains('open'), on = !(was && CHAT_EXPLICIT);
-    closeMenus(m); setMenu(m, on);
-    if (on) { CHAT_EXPLICIT = true; audioChatSeen(); }
-  }
-  /** Dec. 151: abrir el Chat a propósito (menú o ventana) silencia aquí todos los urgentes que se repetían. Solo audio local:
-   *  no toca el texto, «urgent», el log ni la emisión. */
-  function audioChatSeen() { if (AU) AU.RING.dropRepeats('urgent'); }
+  /** Dec. 152: un mensaje de Chat no vacío enviado bien desde este Dashboard (sendChat, el envío de siempre) para aquí la
+   *  repetición de TODOS los urgentes pendientes. Abrir, pasar el ratón, enfocar o escribir sin enviar no cuentan. Solo audio
+   *  local: el mensaje sigue siendo urgente; no toca el texto, «urgent», el log, la emisión ni los datos compartidos. */
+  function audioUrgentAnswered() { if (AU) AU.RING.dropRepeats('urgent'); }
   /** Dec. 148: silenciar el sonido de sobretiempo. Control propio (altavoz tachado, no ✓), en la línea del nombre de EN ESCENA,
    *  fuera de cualquier botón que cambie el show. Solo mientras se repite. Solo detiene ese audio local: no toca la banda,
    *  ni el Tiempo extra, ni los tiempos, ni ningún dato. */
@@ -3728,5 +3763,5 @@
   });
   window.ShowtimePanel = { reload: () => { loadState(); renderAll(); }, _test: { winState: () => Array.from(WIN.entries()).map(([id, x]) => ({ id, name: x.name, vista: x.vista, zona: x.zona, filas: x.filas || null, standby: !!x.standby, fs: x.fs })), setWinVista, setWinRows, resetWinLayout, setWinStandby, closeLive, openGestor, gestorVisible, emProdMessage, emRegenProd, hitoChips, emUrl, prodBigTitle, fileKind, handleFile, emCommand, importSummary, hidesSome, tipoPill, setWake, wakeState: () => ({ on: wakeOn, lock: !!wakeLock }), showSplash, hideSplash, setStandby, standbyOn, room: () => emRoom,
     emSnapshot, emCloseDay, emDay, qrDevices, rmZones, setRmZone: z => { RM_ZONE = z; renderCast(); }, setRoom: r => { emRoom = r; }, fakeEm: (em, st) => { EM = em; EMST = st; }, emStateHtml, renderCastBar, renderHubLed, mtIn, mtOut, cfSimState, renderCfSim, cfSim: () => CFSIM,
-    dayStep, monthLabel, spotItems, spotDays, spotEntries, fmtDayFull, refreshStale, net: () => NET, setNet: o => { NET = netNorm(o); }, netNorm, emLink, emBrokers, emUrl, netHtml, renderCast, audioTick, fillAudioCfg, saveAudioCfg, audioPreview, audioConfirm, audioRearm, audioChatSeen, chatMenuClick, chatOpenNow, fitMtAlerts, auMuteBtn, renderChat, callEditFix, applyEdit, undo, loadNew, impDoImport } };   // _test: solo para tests/control.test.js
+    dayStep, monthLabel, spotItems, spotDays, spotEntries, fmtDayFull, refreshStale, net: () => NET, setNet: o => { NET = netNorm(o); }, netNorm, emLink, emBrokers, emUrl, netHtml, renderCast, audioTick, fillAudioCfg, saveAudioCfg, audioPreview, audioConfirm, audioRearm, audioUrgentAnswered, sendChat, fitMtAlerts, mtJump, mtFreshOff, mtRearm, setAppLang, mtNew: () => Array.from(MT_NEW), auMuteBtn, renderChat, callEditFix, applyEdit, undo, loadNew, impDoImport } };   // _test: solo para tests/control.test.js
 })();
