@@ -88,6 +88,8 @@
   const UI_EN = {
     /*UI-EN-BEGIN*/
     panel: {
+      "Jornada anterior": "Previous day",
+      "Jornada siguiente": "Next day",
       "Entradas": "Entries",
       "{n} show": "{n} show",
       "{n} shows": "{n} shows",
@@ -1504,7 +1506,7 @@
       "Primera jornada no válida.": "Invalid first day.",
       "Última jornada no válida.": "Invalid last day.",
       "La última jornada es anterior a la primera.": "The last day is before the first one.",
-      "Máximo 31 jornadas.": "Maximum 31 days.",
+      "Máximo 120 jornadas.": "Maximum 120 days.",
       "Hora de corte no válida (HH:MM).": "Invalid cut-off time (HH:MM).",
       "Aviso CALL: entre 1 y 180 minutos.": "CALL notice: between 1 and 180 minutes.",
       "Changeover mínimo: entre 0 y 180 minutos.": "Minimum changeover: between 0 and 180 minutes.",

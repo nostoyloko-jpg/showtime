@@ -257,6 +257,13 @@
     const a = I.apply(s, pv, {});
     eq(a.added, 18); eq(a.stagesCreated, 1);
   });
+  test('Dec. 124: el evento provisional del importador admite temporadas de hasta 120 jornadas', () => {
+    const now = C.nowAbs(new Date(2026, 5, 1, 12, 0));
+    const t = '2026-06-01 21:00 Primera (Principal)\n2026-08-15 21:00 Media (Principal)\n2026-12-01 21:00 Lejana (Principal)';
+    const s = I.provisionalState(t, now);
+    eq(s.event.fechaInicio, '2026-06-01'); eq(s.event.fechaFin, '2026-09-28', 'se corta en la jornada 120; lo demás sale «fuera del evento»');
+    eq(C.eventDays(s).length, 120);
+  });
   test('Cabeceras en inglés: MAIN STAGE · STAGE MANAGER SHIFT · STAGE IN/OUT · SHOW (PM) · CREW CALL · LUNCH', () => {
     const t = 'MAIN STAGE\tSTAGE MANAGER SHIFT\tARTIST\tBAND CALL\tSTAGE IN\tSTAGE OUT\tCREW CALL\tSHOW\tDuration\n' +
       'Friday 28\t09:00 - 18:00\tTHE EXAMPLES\t10:00\t10:15\t11:00\t\t\t0:45\n' +

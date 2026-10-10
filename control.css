@@ -218,7 +218,7 @@ tfoot input.bad,tfoot select.bad{border-color:var(--err)!important;background-co
 .days{display:flex;gap:4px;overflow-x:auto;max-width:100%;scrollbar-width:thin}
 .days button{height:32px;padding:0 12px;border-radius:7px;border:1px solid var(--line2);background:transparent;color:var(--muted);font:inherit;font-weight:700;cursor:pointer;white-space:nowrap}
 .days button:hover{color:var(--text)}
-.days button.vacia:not(.on){opacity:.45}
+.days button.vacia:not(.on){opacity:.55}
 .days button.falta{border-color:var(--call);color:var(--call)}
 @media (pointer:coarse){ .days button{height:42px} }
 
@@ -349,7 +349,7 @@ th.dl,td.dl{width:44px;text-align:center;padding-left:4px!important;padding-righ
 .msep{height:1px;background:var(--glass-line);margin:6px 2px}
 .mhead{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:800;padding:6px 8px 8px}
 .mnote{font-size:12px;color:var(--dim);padding:8px 8px 2px;line-height:1.35;white-space:normal}
-.mpanel .days{flex-direction:column;gap:2px;max-height:60vh;overflow:auto}
+.mpanel .days{flex-direction:column;gap:2px;max-height:380px;overflow-x:hidden;overflow-y:auto}
 .mpanel .days button{width:100%;text-align:left;border:0;height:32px}
 .dtog{display:flex;flex-wrap:wrap;gap:6px;padding:0 6px}
 .dtog button{height:30px;padding:0 11px;border-radius:999px;border:1px solid var(--line2);background:transparent;color:var(--muted);font:inherit;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:7px}
@@ -1177,3 +1177,15 @@ body[data-ps="stage"] .tpill{background:#000;border:1.5px solid var(--pc);color:
 body[data-ps="stage"] .net-l{color:#fff}
 body[data-ps="stage"] .net-st.ok i{background:#3ddc97}
 body[data-ps="stage"] .ntip{background:#000;border:1.5px solid rgba(255,214,0,.7)}
+/* ── Jornadas de temporada (dec. 124): flechas ◀ / ▶ junto a «Día» y cabeceras de mes en el menú ── */
+.dstep{display:inline-flex;align-items:center;gap:2px}
+.dstep-b{display:inline-flex;align-items:center;justify-content:center;width:26px;height:30px;padding:0;border:0;border-radius:6px;background:transparent;color:var(--muted);cursor:pointer}
+.dstep-b .ic{width:14px;height:14px}
+.dstep-b.prev .ic{transform:rotate(90deg)}
+.dstep-b.next .ic{transform:rotate(-90deg)}
+.dstep-b:hover:not(:disabled){color:var(--text);background:rgba(255,255,255,.06)}
+.dstep-b:disabled{opacity:.3;cursor:default}
+.dmonth{position:sticky;top:0;z-index:1;display:flex;align-items:center;gap:8px;padding:8px 10px 4px;background:var(--modal-bg,#0d0e11);color:var(--dim);font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;white-space:nowrap}
+.dmonth::before,.dmonth::after{content:"";flex:1;height:1px;background:var(--hair2,rgba(255,255,255,.13))}
+body[data-ps="stage"] .dstep-b{color:#FFD600}
+body[data-ps="stage"] .dmonth{background:#000;color:#FFD600}

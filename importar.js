@@ -985,7 +985,7 @@
   }
 
   /** Sin evento abierto: evento PROVISIONAL para la vista previa, con las jornadas que trae el horario (de la primera a la
-   *  última, máx. 31) o, si no trae fechas, la jornada de hoy. Solo se guarda si el Stage Manager pulsa «Importar».
+   *  última, máx. C.MAX_DAYS) o, si no trae fechas, la jornada de hoy. Solo se guarda si el Stage Manager pulsa «Importar».
    *  forced: las mismas opciones de lectura que la vista previa (cabecera, columnas). now: minutos absolutos (para los tests). */
   function provisionalState(text, now, forced) {
     const cut = { event: { dayCutoff: C.DEFAULT_CUTOFF } };
@@ -994,7 +994,8 @@
     const days = Array.from(new Set(rd.records.map(r => r.jornada).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d || '')))).sort();
     let fi = days.length ? days[0] : today, ff = days.length ? days[days.length - 1] : today;
     const span = (Date.parse(ff) - Date.parse(fi)) / 86400000;
-    if (span > 30) ff = new Date(Date.parse(fi) + 30 * 86400000).toISOString().slice(0, 10);   // el resto saldrá como «fuera del evento»
+    const lim = (C.MAX_DAYS || 120) - 1;
+    if (span > lim) ff = new Date(Date.parse(fi) + lim * 86400000).toISOString().slice(0, 10);   // el resto saldrá como «fuera del evento»
     return C.newFestival({ nombre: C.UNNAMED, fechaInicio: fi, fechaFin: ff, dayCutoff: C.DEFAULT_CUTOFF }).state;
   }
 

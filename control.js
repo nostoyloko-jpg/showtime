@@ -264,10 +264,45 @@
     const withData = FEST ? C.festivalDays(FEST, CONFIG.mode) : [];
     const tab = (v, label, cls, title) => '<button role="tab" data-day="' + esc(v) + '" class="' + cls + (CONFIG.day === v ? ' on' : '') + '" aria-selected="' + (CONFIG.day === v) + '"' + (title ? ' title="' + esc(title) + '"' : '') + '>' + esc(label) + '</button>';
     let html = FEST ? tab('all', tx('Todas'), '', tx('Todas las jornadas')) : '';
-    html += days.map(d => tab(d, fmtDay(d), withData.indexOf(d) < 0 ? 'vacia' : '', withData.indexOf(d) < 0 ? tx('Sin {what} todavía', { what: tx(viewOf().what) }) : '')).join('');
+    // Temporadas (dec. 124): con más de 7 jornadas o más de un mes, cabecera fija por mes («JULIO 2026»)
+    const byMonth = days.length > 7 || new Set(days.map(d => d.slice(0, 7))).size > 1;
+    let mes = '';
+    html += days.map(d => {
+      const head = byMonth && d.slice(0, 7) !== mes ? '<div class="dmonth" role="presentation">' + esc(monthLabel(d)) + '</div>' : '';
+      mes = d.slice(0, 7);
+      return head + tab(d, fmtDay(d), withData.indexOf(d) < 0 ? 'vacia' : '', withData.indexOf(d) < 0 ? tx('Sin {what} todavía', { what: tx(viewOf().what) }) : '');
+    }).join('');
     if (FEST && CONFIG.day !== 'all' && days.indexOf(CONFIG.day) < 0) html += tab(CONFIG.day, fmtDay(CONFIG.day), 'falta', tx('Fuera de las jornadas del evento'));
     $('days').innerHTML = html;
+    // Flechas ◀ / ▶ (dec. 124): jornada anterior / siguiente; desde «Todas», a la primera / la última
+    const st = dayStep();
+    $('day-prev').disabled = !st.prev; $('day-next').disabled = !st.next;
   }
+  /** Mes y año de una jornada, en el idioma del Panel («julio de 2026» → «JULIO 2026» con CSS). */
+  function monthLabel(iso) {
+    const m = /^(\d{4})-(\d{2})/.exec(iso || ''); if (!m) return '';
+    return new Date(Date.UTC(+m[1], +m[2] - 1, 1)).toLocaleDateString(LOCALE(), { month: 'long', year: 'numeric', timeZone: 'UTC' }).replace(/\s+de\s+/i, ' ');
+  }
+  /** A qué jornada llevan las flechas: { prev, next } (null = flecha apagada). */
+  function dayStep() {
+    const days = FEST ? jornadaOptions() : [];
+    if (!days.length) return { prev: null, next: null };
+    const cur = CONFIG.day;
+    if (!cur || cur === 'all') return { prev: days[0], next: days[days.length - 1] };
+    const before = days.filter(d => d < cur), after = days.filter(d => d > cur);
+    return { prev: before.length ? before[before.length - 1] : null, next: after.length ? after[0] : null };
+  }
+  function stepDay(dir) {
+    const d = dayStep()[dir]; if (!d) return;
+    CONFIG = Dt.setConfig({ day: d }); compute(); renderAll(); closeMenus();
+  }
+  $('day-prev').addEventListener('click', () => stepDay('prev'));
+  $('day-next').addEventListener('click', () => stepDay('next'));
+  // Con muchas jornadas, el menú se abre ya en la elegida (no en junio cuando estás en septiembre)
+  document.querySelector('#m-days .mbtn').addEventListener('click', () => setTimeout(() => {
+    const box = $('days'), on = box && box.querySelector('button.on');
+    if (on && box.getBoundingClientRect) box.scrollTop += on.getBoundingClientRect().top - box.getBoundingClientRect().top - box.clientHeight / 2 + 16;
+  }, 0));
 
   function renderWarn() {
     const w = $('warn');
@@ -3385,5 +3420,5 @@
   });
   window.ShowtimePanel = { reload: () => { loadState(); renderAll(); }, _test: { winState: () => Array.from(WIN.entries()).map(([id, x]) => ({ id, name: x.name, vista: x.vista, zona: x.zona, standby: !!x.standby, fs: x.fs })), setWinVista, setWinStandby, closeLive, openGestor, gestorVisible, emProdMessage, emRegenProd, hitoChips, emUrl, prodBigTitle, fileKind, handleFile, emCommand, importSummary, hidesSome, tipoPill, setWake, wakeState: () => ({ on: wakeOn, lock: !!wakeLock }), showSplash, hideSplash, setStandby, standbyOn, room: () => emRoom,
     emSnapshot, emCloseDay, emDay, qrDevices, rmZones, setRmZone: z => { RM_ZONE = z; renderCast(); }, setRoom: r => { emRoom = r; }, fakeEm: (em, st) => { EM = em; EMST = st; }, emStateHtml, renderCastBar, renderHubLed, mtIn, mtOut, cfSimState, renderCfSim, cfSim: () => CFSIM,
-    spotItems, spotDays, spotEntries, fmtDayFull, refreshStale, net: () => NET, setNet: o => { NET = netNorm(o); }, netNorm, emLink, emBrokers, emUrl, netHtml, renderCast } };   // _test: solo para tests/control.test.js
+    dayStep, monthLabel, spotItems, spotDays, spotEntries, fmtDayFull, refreshStale, net: () => NET, setNet: o => { NET = netNorm(o); }, netNorm, emLink, emBrokers, emUrl, netHtml, renderCast } };   // _test: solo para tests/control.test.js
 })();

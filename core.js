@@ -625,13 +625,15 @@
   }
 
   // ── Festival, escenarios y bandas creados en Showtime ─────────────────
-  /** Días de la jornada del evento (de fechaInicio a fechaFin, máx. 31). */
+  /** Máximo de jornadas de un evento (dec. 124: 120, para festivales de temporada; antes 31). */
+  const MAX_DAYS = 120;
+  /** Días de la jornada del evento (de fechaInicio a fechaFin, máx. MAX_DAYS). */
   function eventDays(state) {
     const ev = (state && state.event) || {};
     const a = dayIndex(ev.fechaInicio), b = dayIndex(ev.fechaFin);
     if (a === null) return [];
     const out = [];
-    for (let i = a; i <= (b === null ? a : b) && out.length < 31; i++) out.push(isoOfDay(i));
+    for (let i = a; i <= (b === null ? a : b) && out.length < MAX_DAYS; i++) out.push(isoOfDay(i));
     return out;
   }
 
@@ -643,7 +645,7 @@
     if (dayIndex(fi) === null) return { ok: false, error: 'Primera jornada no válida.' };
     if (dayIndex(ff) === null) return { ok: false, error: 'Última jornada no válida.' };
     if (dayIndex(ff) < dayIndex(fi)) return { ok: false, error: 'La última jornada es anterior a la primera.' };
-    if (dayIndex(ff) - dayIndex(fi) > 30) return { ok: false, error: 'Máximo 31 jornadas.' };
+    if (dayIndex(ff) - dayIndex(fi) > MAX_DAYS - 1) return { ok: false, error: 'Máximo 120 jornadas.' };
     const cut = normHM(ev.dayCutoff == null ? DEFAULT_CUTOFF : ev.dayCutoff);
     if (!cut) return { ok: false, error: 'Hora de corte no válida (HH:MM).' };
     const cm = Math.round(Number(ev.callMins == null || ev.callMins === '' ? DEFAULT_CALL_MINS : ev.callMins));
@@ -1174,7 +1176,7 @@
     DEFAULT_CUTOFF, DEFAULT_CALL_MINS, DEFAULT_DURATION, DEFAULT_CO_MIN, isFija, setFija, coMinFor,
     MARGIN_WARN, UNNAMED, isUnnamed, eventName, scopeToJornada, jornadaOver, isLibre, setDelayFlag, setReal, jornadaOfAbs, activeJornada, legacyCallKey, callIsDone, callKeyName, driftByZone, delayByZone, addRetraso, retrasosOf, blockedIn, movesBy, setAlargar, hitoMargins, MAX_NEXT, ARTIST_COLORS, TIPO_COLORS,
     pad2, parseHM, fmtHM, dayIndex, isoOfDay, shiftDate, toAbs, adjustEnd, nowAbs,
-    cutoffMins, festivalDateOf, entersMode, festivalDays, TIPOS, tipoOf, isBand, isAll, isKindMode, engineMode, entriesOf, tasksNow, hitosOf,
+    cutoffMins, festivalDateOf, entersMode, festivalDays, MAX_DAYS, TIPOS, tipoOf, isBand, isAll, isKindMode, engineMode, entriesOf, tasksNow, hitosOf,
     getEscenario, artistColor, callAbsFor, buildBlocks,
     blockEnd, isPlaying, playingNow, nextPerStage, progress, changeoverBefore, changeoversNow, gapIdle, nextBandIn, callKey, callAt, callList,
     pickBlocks, stripLabel, stripLabels, validateProject,

@@ -13,8 +13,8 @@
 <meta name="apple-mobile-web-app-title" content="Showtime">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
-<link rel="stylesheet" href="control.css?v=20261135">
-<link rel="stylesheet" href="marca.css?v=20261135">
+<link rel="stylesheet" href="control.css?v=20261136">
+<link rel="stylesheet" href="marca.css?v=20261136">
 </head>
 <body>
 <div id="splash" class="splash" hidden></div>
@@ -102,9 +102,13 @@
         <button class="mitem" data-mode="hito" role="menuitemradio" title="Solo los marcadores temporales y toques de queda" data-i18n data-i18n-title>Marcadores</button>
       </div>
     </div>
+    <div class="dstep">
+    <button id="day-prev" class="dstep-b prev" type="button" title="Jornada anterior" aria-label="Jornada anterior" data-i18n-title data-i18n-aria><svg class="ic"><use href="#i-chev"/></svg></button>
     <div class="menu" id="m-days">
       <button class="mbtn" aria-haspopup="true" aria-expanded="false"><span class="mlbl" data-i18n>Día:</span><b id="day-lbl">Todos</b><svg class="ic chev"><use href="#i-chev"/></svg></button>
       <div class="mpanel" role="menu"><nav id="days" class="days" aria-label="Jornadas" data-i18n-aria></nav></div>
+    </div>
+    <button id="day-next" class="dstep-b next" type="button" title="Jornada siguiente" aria-label="Jornada siguiente" data-i18n-title data-i18n-aria><svg class="ic"><use href="#i-chev"/></svg></button>
     </div>
     <div class="menu" id="m-delay">
       <button class="mbtn" aria-haspopup="true" aria-expanded="false" title="Retrasos"><svg class="ic"><use href="#i-clock"/></svg><span class="mtxt" data-i18n>Retrasos</span><span id="delay-on" class="mdot" hidden></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
@@ -469,20 +473,20 @@
 <datalist id="zones-dl"></datalist>
 <div id="toast" class="toast" hidden></div>
 
-<script src="i18n.js?v=20261135"></script>
-<script src="core.js?v=20261135"></script>
-<script src="meteo.js?v=20261135"></script>
-<script src="datos.js?v=20261135"></script>
-<script src="importar.js?v=20261135"></script>
-<script src="xlsx.js?v=20261135"></script>
-<script src="qr.js?v=20261135"></script>
-<script src="emision.js?v=20261135"></script>
-<script src="mando.js?v=20261135"></script>
-<script src="vistas.js?v=20261135"></script>
-<script src="log.js?v=20261135"></script>
-<script src="print.js?v=20261135"></script>
-<script src="marca.js?v=20261135"></script>
-<script src="control.js?v=20261135"></script>
-<script src="pwa.js?v=20261135"></script>
+<script src="i18n.js?v=20261136"></script>
+<script src="core.js?v=20261136"></script>
+<script src="meteo.js?v=20261136"></script>
+<script src="datos.js?v=20261136"></script>
+<script src="importar.js?v=20261136"></script>
+<script src="xlsx.js?v=20261136"></script>
+<script src="qr.js?v=20261136"></script>
+<script src="emision.js?v=20261136"></script>
+<script src="mando.js?v=20261136"></script>
+<script src="vistas.js?v=20261136"></script>
+<script src="log.js?v=20261136"></script>
+<script src="print.js?v=20261136"></script>
+<script src="marca.js?v=20261136"></script>
+<script src="control.js?v=20261136"></script>
+<script src="pwa.js?v=20261136"></script>
 </body>
 </html>

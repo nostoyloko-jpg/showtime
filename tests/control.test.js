@@ -1868,6 +1868,30 @@ const miss = [...found].filter(k => !I.txHas(k) && !/^(OK|CALL|SC|Live|Raycast|S
     const g = T.spotItems('jul').map(x => x.group); ok(g.indexOf('Jornadas') < g.indexOf('Entradas'), 'jornadas primero');
   });
 
+  test('Dec. 124: flechas ◀ / ▶ de jornada y menú de Día con cabeceras de mes (temporadas)', () => {
+    let s = C.newFestival({ nombre: 'Temporada', fechaInicio: '2026-06-28', fechaFin: '2026-07-03', dayCutoff: '06:00' }).state;
+    s = C.addStage(s, 'P').state;
+    s = C.addArtist(s, 'show', { jornada: '2026-06-29', nombre: 'Uno', escenarioId: s.escenarios[0].id, inicio: '21:00', fin: '22:00' }).state;
+    const t = panel({ 'showtime.festival': JSON.stringify(s), 'showtime.config': JSON.stringify({ mode: 'all', day: 'all' }) }, NOWc), T = t.T, el = id => t.env.getEl(id);
+    eq(JSON.stringify(T.dayStep()), JSON.stringify({ prev: '2026-06-28', next: '2026-07-03' }), 'desde Todas: a la primera / la última');
+    t.env.fire('day-next', 'click', {}); eq(t.read('showtime.config').day, '2026-07-03');
+    eq(el('day-next').disabled, true, 'en la última, ▶ apagada'); eq(el('day-prev').disabled, false);
+    t.env.fire('day-prev', 'click', {}); eq(t.read('showtime.config').day, '2026-07-02', 'una atrás');
+    const html = ultimo(t, 'days');
+    ok((html.match(/class="dmonth"/g) || []).length === 2 && /junio 2026<\/div>/.test(html) && /julio 2026<\/div>/.test(html), 'dos meses → dos cabeceras: ' + html.slice(0, 160));
+    ok(html.indexOf('junio 2026') < html.indexOf('data-day="2026-06-28"') && html.indexOf('julio 2026') < html.indexOf('data-day="2026-07-01"') && html.indexOf('julio 2026') > html.indexOf('data-day="2026-06-30"'), 'cada cabecera antes de su primer día');
+    ok(/data-day="2026-06-28" class="vacia/.test(html) && !/data-day="2026-06-29" class="vacia/.test(html), 'días libres atenuados');
+    eq(T.monthLabel('2026-07-15'), 'julio 2026');
+    const css = D.src('control.css');
+    ok(/\.mpanel \.days\{[^}]*max-height:380px;overflow-x:hidden;overflow-y:auto\}/.test(css) && /\.days button\.vacia:not\(\.on\)\{opacity:\.55\}/.test(css), 'lista con scroll acotado y días libres al 55 %');
+    ok(/\.dmonth\{position:sticky;top:0;/.test(css), 'cabecera de mes fija al desplazar');
+    // Un solo mes y pocos días: sin cabeceras
+    let c = C.newFestival({ nombre: 'Corto', fechaInicio: '2026-07-10', fechaFin: '2026-07-12', dayCutoff: '06:00' }).state;
+    const t2 = panel({ 'showtime.festival': JSON.stringify(c) }, NOWc);
+    ok(!/dmonth/.test(ultimo(t2, 'days')), 'evento corto: lista de siempre');
+    eq(JSON.stringify(t2.T.dayStep()), JSON.stringify({ prev: '2026-07-10', next: '2026-07-12' }));
+  });
+
   // ── Ejecutor ─────────────────────────────────────────────────────────
   (async () => {
     let pass = 0, fail = 0;

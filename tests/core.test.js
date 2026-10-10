@@ -433,6 +433,16 @@
     ok(!C.newFestival({ nombre: 'X', fechaInicio: '2026-07-10', callMins: 0 }).ok);
     eq(C.newFestival({ nombre: 'X', fechaInicio: '2026-07-10' }).state.event.fechaFin, '2026-07-10', 'un solo día');
   });
+  test('Dec. 124: eventos de temporada hasta 120 jornadas (antes 31)', () => {
+    eq(C.MAX_DAYS, 120);
+    const r = C.newFestival({ nombre: 'Temporada', fechaInicio: '2026-06-01', fechaFin: '2026-09-28' });   // 120 días justos
+    ok(r.ok, r.error); const d = C.eventDays(r.state);
+    eq(d.length, 120); eq(d[0], '2026-06-01'); eq(d[119], '2026-09-28');
+    const mas = C.newFestival({ nombre: 'Demasiado', fechaInicio: '2026-06-01', fechaFin: '2026-09-29' });
+    ok(!mas.ok); eq(mas.error, 'Máximo 120 jornadas.');
+    ok(C.newFestival({ nombre: 'Mes y medio', fechaInicio: '2026-06-01', fechaFin: '2026-07-15' }).ok, 'más de 31 ya vale');
+    eq(C.eventDays({ event: { fechaInicio: '2026-06-01', fechaFin: '2027-06-01' } }).length, 120, 'datos fuera de rango: nunca más de 120');
+  });
   test('escenarios: añadir, nombre repetido, color, mover, borrar solo si está vacío', () => {
     const s = mkFest();
     deq(s.escenarios.map(e => e.id + ':' + e.nombre), ['esc1:Principal', 'esc2:Carpa']);
