@@ -2085,6 +2085,29 @@ const miss = [...found].filter(k => !I.txHas(k) && !/^(OK|CALL|SC|Live|Raycast|S
     ok(/if \(document\.activeElement !== zs\) \{\s*const z = conf \?/.test(js), 'zona / filas');
   });
 
+  // ── Dec. 153 · estado sin evento (#empty) centrado de verdad: Grid a todo el hueco, sin desplazamientos ni transform ─────
+  test('#empty: ocupa todo el hueco bajo la barra y centra la tarjeta con Grid; sin offsets, transform ni márgenes automáticos', () => {
+    const css = D.src('control.css').replace(/\/\*[\s\S]*?\*\//g, ''), idx = D.src('index.html');
+    const rules = sel => (css.match(new RegExp('(^|[}\\n])\\s*([^{}]*)\\{([^}]*)\\}', 'g')) || []).map(r => /([^{}]*)\{([^}]*)\}/.exec(r)).filter(Boolean)
+      .filter(m => m[1].split(',').some(x => sel.test(x.trim()))).map(m => m[2]).join(';');
+    ok(/<section id="empty" class="empty" hidden>\s*<div class="onb">/.test(idx), 'estructura: #empty > .onb, hermano de <main>');
+    const em = rules(/^#empty$/);
+    ok(/display:grid/.test(em) && /place-items:center/.test(em), '#empty: Grid con place-items:center');
+    ok(/align-self:stretch/.test(em) && /(?:^|;)width:100%/.test(em) && /inline-size:100%/.test(em) && /min-width:0/.test(em) && /flex:1 1 auto/.test(em), 'se estira a todo el ancho y alto libres');
+    ok(/grid-template-columns:minmax\(0,1fr\)/.test(em), 'una columna a todo el ancho (la tarjeta se centra dentro)');
+    ok(/#empty\[hidden\]\{display:none\}/.test(css), 'oculto de verdad cuando hay evento');
+    // Nada de centrar con trucos: ni transform/translate, ni left/right/margin fijos, ni márgenes automáticos dentro de #empty
+    const all = rules(/^(#empty|\.empty)(\s|$|\[|>|:)/) + ';' + rules(/^(#empty|\.empty)\s+\.onb$/);
+    ok(!/(?:^|;)\s*(?:transform|translate|rotate|scale)\s*:|translate\(|(?:^|;)\s*(left|right|inset)\s*:|margin-left\s*:\s*-?\d|margin-right\s*:\s*-?\d|position\s*:\s*(absolute|fixed|relative)/.test(all), 'sin desplazamientos ni transform: ' + all);
+    ok(!/(?:^|;)\s*margin\s*:\s*[^;]*auto/.test(all), 'sin márgenes automáticos para centrar #empty');
+    ok(!/^\.empty \.onb/m.test(css.replace(/\.empty \.onb-[ts]/g, '')), 'la tarjeta de #empty ya no se centra con margin:auto');
+    ok(!/@media[^{]*\{[^@]*#empty/.test(css), 'sin valores por dispositivo');
+    // Lo demás, igual: main.vacia y la tarjeta de evento sin entradas (#list-empty)
+    ok(/\.list-empty \.onb\{margin:auto\}/.test(css), '#list-empty sigue como estaba');
+    ok(/main\.vacia\{grid-template-columns:minmax\(0,1fr\)\}/.test(css) && /main\.vacia \.list-empty\{padding:16px 16px 9vh\}/.test(css), 'main.vacia sin tocar');
+    ok(/\.onb\{width:min\(560px,100%\);/.test(css) && /body\[data-ps="stage"\] \.onb\{background:#000;/.test(css), 'la tarjeta (Studio y Stage) igual');
+  });
+
   // ── Ejecutor ─────────────────────────────────────────────────────────
   (async () => {
     let pass = 0, fail = 0;

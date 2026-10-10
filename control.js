@@ -30,9 +30,11 @@
   const VISTA_OPCIONES = [['manager', 'Manager'], ['confidence', 'Confidence'], ['backstage', 'Backstage']];
   const Vs = window.ShowtimeVistas;
   // Dec. 152 · avisos meteo recién llegados (pista visual local «!»). Aquí arriba: loadNew() puede rearmar antes de llegar a renderMeteo.
-  // Orden por llegada (dec. 152, L.A.): [{ id, at }] con la hora local de detección (solo en memoria: no se emite, ni va al log ni
-  // al evento). null = la próxima lectura solo fija la referencia, sin hora, «!» ni salto (carga, importación, rearme).
-  let MT_ORDER = null;
+  // Orden por llegada (dec. 152, L.A.): [{ id, at }] con la hora local de detección. Se guarda SOLO en este navegador
+  // («showtime.meteoOrder», dec. 153), por contexto evento + fuente Meteo; nunca va al evento, la emisión, el log ni los datos
+  // compartidos. null = la próxima lectura la recupera (mismo contexto) o fija la referencia, sin hora, «!» ni salto.
+  let MT_ORDER = null, MT_CLEAN = false, MT_SAVED = '';   // MT_CLEAN: la próxima lectura ignora lo guardado (rearme)
+  const MT_ORD_KEY = 'showtime.meteoOrder';
   const MT_NEW = new Set();    // ids con «!» puesto (se quita con hover o toque; nunca por tiempo)
   let MT_SIG;                  // evento de la lectura anterior (cambiar de evento rearma)
   let CALL_UNDO = null;   // dec. 148: { add: [OK de CALL que vuelven], del: [claves que se quitan] } para el paso de Deshacer de una edición
@@ -2487,30 +2489,78 @@
     });
     return h;
   }
-  /** Dec. 151/152 · avisos del tiempo: siempre DOS avisos consecutivos completos a la vista (aunque ocupen dos líneas) y,
-   *  desde el tercero, scroll dentro de la lista. El alto es el del par consecutivo más alto, medido tal y como se pinta
-   *  (idioma, estilo y ancho reales), nunca una cifra fija: así ningún aviso posterior más alto queda cortado al llegar a él.
+  /** Dec. 151–153 · avisos del tiempo: siempre TRES avisos consecutivos completos a la vista (aunque ocupen varias líneas) y,
+   *  desde el cuarto, scroll dentro de la lista. El alto es el del grupo de tres consecutivos más alto, medido tal y como se
+   *  pinta (idioma, estilo y ancho reales), nunca una cifra fija: ningún aviso posterior más alto queda cortado al llegar a él.
    *  El resumen y el pie no se tocan. L: la lista (por defecto, la de la tarjeta). */
+  const MT_VIS = 3;
   function fitMtAlerts(L) {
-    L = L || ($('v-meteo').querySelector && $('v-meteo').querySelector('.mt-alerts'));
+    L = L || mtList();
     if (!L || !L.children) return null;
     const items = Array.from(L.children);
-    L.classList.toggle('scroll', items.length > 2);   // primero el hueco de la barra: así se mide con el ancho que tendrá
-    if (items.length <= 2) { L.style.maxHeight = ''; return null; }
+    L.classList.toggle('scroll', items.length > MT_VIS);   // primero el hueco de la barra: así se mide con el ancho que tendrá
+    if (items.length <= MT_VIS) { L.style.maxHeight = ''; return null; }
     // medidas con decimales (getBoundingClientRect): con offsetTop/offsetHeight, redondeados, un aviso podía quedar 1 px cortado
     const top = x => x.getBoundingClientRect ? x.getBoundingClientRect().top : x.offsetTop, bot = x => x.getBoundingClientRect ? x.getBoundingClientRect().bottom : x.offsetTop + x.offsetHeight;
     let h = 0;
-    for (let i = 0; i + 1 < items.length; i++) h = Math.max(h, bot(items[i + 1]) - top(items[i]));
+    for (let i = 0; i + MT_VIS - 1 < items.length; i++) h = Math.max(h, bot(items[i + MT_VIS - 1]) - top(items[i]));
     if (!(h > 0)) return null;   // tarjeta oculta: se medirá cuando se vea
     L.style.maxHeight = Math.ceil(h) + 'px';
     return Math.ceil(h);
   }
+  function mtList() { return $('v-meteo').querySelector && $('v-meteo').querySelector('.mt-alerts'); }
+  // ── Dec. 153 · scroll manual conservado por ANCLA SEMÁNTICA (no por píxeles): el aviso visible de arriba (su data-id) y
+  //    cuánto asoma. Se guarda al hacer scroll y antes de repintar; después de repintar o de cambiar el alto de los avisos
+  //    (idioma, Studio / Stage, ancho) se vuelve a poner ese aviso en el mismo sitio. Sin ancla (arriba del todo): nada.
+  let MT_ANCHOR = null;   // { id, delta, next: [ids de debajo], px }
+  const mtTopIn = (L, it) => it.getBoundingClientRect && L.getBoundingClientRect ? it.getBoundingClientRect().top - L.getBoundingClientRect().top + (L.scrollTop || 0) : it.offsetTop;
+  const mtBotIn = (L, it) => it.getBoundingClientRect && L.getBoundingClientRect ? it.getBoundingClientRect().bottom - L.getBoundingClientRect().top + (L.scrollTop || 0) : it.offsetTop + it.offsetHeight;
+  function mtAnchorSave(L) {
+    L = L || mtList();
+    if (!L || !L.children) return;
+    const st = L.scrollTop || 0, items = Array.from(L.children);
+    if (st <= 0) { MT_ANCHOR = null; return; }
+    const i = items.findIndex(it => mtBotIn(L, it) > st);
+    if (i < 0 || !items[i].dataset || !items[i].dataset.id) { MT_ANCHOR = null; return; }
+    MT_ANCHOR = { id: items[i].dataset.id, delta: mtTopIn(L, items[i]) - st, next: items.slice(i + 1).map(x => x.dataset && x.dataset.id), px: st };
+  }
+  function mtAnchorApply(L) {
+    L = L || mtList();
+    if (!MT_ANCHOR || !L || !L.children) return;
+    const items = Array.from(L.children), byId = id => items.find(x => x.dataset && x.dataset.id === id);
+    const max = Math.max(0, (L.scrollHeight || 0) - (L.clientHeight || 0));
+    let it = byId(MT_ANCHOR.id), target;
+    if (it) target = mtTopIn(L, it) - MT_ANCHOR.delta;
+    else {   // el aviso ancla ya no está: el siguiente que siga en la lista, arriba del todo; si no queda ninguno, los píxeles de antes
+      const nx = MT_ANCHOR.next.map(byId).find(Boolean);
+      target = nx ? mtTopIn(L, nx) : MT_ANCHOR.px;
+    }
+    target = Math.max(0, Math.min(max, target));
+    if (Math.abs((L.scrollTop || 0) - target) >= 1) L.scrollTop = target;
+  }
+  /** Medir y mantener el ancla (cada tick, al cambiar el ancho o el estilo). */
+  function mtLayout() { const L = mtList(); fitMtAlerts(L); mtAnchorApply(L); }
   // Cambia el ancho (ventana, columnas) o la tarjeta pasa a verse: se vuelve a medir
-  if (typeof ResizeObserver === 'function') { try { new ResizeObserver(() => fitMtAlerts()).observe($('v-meteo')); } catch (e) {} }
-  window.addEventListener('resize', () => fitMtAlerts());
+  if (typeof ResizeObserver === 'function') { try { new ResizeObserver(() => mtLayout()).observe($('v-meteo')); } catch (e) {} }
+  window.addEventListener('resize', () => mtLayout());
+  $('v-meteo').addEventListener('scroll', e => { if (e.target && e.target.classList && e.target.classList.contains('mt-alerts')) mtAnchorSave(e.target); }, true);
   /** Dec. 152: la próxima lectura de avisos solo fija la referencia (sin hora, «!» ni salto): carga, importación, otro evento,
    *  otra fuente, Meteo apagado. */
-  function mtRearm() { MT_ORDER = null; MT_NEW.clear(); }
+  function mtRearm() { MT_ORDER = null; MT_NEW.clear(); MT_CLEAN = true; MT_SAVED = ''; try { localStorage.removeItem(MT_ORD_KEY); } catch (e) {} }
+  /** Cronología guardada para este contexto (evento + fuente Meteo); null si no hay o es de otro contexto. */
+  function mtLoadOrder(ctx) {
+    try {
+      const o = JSON.parse(localStorage.getItem(MT_ORD_KEY) || 'null');
+      if (!o || o.ctx !== ctx || !Array.isArray(o.order)) return null;
+      const seen = new Set();
+      return o.order.filter(e => e && typeof e.id === 'string' && !seen.has(e.id) && seen.add(e.id)).map(e => ({ id: e.id, at: Number.isFinite(e.at) ? e.at : null }));
+    } catch (e) { return null; }
+  }
+  function mtSaveOrder(ctx) {
+    const s = JSON.stringify({ ctx, order: MT_ORDER });
+    if (s === MT_SAVED) return;
+    MT_SAVED = s; try { localStorage.setItem(MT_ORD_KEY, s); } catch (e) {}
+  }
   /** Identidad estable de cada aviso de una lectura: su tipo (W.alerts da uno por tipo); si algún día hubiera dos del mismo
    *  tipo, «tipo#2», «tipo#3»… en su orden. */
   function mtIds(list) { const n = {}; return list.map(a => { n[a.kind] = (n[a.kind] || 0) + 1; return n[a.kind] > 1 ? a.kind + '#' + n[a.kind] : a.kind; }); }
@@ -2524,29 +2574,36 @@
     const b = al && al.querySelector && al.querySelector('.mt-fresh'); if (b && b.remove) b.remove();
     MT_HTML = MT_HTML.split(mtRowHead(id) + mtFresh()).join(mtRowHead(id));
   }
-  /** Un único scroll al final de la lista para que el aviso recién llegado (siempre el último) se vea entero. */
+  /** Un único scroll al final de la lista para que el aviso recién llegado (siempre el último) se vea entero (desde el cuarto). */
   function mtJump(L) {
-    if (!L || !L.children || L.children.length <= 2) return;
+    if (!L || !L.children || L.children.length <= MT_VIS) return;
     L.scrollTop = Math.max(0, (L.scrollHeight || 0) - (L.clientHeight || 0));
+    mtAnchorSave(L);   // a partir de aquí, se conserva esta posición
   }
   /** Tarjeta METEO (columna izquierda, bajo CALL). */
   function renderMeteo() {
     const card = $('card-meteo');
     const st = meteoState(), c = st.c;
     card.hidden = !c.on;
-    if (!c.on) { MT_HTML = ''; mtRearm(); return st; }
-    const sig = (FEST && window.ShowtimeLog ? window.ShowtimeLog.eventKey(FEST) : '') + '|' + mtKey(c);   // otro evento u otra fuente: rearme
-    if (sig !== MT_SIG) { MT_SIG = sig; mtRearm(); }
+    if (!c.on) { MT_HTML = ''; if (!MT_CLEAN || MT_ORDER) mtRearm(); return st; }   // apagado: al reactivar, referencia limpia
+    const sig = (FEST && window.ShowtimeLog ? window.ShowtimeLog.eventKey(FEST) : '') + '|' + mtKey(c);   // contexto: evento + fuente
+    if (sig !== MT_SIG) { MT_SIG = sig; MT_ORDER = null; MT_NEW.clear(); }   // otro contexto: lo guardado de otro no vale (referencia limpia)
     let jump = false;
     const ids = mtIds(st.list), byId = {}; ids.forEach((id, i) => { byId[id] = st.list[i]; });
     if (st.sum) {   // dec. 152: orden por llegada. Aviso real nuevo = una identidad que no estaba en la lectura anterior
-      if (!MT_ORDER) MT_ORDER = ids.map(id => ({ id, at: null }));   // primera lectura / rearme: solo referencia
-      else {
+      if (!MT_ORDER) {   // primera lectura: la cronología guardada de ESTE contexto (recarga) o, sin ella, solo referencia
+        const saved = MT_CLEAN ? null : mtLoadOrder(sig);
+        MT_CLEAN = false;
+        // los que siguen activos conservan orden y hora; los que se fueron mientras tanto, fuera; los que no constan, sin hora
+        MT_ORDER = saved ? saved.filter(e => byId[e.id]) : [];
+        ids.forEach(id => { if (!MT_ORDER.some(e => e.id === id)) MT_ORDER.push({ id, at: null }); });
+      } else {
         MT_ORDER = MT_ORDER.filter(e => byId[e.id]);   // el que se va sale de la lista (si vuelve, entrada nueva)
         const now = Date.now();
         ids.forEach(id => { if (!MT_ORDER.some(e => e.id === id)) { MT_ORDER.push({ id, at: now }); MT_NEW.add(id); jump = true; } });
       }
       MT_NEW.forEach(id => { if (!byId[id]) MT_NEW.delete(id); });
+      mtSaveOrder(sig);
     }
     let h = '';
     const where = c.source === 'openmeteo' ? (c.place || (c.lat !== null ? c.lat + ', ' + c.lon : '')) : tx(MT_SRC[c.source]);
@@ -2578,13 +2635,13 @@
       h += '<div class="mt-foot">' + esc(tx(MT_SRC[s.src] || '')) + ' · ' + tx('dato {h} · previsión, no aviso oficial', { h: W.hhmm(s.at) }) + ' · <a href="' + W.AEMET_URL + '" target="_blank" rel="noopener">' + tx('Avisos AEMET') + '<svg class="ic"><use href="#i-ext"/></svg></a></div>';
     }
     if (h !== MT_HTML) {
-      const L0 = $('v-meteo').querySelector && $('v-meteo').querySelector('.mt-alerts'), top = L0 ? L0.scrollTop : 0;   // dec. 151: al repintar, la lista sigue donde estaba
+      if (!jump) mtAnchorSave();   // dec. 153: el aviso visible de arriba y cuánto asoma (no los píxeles)
       MT_HTML = h; $('v-meteo').innerHTML = h;
-      fitMtAlerts();
-      const L1 = $('v-meteo').querySelector && $('v-meteo').querySelector('.mt-alerts');
-      if (L1 && top) L1.scrollTop = top;
-      if (L1 && jump) mtJump(L1);   // dec. 152: solo cuando entra un aviso real nuevo; nunca por ticks, idioma, resize ni repintados
-    } else fitMtAlerts();   // cada segundo: un cambio de estilo (Studio / Stage) o de letra también cambia el alto de los avisos
+      const L1 = mtList();
+      fitMtAlerts(L1);
+      if (L1 && jump) mtJump(L1);   // dec. 152: solo cuando entra un aviso real nuevo; entonces no se conserva el scroll anterior
+      else mtAnchorApply(L1);
+    } else mtLayout();   // cada segundo: un cambio de estilo (Studio / Stage) o de letra también cambia el alto de los avisos
     return st;
   }
   document.addEventListener('click', e => {
@@ -2597,16 +2654,36 @@
     }
     if (e.target.closest('[data-act="mt-cfg"]')) openConfig('meteo');
   });
-  // Dec. 152: el «!» se quita con el ratón encima del aviso, o con un toque breve sin arrastre en una zona del aviso que no sea
-  // botón ni enlace. El toque es el «click» del propio navegador: no lo dispara pointerdown, ni un scroll, ni un pellizco.
+  // Dec. 152/153: el «!» se quita con el ratón encima del aviso, o con un TOQUE completo de un dedo (táctil o lápiz) sobre una
+  // zona del aviso que no sea botón ni enlace. Toque = el ciclo real de pointer: down y up del MISMO dedo, sin otro dedo en
+  // medio (pellizco), sin pointercancel (el navegador empieza un scroll o un gesto), sin scroll de la lista o la página entre
+  // medias, y soltando dentro del mismo aviso. pointerdown solo no confirma nada. Sin umbrales propios de tiempo ni distancia.
   $('v-meteo').addEventListener('pointerover', e => {
     if (e.pointerType !== 'mouse') return;
     const al = e.target.closest && e.target.closest('.mt-al'); if (al && al.dataset.id) mtFreshOff(al.dataset.id, al);
   });
-  $('v-meteo').addEventListener('click', e => {
-    if (!e.target.closest || e.target.closest('button, a')) return;
-    const al = e.target.closest('.mt-al'); if (al && al.dataset.id) mtFreshOff(al.dataset.id, al);
+  const MT_TOUCH = new Set();   // dedos apoyados ahora mismo sobre la tarjeta
+  let MT_TAP = null;            // { pid, al } candidato a toque
+  function mtTapOff() { MT_TAP = null; }
+  $('v-meteo').addEventListener('pointerdown', e => {
+    if (e.pointerType === 'mouse') return;
+    MT_TOUCH.add(e.pointerId);
+    if (MT_TOUCH.size > 1) { MT_TAP = null; return; }   // multitáctil (pellizco): nada
+    const al = e.target.closest && !e.target.closest('button, a') && e.target.closest('.mt-al');
+    MT_TAP = al && al.dataset && al.dataset.id && MT_NEW.has(al.dataset.id) ? { pid: e.pointerId, al } : null;
   });
+  $('v-meteo').addEventListener('pointerup', e => {
+    if (e.pointerType === 'mouse') return;
+    const t = MT_TAP, solo = MT_TOUCH.size === 1;
+    MT_TOUCH.delete(e.pointerId); MT_TAP = null;
+    if (!t || !solo || t.pid !== e.pointerId) return;
+    const r = t.al.getBoundingClientRect ? t.al.getBoundingClientRect() : null;
+    if (r && !(e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom)) return;   // soltó fuera: arrastre
+    mtFreshOff(t.al.dataset.id, t.al);
+  });
+  $('v-meteo').addEventListener('pointercancel', e => { MT_TOUCH.delete(e.pointerId); mtTapOff(); });
+  $('v-meteo').addEventListener('scroll', mtTapOff, true);   // la lista se mueve entre down y up: era un scroll
+  window.addEventListener('scroll', mtTapOff, true);
 
   // Configuración › Meteo
   function fillMeteoStatus() {
@@ -3773,5 +3850,5 @@
   });
   window.ShowtimePanel = { reload: () => { loadState(); renderAll(); }, _test: { winState: () => Array.from(WIN.entries()).map(([id, x]) => ({ id, name: x.name, vista: x.vista, zona: x.zona, filas: x.filas || null, standby: !!x.standby, fs: x.fs })), setWinVista, setWinRows, resetWinLayout, setWinStandby, closeLive, openGestor, gestorVisible, emProdMessage, emRegenProd, hitoChips, emUrl, prodBigTitle, fileKind, handleFile, emCommand, importSummary, hidesSome, tipoPill, setWake, wakeState: () => ({ on: wakeOn, lock: !!wakeLock }), showSplash, hideSplash, setStandby, standbyOn, room: () => emRoom,
     emSnapshot, emCloseDay, emDay, qrDevices, rmZones, setRmZone: z => { RM_ZONE = z; renderCast(); }, setRoom: r => { emRoom = r; }, fakeEm: (em, st) => { EM = em; EMST = st; }, emStateHtml, renderCastBar, renderHubLed, mtIn, mtOut, cfSimState, renderCfSim, cfSim: () => CFSIM,
-    dayStep, monthLabel, spotItems, spotDays, spotEntries, fmtDayFull, refreshStale, net: () => NET, setNet: o => { NET = netNorm(o); }, netNorm, emLink, emBrokers, emUrl, netHtml, renderCast, audioTick, fillAudioCfg, saveAudioCfg, audioPreview, audioConfirm, audioRearm, audioUrgentAnswered, sendChat, fitMtAlerts, mtJump, mtFreshOff, mtRearm, setAppLang, mtNew: () => Array.from(MT_NEW), mtIds, mtOrder: () => MT_ORDER && MT_ORDER.map(e => Object.assign({}, e)), auMuteBtn, renderChat, callEditFix, applyEdit, undo, loadNew, impDoImport } };   // _test: solo para tests/control.test.js
+    dayStep, monthLabel, spotItems, spotDays, spotEntries, fmtDayFull, refreshStale, net: () => NET, setNet: o => { NET = netNorm(o); }, netNorm, emLink, emBrokers, emUrl, netHtml, renderCast, audioTick, fillAudioCfg, saveAudioCfg, audioPreview, audioConfirm, audioRearm, audioUrgentAnswered, sendChat, fitMtAlerts, mtJump, mtFreshOff, mtRearm, mtAnchorSave, mtAnchorApply, mtAnchor: () => MT_ANCHOR, setAppLang, mtNew: () => Array.from(MT_NEW), mtIds, mtOrder: () => MT_ORDER && MT_ORDER.map(e => Object.assign({}, e)), auMuteBtn, renderChat, callEditFix, applyEdit, undo, loadNew, impDoImport } };   // _test: solo para tests/control.test.js
 })();

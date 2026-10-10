@@ -801,28 +801,28 @@
     ok(!t2.A.RING.repeating('urgent:' + t2.read('showtime.chat').slice(-1)[0].id), 'sin «Repetir» no se repite');
   });
 
-  test('35 · Meteo: siempre dos avisos completos (aunque ocupen dos líneas); desde el tercero, scroll dentro; sin altura fija', () => {
+  test('35 · Meteo: siempre tres avisos completos (aunque ocupen dos líneas); desde el cuarto, scroll dentro; sin altura fija', () => {
     const css = D.src('control.css');
     ok(/\.mt-alerts\{display:flex;flex-direction:column;gap:4px;margin-top:8px;position:relative\}/.test(css) && !/\.mt-alerts[^{]*\{[^}]*max-height/.test(css), 'sin altura fija en CSS');
-    ok(/\.mt-alerts\.scroll\{overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-gutter:stable\}/.test(css), 'scroll vertical solo con la clase «scroll» (desde el tercer aviso)');
+    ok(/\.mt-alerts\.scroll\{overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-gutter:stable\}/.test(css), 'scroll vertical solo con la clase «scroll» (desde el cuarto aviso)');
     ok(!/#card-meteo\{[^}]*(max-height|overflow)/.test(css) && !/#v-meteo\{[^}]*(max-height|overflow)/.test(css), 'ni la tarjeta ni el resumen cambian');
     // Lista de mentira con las medidas del navegador (offsetTop relativo a la lista, hueco de 4 px entre avisos)
     const lista = (alts, gap) => { let y = 0; gap = gap === undefined ? 4 : gap; const cls = new Set(); return { style: {}, classList: { toggle: (c, on) => on ? cls.add(c) : cls.delete(c), has: c => cls.has(c) },
       children: alts.map(h => { const it = { offsetTop: y, offsetHeight: h }; y += h + gap; return it; }) }; };
     const t = dashboard({});
     let L = lista([34, 34, 34, 34, 34]);                 // avisos largos, partidos en dos líneas
-    eq(t.T.fitMtAlerts(L), 72, 'dos avisos de dos líneas completos: 34 + 4 + 34'); eq(L.style.maxHeight, '72px'); ok(L.classList.has('scroll'), 'con 5: scroll');
-    ok(L.children[1].offsetTop + L.children[1].offsetHeight <= 72 && L.children[2].offsetTop >= 72, 'el segundo entra entero; el tercero empieza fuera (ninguno cortado a medias)');
-    L = lista([18, 37, 18]);                              // uno corto y otro de dos líneas más alto (otro idioma u otro estilo)
-    eq(t.T.fitMtAlerts(L), 59, 'se mide con los dos primeros tal como se pintan: 18 + 4 + 37');
-    L = lista([34, 34]);
-    eq(t.T.fitMtAlerts(L), null, 'con dos: sin tope'); eq(L.style.maxHeight, ''); ok(!L.classList.has('scroll'), 'y sin scroll');
-    L = { style: {}, classList: { toggle() {} }, children: [[0, 32.4], [36.4, 68.8], [72.8, 105.2]].map(([t, b]) => ({ offsetTop: Math.round(t), offsetHeight: Math.round(b - t), getBoundingClientRect: () => ({ top: t, bottom: b }) })) };
-    eq(t.T.fitMtAlerts(L), 69, 'con medidas con decimales del navegador: el 2.º aviso entra entero (sin perder 1 px por redondeo)');
-    L = lista([0, 0, 0], 0);
+    eq(t.T.fitMtAlerts(L), 110, 'tres avisos de dos líneas completos: 34 + 4 + 34 + 4 + 34'); eq(L.style.maxHeight, '110px'); ok(L.classList.has('scroll'), 'con 5: scroll');
+    ok(L.children[2].offsetTop + L.children[2].offsetHeight <= 110 && L.children[3].offsetTop >= 110, 'el tercero entra entero; el cuarto empieza fuera (ninguno cortado a medias)');
+    L = lista([18, 37, 18, 18]);                          // uno de dos líneas más alto (otro idioma u otro estilo)
+    eq(t.T.fitMtAlerts(L), 81, 'se mide tal como se pinta: 18 + 4 + 37 + 4 + 18');
+    L = lista([34, 34, 34]);
+    eq(t.T.fitMtAlerts(L), null, 'con tres: sin tope'); eq(L.style.maxHeight, ''); ok(!L.classList.has('scroll'), 'y sin scroll');
+    L = { style: {}, classList: { toggle() {} }, children: [[0, 32.4], [36.4, 68.8], [72.8, 105.2], [109.2, 141.6]].map(([t, b]) => ({ offsetTop: Math.round(t), offsetHeight: Math.round(b - t), getBoundingClientRect: () => ({ top: t, bottom: b }) })) };
+    eq(t.T.fitMtAlerts(L), 106, 'con medidas con decimales del navegador: el 3.º aviso entra entero (sin perder 1 px por redondeo)');
+    L = lista([0, 0, 0, 0], 0);
     eq(t.T.fitMtAlerts(L), null, 'tarjeta oculta (medidas 0): no fija nada; se mide al verse');
     const cj = D.src('control.js');
-    ok(/new ResizeObserver\(\(\) => fitMtAlerts\(\)\)\.observe\(\$\('v-meteo'\)\)/.test(cj) && /window\.addEventListener\('resize', \(\) => fitMtAlerts\(\)\)/.test(cj) && /\} else fitMtAlerts\(\);/.test(cj), 'se vuelve a medir al cambiar el ancho, al verse y en cada repintado (idioma, estilo)');
+    ok(/new ResizeObserver\(\(\) => mtLayout\(\)\)\.observe\(\$\('v-meteo'\)\)/.test(cj) && /window\.addEventListener\('resize', \(\) => mtLayout\(\)\)/.test(cj) && /\} else mtLayout\(\);/.test(cj), 'se vuelve a medir al cambiar el ancho, al verse y en cada repintado (idioma, estilo)');
     // Con datos reales: resumen arriba, los avisos dentro de la lista, el pie fuera
     const cfgM = { on: true, source: 'manual', manual: { temp: 38, rain: 8, wind: 70, gust: 95, uv: 10, at: Date.UTC(2026, 6, 10, 12, 0, 0) }, th: { wind: 40, gust: 50, rain: 2, heat: 30, storm: true, uvOn: true, uv: 8 } };
     const Wm = require('../meteo.js'), c = Wm.normMeteo(cfgM), key = c.source + '|' + c.lat + '|' + c.lon + '|' + c.url;
@@ -838,23 +838,26 @@
   /** Lista de avisos de mentira con medidas de navegador: alturas, hueco de 4 px, alto visible y scroll. */
   function mtLista(alts, kinds, visible) {
     const cls = new Set(); let y = 0, st = 0;
-    const L = { style: {}, classList: { toggle: (c, on) => on ? cls.add(c) : cls.delete(c), has: c => cls.has(c) }, sets: 0,
+    const L = { style: {}, classList: { toggle: (c, on) => on ? cls.add(c) : cls.delete(c), has: c => cls.has(c), contains: c => c === 'mt-alerts' || cls.has(c) }, sets: 0,
       get scrollTop() { return st; }, set scrollTop(v) { L.sets++; st = Math.max(0, Math.min(v, L.scrollHeight - L.clientHeight)); },
       getBoundingClientRect: () => ({ top: 100, bottom: 100 + L.clientHeight }) };
-    L.children = alts.map((h, i) => { const it = { dataset: { k: kinds ? kinds[i] : 'k' + i }, top: y, h,
+    L.children = alts.map((h, i) => { const k = kinds ? kinds[i] : 'k' + i, it = { dataset: { k, id: k }, top: y, h,
       getBoundingClientRect: () => ({ top: 100 + it.top - st, bottom: 100 + it.top + it.h - st }) }; y += h + 4; return it; });
     L.scrollHeight = y - 4; L.clientHeight = visible || 0;
     const seen = it => it.top >= st && it.top + it.h <= st + L.clientHeight;
-    return { L, seen, reset() { st = 0; } };
+    /** Mismo DOM, otras alturas (Studio / Stage, letra): el navegador recoloca sin tocar scrollTop (salvo si ya no cabe). */
+    const relayout = hs => { let yy = 0; L.children.forEach((it, i) => { it.top = yy; it.h = hs[i]; yy += hs[i] + 4; }); L.scrollHeight = yy - 4; st = Math.max(0, Math.min(st, L.scrollHeight - L.clientHeight)); };
+    const r = { L, seen, relayout, next: null, reset() { st = 0; if (r.next) { relayout(r.next); r.next = null; } } };
+    return r;
   }
   const MT_TH = { wind: 40, gust: 50, rain: 2, heat: 30, storm: true, uvOn: true, uv: 8 };
   const mtCfg = man => ({ on: true, source: 'manual', manual: Object.assign({ temp: 20, rain: 0, wind: 45, gust: 60, uv: 2, at: Date.UTC(2026, 6, 10, 12, 0, 0) }, man), th: MT_TH });
   /** Dashboard con Meteo manual: ráfagas y viento (dos avisos). set(man) cambia los valores como el regidor en Configuración. */
-  function mtDash(man) {
+  function mtDash(man, seed, t0) {
     const Wm = require('../meteo.js');
     const meteo = m => { const c = Wm.normMeteo(mtCfg(m)); return JSON.stringify({ snap: Wm.manualSnap(c.manual), err: '', errAt: null, key: c.source + '|' + c.lat + '|' + c.lon + '|' + c.url }); };
     const F = festCall(Date.UTC(2026, 6, 10, 12, 0, 0));
-    const t = dashboard({ 'showtime.festival': JSON.stringify(F), 'showtime.config': JSON.stringify({ mode: 'all', meteo: mtCfg(man) }), 'showtime.meteo': meteo(man) });
+    const t = dashboard(seed || { 'showtime.festival': JSON.stringify(F), 'showtime.config': JSON.stringify({ mode: 'all', meteo: mtCfg(man) }), 'showtime.meteo': meteo(man) }, null, t0);
     t.env.win.ShowtimePanel.reload();
     const last = () => (t.env.innerLog.filter(([n]) => n === 'v-meteo').slice(-1)[0] || ['', ''])[1];
     const kinds = () => (last().match(/class="mt-al[ "][^>]*data-id="([a-z#0-9]+)"/g) || []).map(x => x.match(/data-id="([a-z#0-9]+)"/)[1]);
@@ -867,37 +870,44 @@
     // Como el navegador: cada repintado (innerHTML) crea una lista nueva con el scroll a 0
     const lista = (alts, visible) => { const r = mtLista(alts, kinds(), visible); let p = paints();
       t.env.getEl('v-meteo').querySelector = () => { if (paints() !== p) { p = paints(); r.reset(); } return r.L; }; return r; };
-    return { t, last, kinds, fresh, horas, set, lista };
+    /** Cierra y vuelve a abrir el Dashboard en el mismo navegador (mismo almacén local, misma hora). */
+    const reopen = (m2) => { const sd = {}; t.env.storage.forEach((v, k) => { sd[k] = v; }); if (m2) Object.assign(sd, { 'showtime.config': JSON.stringify({ mode: 'all', meteo: mtCfg(m2) }), 'showtime.meteo': meteo(m2) }); return mtDash(man, sd, t.clk.t); };
+    const saved = () => JSON.parse(t.env.storage.get('showtime.meteoOrder') || 'null');
+    return { t, last, kinds, fresh, horas, set, lista, reopen, saved };
   }
 
-  test('35b · Meteo: el alto deja ver dos avisos consecutivos completos aunque un tercero o posterior sea más alto (texto largo)', () => {
+  test('35b · Meteo: el alto deja ver tres avisos consecutivos completos aunque un cuarto o posterior sea más alto (texto largo)', () => {
     const t = dashboard({});
-    let r = mtLista([18, 18, 60]);
-    eq(t.T.fitMtAlerts(r.L), 82, 'el par más alto: 18 + 4 + 60 (el 3.º, de varias líneas, entra entero)');
-    r = mtLista([18, 18, 40, 18, 18]);
-    eq(t.T.fitMtAlerts(r.L), 62, 'el par 2.º–3.º (18 + 4 + 40) manda; con cualquier scroll caben dos seguidos');
-    r = mtLista([34, 34, 34, 34, 34]); eq(t.T.fitMtAlerts(r.L), 72, 'iguales: como antes');
-    r = mtLista([18.4, 18.4, 18.4]); eq(t.T.fitMtAlerts(r.L), 41, 'con decimales, hacia arriba (nunca 1 px cortado)');
+    let r = mtLista([18, 18, 18, 60]);
+    eq(t.T.fitMtAlerts(r.L), 104, 'el trío más alto: 18 + 4 + 18 + 4 + 60 (el 4.º, de varias líneas, entra entero con los dos de antes)');
+    r = mtLista([18, 18, 40, 18, 18, 18]);
+    eq(t.T.fitMtAlerts(r.L), 84, 'los tríos que incluyen el alto (18 + 4 + 40 + 4 + 18) mandan; con cualquier scroll caben tres seguidos');
+    r = mtLista([18, 60, 18, 18, 60]);
+    eq(t.T.fitMtAlerts(r.L), 104, 'el grupo de tres más alto, no el primero: 60 + 4 + 18 + 4 + 18 = 104 = 18 + 4 + 18 + 4 + 60');
+    r = mtLista([34, 34, 34, 34, 34]); eq(t.T.fitMtAlerts(r.L), 110, 'iguales');
+    r = mtLista([18.4, 18.4, 18.4, 18.4]); eq(t.T.fitMtAlerts(r.L), 64, 'con decimales, hacia arriba (nunca 1 px cortado)');
+    ok(!/MT_VIS = 2|i \+ 1 < items\.length/.test(D.src('control.js')), 'ya no se mide por pares');
     ok(!/max-height:\s*\d/.test(D.src('control.css').match(/\.mt-[a-z]+[^{]*\{[^}]*\}/g).join('')), 'sin alturas fijas en CSS');
   });
 
   const hm = ms => { const d = new Date(ms); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
 
-  test('36 · Meteo por orden de llegada: el nuevo va al final con su hora HH:MM y «!», un único scroll al final; repintar conserva orden, hora y scroll', () => {
+  test('36 · Meteo por orden de llegada: con tres, todo a la vista; el 4.º nuevo va al final con su hora y «!», un único salto al final', () => {
     const m = mtDash({});
     eq(m.kinds().join(), 'gust,wind', 'primera lectura: dos avisos'); eq(m.fresh().length, 0, 'sin «!»'); eq(m.horas().join(), ',', 'sin hora inventada');
-    let r = m.lista([18, 18, 18], 40);
+    let r = m.lista([18, 18, 18], 0);
     m.t.adv(5 * 60000); const t1 = Date.UTC(2026, 6, 10, 12, 5, 0); m.set({ rain: 8 });
     eq(m.kinds().join(), 'gust,wind,rain', 'la lluvia al final'); eq(m.fresh().join(), 'rain', '«!» solo en el nuevo');
     eq(m.horas().join(), ',,' + hm(t1), 'hora local de detección solo en el nuevo');
-    eq(r.L.scrollTop, r.L.scrollHeight - r.L.clientHeight, 'un scroll al final'); ok(r.seen(r.L.children[2]), 'el nuevo, entero');
-    // Calor: en el orden de tipos iría antes que la lluvia; por llegada, al final
-    r = m.lista([18, 18, 18, 18], 40);
+    eq(r.L.sets, 0, 'con tres, todos a la vista: no hay salto'); ok(!r.L.classList.has('scroll'), 'ni scroll');
+    // Calor: 4.º aviso. En el orden de tipos iría antes que la lluvia; por llegada, al final
+    r = m.lista([18, 18, 18, 18], 62);
     m.t.adv(3 * 60000); const t2 = Date.UTC(2026, 6, 10, 12, 8, 0); m.set({ rain: 8, temp: 38 });
     eq(m.kinds().join(), 'gust,wind,rain,heat', 'por llegada, no por tipo'); eq(m.horas().join(), ',,' + hm(t1) + ',' + hm(t2), 'cada uno con su hora');
-    eq(r.L.scrollTop, r.L.scrollHeight - r.L.clientHeight, 'al final otra vez'); ok(r.seen(r.L.children[3]), 'el nuevo, entero');
+    ok(r.L.classList.has('scroll'), 'desde el cuarto: scroll');
+    eq(r.L.scrollTop, r.L.scrollHeight - r.L.clientHeight, 'un salto al final'); ok(r.seen(r.L.children[3]), 'el nuevo, entero');
     // Repintados: ticks, empeora uno que ya estaba, idioma y resize → mismo orden, misma hora, scroll manual intacto
-    r.L.scrollTop = 7; const manual = r.L.sets;   // el regidor mueve la lista a mano
+    r.L.scrollTop = 7; m.t.env.fire('v-meteo', 'scroll', { target: r.L });   // el regidor mueve la lista a mano
     for (let i = 0; i < 3; i++) { m.t.adv(60000); m.t.env.win.ShowtimePanel.reload(); }
     m.set({ rain: 9, temp: 39 });
     m.t.T.setAppLang('en'); m.t.env.fire('window', 'resize', {});
@@ -906,6 +916,54 @@
     eq(m.kinds().join(), 'gust,wind,rain,heat', 'orden conservado'); eq(m.horas().join(), ',,' + hm(t1) + ',' + hm(t2), 'horas conservadas (no se recalculan)');
     eq(r.L.scrollTop, 7, 'scroll manual respetado en cada repintado (también en los que rehacen la lista)');
     ok(/title="Detectado a las \d\d:\d\d"/.test(m.last()), 'etiqueta localizada de la hora');
+    // Con scroll manual, un aviso nuevo SÍ salta al final (no se conserva el scroll de antes)
+    r = m.lista([18, 18, 18, 18, 18], 62); r.L.scrollTop = 7; m.t.env.fire('v-meteo', 'scroll', { target: r.L });
+    m.t.adv(60000); m.set({ rain: 9, temp: 39, uv: 10 });
+    eq(m.kinds().slice(-1)[0], 'uv'); eq(r.L.scrollTop, r.L.scrollHeight - r.L.clientHeight, 'aviso nuevo: salto al final, por encima del ancla'); ok(r.seen(r.L.children[4]));
+  });
+
+  test('36c · Meteo: el scroll manual se conserva por ANCLA (el aviso de arriba), no por píxeles: ES/EN, Studio/Stage y aviso ancla que se va', () => {
+    const m = mtDash({ rain: 8, temp: 38 });   // gust, wind, rain, heat (referencia: sin horas)
+    eq(m.kinds().join(), 'gust,wind,rain,heat');
+    const r = m.lista([18, 18, 18, 18], 40);   // ventana de 40 px (como una tarjeta baja), para poder mover la lista
+    r.L.scrollTop = 22; m.t.env.fire('v-meteo', 'scroll', { target: r.L });   // arriba del todo, «wind» (2.º) justo en el borde
+    eq(JSON.stringify(m.t.T.mtAnchor() && { id: m.t.T.mtAnchor().id, delta: m.t.T.mtAnchor().delta }), JSON.stringify({ id: 'wind', delta: 0 }), 'ancla: el aviso visible de arriba y cuánto asoma');
+    // EN: textos más largos → avisos más altos; repinta la lista entera (scroll a 0) y se recoloca con el ancla
+    r.next = [30, 30, 30, 30]; m.t.T.setAppLang('en');
+    eq(r.L.scrollTop, 34, 'en inglés, «wind» sigue arriba (34 px; por píxeles se habría quedado en 22, mostrando otro aviso)');
+    ok(r.L.children[1].getBoundingClientRect().top === 100, '«wind» exactamente en el borde superior');
+    r.next = [18, 18, 18, 18]; m.t.T.setAppLang('es'); eq(r.L.scrollTop, 22, 'vuelta a ES: igual');
+    // Studio → Stage: otra letra, mismo DOM (no se repinta): el tick de cada segundo recoloca con el ancla
+    const p0 = m.t.env.innerLog.filter(([n]) => n === 'v-meteo').length;
+    r.relayout([24, 24, 24, 24]); eq(r.L.scrollTop, 22, '(el navegador deja los píxeles)');
+    m.t.adv(1000); m.t.env.win.ShowtimePanel.reload();
+    eq(m.t.env.innerLog.filter(([n]) => n === 'v-meteo').length, p0, 'sin repintar'); eq(r.L.scrollTop, 28, 'Stage: «wind» sigue arriba');
+    r.relayout([18, 18, 18, 18]); m.t.adv(1000); m.t.env.win.ShowtimePanel.reload(); eq(r.L.scrollTop, 22, 'Studio: igual');
+    // A medio aviso: se conserva cuánto asoma
+    r.L.scrollTop = 30; m.t.env.fire('v-meteo', 'scroll', { target: r.L });
+    eq(m.t.T.mtAnchor().id, 'wind'); eq(m.t.T.mtAnchor().delta, -8, '«wind» asoma 10 de 18 px');
+    r.next = [30, 30, 30, 30]; m.t.T.setAppLang('en'); eq(r.L.scrollTop, 42, 'EN: «wind» asoma igual (34 + 8)'); r.next = [18, 18, 18, 18]; m.t.T.setAppLang('es');
+    // El aviso ancla desaparece: alternativa segura (el siguiente que siga, arriba)
+    r.L.scrollTop = 22; m.t.env.fire('v-meteo', 'scroll', { target: r.L });
+    m.t.env.getEl('v-meteo').querySelector = () => null;   // el navegador pinta la lista nueva (las medidas del fallback, en 36d)
+    m.set({ rain: 8, temp: 38, wind: 10 });
+    ok(m.kinds().indexOf('wind') < 0, '«wind» se va'); eq(m.kinds().join(), 'gust,rain,heat');
+    eq(m.t.env.errors.length, 0, 'sin errores');
+    const cj = D.src('control.js');
+    ok(/if \(!jump\) mtAnchorSave\(\);/.test(cj) && /if \(L1 && jump\) mtJump\(L1\);[^\n]*\n\s*else mtAnchorApply\(L1\);/.test(cj), 'con salto por aviso nuevo, no se aplica el ancla');
+    ok(!/L1\.scrollTop = top/.test(cj), 'fuera la restauración por píxeles');
+  });
+
+  test('36d · Meteo: ancla perdida → el siguiente aviso que siga en la lista, o los píxeles de antes (acotados)', () => {
+    const t = dashboard({});
+    const r = mtLista([18, 18, 18, 18, 18], ['a', 'b', 'c', 'd', 'e'], 62);
+    r.L.scrollTop = 22; t.env.getEl('v-meteo').querySelector = () => r.L; t.T.mtAnchorSave(r.L);
+    eq(t.T.mtAnchor().id, 'b');
+    const r2 = mtLista([18, 18, 18, 18], ['a', 'c', 'd', 'e'], 62); t.T.mtAnchorApply(r2.L);
+    eq(r2.L.scrollTop, 22, 'sin «b»: «c» (el siguiente) arriba');
+    const r3 = mtLista([18, 18, 18, 18], ['x', 'y', 'z', 'w'], 70); t.T.mtAnchorApply(r3.L);
+    eq(r3.L.scrollTop, 14, 'ninguno de antes: los píxeles de antes, acotados al máximo (14)');
+    r.L.scrollTop = 0; t.T.mtAnchorSave(r.L); eq(t.T.mtAnchor(), null, 'arriba del todo: sin ancla');
   });
 
   test('36b · Meteo: desaparece y reaparece → entrada nueva al final, hora nueva, «!» y salto; textos largos sin cortar', () => {
@@ -918,7 +976,7 @@
     eq(m.kinds().join(), 'gust,wind,heat,rain', 'vuelve como entrada nueva, al final'); eq(m.horas().slice(-1)[0], hm(t3), 'con hora nueva');
     eq(m.fresh().sort().join(), 'heat,rain', '«!» en el que vuelve (y en el calor, aún sin quitar)');
     ok(r.seen(r.L.children[3]) && r.L.scrollTop === r.L.scrollHeight - r.L.clientHeight, 'salto al final: el nuevo, largo, entero');
-    eq(r.L.clientHeight, 82, 'el alto cubre el par consecutivo más alto (18 + 4 + 60)');
+    eq(r.L.clientHeight, 104, 'el alto cubre el trío consecutivo más alto (18 + 4 + 18 + 4 + 60)');
     const W = require('../meteo.js'), c = W.normMeteo(Object.assign(mtCfg({ temp: 45, rain: 30, wind: 90, gust: 120, uv: 11 }), {}));
     const list = W.alerts(W.manualSnap(c.manual), c, Date.UTC(2026, 6, 10, 12, 0, 0), []);
     eq(new Set(list.map(a => a.kind)).size, list.length, 'W.alerts da un aviso por tipo: el tipo es la identidad estable');
@@ -932,17 +990,18 @@
     m.t.T.mtRearm(); m.set({ rain: 8, temp: 38 });
     eq(m.fresh().length + m.horas().filter(Boolean).length, 0, 'tras rearme (abrir / importar), lo que llega solo fija la referencia'); eq(r.L.sets, 0, 'sin salto');
     const cj = D.src('control.js');
-    ok(/audioRearm\(\); mtRearm\(\);   \/\/ abrir \/ crear \/ demo/.test(cj) && /audioRearm\(\); mtRearm\(\);   \/\/ importar/.test(cj) && /if \(!c\.on\) \{ MT_HTML = ''; mtRearm\(\); return st; \}/.test(cj), 'abrir / crear / demo, importar y Meteo apagado rearman');
+    ok(/audioRearm\(\); mtRearm\(\);   \/\/ abrir \/ crear \/ demo/.test(cj) && /audioRearm\(\); mtRearm\(\);   \/\/ importar/.test(cj) && /if \(!c\.on\) \{ MT_HTML = ''; if \(!MT_CLEAN \|\| MT_ORDER\) mtRearm\(\); return st; \}/.test(cj), 'abrir / crear / demo, importar y Meteo apagado rearman');
     const log = m.t.env.storage.get('showtime.log'), fest = m.t.env.storage.get('showtime.festival'), snap = JSON.stringify(m.t.T.emSnapshot());
     m.t.adv(60000); m.set({ rain: 8, temp: 38, uv: 10 }); eq(m.fresh().join(), 'uv'); ok(m.horas().slice(-1)[0], 'el siguiente nuevo sí lleva hora');
     eq(m.t.env.storage.get('showtime.festival'), fest, 'el evento no cambia');
     ok(snap.length > 0); const sn1 = JSON.stringify(m.t.T.emSnapshot());
     m.t.adv(60000); m.t.env.win.ShowtimePanel.reload(); eq(JSON.stringify(m.t.T.emSnapshot()), sn1, 'la emisión no lleva orden ni horas de la tarjeta (igual tras repintar con hora puesta)');
-    ok(!/(localStorage|logEvent|sendProd|Dt\.set)[^\n]*MT_ORDER|MT_ORDER[^\n]*(localStorage|logEvent|sendProd|Dt\.set)/.test(cj), 'MT_ORDER solo vive en memoria: ni almacén, ni log, ni emisión');
+    ok(!/(logEvent|sendProd|Dt\.set|emPush|send\()[^\n]*MT_ORDER|MT_ORDER[^\n]*(logEvent|sendProd|Dt\.set|emPush|send\()/.test(cj), 'la cronología no va al log, la emisión ni los datos compartidos');
+    ok(!/meteoOrder/.test(D.src('datos.js') + D.src('emision.js') + D.src('log.js') + D.src('live.js') + D.src('remote.js')), 'ni datos.js, ni emisión, ni log, ni Live, ni Mando la conocen');
     ok(!m.t.env.storage.get('showtime.log') || !m.t.env.storage.get('showtime.log').includes('Detectado a las'), 'la hora de detección no va al log');
   });
 
-  test('37b · Meteo «!»: hover o tap breve lo quitan sin «Visto», sin escribir nada, sin repintar y sin volver; pointerdown, scroll o pinch, no', () => {
+  test('37b · Meteo «!»: hover o un toque real (un dedo, sin scroll ni pellizco) lo quitan sin «Visto», sin escribir, sin repintar y sin volver', () => {
     const m = mtDash({}); m.set({ rain: 8 });
     eq(m.fresh().join(), 'rain');
     const h = m.last();
@@ -952,19 +1011,30 @@
     const css = D.src('control.css');
     ok(/\.mt-al\{[^}]*position:relative\}/.test(css) && /\.mt-fresh\{position:absolute;[^}]*pointer-events:none\}/.test(css) && !/\.mt-fresh\{[^}]*(animation|transition)/.test(css), 'superpuesto, sin mover nada, sin animación');
     const cj = D.src('control.js');
-    ok(!/addEventListener\('(pointerdown|touchstart|touchmove|scroll|wheel|gesture[a-z]*)'[^\n]*mtFreshOff/.test(cj) && (cj.match(/mtFreshOff\(al\.dataset\.id, al\)/g) || []).length === 2, 'solo pointerover (ratón) y click (tap del navegador) lo quitan');
-    ok(!/setTimeout[^\n]*mtFreshOff|mtFreshOff[^\n]*setTimeout/.test(cj), 'sin temporizador');
+    ok((cj.match(/mtFreshOff\(/g) || []).length === 3 && /addEventListener\('pointerover'[^\n]*\n[^\n]*\n\s*const al = [^\n]*mtFreshOff\(al\.dataset\.id, al\)/.test(cj) && /mtFreshOff\(t\.al\.dataset\.id, t\.al\);\n  \}\);/.test(cj), 'solo hover (ratón) y el ciclo completo de un toque lo quitan');
+    ok(!/addEventListener\('click', e => \{\n\s*if \(!e\.target\.closest \|\| e\.target\.closest\('button, a'\)\) return;\n\s*const al = e\.target\.closest\('\.mt-al'\)/.test(cj), 'ya no depende del «click» (en tablet no llegaba)');
+    ok(!/setTimeout[^\n]*mtFreshOff|mtFreshOff[^\n]*setTimeout/.test(cj) && !/MT_TAP[^\n]*(Date\.now|performance|clientX -|Math\.hypot)/.test(cj), 'sin temporizador ni umbrales de tiempo o distancia');
     const AK = 'showtime.meteoAck', snap = () => [AK, 'showtime.log', 'showtime.meteo', 'showtime.config', 'showtime.festival'].map(k => m.t.env.storage.get(k)).join('|');
     const s0 = snap(), paints = () => m.t.env.innerLog.filter(([n]) => n === 'v-meteo').length;
-    let removed = 0; const al = { dataset: { id: 'rain' }, querySelector: q => q === '.mt-fresh' ? { remove() { removed++; } } : null };
-    const tgt = onBtn => ({ target: { closest: q => q === 'button, a' ? (onBtn ? {} : null) : q === '.mt-al' ? al : null } });
-    m.t.env.fire('v-meteo', 'pointerdown', Object.assign({ pointerType: 'touch' }, tgt())); eq(m.fresh().join(), 'rain', 'pointerdown: no');
-    m.t.env.fire('v-meteo', 'pointerover', Object.assign({ pointerType: 'touch' }, tgt())); eq(m.fresh().join(), 'rain', 'pointerover táctil (inicio de arrastre o pinch): no');
-    m.t.env.fire('v-meteo', 'scroll', tgt()); eq(m.fresh().join(), 'rain', 'scroll: no');
-    m.t.env.fire('v-meteo', 'click', tgt(true)); eq(m.fresh().join(), 'rain', 'tap en «Visto» o enlace: no');
+    let removed = 0; const al = { dataset: { id: 'rain' }, querySelector: q => q === '.mt-fresh' ? { remove() { removed++; } } : null, getBoundingClientRect: () => ({ left: 0, right: 200, top: 0, bottom: 20 }) };
+    const ev = (pointerId, o) => Object.assign({ pointerType: 'touch', pointerId, clientX: 50, clientY: 10, target: { closest: q => q === 'button, a' ? (o && o.btn ? {} : null) : q === '.mt-al' ? al : null } }, o || {});
+    const F = (type, e) => m.t.env.fire('v-meteo', type, e), still = msg => eq(m.t.T.mtNew().join(), 'rain', msg);
+    F('pointerdown', ev(1)); still('pointerdown solo: no confirma');
+    F('pointerover', ev(1)); still('pointerover táctil: no');
+    F('pointercancel', ev(1)); F('pointerup', ev(1)); still('el navegador cancela (empieza un scroll o un gesto): no');
+    F('pointerdown', ev(2)); F('scroll', { target: {} }); F('pointerup', ev(2)); still('la lista hace scroll entre down y up: no');
+    F('pointerdown', ev(3)); m.t.env.fire('window', 'scroll', {}); F('pointerup', ev(3)); still('la página hace scroll entre down y up: no');
+    F('pointerdown', ev(4)); F('pointerdown', ev(5)); F('pointerup', ev(4)); F('pointerup', ev(5)); still('dos dedos (pellizco): no');
+    F('pointerdown', ev(11)); F('pointerdown', ev(12)); F('pointerup', ev(12)); F('pointerup', ev(11)); still('pellizco soltando primero el segundo dedo: no');
+    F('pointerdown', ev(6)); F('pointerup', ev(6, { clientX: 500 })); still('suelta fuera del aviso (arrastre): no');
+    F('pointerdown', ev(7, { btn: true })); F('pointerup', ev(7, { btn: true })); still('toque en «Visto» o un enlace: no (y «Visto» va por su lado)');
+    F('pointerdown', ev(8, { pointerType: 'mouse' })); F('pointerup', ev(8, { pointerType: 'mouse' })); still('ratón: solo por hover');
+    eq(removed, 0, 'nada quitado aún');
     const p0 = paints();
-    m.t.env.fire('v-meteo', 'click', tgt()); eq(removed, 1, 'tap breve en zona no accionable: se quita ese elemento');
+    F('pointerdown', ev(9)); F('pointerup', ev(9)); eq(removed, 1, 'toque de un dedo, sin moverse, dentro del aviso: se quita ese «!»');
+    eq(m.t.T.mtNew().length, 0);
     eq(paints(), p0, 'sin repintar la tarjeta (sin parpadeo)');
+    F('pointerdown', ev(10, { pointerType: 'pen' })); F('pointerup', ev(10, { pointerType: 'pen' })); eq(removed, 1, 'otro toque sin «!»: nada que hacer');
     m.t.adv(1000); m.t.env.win.ShowtimePanel.reload(); eq(paints(), p0, 'y el siguiente tick tampoco repinta: el HTML guardado ya va sin «!»');
     eq(m.t.T.mtNew().length, 0, 'fuera'); eq(snap(), s0, 'ni «Visto», ni log, ni estado meteo, ni configuración, ni evento');
     m.t.T.setAppLang('en'); m.t.T.setAppLang('es'); eq(m.fresh().length, 0, 'no vuelve al repintar');
@@ -979,6 +1049,80 @@
     m.t.env.fire('document', 'click', { target: { closest: q => q === '[data-act="mt-ack"]' ? { dataset: { k: 'rain' } } : null } });
     ok(m.t.env.storage.get(AK) !== s0.split('|')[0], '«Visto» sí guarda');
     eq(m.t.env.errors.length, 0, 'sin errores');
+  });
+
+  // ── Dec. 153 · cronología Meteo guardada solo en este navegador, por evento + fuente ──────────
+  test('38 · Meteo: recargar con el mismo evento, fuente y avisos conserva orden y HH:MM (sin «!» ni salto); solo en este navegador', () => {
+    const m = mtDash({});
+    eq(m.saved().order.map(e => e.at).join(), ',', 'primera lectura: guardada sin horas');
+    m.t.adv(5 * 60000); const t1 = m.t.clk.t; m.set({ rain: 8 });
+    m.t.adv(3 * 60000); const t2 = m.t.clk.t; m.set({ rain: 8, temp: 38 });
+    eq(m.kinds().join(), 'gust,wind,rain,heat'); eq(m.horas().join(), ',,' + hm(t1) + ',' + hm(t2));
+    const sv = m.saved(); ok(sv && /^Prueba audio\|/.test(sv.ctx) && /manual\|/.test(sv.ctx), 'contexto: evento + fuente');
+    eq(JSON.stringify(sv.order), JSON.stringify([{ id: 'gust', at: null }, { id: 'wind', at: null }, { id: 'rain', at: t1 }, { id: 'heat', at: t2 }]), 'orden y horas');
+    // Recarga: mismo navegador, mismo evento, misma fuente, mismos avisos
+    m.t.adv(10 * 60000); const r2 = m.reopen();
+    eq(r2.kinds().join(), 'gust,wind,rain,heat', 'mismo orden'); eq(r2.horas().join(), ',,' + hm(t1) + ',' + hm(t2), 'mismas horas (no la de la recarga)');
+    eq(r2.fresh().length, 0, 'sin «!»');
+    const L = r2.lista([18, 18, 18, 18], 40); r2.t.env.win.ShowtimePanel.reload(); eq(L.L.sets, 0, 'sin salto');
+    // Nada sale de este navegador
+    const fest = r2.t.env.storage.get('showtime.festival'), log = r2.t.env.storage.get('showtime.log') || '', snap = JSON.stringify(r2.t.T.emSnapshot());
+    ok(!/meteoOrder|"at":\s*\d{12}/.test(fest) && !/meteoOrder/.test(log) && !/meteoOrder/.test(snap) && snap.indexOf(String(t1)) < 0, 'ni evento, ni log, ni emisión');
+    // Tras recargar sigue funcionando la llegada en directo
+    r2.t.adv(60000); const t3 = r2.t.clk.t; r2.set({ rain: 8, temp: 38, uv: 10 });
+    eq(r2.kinds().join(), 'gust,wind,rain,heat,uv'); eq(r2.horas().slice(-1)[0], hm(t3)); eq(r2.fresh().join(), 'uv', '«!» al nuevo');
+    eq(r2.saved().order.length, 5, 'y se guarda');
+  });
+
+  test('38b · Meteo: un aviso que se va borra su entrada local; si vuelve (en directo o tras recargar), es nuevo: hora nueva, al final, «!» y salto', () => {
+    const m = mtDash({}); m.t.adv(60000); const t1 = m.t.clk.t; m.set({ rain: 8 }); m.t.adv(60000); m.set({ rain: 8, temp: 38 });
+    m.t.adv(60000); m.set({ rain: 0, temp: 38 });
+    eq(m.kinds().join(), 'gust,wind,heat'); ok(!m.saved().order.some(e => e.id === 'rain'), 'la lluvia sale también de lo guardado');
+    const L = m.lista([18, 18, 18, 18], 40);
+    m.t.adv(60000); const t4 = m.t.clk.t; m.set({ rain: 8, temp: 38 });
+    eq(m.kinds().join(), 'gust,wind,heat,rain', 'vuelve al final'); eq(m.horas().slice(-1)[0], hm(t4), 'con hora nueva'); ok(hm(t4) !== hm(t1));
+    ok(m.fresh().indexOf('rain') >= 0, 'con «!»'); eq(L.L.scrollTop, L.L.scrollHeight - L.L.clientHeight, 'y salto al final');
+    // Se va con el Dashboard cerrado: al recargar ya no está; si vuelve después, es nuevo
+    const r2 = m.reopen({ rain: 0, temp: 38 });
+    eq(r2.kinds().join(), 'gust,wind,heat'); ok(!r2.saved().order.some(e => e.id === 'rain'), 'se borra al recargar');
+    const L2 = r2.lista([18, 18, 18, 18], 40); r2.t.adv(60000); const t5 = r2.t.clk.t; r2.set({ rain: 8, temp: 38 });
+    eq(r2.kinds().join(), 'gust,wind,heat,rain'); eq(r2.horas().slice(-1)[0], hm(t5)); eq(r2.fresh().join().indexOf('rain') >= 0, true);
+    eq(L2.L.scrollTop, L2.L.scrollHeight - L2.L.clientHeight, 'salto al final');
+    // Aparece con el Dashboard cerrado: al recargar se suma al final SIN hora (no se sabe cuándo llegó), sin «!» ni salto
+    const r3 = r2.reopen({ rain: 8, temp: 38, uv: 10 });
+    eq(r3.kinds().join(), 'gust,wind,heat,rain,uv'); eq(r3.horas().slice(-1)[0], '', 'sin hora inventada'); eq(r3.fresh().length, 0, 'sin «!»');
+  });
+
+  test('38c · Meteo: cambio de evento, de fuente, importación o Meteo reactivado → referencia limpia (sin horas, «!» ni salto)', () => {
+    const m = mtDash({}); m.t.adv(60000); m.set({ rain: 8 });
+    ok(m.horas().slice(-1)[0], 'con hora');
+    // Otro evento (el mismo navegador): lo guardado es de otro contexto
+    const sd = {}; m.t.env.storage.forEach((v, k) => { sd[k] = v; });
+    const F2 = JSON.parse(sd['showtime.festival']); F2.event.nombre = 'Otro festival'; sd['showtime.festival'] = JSON.stringify(F2);
+    const e2 = mtDash({}, sd, m.t.clk.t);
+    eq(e2.kinds().join(), 'gust,wind,rain'); eq(e2.horas().filter(Boolean).length + e2.fresh().length, 0, 'otro evento: sin horas ni «!»');
+    ok(/^Otro festival\|/.test(e2.saved().ctx), 'lo guardado pasa a ser del nuevo contexto');
+    // Otra fuente (misma sesión): manual → otra ubicación
+    const m2 = mtDash({}); m2.t.adv(60000); m2.set({ rain: 8 }); ok(m2.horas().slice(-1)[0]);
+    const Wm = require('../meteo.js'), cfg = Object.assign(mtCfg({ rain: 8 }), { lat: 40.4, lon: -3.7 }), c = Wm.normMeteo(cfg);
+    m2.t.env.storage.set('showtime.config', JSON.stringify({ mode: 'all', meteo: cfg }));
+    m2.t.env.storage.set('showtime.meteo', JSON.stringify({ snap: Wm.manualSnap(c.manual), err: '', errAt: null, key: c.source + '|' + c.lat + '|' + c.lon + '|' + c.url }));
+    m2.t.env.win.ShowtimePanel.reload();
+    eq(m2.kinds().join(), 'gust,wind,rain', 'otra fuente: mismos avisos'); eq(m2.horas().filter(Boolean).length + m2.fresh().length, 0, 'pero referencia limpia');
+    ok(/\|manual\|40\.4\|-3\.7\|/.test(m2.saved().ctx), 'contexto nuevo');
+    // Importación / abrir evento (mtRearm): limpia aunque el contexto coincida, también tras recargar
+    const m3 = mtDash({}); m3.t.adv(60000); m3.set({ rain: 8 });
+    m3.t.T.mtRearm(); eq(m3.saved(), null, 'rearme: lo guardado se borra');
+    m3.t.env.win.ShowtimePanel.reload(); eq(m3.horas().filter(Boolean).length + m3.fresh().length, 0, 'importación: referencia limpia');
+    // Meteo apagado y reactivado
+    const m4 = mtDash({}); m4.t.adv(60000); m4.set({ rain: 8 }); ok(m4.horas().slice(-1)[0]);
+    m4.t.env.storage.set('showtime.config', JSON.stringify({ mode: 'all', meteo: Object.assign(mtCfg({ rain: 8 }), { on: false }) })); m4.t.env.win.ShowtimePanel.reload();
+    eq(m4.saved(), null, 'apagado: nada guardado');
+    m4.t.env.storage.set('showtime.config', JSON.stringify({ mode: 'all', meteo: mtCfg({ rain: 8 }) })); m4.t.env.win.ShowtimePanel.reload();
+    eq(m4.kinds().join(), 'gust,wind,rain'); eq(m4.horas().filter(Boolean).length + m4.fresh().length, 0, 'reactivado: referencia limpia');
+    // Datos guardados rotos: como sin historial
+    const sd5 = {}; m.t.env.storage.forEach((v, k) => { sd5[k] = v; }); sd5['showtime.meteoOrder'] = '{roto';
+    const m5 = mtDash({}, sd5, m.t.clk.t); eq(m5.horas().filter(Boolean).length, 0, 'almacén roto: referencia limpia'); eq(m5.t.env.errors.length, 0);
   });
 
   (async () => {
