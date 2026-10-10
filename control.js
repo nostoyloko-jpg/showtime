@@ -1690,7 +1690,7 @@
       x.name = n; t.value = n; saveWinName(id, n); return;
     }
     // 3ª columna (dec. 133): en Confidence es la zona; en Manager, las filas de esa ventana
-    if (t.classList.contains('gv-zona') && x.vista === 'manager') { setWinRows(id, t.value); return; }
+    if (t.classList.contains('gv-zona') && x.vista === 'manager') { setWinRows(id, t.value); const filas = Vs.normRows(t.value); toast(filas ? tx('Pantalla Live: {n} filas fijas', { n: filas }) : tx('Pantalla Live: filas automáticas')); return; }
     if (t.classList.contains('gv-vista')) { const v = Vs.normVista(t.value); setWinVista(id, v, v === 'confidence' ? (x.zona != null ? x.zona : ((zonasLive()[0] || {}).id || '')) : null); return; }
     if (t.classList.contains('gv-zona')) setWinVista(id, x.vista, t.value);
   });

@@ -308,6 +308,8 @@
       "soundchecks": "soundchecks",
       "Deshacer ({n})": "Undo ({n})",
       "Deshacer": "Undo",
+      "Pantalla Live: {n} filas fijas": "Live screen: {n} fixed rows",
+      "Pantalla Live: filas automáticas": "Live screen: automatic rows",
       "Horario a importar": "Schedule to import",
       "Vista previa": "Preview",
       "↺ Reset": "↺ Reset",

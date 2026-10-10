@@ -468,3 +468,6 @@ body.park-on .rx{display:none}
 .evlogo{display:flex;align-items:center;justify-content:center;width:min(60vw,720px);height:min(34vh,360px)}
 .evlogo img{display:block;max-width:100%;max-height:100%;object-fit:contain}
 .tkline .nw{white-space:nowrap}   /* dec. 138: «quedan 50 min» y el horario no se parten */
+/* Filas fijas desde el gestor (dec. 140): la letra crece con el alto de la fila (2 filas > 3 > 4…), no con el ancho del panel */
+body.rows-fixed .aname{font-size:clamp(14px,30cqh,80px)}
+body.rows-fixed .atime{font-size:clamp(11px,13cqh,30px)}

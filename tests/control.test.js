@@ -2028,7 +2028,7 @@ const miss = [...found].filter(k => !I.txHas(k) && !/^(OK|CALL|SC|Live|Raycast|S
     eq(t.env.win.ShowtimeI18n.tx('Zona / Filas', null, 'en'), 'Stage / Rows'); eq(t.env.win.ShowtimeI18n.tx('Filas', null, 'en'), 'Rows');
     const js = D.src('control.js');
     ok(/hz\.textContent = tx\(m && !c \? 'Filas' : c && !m \? 'Zona' : 'Zona \/ Filas'\)/.test(js), 'cabecera según lo abierto: Filas · Zona · Zona / Filas');
-    ok(/if \(t\.classList\.contains\('gv-zona'\) && x\.vista === 'manager'\) \{ setWinRows\(id, t\.value\); return; \}/.test(js), 'en Manager, la 3ª columna son las filas');
+    ok(/if \(t\.classList\.contains\('gv-zona'\) && x\.vista === 'manager'\) \{ setWinRows\(id, t\.value\);/.test(js), 'en Manager, la 3ª columna son las filas');
     ok(/zs\.disabled = !conf && !mgr;/.test(js), 'Backstage: deshabilitado con «—»');
   });
 
@@ -2072,6 +2072,11 @@ const miss = [...found].filter(k => !I.txHas(k) && !/^(OK|CALL|SC|Live|Raycast|S
     ok(/'<div class="v-row tarea"><div class="v-name">' \+ esc\(b\.name\) \+ '<\/div>'/.test(blk) && !/tx\('Tarea'\) \+ ' · '/.test(blk), 'tarea: sin «Tarea ·»');
     const idleAndTask = blk.slice(0, blk.indexOf("rows.push({ o: order(co.stageId), h: '<div class=\"v-row co' + (co.standby")) + blk.slice(blk.indexOf('C.tasksNow('));
     ok(!/tx\('después'\)/.test(idleAndTask), 'sin «después» en el hueco ni en la tarea (CHANGEOVER y STANDBY lo conservan)');
+  });
+
+  test('Dec. 140: Gestor — al cambiar las filas de una Manager, aviso «N filas fijas» / «filas automáticas»', () => {
+    ok(/toast\(filas \? tx\('Pantalla Live: \{n\} filas fijas', \{ n: filas \}\) : tx\('Pantalla Live: filas automáticas'\)\)/.test(D.src('control.js')));
+    const I = require('../i18n.js'); eq(I.tx('Pantalla Live: {n} filas fijas', { n: 3 }, 'en'), 'Live screen: 3 fixed rows'); eq(I.tx('Pantalla Live: filas automáticas', null, 'en'), 'Live screen: automatic rows');
   });
 
   // ── Ejecutor ─────────────────────────────────────────────────────────

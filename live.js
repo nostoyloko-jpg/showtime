@@ -342,10 +342,11 @@
     const q = new URLSearchParams(location.search);
     if (ROWS) q.set('filas', String(ROWS)); else q.delete('filas');
     try { history.replaceState(null, '', location.pathname + '?' + q.toString() + location.hash); } catch (e) {}
-    if (!quiet) { STRIP_H = {}; pset(P.stripH, STRIP_H); setRowH(ROW_H); }
+    if (!quiet) { STRIP_H = {}; pset(P.stripH, STRIP_H); setRowH(ROW_H); requestAnimationFrame(() => { applyInfoWidth(); requestAnimationFrame(redraw); }); }   // con la letra nueva, el ancho del nombre se vuelve a medir
     reportVista();
   }
   function setRowH(v) {
+    document.body.classList.toggle('rows-fixed', !!fixedRows());   // la letra crece con el alto de la fila (dec. 140)
     ROW_H = ROW_STEPS.indexOf(v) >= 0 ? v : 0;
     pset(P.rowH, ROW_H);
     STRIP_H = {}; pset(P.stripH, STRIP_H);          // fuera los altos a mano: todas iguales
@@ -380,7 +381,8 @@
         '<div class="cvsw"><canvas></canvas></div>' +
         '<div class="striph" title="' + tx('Arrastra para ajustar el alto; doble clic: automático') + '"></div>';
       // Alto FIJO: agrandar una barra empuja a las demás y aparece scroll.
-      s.style.flex = '0 0 ' + (STRIP_H[i] || baseH) + 'px';
+      // Filas fijas (dec. 140): cada fila es exactamente 1/N del alto (en %: se reajusta sola al cambiar el tamaño o pasar a pantalla completa)
+      s.style.flex = fixedRows() ? '0 0 calc(100% / ' + fixedRows() + ')' : '0 0 ' + (STRIP_H[i] || baseH) + 'px';
       bot.appendChild(s);
       s.querySelector('.drag-handle').addEventListener('pointerdown', startInfoResize);
       s.querySelector('.drag-handle').addEventListener('dblclick', resetInfoAuto);
@@ -779,7 +781,9 @@
     const el = document.querySelector('.aname') || document.body;
     const cs = getComputedStyle(el), fam = (cs && cs.fontFamily) || 'sans-serif';
     const realSz = el.matches && el.matches('.aname') ? (parseFloat(cs.fontSize) || 0) : 0;
-    const nameSz = Math.max(INFO_REF_NAME, realSz);
+    // Filas fijas (dec. 140): el nombre se dibuja al 30 % del alto de la fila (máx. 80 px); se mide a ese tamaño para que quepa sin encogerse
+    const fixSz = fixedRows() && $('bot') ? Math.min(80, 0.3 * $('bot').clientHeight / fixedRows()) : 0;
+    const nameSz = Math.max(INFO_REF_NAME, realSz, fixSz);
     let need = 0;
     (BLOCKS || []).forEach(b => {
       need = Math.max(need, measureTxt(String(b.name || '').toUpperCase(), 900, nameSz, fam));

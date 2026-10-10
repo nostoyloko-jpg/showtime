@@ -157,7 +157,7 @@
   test('Ancho del panel de info: automático y estable (medida a tamaño de referencia), mínimo 280 px y máximo 45 vw', () => {
     const src = D.src('live.js');
     ok(/const INFO_REF_NAME = 37, INFO_REF_TIME = 20, INFO_PAD = 80, INFO_MIN = 280;/.test(src), 'tamaños de referencia y margen');
-    ok(/const nameSz = Math\.max\(INFO_REF_NAME, realSz\);/.test(src), 'mide el nombre al tamaño real si es mayor (Backstage)');
+    ok(/const nameSz = Math\.max\(INFO_REF_NAME, realSz, fixSz\);/.test(src), 'mide el nombre al tamaño real si es mayor (Backstage)');
     ok(/Math\.max\(INFO_MIN, Math\.min\(need \+ INFO_PAD, hi\)\)/.test(src) && /const hi = window\.innerWidth \* 0\.55/.test(src), 'clamp: mín. 280 px, máx. 55 vw');
     ok(/\.toUpperCase\(\), 900, nameSz, fam\)/.test(src) && /C\.fmtHM\(b\.si\) \+ '–' \+ C\.fmtHM\(b\.sf\)/.test(src), 'mide el nombre (900) y el horario');
     const rec = {}, t = arrancar({ rec });
@@ -626,6 +626,15 @@
     const co = js.slice(js.indexOf('function changeoverHtml'), js.indexOf('function nextHtml'));
     ok(/<div class="tname" style="color:var\(--c\)">' \+ esc\(co\.stage\.toUpperCase\(\)\) \+ '<\/div><div class="tmeta">— ' \+ tx\('Sin actividad'\) \+ ' —<\/div>/.test(co), 'hueco: la zona en grande y «— Sin actividad —» debajo');
     ok(!/despuesHtml/.test(js), 'fuera la función que ya nadie usa');
+  });
+
+  test('Dec. 140: filas fijas — cada fila exactamente 1/N del alto (también al cambiar el tamaño) y letra según el alto de la fila', () => {
+    const js = D.src('live.js'), css = D.src('live.css');
+    ok(/s\.style\.flex = fixedRows\(\) \? '0 0 calc\(100% \/ ' \+ fixedRows\(\) \+ '\)' : '0 0 ' \+ \(STRIP_H\[i\] \|\| baseH\) \+ 'px';/.test(js), '1/N en %, sin altos a mano');
+    ok(/document\.body\.classList\.toggle\('rows-fixed', !!fixedRows\(\)\)/.test(js), 'marca el modo');
+    ok(/body\.rows-fixed \.aname\{font-size:clamp\(14px,30cqh,80px\)\}/.test(css) && /body\.rows-fixed \.atime\{font-size:clamp\(11px,13cqh,30px\)\}/.test(css), 'letra al 30 % del alto de la fila');
+    ok(/const fixSz = fixedRows\(\) && \$\('bot'\) \? Math\.min\(80, 0\.3 \* \$\('bot'\)\.clientHeight \/ fixedRows\(\)\) : 0;/.test(js), 'el ancho del nombre se mide a ese tamaño (no se encoge)');
+    ok(/return Math\.max\(autoCount\(\), left\);/.test(js), 'con menos entradas que filas, filas vacías hasta completar');
   });
   test('Dec. 132: el cartel del reposo y del Standby lleva el logo del evento (si no hay, el de Showtime) y se repinta si cambia', () => {
     const js = D.src('live.js'), css = D.src('live.css');
