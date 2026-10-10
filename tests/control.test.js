@@ -818,11 +818,11 @@
     eq(s.escenarios.map(e => e.nombre).join(), 'principal');
     ok(s.artists.length === 2 && s.artists.every(a => a.escenarioId === s.escenarios[0].id));
   });
-  test('Modales sólidos (Safari): fondo oscurecido con desenfoque y caja opaca sin cristal, en Studio y en Stage', () => {
+  test('Ventanas de cristal esmerilado (dec. 139; antes opacas por Safari): fondo oscurecido y desenfocado, caja ahumada al 90 %; Stage opaco', () => {
     const css = D.src('control.css'), tail = css.slice(css.lastIndexOf('/* ── Modales sólidos'));
-    ok(/\.modal\{background:rgba\(0,0,0,\.75\);-webkit-backdrop-filter:blur\(8px\);backdrop-filter:blur\(8px\)\}/.test(tail));
-    ok(/\.modal-box,\.imp-box\{--modal-bg:#0e1015;background:linear-gradient\(180deg,#16181f,#0e1015\);-webkit-backdrop-filter:none;backdrop-filter:none;border:1px solid rgba\(255,255,255,\.14\);box-shadow:0 24px 64px rgba\(0,0,0,\.85\),inset 0 1px 0 rgba\(255,255,255,\.08\)\}/.test(tail), 'Studio (base): opaco, con degradado y filo de luz (dec. 136)');
-    ok(/body\[data-ps="stage"\] \.modal-box,body\[data-ps="stage"\] \.imp-box,body\[data-ps="stage"\] \.spot-box\{--modal-bg:#000;background:#000;/.test(tail), 'Stage: negro (también ⌘K)');
+    ok(/\.modal\{background:rgba\(0,0,0,\.65\);-webkit-backdrop-filter:blur\(12px\);backdrop-filter:blur\(12px\)\}/.test(tail), 'fondo de pantalla al 65 % y desenfocado');
+    ok(/\.modal-box,\.imp-box,\.spot-box\{--modal-bg:#12141a;background-color:rgba\(18,20,26,\.9\);background-image:linear-gradient\(180deg,rgba\(255,255,255,\.08\),rgba\(255,255,255,\.02\) 40%,transparent\);-webkit-backdrop-filter:blur\(32px\) saturate\(180%\);backdrop-filter:blur\(32px\) saturate\(180%\);border:1px solid rgba\(255,255,255,\.16\);/.test(tail), 'Studio: cristal ahumado al 90 % (ventanas y ⌘K)');
+    ok(/body\[data-ps="stage"\] \.modal-box,body\[data-ps="stage"\] \.imp-box,body\[data-ps="stage"\] \.spot-box\{--modal-bg:#000;background:#000;-webkit-backdrop-filter:none;backdrop-filter:none;border-color:#FFD600\}/.test(tail), 'Stage: negro opaco y borde amarillo (también ⌘K)');
     ok(css.indexOf('/* ── Modales sólidos') > css.indexOf('/* ── Cristal'), 'va después del cristal (gana)');
   });
 
@@ -2046,7 +2046,7 @@ const miss = [...found].filter(k => !I.txHas(k) && !/^(OK|CALL|SC|Live|Raycast|S
 
   test('Dec. 136: todas las ventanas con el mismo acabado — degradado, tarjetas, campos de alto contraste; Pegar horario en 4 tarjetas', () => {
     const css = D.src('control.css'), html = D.src('index.html');
-    ok(/\.spot-box\{[^}]*background:linear-gradient\(180deg,#16181f,#0e1015\);border:1px solid rgba\(255,255,255,\.14\);box-shadow:0 24px 64px rgba\(0,0,0,\.85\),inset 0 1px 0 rgba\(255,255,255,\.08\)\}/.test(css), '⌘K, igual que las ventanas');
+    ok(/\.modal-box,\.imp-box,\.spot-box\{/.test(css) && !/\n\.spot-box\{[^}]*background/.test(css), '⌘K, igual que las ventanas (una sola regla)');
     ok(css.indexOf(':where(body:not([data-ps="stage"])) :is(.modal-box,.imp-box) :is(input[type=text],input[type=number],input[type=date],input[type=time],input[type=search],input:not([type]),select,textarea):where(:not(:disabled)){background-color:#08090c;border:1px solid rgba(255,255,255,.12)}') >= 0, 'campos: fondo #08090c y borde nítido (background-color, dec. 112); Stage conserva su negro y amarillo');
     ok(/,select,textarea\):focus\{outline:none;border-color:rgba\(255,255,255,\.42\);box-shadow:0 0 0 3px rgba\(255,255,255,\.07\)\}/.test(css), 'halo blanco al escribir');
     const imp = html.slice(html.indexOf('<div id="imp"'), html.indexOf('<datalist id="zones-dl"'));
