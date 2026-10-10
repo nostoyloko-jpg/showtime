@@ -100,6 +100,9 @@ td.t input{width:68px;text-align:center;font-weight:700}
 td.n{position:relative;min-width:88px}   /* Notas (dec. 121): elástica, se queda con el sitio que sobra (0 desplazamiento a 1440 px; ~245 px a 1920). Nota entera: al pasar el ratón (title) o al escribir (320 px). En Foco se oculta */
 td.n input{width:100%;min-width:88px}
 td.n input:focus{position:absolute;right:3px;left:auto;top:50%;transform:translateY(-50%);width:320px;max-width:none;z-index:6;box-shadow:0 6px 20px rgba(0,0,0,.5)}   /* Notas: se ensancha al escribir */
+.ntip{display:none;position:absolute;right:0;bottom:calc(100% + 4px);z-index:50;width:max-content;min-width:200px;max-width:340px;padding:8px 12px;border-radius:8px;background:#0f1117;border:1px solid rgba(255,255,255,.16);box-shadow:0 10px 30px rgba(0,0,0,.7);color:#fff;font-size:13px;font-weight:500;line-height:1.4;white-space:normal;overflow-wrap:break-word;pointer-events:none}   /* Notas: la nota entera al pasar el ratón (dec. 122) */
+td.n:not(:focus-within):hover .ntip:not([hidden]){display:block}
+#tbl tbody tr:nth-child(-n+2) td.n .ntip{bottom:auto;top:calc(100% + 4px)}   /* primeras filas: debajo, para no chocar con la cabecera fija de la tabla */
 td select{height:30px;width:118px}
 td.mod input,td.mod select{border-color:rgba(255,197,51,.6);background-color:rgba(255,197,51,.08)}
 td input.bad{border-color:var(--err)!important;background-color:rgba(255,107,107,.12)!important}
@@ -1172,3 +1175,4 @@ body[data-ps="stage"] .tpill{background:#000;border:1.5px solid var(--pc);color:
 .cast-net .mnote{margin:0}
 body[data-ps="stage"] .net-l{color:#fff}
 body[data-ps="stage"] .net-st.ok i{background:#3ddc97}
+body[data-ps="stage"] .ntip{background:#000;border:1.5px solid rgba(255,214,0,.7)}

@@ -1828,17 +1828,22 @@ const miss = [...found].filter(k => !I.txHas(k) && !/^(OK|CALL|SC|Live|Raycast|S
     ok(/body\.focus #tbl \.c-n,body\.focus #tbl td\.n,/.test(css), 'en Foco, Notas sigue oculta');
   });
 
-  test('Dec. 121: Notas elástica (se queda con el sitio que sobra, nunca obliga a desplazar) y la nota entera al pasar el ratón', () => {
+  test('Dec. 121/122: Notas elástica (nunca obliga a desplazar) y la nota entera en una tarjeta flotante al pasar el ratón', () => {
     const css = D.src('control.css'), js = D.src('control.js');
     ok(/td\.n\{position:relative;min-width:88px\}/.test(css) && /td\.n input\{width:100%;min-width:88px\}/.test(css), 'sin ancho fijo: la columna crece con la pantalla');
     ok(!/td\.n(?![\w-])[^{]*\{[^}]*width:(96|140|170|200)px/.test(css), 'ningún ancho fijo que empuje la tabla');
     ok(/td\.n input:focus\{position:absolute;[^}]*width:320px;max-width:none;z-index:6;/.test(css), 'al escribir flota a 320 px');
     ok(/body\.focus #tbl \.c-n,body\.focus #tbl td\.n,/.test(css), 'en Foco sigue oculta');
-    ok(/\(k === 'notas' \? ' title="' \+ esc\(v\('notas'\) \|\| ''\) \+ '"' : ''\)/.test(js), 'title con la nota entera');
-    ok(/tb\.addEventListener\('input', e => \{ if \(e\.target\.dataset && e\.target\.dataset\.k === 'notas'\) e\.target\.title = e\.target\.value; \}\)/.test(js), 'el title sigue a lo que se escribe');
+    // Dec. 122: tarjeta flotante propia (.ntip), sin el aviso nativo del navegador
+    ok(!/data-k="notas"[^>]*title=/.test(js) && !/k === 'notas' \? ' title=/.test(js), 'sin title nativo');
+    ok(/td\('notas', 'n', inp\('notas'\) \+ \(v\('notas'\) \? '<span class="ntip" aria-hidden="true">' \+ esc\(v\('notas'\)\) \+ '<\/span>' : ''\)\)/.test(js), 'tarjeta junto al input, solo si hay nota');
+    ok(/if \(tip\) \{ tip\.textContent = e\.target\.value; tip\.hidden = !e\.target\.value; \}/.test(js), 'la tarjeta sigue a lo que se escribe');
+    ok(/\.ntip\{display:none;position:absolute;right:0;bottom:calc\(100% \+ 4px\);z-index:50;width:max-content;min-width:200px;max-width:340px;[^}]*pointer-events:none\}/.test(css), 'estilo de la tarjeta');
+    ok(/td\.n:not\(:focus-within\):hover \.ntip:not\(\[hidden\]\)\{display:block\}/.test(css), 'al pasar el ratón; al escribir, no');
+    ok(/#tbl tbody tr:nth-child\(-n\+2\) td\.n \.ntip\{bottom:auto;top:calc\(100% \+ 4px\)\}/.test(css), 'primeras filas: debajo (sin chocar con la cabecera fija)');
+    ok(/body\[data-ps="stage"\] \.ntip\{background:#000;border:1\.5px solid rgba\(255,214,0,\.7\)\}/.test(css), 'Stage: negro y borde amarillo');
     const t = dashboard(), html = ultimo(t, 'tbody');
-    ok(/<input type="text" data-k="notas" value="[^"]*" data-orig="[^"]*" title="[^"]*" autocomplete/.test(html), 'cada nota de la tabla lleva su title');
-    ok(!/data-k="nombre"[^>]*title=/.test(html), 'los demás campos, sin title');
+    ok(!/title="[^"]*" autocomplete/.test(html.match(/<td class="n[^"]*">[\s\S]*?<\/td>/) ? html.match(/<td class="n[^"]*">[\s\S]*?<\/td>/)[0] : ''), 'la celda de Notas no lleva title');
   });
 
   // ── Ejecutor ─────────────────────────────────────────────────────────

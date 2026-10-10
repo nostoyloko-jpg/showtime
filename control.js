@@ -458,8 +458,7 @@
     const v = k => C.fieldValue(a, mode, k);
     const isMod = k => m.indexOf(k) >= 0;
     const td = (k, cls, inner) => '<td class="' + cls + (isMod(k) ? ' mod' : '') + '"' + (isMod(k) ? ' title="' + tx('Cambiado desde la última importación/exportación') + '"' : '') + '>' + inner + '</td>';
-    const inp = (k, ph) => '<input type="text" data-k="' + k + '" value="' + esc(v(k)) + '" data-orig="' + esc(v(k)) + '"' + (ph ? ' placeholder="' + ph + '"' : '')
-      + (k === 'notas' ? ' title="' + esc(v('notas') || '') + '"' : '') + ' autocomplete="off" spellcheck="false">';   // Notas: la nota entera al pasar el ratón (dec. 121)
+    const inp = (k, ph) => '<input type="text" data-k="' + k + '" value="' + esc(v(k)) + '" data-orig="' + esc(v(k)) + '"' + (ph ? ' placeholder="' + ph + '"' : '') + ' autocomplete="off" spellcheck="false">';
     const esc0 = C.getEscenario(FEST, a.escenarioId);
     const scol = safeColor(esc0 && esc0.color, '#555');
     const col = hex6(C.artistColor(FEST, a), '#888888');
@@ -496,7 +495,7 @@
         (isNew ? '<span class="tag" title="' + tx('Creada desde la última importación/exportación') + '">' + tx('NUEVA') + '</span>' : '') + '</div></td>' +
       td('call', 't', band ? inp('call', '—') : off) +
       td('standby', 'gap', gap) +
-      td('notas', 'n', inp('notas')) +
+      td('notas', 'n', inp('notas') + (v('notas') ? '<span class="ntip" aria-hidden="true">' + esc(v('notas')) + '</span>' : '')) +   // nota entera en tarjeta flotante (dec. 122)
       '<td class="mo"><div class="more"><button class="delbtn morebtn" data-act="more" title="' + tx('Más: duplicar, borrar') + '"><svg class="ic"><use href="#i-dots"/></svg></button>' +
         '<div class="morep"><button class="delbtn dupbtn" data-act="dup" title="' + tx('Duplicar en otra jornada') + '"><svg class="ic"><use href="#i-copy"/></svg><span>' + tx('Duplicar') + '</span></button>' +
         '<button class="delbtn delb" data-act="del" title="' + tx('Borrar {what}', { what: tx(TIPO_TXT[tipo]) }) + '"><svg class="ic"><use href="#i-trash"/></svg><span>' + tx('Borrar') + '</span></button></div></div></td>' +
@@ -838,7 +837,11 @@
       const el = e.target;
       if (el.matches('select, input[type=color]')) applyEdit(el);
     });
-    tb.addEventListener('input', e => { if (e.target.dataset && e.target.dataset.k === 'notas') e.target.title = e.target.value; });   // el aviso flotante sigue a lo que se escribe
+    tb.addEventListener('input', e => {   // la tarjeta flotante de Notas sigue a lo que se escribe (dec. 122)
+      if (!e.target.dataset || e.target.dataset.k !== 'notas') return;
+      const td = e.target.closest('td'), tip = td && td.querySelector('.ntip');
+      if (tip) { tip.textContent = e.target.value; tip.hidden = !e.target.value; }
+    });
     tb.addEventListener('click', e => {
       const lv = e.target.closest('[data-act="start"], [data-act="stop"]');
       if (lv) { registerReal(lv.closest('tr'), lv.dataset.act === 'start' ? 'i' : 'f'); return; }
