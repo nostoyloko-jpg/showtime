@@ -588,6 +588,16 @@
     ok(!/Neutro|Raycast/.test(css.slice(0, 400)), 'cabecera del archivo al día');
   });
 
+  test('Dec. 133: filas fijas de una ventana Manager desde el gestor — en su URL (&filas=N), repartiendo el alto; − / + en la pantalla las deja', () => {
+    const js = D.src('live.js');
+    ok(/let ROWS = Vs\.normRows\(URLP\.get\('filas'\)\);/.test(js), 'se leen de la URL de esta ventana (sobreviven a recargarla)');
+    ok(/const fixedRows = \(\) => VISTA === 'manager' && ROWS \? ROWS : 0;/.test(js), 'solo en Manager');
+    ok(/if \(fixedRows\(\)\) return fixedRows\(\);/.test(js) && /if \(fixedRows\(\)\) return Math\.max\(ROW_STEPS\[0\], Math\.floor\(h \/ fixedRows\(\)\)\);/.test(js), 'N filas reparten el alto');
+    ok(/if \(ROWS\) q\.set\('filas', String\(ROWS\)\); else q\.delete\('filas'\);/.test(js), 'se guardan en la URL');
+    ok(/else if \(m\.type === 'setRows'\) setRows\(m\.filas\);/.test(js), 'orden del gestor (solo de quien la abrió)');
+    ok(/if \(ROWS\) setRows\(null, true\);/.test(js), '− / + en la pantalla manda');
+    ok(/filas: ROWS \|\| null, standby: STANDBY,/.test(js), 'lo cuenta al Dashboard');
+  });
   test('Dec. 132: el cartel del reposo y del Standby lleva el logo del evento (si no hay, el de Showtime) y se repinta si cambia', () => {
     const js = D.src('live.js'), css = D.src('live.css');
     ok(/const lg = C\.eventLogo \? C\.eventLogo\(FEST\) : '';\s*return lg \? '<div class="evlogo"><img src="' \+ esc\(lg\) \+ '"/.test(js) && /: Mk\.banner\(\{ version:/.test(js), 'logo o cartel de Showtime');

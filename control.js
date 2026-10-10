@@ -1571,6 +1571,13 @@
     try { x.w.postMessage({ app: 'showtime', type: 'setVista', vista: x.vista, zona: x.zona }, '*'); } catch (e) {}
     tick();
   }
+  /** Filas fijas de UNA ventana Manager desde el gestor (dec. 133): 'auto' o 2–6. La ventana lo guarda en su URL y lo devuelve en su latido. */
+  function setWinRows(id, v) {
+    const x = WIN.get(id); if (!x || !liveOpen(id)) return;
+    x.filas = Vs.normRows(v);
+    try { x.w.postMessage({ app: 'showtime', type: 'setRows', filas: x.filas }, '*'); } catch (e) {}
+    tick();
+  }
   // ── Standby / Modo Cartel: TODAS las Confidence (las de este Mac y las que van por QR) enseñan el cartel y la hora ──
   // Es un estado del evento (como los mensajes): viaja a las Live del Mac y va en la emisión. Manager y Backstage no cambian.
   function standbyOn() { const s = Dt.getStandby && Dt.getStandby(); return !!(s && s.on); }
@@ -1597,16 +1604,22 @@
   /** Pone en cada fila lo que dice la ventana. No toca el nombre si lo estás escribiendo. */
   function gvSync(ids) {
     const box = $('gv'); if (!box) return;
+    // Cabecera de la 3ª columna según lo que haya abierto: solo Manager → Filas · solo Confidence → Zona · mezcla (o ninguna) → Zona / Filas
+    const hz = box.querySelector('.gv-hz');
+    if (hz) { const vs = ids.map(id => (WIN.get(id) || {}).vista), m = vs.indexOf('manager') >= 0, c = vs.indexOf('confidence') >= 0; hz.textContent = tx(m && !c ? 'Filas' : c && !m ? 'Zona' : 'Zona / Filas'); }
     ids.forEach(id => {
       const x = WIN.get(id), row = Array.from(box.querySelectorAll('.gv-row')).find(r => r.dataset.id === id); if (!x || !row) return;
       const name = row.querySelector('.gv-name'), vs = row.querySelector('.gv-vista'), zs = row.querySelector('.gv-zona'), sb = row.querySelector('.gv-sb');
       if (name && document.activeElement !== name && name.value !== x.name) name.value = x.name;
       if (vs && vs.value !== x.vista) vs.value = x.vista;
-      if (zs) {   // Manager y Backstage: el select queda deshabilitado con «—» (la rejilla no cambia)
-        const conf = x.vista === 'confidence', want = conf ? zonasLive().map(z => '<option value="' + esc(z.id) + '">' + esc(z.name) + '</option>').join('') : '<option value="">—</option>';
+      if (zs) {   // 3ª columna (dec. 133): Confidence → zona · Manager → filas de esa ventana · Backstage → «—» deshabilitado (la rejilla no cambia)
+        const conf = x.vista === 'confidence', mgr = x.vista === 'manager';
+        const want = conf ? zonasLive().map(z => '<option value="' + esc(z.id) + '">' + esc(z.name) + '</option>').join('')
+          : mgr ? Vs.MGR_ROWS.map(r => '<option value="' + r + '">' + esc(tx(Vs.MGR_ROWS_TXT[r])) + '</option>').join('') : '<option value="">—</option>';
         if (zs.dataset.h !== want) { zs.innerHTML = want; zs.dataset.h = want; }
-        zs.disabled = !conf;
-        const z = conf && x.zona != null ? x.zona : ''; if (zs.value !== z) zs.value = z;
+        zs.disabled = !conf && !mgr;
+        zs.setAttribute('aria-label', tx(mgr ? 'Filas' : 'Zona'));
+        const z = conf ? (x.zona != null ? x.zona : '') : mgr ? String(x.filas || 'auto') : ''; if (zs.value !== z) zs.value = z;
       }
       const fe = row.querySelector('.gv-fs');
       if (fe) { const full = !!x.fs; fe.classList.toggle('on', full); fe.textContent = tx(full ? '⛶ Pantalla completa' : 'Ventana'); }
@@ -1620,7 +1633,7 @@
     if (sig !== gvSig) {
       gvSig = sig;
       const head = '<div class="gv-top"><div class="gv-seg"><button type="button" class="gv-segb" data-gv="all" data-on="1">' + tx('⏸ Todas en standby') + '</button><button type="button" class="gv-segb" data-gv="all" data-on="0">' + tx('▶ Reanudar todas') + '</button></div></div>';
-      const hd = '<div class="gv-row gv-hd" aria-hidden="true"><span>' + tx('Nombre') + '</span><span>' + tx('Vista') + '</span><span>' + tx('Zona') + '</span><span>' + tx('Pantalla') + '</span><span>' + tx('Standby') + '</span><span></span></div>';
+      const hd = '<div class="gv-row gv-hd" aria-hidden="true"><span>' + tx('Nombre') + '</span><span>' + tx('Vista') + '</span><span class="gv-hz">' + tx('Zona / Filas') + '</span><span>' + tx('Pantalla') + '</span><span>' + tx('Standby') + '</span><span></span></div>';
       const rows = ids.length ? hd + ids.map(gvRowHtml).join('') : '<p class="mnote gv-empty">' + tx('No hay ventanas Live abiertas desde este Dashboard.') + '</p>';
       // Mismo acabado que el panel de Pantallas y Emisión: cabecera en gris pizarra y cada bloque en su tarjeta
       const loc = '<div class="gv-sec"><svg class="ic"><use href="#i-screen"/></svg><b>' + tx('Monitores locales (HDMI / Mac)') + '</b></div>';
@@ -1667,7 +1680,10 @@
       const n = String(t.value).replace(/\s+/g, ' ').trim().slice(0, 40) || x.name;
       x.name = n; t.value = n; saveWinName(id, n); return;
     }
-    if (t.classList.contains('gv-vista') || t.classList.contains('gv-zona')) setWinVista(id, row.querySelector('.gv-vista').value, row.querySelector('.gv-zona').value);
+    // 3ª columna (dec. 133): en Confidence es la zona; en Manager, las filas de esa ventana
+    if (t.classList.contains('gv-zona') && x.vista === 'manager') { setWinRows(id, t.value); return; }
+    if (t.classList.contains('gv-vista')) { const v = Vs.normVista(t.value); setWinVista(id, v, v === 'confidence' ? (x.zona != null ? x.zona : ((zonasLive()[0] || {}).id || '')) : null); return; }
+    if (t.classList.contains('gv-zona')) setWinVista(id, x.vista, t.value);
   });
   $('modal-body').addEventListener('click', e => {
     const b = e.target.closest && e.target.closest('[data-gv]'); if (!b) return;
@@ -1693,7 +1709,7 @@
   // Cada Live dice qué vista muestra, si está en standby y qué zona (al abrirse, al cambiar con la V y en el latido)
   window.addEventListener('message', e => {
     const m = e.data; if (!m || m.app !== 'showtime' || m.type !== 'vistaState') return;
-    for (const x of WIN.values()) if (x.w === e.source) { x.vista = String(m.vista || x.vista || ''); x.zona = m.zona == null ? null : String(m.zona); x.standby = !!m.standby; x.fs = !!m.fs; }
+    for (const x of WIN.values()) if (x.w === e.source) { x.vista = String(m.vista || x.vista || ''); x.zona = m.zona == null ? null : String(m.zona); x.filas = Vs.normRows(m.filas); x.standby = !!m.standby; x.fs = !!m.fs; }
     tick();
   });
   // Las ventanas que se abrieron antes de recargar el Dashboard se vuelven a presentar solas: se recuperan con su nombre.
@@ -3492,7 +3508,7 @@
     if (mod && !e.shiftKey && !e.altKey && k === 'o') { e.preventDefault(); $('file').click(); return; }
     if (mod && !e.shiftKey && !e.altKey && k === 'n') { e.preventDefault(); askNew(); return; }
   });
-  window.ShowtimePanel = { reload: () => { loadState(); renderAll(); }, _test: { winState: () => Array.from(WIN.entries()).map(([id, x]) => ({ id, name: x.name, vista: x.vista, zona: x.zona, standby: !!x.standby, fs: x.fs })), setWinVista, setWinStandby, closeLive, openGestor, gestorVisible, emProdMessage, emRegenProd, hitoChips, emUrl, prodBigTitle, fileKind, handleFile, emCommand, importSummary, hidesSome, tipoPill, setWake, wakeState: () => ({ on: wakeOn, lock: !!wakeLock }), showSplash, hideSplash, setStandby, standbyOn, room: () => emRoom,
+  window.ShowtimePanel = { reload: () => { loadState(); renderAll(); }, _test: { winState: () => Array.from(WIN.entries()).map(([id, x]) => ({ id, name: x.name, vista: x.vista, zona: x.zona, filas: x.filas || null, standby: !!x.standby, fs: x.fs })), setWinVista, setWinRows, setWinStandby, closeLive, openGestor, gestorVisible, emProdMessage, emRegenProd, hitoChips, emUrl, prodBigTitle, fileKind, handleFile, emCommand, importSummary, hidesSome, tipoPill, setWake, wakeState: () => ({ on: wakeOn, lock: !!wakeLock }), showSplash, hideSplash, setStandby, standbyOn, room: () => emRoom,
     emSnapshot, emCloseDay, emDay, qrDevices, rmZones, setRmZone: z => { RM_ZONE = z; renderCast(); }, setRoom: r => { emRoom = r; }, fakeEm: (em, st) => { EM = em; EMST = st; }, emStateHtml, renderCastBar, renderHubLed, mtIn, mtOut, cfSimState, renderCfSim, cfSim: () => CFSIM,
     dayStep, monthLabel, spotItems, spotDays, spotEntries, fmtDayFull, refreshStale, net: () => NET, setNet: o => { NET = netNorm(o); }, netNorm, emLink, emBrokers, emUrl, netHtml, renderCast } };   // _test: solo para tests/control.test.js
 })();

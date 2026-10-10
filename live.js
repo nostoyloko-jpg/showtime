@@ -18,6 +18,9 @@
   let STANDBY = !!(Mk && Mk.isStandby(location.search));
   let VISTA = vistaOk(STANDBY ? Mk.prevVista(location.search) : URLP.get('vista'));
   let ZONA = URLP.has('zona') ? URLP.get('zona') : null;   // zona de Confidence (null = sin elegir)
+  // Filas fijas de ESTA ventana Manager (dec. 133): «&filas=4» en su URL (sobrevive a recargarla y no toca a las demás); null = auto
+  let ROWS = Vs.normRows(URLP.get('filas'));
+  const fixedRows = () => VISTA === 'manager' && ROWS ? ROWS : 0;
 
   // ── Preferencias de ESTA pantalla (otra luz, otro monitor: van aparte del Panel) ──
   const P = {
@@ -323,20 +326,30 @@
 
   // ── Barras dinámicas ─────────────────────────────────────────────────
   /** Filas que llenan la pantalla (para no dejar huecos): según el alto elegido o el automático. */
-  function autoCount() { if (VISTA === 'backstage') return 2; const h = $('bot').clientHeight; return Math.max(1, Math.floor(h / (ROW_H || STRIP_MIN_H))); }
+  function autoCount() { if (VISTA === 'backstage') return 2; if (fixedRows()) return fixedRows(); const h = $('bot').clientHeight; return Math.max(1, Math.floor(h / (ROW_H || STRIP_MIN_H))); }
   /** Alto actual de una fila (el elegido o el automático). */
-  function curRowH() { const h = $('bot').clientHeight; if (VISTA === 'backstage') return Math.max(60, Math.floor(h / 2)); return ROW_H || Math.max(STRIP_MIN_H, Math.floor(h / autoCount())); }
+  function curRowH() { const h = $('bot').clientHeight; if (VISTA === 'backstage') return Math.max(60, Math.floor(h / 2)); if (fixedRows()) return Math.max(ROW_STEPS[0], Math.floor(h / fixedRows())); return ROW_H || Math.max(STRIP_MIN_H, Math.floor(h / autoCount())); }
   /** − / +: un paso más bajo o más alto para todas las filas por igual. */
   function stepRowH(dir) {
     const cur = curRowH();
+    if (ROWS) setRows(null, true);   // − / + en la propia pantalla manda: deja las filas fijas del gestor
     const next = dir > 0 ? ROW_STEPS.find(v => v > cur) : ROW_STEPS.slice().reverse().find(v => v < cur);
     if (next) setRowH(next);
+  }
+  /** Filas fijas desde el gestor del Dashboard (dec. 133): 2–6 o null (auto). Se guardan en la URL de esta ventana. */
+  function setRows(n, quiet) {
+    ROWS = Vs.normRows(n);
+    const q = new URLSearchParams(location.search);
+    if (ROWS) q.set('filas', String(ROWS)); else q.delete('filas');
+    try { history.replaceState(null, '', location.pathname + '?' + q.toString() + location.hash); } catch (e) {}
+    if (!quiet) { STRIP_H = {}; pset(P.stripH, STRIP_H); setRowH(ROW_H); }
+    reportVista();
   }
   function setRowH(v) {
     ROW_H = ROW_STEPS.indexOf(v) >= 0 ? v : 0;
     pset(P.rowH, ROW_H);
     STRIP_H = {}; pset(P.stripH, STRIP_H);          // fuera los altos a mano: todas iguales
-    $('rlbl').textContent = ROW_H ? tx('alto {n}', { n: ROW_H }) : tx('alto auto');
+    $('rlbl').textContent = fixedRows() ? tx('{n} filas', { n: fixedRows() }) : ROW_H ? tx('alto {n}', { n: ROW_H }) : tx('alto auto');
     $('rmin').disabled = curRowH() <= ROW_STEPS[0];
     $('rmax').disabled = curRowH() >= ROW_STEPS[ROW_STEPS.length - 1];
     buildStrips(visibleCount()); tick();
@@ -1106,7 +1119,7 @@
     if (g.on !== STANDBY) setStandby(g.on);
   }
   /** Dice al Dashboard qué vista muestra ESTA ventana (puede haber cambiado con la tecla V). Lo usa el desplegable de Live. */
-  function reportVista() { try { if (window.opener && !Dt.READONLY) window.opener.postMessage({ app: 'showtime', type: 'vistaState', vista: VISTA, zona: ZONA == null ? null : String(ZONA), standby: STANDBY, fs: !!(document.fullscreenElement || document.webkitFullscreenElement) }, '*'); } catch (e) {} }
+  function reportVista() { try { if (window.opener && !Dt.READONLY) window.opener.postMessage({ app: 'showtime', type: 'vistaState', vista: VISTA, zona: ZONA == null ? null : String(ZONA), filas: ROWS || null, standby: STANDBY, fs: !!(document.fullscreenElement || document.webkitFullscreenElement) }, '*'); } catch (e) {} }
   // Al entrar o salir de pantalla completa, el Dashboard se entera al momento (no espera al latido)
   document.addEventListener('fullscreenchange', reportVista);
   document.addEventListener('webkitfullscreenchange', reportVista);
@@ -1242,6 +1255,7 @@
     const m = e.data; if (!m || m.app !== 'showtime' || Dt.READONLY || !window.opener || e.source !== window.opener) return;
     if (m.type === 'standby') setStandby(!!m.on);
     else if (m.type === 'setVista' && m.vista) setVista(m.vista, m.zona == null ? null : String(m.zona));
+    else if (m.type === 'setRows') setRows(m.filas);
   });
 
   // Idioma: al cambiar (llega con la configuración del Panel, aquí o por la emisión) se repinta todo lo que escribe el JS, sin recargar

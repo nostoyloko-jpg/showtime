@@ -31,6 +31,11 @@
     ticker: { delays: true, hitos: true, meteo: true, mode: 'crawl', bg: '#000000', fg: '#ffb347', speed: 30 },
     park: { mins: 5 }   // dec. 131: reposo de las pantallas remotas sin emisión (0 = nunca)
   };
+  // ── Filas de una ventana Manager (dec. 133): «auto» o un número fijo de filas que reparten el alto. Va en la URL de cada ventana ──
+  const MGR_ROWS = ['auto', 2, 3, 4, 5, 6];
+  const MGR_ROWS_TXT = { auto: 'Auto (según pantalla)', 2: '2 filas (grande)', 3: '3 filas', 4: '4 filas', 5: '5 filas', 6: '6 filas (compacto)' };
+  /** Número de filas fijo (2–6) o null (auto: el reparto de siempre). */
+  function normRows(v) { const n = Math.round(Number(v)); return v !== null && v !== '' && v !== 'auto' && n >= 2 && n <= 6 ? n : null; }
   const PARK_MINS = [5, 2, 10, 0];   // 5 = recomendado · 0 = nunca (mantener siempre el último horario)
   const PARK_END_MS = 3000;          // «Parar emisión» en el Dashboard → reposo a los 3 s
   /** Número con decimales (un decimal) entre lo y hi; lo que no sea número, al valor por defecto. */
@@ -228,7 +233,7 @@
     if (by.k === 'zone' && by.n) return '[' + String(by.n) + ']';
     return '';
   }
-  const API = { byLabel, VISTAS, VISTA_TXT, VISTA_SUB, DEFAULT_SCREENS, normVista, nextVista, normProdVista, nextProdVista, normScreens, parkState, PARK_MINS, PARK_END_MS, normTargets, normZones, flashFor, targetsTxt,
+  const API = { byLabel, VISTAS, VISTA_TXT, VISTA_SUB, DEFAULT_SCREENS, normVista, nextVista, normProdVista, nextProdVista, normScreens, MGR_ROWS, MGR_ROWS_TXT, normRows, parkState, PARK_MINS, PARK_END_MS, normTargets, normZones, flashFor, targetsTxt,
     level, fmtClock, confidence, tickerItems, backstageCalls, liveUrl, parseLive, pickScreen };
   if (isNode) module.exports = API;
   else root.ShowtimeVistas = API;

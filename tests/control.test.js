@@ -953,7 +953,7 @@
   });
   test('Gestor: rejilla de 6 columnas, píldora con micro-LED, cabecera y pie; en móvil, tres filas; «+ Abrir» abre Manager', async () => {
     const css = D.src('control.css'), js = D.src('control.js');
-    ok(/\.gv-row\{display:grid;grid-template-columns:minmax\(150px,1\.3fr\) 124px 124px 140px 112px 36px;grid-template-areas:"name vista zona fs sb x"/.test(css), 'rejilla fija: nombre, vista, zona, pantalla, standby, ✕');
+    ok(/\.gv-row\{display:grid;grid-template-columns:minmax\(96px,1fr\) 118px 180px 128px 108px 36px;grid-template-areas:"name vista zona fs sb x"/.test(css), 'rejilla fija: nombre, vista, zona, pantalla, standby, ✕');
     ok(/\.modal-box\.wide\{max-width:780px\}/.test(css), 'modal ancho: cabe la rejilla sin scroll');
     ok(/@media \(max-width:700px\)\{ \.gv-row\{grid-template-columns:minmax\(0,1fr\) minmax\(0,1fr\) auto;grid-template-areas:"name name x" "vista zona sb" "fs fs fs"\}/.test(css), 'móvil: tres filas, sin scroll');
     ok(/\.gv-sb\{height:34px;[^}]*border-radius:999px/.test(css) && /\.gv-led\{/.test(css), 'standby como píldora con micro-LED');
@@ -2000,6 +2000,36 @@ const miss = [...found].filter(k => !I.txHas(k) && !/^(OK|CALL|SC|Live|Raycast|S
       ok(/Math\.min\(1, 480 \/ img\.naturalWidth, 240 \/ img\.naturalHeight\)/.test(js) && /cv\.toDataURL\('image\/webp', 0\.86\)/.test(js), 'se reduce a 480×240 (WebP) al subir');
       ok(/logo: C\.eventLogo\(FEST\)/.test(js), 'la hoja impresa recibe el logo');
     });
+  });
+
+  test('Dec. 133: la fila en curso es un resalte neutro (blanco en Studio, amarillo en Stage), nunca rojo', () => {
+    const css = D.src('control.css');
+    ok(/tbody tr\.playing\{background:rgba\(255,255,255,\.05\);box-shadow:inset 3px 0 0 rgba\(255,255,255,\.45\)\}/.test(css), 'Studio: fondo y filete blancos');
+    ok(/tbody tr\.playing td\.mo\{background:color-mix\(in srgb,#fff 5%,var\(--panel\)\)\}/.test(css), 'la columna fija, igual');
+    ok(/body\[data-ps="stage"\] tbody tr\.playing\{background:rgba\(255,214,0,\.07\);box-shadow:inset 3px 0 0 #FFD600\}/.test(css), 'Stage: amarillo');
+    ok(!/tr\.playing[^{]*\{[^}]*(--accent|#ff6363|#e94560)/.test(css), 'ninguna regla de la fila en curso usa el rojo del acento');
+  });
+  test('Dec. 133: Gestor — 3ª columna ZONA / FILAS: zona en Confidence, filas (Auto · 2–6) en Manager, «—» en Backstage; llega a la ventana y vuelve en su latido', async () => {
+    const t = panel(), msgs = [];
+    const w = { closed: false, focus() {}, postMessage(m) { msgs.push(m); }, close() { this.closed = true; } };
+    t.env.win.open = () => w;
+    t.env.fire('document', 'click', { target: { closest: q => q === '#m-hub [data-vista]' ? { dataset: { vista: 'manager' } } : null } });
+    await new Promise(r => setImmediate(r));
+    const [a] = t.T.winState();
+    t.T.setWinRows(a.id, '4');
+    ok(msgs.some(m => m.type === 'setRows' && m.filas === 4), 'la ventana Manager recibe 4 filas');
+    eq(t.T.winState()[0].filas, 4);
+    t.T.setWinRows(a.id, 'auto'); ok(msgs.some(m => m.type === 'setRows' && m.filas === null), 'Auto');
+    t.env.fire('window', 'message', { data: { app: 'showtime', type: 'vistaState', vista: 'manager', zona: null, filas: 5, standby: false }, source: w });
+    eq(t.T.winState()[0].filas, 5, 'lo que dice la ventana (p. ej. tras recargarla) manda');
+    const Vs = require('../vistas.js');
+    eq(Vs.MGR_ROWS.join(), 'auto,2,3,4,5,6'); eq(Vs.normRows('4'), 4); eq(Vs.normRows('auto'), null); eq(Vs.normRows(9), null); eq(Vs.normRows(1), null); eq(Vs.normRows(null), null);
+    eq(t.env.win.ShowtimeI18n.tx('Auto (según pantalla)', null, 'en'), 'Auto (fit screen)'); eq(t.env.win.ShowtimeI18n.tx('6 filas (compacto)', null, 'en'), '6 rows (compact)');
+    eq(t.env.win.ShowtimeI18n.tx('Zona / Filas', null, 'en'), 'Stage / Rows'); eq(t.env.win.ShowtimeI18n.tx('Filas', null, 'en'), 'Rows');
+    const js = D.src('control.js');
+    ok(/hz\.textContent = tx\(m && !c \? 'Filas' : c && !m \? 'Zona' : 'Zona \/ Filas'\)/.test(js), 'cabecera según lo abierto: Filas · Zona · Zona / Filas');
+    ok(/if \(t\.classList\.contains\('gv-zona'\) && x\.vista === 'manager'\) \{ setWinRows\(id, t\.value\); return; \}/.test(js), 'en Manager, la 3ª columna son las filas');
+    ok(/zs\.disabled = !conf && !mgr;/.test(js), 'Backstage: deshabilitado con «—»');
   });
 
   // ── Ejecutor ─────────────────────────────────────────────────────────

@@ -82,7 +82,7 @@ main[hidden]{display:none}
 table{width:100%;border-collapse:collapse}
 thead th{position:sticky;top:0;background:var(--head);z-index:2;text-align:left;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:9px 5px;border-bottom:1px solid var(--line2);white-space:nowrap}
 tbody td{padding:5px 5px;border-bottom:1px solid var(--line);vertical-align:middle}
-tbody tr.playing{background:color-mix(in srgb,var(--accent) 12%,transparent);box-shadow:inset 4px 0 0 var(--accent)}
+tbody tr.playing{background:rgba(255,255,255,.05);box-shadow:inset 3px 0 0 rgba(255,255,255,.45)}   /* dec. 133: en curso = resalte neutro; el rojo es solo para alertas */
 tbody tr.next{background:rgba(255,255,255,.035)}
 tbody tr.done td:not(.gap):not(.est){opacity:.5}
 /* Dec. 113 · La celda REAL se atenúa por dentro (la opacidad de un padre no se puede deshacer en un hijo): el aviso de choque queda al 100 % */
@@ -274,6 +274,8 @@ body[data-ps="stage"]{--glass-bg:#000;--glass-line:rgba(255,214,0,.55);--glass-b
 body[data-ps="stage"] .cfg-h{background:#000}
 body[data-ps="stage"] .cfg-sum{color:#FFD600}
 body[data-ps="stage"] .htab.on{background:#FFD600;color:#000}
+body[data-ps="stage"] tbody tr.playing{background:rgba(255,214,0,.07);box-shadow:inset 3px 0 0 #FFD600}
+body[data-ps="stage"] tbody tr.playing td.mo{background:color-mix(in srgb,#FFD600 7%,#000)}
 body[data-ps="stage"] .mpanel,body[data-ps="stage"] .cfg,body[data-ps="stage"] .modal-box,body[data-ps="stage"] .qr-big-box{background-image:none}
 
 /* ── Pegar horario ── */
@@ -634,7 +636,7 @@ body[data-ps="stage"] .qr-big-box{background:#000;border-color:rgba(255,214,0,.4
 /* «⋯» (Duplicar · Borrar) siempre visible: pegado al borde derecho aunque la tabla no quepa */
 th.mo,td.mo{position:sticky;right:0;z-index:3;background:var(--panel);box-shadow:-8px 0 10px -8px rgba(0,0,0,.7)}
 thead th.mo{z-index:4}
-tbody tr.playing td.mo{background:color-mix(in srgb,var(--accent) 12%,var(--panel))}
+tbody tr.playing td.mo{background:color-mix(in srgb,#fff 5%,var(--panel))}
 tbody tr.next td.mo{background:color-mix(in srgb,#fff 3.5%,var(--panel))}
 tbody tr.done td.mo{opacity:1}
 
@@ -942,7 +944,7 @@ main.vacia .list-empty{padding:16px 16px 9vh}
 .gv-segb+.gv-segb{border-left:1px solid var(--hair2)}
 .gv-segb:hover{color:var(--text);background:rgba(255,255,255,.04)}
 .gv-list{display:flex;flex-direction:column;gap:6px}
-.gv-row{display:grid;grid-template-columns:minmax(150px,1.3fr) 124px 124px 140px 112px 36px;grid-template-areas:"name vista zona fs sb x";gap:6px;align-items:center}
+.gv-row{display:grid;grid-template-columns:minmax(96px,1fr) 118px 180px 128px 108px 36px;grid-template-areas:"name vista zona fs sb x";gap:6px;align-items:center}
 .gv-row>.gv-name{grid-area:name}.gv-row>.gv-vista{grid-area:vista}.gv-row>.gv-zona{grid-area:zona}.gv-row>.gv-fs{grid-area:fs}.gv-row>.gv-sb{grid-area:sb}.gv-row>.gv-x{grid-area:x}
 .gv-row input,.gv-row select{height:32px;min-width:0;width:100%;box-sizing:border-box;border:1px solid var(--hair2);border-radius:8px;background-color:var(--field);color:var(--text);padding:0 10px;font:inherit;font-size:14px}
 .gv-row input:focus,.gv-row select:focus{outline:none}
