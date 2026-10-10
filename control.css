@@ -610,7 +610,9 @@ body[data-ps="stage"] .qr-big-box{background:#000;border-color:rgba(255,214,0,.4
 .mt-grid b{color:var(--text)}
 .mt-grid small{color:var(--dim)}
 .mt-gmax b{color:#7dd3fc}
-.mt-alerts{display:flex;flex-direction:column;gap:4px;margin-top:8px}
+.mt-alerts{display:flex;flex-direction:column;gap:4px;margin-top:8px;position:relative}
+/* dec. 151: desde el tercer aviso, scroll dentro de la lista; el alto (dos avisos completos) lo mide fitMtAlerts() */
+.mt-alerts.scroll{overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-gutter:stable}
 .mt-al{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--call);opacity:.75}
 .mt-al.new{opacity:1}
 .mt-al .ic{width:14px;height:14px;flex:0 0 auto}
@@ -651,12 +653,6 @@ body[data-ps="stage"] .qr-big-box{background:#000;border-color:rgba(255,214,0,.4
 .form .chk.au-rp{font-weight:600;color:var(--muted)!important;font-size:12px}
 .form.au .au-rp:has(input:disabled){opacity:.45;cursor:default}
 .au-row select.mini{width:64px;height:26px;margin-left:0}
-/* ✓ local que silencia la repetición, dentro del aviso que ya existe (EN ESCENA, mensaje urgente del chat) */
-.au-ack{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;padding:0;margin-left:6px;vertical-align:-3px;border-radius:999px;border:1px solid #ff8a00;background-color:transparent;color:#ff8a00;cursor:pointer}
-.au-ack:hover{background-color:#ff8a00;color:#000}
-.au-ack .ic{width:11px;height:11px}
-body[data-ps="stage"] .au-ack{border-color:#FFD600;color:#FFD600}
-body[data-ps="stage"] .au-ack:hover{background-color:#FFD600;color:#000}
 /* Dec. 148: silenciar sobretiempo — altavoz tachado, cuadrado y neutro, a la derecha del nombre (lejos del botón Tiempo extra) */
 .au-mute{float:right;display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;margin:0 0 0 8px;padding:0;border-radius:6px;border:1px solid var(--line);background-color:rgba(255,255,255,.04);color:var(--muted);cursor:pointer;font-size:0;line-height:0}
 .au-mute:hover{color:var(--text);background-color:rgba(255,255,255,.1)}

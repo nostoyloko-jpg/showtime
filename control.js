@@ -29,6 +29,7 @@
   const LIVE_NAMES_KEY = 'showtime.liveNames';   // { id: nombre } de las ventanas abiertas, para recordar el nombre tras recargar
   const VISTA_OPCIONES = [['manager', 'Manager'], ['confidence', 'Confidence'], ['backstage', 'Backstage']];
   const Vs = window.ShowtimeVistas;
+  let CHAT_EXPLICIT = false;   // dec. 151: el menú Chat se abrió a propósito (clic, toque o teclado), no solo con el ratón encima
   let CALL_UNDO = null;   // dec. 148: { add: [OK de CALL que vuelven], del: [claves que se quitan] } para el paso de Deshacer de una edición
   const AU = window.ShowtimeAudio || null;   // avisos de audio locales (dec. 145, audio.js)
   const AU_EDGE = AU ? { call: AU.edge(), overrun: AU.edge(), meteo: AU.edge() } : null;   // el primer tick solo arma: nunca suena al cargar
@@ -1336,13 +1337,17 @@
 
   // ── Menús de la barra (cristal): hover o clic; se cierran al salir el cursor o con Esc ──
   const MENUS = Array.from(document.querySelectorAll('.menus .menu, #m-hub'));
-  function setMenu(m, on) { m.classList.toggle('open', on); m.querySelector('.mbtn').setAttribute('aria-expanded', String(on)); }
+  function setMenu(m, on) { m.classList.toggle('open', on); m.querySelector('.mbtn').setAttribute('aria-expanded', String(on)); if (!on && m.id === 'm-chat') CHAT_EXPLICIT = false; }
   function closeMenus(except) { MENUS.forEach(m => { if (m !== except) setMenu(m, false); }); }
   MENUS.forEach(m => {
     let tOpen = 0, tClose = 0;
     m.addEventListener('pointerenter', e => { if (e.pointerType !== 'mouse') return; clearTimeout(tClose); tOpen = setTimeout(() => { closeMenus(m); setMenu(m, true); }, 120); });
     m.addEventListener('pointerleave', e => { if (e.pointerType !== 'mouse') return; clearTimeout(tOpen); tClose = setTimeout(() => setMenu(m, false), 350); });
-    m.querySelector('.mbtn').addEventListener('click', () => { clearTimeout(tOpen); const on = !m.classList.contains('open'); closeMenus(m); setMenu(m, on); });
+    m.querySelector('.mbtn').addEventListener('click', () => {
+      clearTimeout(tOpen);
+      if (m.id === 'm-chat') { chatMenuClick(m); return; }
+      const on = !m.classList.contains('open'); closeMenus(m); setMenu(m, on);
+    });
     // Las acciones cierran el menú (los toggles de Retrasos no: se marcan varios seguidos)
     m.querySelectorAll('.mitem').forEach(it => it.addEventListener('click', () => setMenu(m, false)));
   });
@@ -2479,6 +2484,25 @@
     });
     return h;
   }
+  /** Dec. 151 · avisos del tiempo: siempre DOS avisos completos a la vista (aunque ocupen dos líneas) y, desde el tercero,
+   *  scroll dentro de la lista. El alto se mide con los dos primeros avisos tal y como se pintan (idioma, estilo y ancho
+   *  reales), nunca con una cifra fija. El resumen y el pie no se tocan. L: la lista (por defecto, la de la tarjeta). */
+  function fitMtAlerts(L) {
+    L = L || ($('v-meteo').querySelector && $('v-meteo').querySelector('.mt-alerts'));
+    if (!L || !L.children) return null;
+    const items = Array.from(L.children);
+    L.classList.toggle('scroll', items.length > 2);   // primero el hueco de la barra: así se mide con el ancho que tendrá
+    if (items.length <= 2) { L.style.maxHeight = ''; return null; }
+    const a = items[0], b = items[1];
+    // medidas con decimales (getBoundingClientRect): con offsetTop/offsetHeight, redondeados, el 2.º aviso podía quedar 1 px cortado
+    const h = a.getBoundingClientRect && b.getBoundingClientRect ? b.getBoundingClientRect().bottom - a.getBoundingClientRect().top : b.offsetTop + b.offsetHeight - a.offsetTop;
+    if (!(h > 0)) return null;   // tarjeta oculta: se medirá cuando se vea
+    L.style.maxHeight = Math.ceil(h) + 'px';
+    return Math.ceil(h);
+  }
+  // Cambia el ancho (ventana, columnas) o la tarjeta pasa a verse: se vuelve a medir
+  if (typeof ResizeObserver === 'function') { try { new ResizeObserver(() => fitMtAlerts()).observe($('v-meteo')); } catch (e) {} }
+  window.addEventListener('resize', () => fitMtAlerts());
   /** Tarjeta METEO (columna izquierda, bajo CALL). */
   function renderMeteo() {
     const card = $('card-meteo');
@@ -2512,7 +2536,12 @@
         (st.pending.indexOf(a) >= 0 ? '<button class="chipx" data-act="mt-ack" data-k="' + a.kind + '">' + tx('Visto') + '</button>' : '<small>' + tx('visto') + '</small>') + '</div>').join('') + '</div>';
       h += '<div class="mt-foot">' + esc(tx(MT_SRC[s.src] || '')) + ' · ' + tx('dato {h} · previsión, no aviso oficial', { h: W.hhmm(s.at) }) + ' · <a href="' + W.AEMET_URL + '" target="_blank" rel="noopener">' + tx('Avisos AEMET') + '<svg class="ic"><use href="#i-ext"/></svg></a></div>';
     }
-    if (h !== MT_HTML) { MT_HTML = h; $('v-meteo').innerHTML = h; }
+    if (h !== MT_HTML) {
+      const L0 = $('v-meteo').querySelector && $('v-meteo').querySelector('.mt-alerts'), top = L0 ? L0.scrollTop : 0;   // dec. 151: al repintar, la lista sigue donde estaba
+      MT_HTML = h; $('v-meteo').innerHTML = h;
+      fitMtAlerts();
+      const L1 = top && $('v-meteo').querySelector('.mt-alerts'); if (L1) L1.scrollTop = top;
+    } else fitMtAlerts();   // cada segundo: un cambio de estilo (Studio / Stage) o de letra también cambia el alto de los avisos
     return st;
   }
   document.addEventListener('click', e => {
@@ -2981,7 +3010,7 @@
   function renderChat() {
     const list = Dt.getChat();
     const html = list.slice(-100).map(m => '<div class="chat-list-item' + (m.sm ? ' sm' : '') + (m.urgent === true ? ' urg' : '') + '"><div class="chat-list-item-from">' + (m.urgent === true ? urgIcon() : '') + esc(m.sm ? 'Stage Manager' : m.from) +
-      '<small>' + hhmmOf(m.at) + '</small>' + (m.urgent === true ? auAckBtn('urgent:' + m.id, m.sm ? 'Stage Manager' : m.from) : '') + '</div><div class="chat-list-item-text">' + esc(m.text) + '</div></div>').join('');
+      '<small>' + hhmmOf(m.at) + '</small></div><div class="chat-list-item-text">' + esc(m.text) + '</div></div>').join('');
     // la lista del menú y la de la ventana (si existe) muestran lo mismo
     [['chat-list', 'chat-empty', 'chat-off'], ['chat-list2', 'chat-empty2', 'chat-off2']].forEach(([l, e, o]) => {
       const box = $(l); if (!box || !$(e) || !$(o)) return;
@@ -3002,7 +3031,7 @@
   $('chat-form2').addEventListener('submit', e => { e.preventDefault(); sendChat($('chat-text2')); });
   /** Ventana flotante del chat: se abre centrada; Esc, ✕ o clic fuera la cierran. */
   let chatPopOn = false;   // estado propio (no depende del atributo hidden)
-  function openChatPop() { closeMenus(); $('chat-on').hidden = true; chatPopOn = true; $('chat-modal').hidden = false; renderChat(); $('chat-text2').focus(); }
+  function openChatPop() { closeMenus(); $('chat-on').hidden = true; chatPopOn = true; $('chat-modal').hidden = false; audioChatSeen(); renderChat(); $('chat-text2').focus(); }
   function closeChatPop() { chatPopOn = false; $('chat-modal').hidden = true; }
   $('chat-pop').addEventListener('click', e => { e.stopPropagation(); openChatPop(); });
   $('chat-x').addEventListener('click', closeChatPop);
@@ -3051,16 +3080,22 @@
   function audioUrgent(m) {
     if (!AU) return;
     const p = AU.load(); if (!AU.enabled(p, 'urgent')) return;
-    AU.RING.add({ id: 'urgent:' + m.id, kind: 'urgent', key: m.id, label: m.from, repeat: AU.repeats(p, 'urgent') }, Date.now());
+    // dec. 151: con el Chat ya abierto (menú o ventana) el operador lo está viendo: suena una vez y no queda repitiéndose
+    AU.RING.add({ id: 'urgent:' + m.id, kind: 'urgent', key: m.id, label: m.from, repeat: AU.repeats(p, 'urgent') && !chatOpenNow() }, Date.now());
     audioStep();
   }
-  /** ✓ local dentro del aviso que ya existe (sobretiempo en EN ESCENA, mensaje urgente del chat), solo mientras se repite.
-   *  Solo silencia ese audio: no termina la banda, no toca el mensaje, el log, «urgent» ni la emisión. */
-  function auAckBtn(id, what) {
-    if (!AU || !AU.RING.repeating(id)) return '';
-    const t = esc(tx('Silenciar el aviso de audio') + (what ? ' · ' + what : ''));
-    return '<button class="au-ack" type="button" data-au-ack="' + esc(id) + '" title="' + t + '" aria-label="' + t + '"><svg class="ic"><use href="#i-check"/></svg></button>';
+  /** ¿Está el Chat abierto a propósito? (menú abierto con clic, toque o teclado, o su ventana flotante). Pasar el ratón no cuenta. */
+  function chatOpenNow() { return ($('m-chat').classList.contains('open') && CHAT_EXPLICIT) || chatPopOn; }
+  /** Clic, toque o teclado (Intro / Espacio) sobre «Chat». Si ya estaba abierto solo por pasar el ratón, el clic lo deja abierto
+   *  (es la confirmación de que se quiere ver); si ya estaba abierto a propósito, lo cierra, como siempre. */
+  function chatMenuClick(m) {
+    const was = m.classList.contains('open'), on = !(was && CHAT_EXPLICIT);
+    closeMenus(m); setMenu(m, on);
+    if (on) { CHAT_EXPLICIT = true; audioChatSeen(); }
   }
+  /** Dec. 151: abrir el Chat a propósito (menú o ventana) silencia aquí todos los urgentes que se repetían. Solo audio local:
+   *  no toca el texto, «urgent», el log ni la emisión. */
+  function audioChatSeen() { if (AU) AU.RING.dropRepeats('urgent'); }
   /** Dec. 148: silenciar el sonido de sobretiempo. Control propio (altavoz tachado, no ✓), en la línea del nombre de EN ESCENA,
    *  fuera de cualquier botón que cambie el show. Solo mientras se repite. Solo detiene ese audio local: no toca la banda,
    *  ni el Tiempo extra, ni los tiempos, ni ningún dato. */
@@ -3693,5 +3728,5 @@
   });
   window.ShowtimePanel = { reload: () => { loadState(); renderAll(); }, _test: { winState: () => Array.from(WIN.entries()).map(([id, x]) => ({ id, name: x.name, vista: x.vista, zona: x.zona, filas: x.filas || null, standby: !!x.standby, fs: x.fs })), setWinVista, setWinRows, resetWinLayout, setWinStandby, closeLive, openGestor, gestorVisible, emProdMessage, emRegenProd, hitoChips, emUrl, prodBigTitle, fileKind, handleFile, emCommand, importSummary, hidesSome, tipoPill, setWake, wakeState: () => ({ on: wakeOn, lock: !!wakeLock }), showSplash, hideSplash, setStandby, standbyOn, room: () => emRoom,
     emSnapshot, emCloseDay, emDay, qrDevices, rmZones, setRmZone: z => { RM_ZONE = z; renderCast(); }, setRoom: r => { emRoom = r; }, fakeEm: (em, st) => { EM = em; EMST = st; }, emStateHtml, renderCastBar, renderHubLed, mtIn, mtOut, cfSimState, renderCfSim, cfSim: () => CFSIM,
-    dayStep, monthLabel, spotItems, spotDays, spotEntries, fmtDayFull, refreshStale, net: () => NET, setNet: o => { NET = netNorm(o); }, netNorm, emLink, emBrokers, emUrl, netHtml, renderCast, audioTick, fillAudioCfg, saveAudioCfg, audioPreview, audioConfirm, audioRearm, auAckBtn, auMuteBtn, renderChat, callEditFix, applyEdit, undo, loadNew, impDoImport } };   // _test: solo para tests/control.test.js
+    dayStep, monthLabel, spotItems, spotDays, spotEntries, fmtDayFull, refreshStale, net: () => NET, setNet: o => { NET = netNorm(o); }, netNorm, emLink, emBrokers, emUrl, netHtml, renderCast, audioTick, fillAudioCfg, saveAudioCfg, audioPreview, audioConfirm, audioRearm, audioChatSeen, chatMenuClick, chatOpenNow, fitMtAlerts, auMuteBtn, renderChat, callEditFix, applyEdit, undo, loadNew, impDoImport } };   // _test: solo para tests/control.test.js
 })();
