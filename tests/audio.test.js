@@ -32,6 +32,7 @@
   function dashboard(storage, AC, t0) {
     const env = D.makeEnv({ cripto: true, storage: Object.assign({ 'showtime.producers': JSON.stringify({ producers: [{ id: 'prod_001', name: 'Marta' }], counter: 1, defaultId: 'prod_001' }) }, storage || {}) });
     const clk = { t: Number.isFinite(t0) ? t0 : Date.UTC(2026, 6, 10, 12, 0, 0) };
+    env.win.CSS = { escape: x => String(x) };
     env.win.Date = class extends Date { constructor(...a) { if (a.length) super(...a); else super(clk.t); } static now() { return clk.t; } };
     if (AC) env.win.AudioContext = AC;
     D.cargar(env, MODULOS);
@@ -187,7 +188,7 @@
     log.length = 0; t.env.storage.set(KEY, JSON.stringify({ on: false }));
     t.adv(2000); t.T.emProdMessage({ type: 'chat', from: 'prod_001', text: '¡otra!', urgent: true }); t.T.audioTick(['z'], ['q'], []); eq(log.length, 0, 'interruptor apagado: silencio');
     const cj = D.src('control.js');
-    ok(/audioTick\(C\.callList\(LIVE, nowInt, Dt\.callMinsOf\(FEST, CONFIG\), new Set\(Dt\.getCallDone\(\)\)\)\.map\(b => \(\{ key: C\.callKey\(b\), label: b\.name \}\)\),/.test(cj), 'CALL: la misma ventana que la tarjeta CALL');
+    ok(/audioTick\(C\.callList\(LIVE, nowInt, cmins, new Set\(Dt\.getCallDone\(\)\)\)\.map\(b => \(\{ key: C\.callKey\(b\), label: b\.name, at: C\.callAt\(b, cmins\) \}\)\),/.test(cj), 'CALL: la misma ventana que la tarjeta CALL');
     ok(/LIVE\.filter\(b => xtraOver\(b, nowInt\) !== null\)\.map\(b => \(\{ key: b\.key, label: b\.name \}\)\),/.test(cj), 'sobretiempo: Tiempo extra pasado de su fin previsto (xtraOver)');
     ok(/mst && mst\.c\.on \? mst\.pending\.map\(a => \(\{ key: a\.kind, label: a\.text \}\)\) : \[\]\);/.test(cj), 'meteo: la cola de pendientes existente');
     const idx = D.src('index.html'), sec = idx.slice(idx.indexOf('<details class="cfg-s" id="cfg-s-audio">'), idx.indexOf('</details>', idx.indexOf('id="cfg-s-audio"')));
@@ -317,13 +318,13 @@
     t.adv(1000); t.T.audioTick([], [{ key: 'b9', label: 'Banda Z' }], []);
     ok(!t.A.RING.repeating('meteo:gust'), 'Meteo: «Visto» → se para'); ok(!/auAckBtn\('meteo/.test(D.src('control.js')), 'Meteo: sin ✓ nuevo (usa su «Visto»)');
     // Sobretiempo: ✓ local dentro de EN ESCENA (solo mientras se repite)
-    ok(/data-au-ack="overrun:b9"/.test(t.T.auAckBtn('overrun:b9', 'Banda Z')), 'Sobretiempo: ✓ en su aviso');
+    ok(/class="au-mute"[^>]*data-au-ack="overrun:b9"[^>]*><svg class="ic"><use href="#i-mute"\/>/.test(t.T.auMuteBtn('overrun:b9', 'Banda Z')), 'Sobretiempo: control propio de silenciar (altavoz tachado, no ✓)');
     const callDone = t.env.storage.get('showtime.callDone'), chat = t.env.storage.get('showtime.chat'), fest = t.env.storage.get('showtime.festival'), log = t.env.storage.get('showtime.log');
     t.env.fire('document', 'click', { target: { closest: q => q === '[data-au-ack]' ? { dataset: { auAck: 'overrun:b9' } } : null } });
-    ok(!t.A.RING.repeating('overrun:b9') && t.T.auAckBtn('overrun:b9') === '', 'Sobretiempo: ✓ → se para y el ✓ desaparece');
+    ok(!t.A.RING.repeating('overrun:b9') && t.T.auMuteBtn('overrun:b9') === '', 'Sobretiempo: silenciar → se para y el control desaparece');
     t.adv(1000); t.T.audioTick([], [{ key: 'b9', label: 'Banda Z' }], []); ok(!t.A.RING.repeating('overrun:b9'), 'y no vuelve mientras siga en sobretiempo');
     eq(t.env.storage.get('showtime.festival'), fest, '✓ no termina la banda ni cambia el evento');
-    ok(/tx\('TIEMPO EXTRA · \+\{n\} min', \{ n: xtraOver\(b, nowInt\) \}\) \+ auAckBtn\('overrun:' \+ b\.key, b\.name\)/.test(D.src('control.js')), 'el ✓ va dentro de «TIEMPO EXTRA · +N min» de EN ESCENA');
+    ok(/<div class="v-name">' \+ nameKind\(b\) \+ \(xo !== null \? auMuteBtn\('overrun:' \+ b\.key, b\.name\) : ''\) \+ '<\/div>'/.test(D.src('control.js')), 'silenciar va en la línea del nombre de EN ESCENA');
     // Urgente: ✓ local dentro del propio mensaje del chat
     t.T.renderChat(); const ch = t.env.innerLog.filter(([n]) => n === 'chat-list').slice(-1)[0][1];
     ok(new RegExp('data-au-ack="urgent:' + uid + '"').test(ch), 'Urgente: ✓ dentro del mensaje');
@@ -364,6 +365,292 @@
     ok(!/audio\.js/.test(D.src('live.html') + D.src('remote.html')), 'Live, Producción, Mando, Confidence, Backstage y Staff no cargan audio.js');
     const E2 = E.cleanProdMsg({ type: 'chat', from: 'p', text: 'x', urgent: true, repeat: true, ack: true });
     eq(Object.keys(E2).sort().join(), 'from,text,type,urgent', 'el mensaje de Producción no admite campos del audio');
+  });
+
+  // ── Dec. 148: regresiones críticas ─────────────────────────────────────
+  /** Live (Staff por QR) con el evento llegado por la emisión, como en una pantalla real. */
+  async function liveCon(vista, snap, AC, now) {
+    const env = D.makeEnv({ cripto: true, now, search: '?vista=' + vista, hash: (await E.newRoom().then(r => E.staffUrl(r, 'http://x/'))).replace(/^[^#]*/, '') });
+    if (AC) env.win.AudioContext = AC;
+    env.getEl('msgdock').hidden = true; env.getEl('pmodal').hidden = true; env.getEl('chatdock').hidden = true;
+    D.cargar(env, ['core.js', 'meteo.js', 'datos.js', 'emision.js']);
+    env.win.ShowtimeEmision.Receptor.prototype.start = async function () {};
+    D.cargar(env, ['vistas.js', 'marca.js', 'i18n.js', 'live.js']);
+    env.win.ShowtimeDatos.loadSnapshot(snap);
+    env.win.ShowtimeLive.reload();   // = el tick de cada segundo de la pantalla real
+    return env;
+  }
+
+  test('19 · CALL activo aparece en el Dashboard, en Manager y en Backstage (el audio no se mete en la ruta de CALL)', async () => {
+    const T0 = at2320(), F = festCall(T0), rec = {};
+    const t = dashboard({ 'showtime.festival': JSON.stringify(F), [KEY]: JSON.stringify({ on: true, rep: { call: true } }) }, fakeAC2(rec), T0);
+    ok(/Banda A/.test(t.env.innerLog.filter(([n]) => n === 'v-call').slice(-1)[0][1]), 'Dashboard: tarjeta CALL con «Banda A»');
+    const snap = t.T.emSnapshot();
+    ok(snap && snap.festival && Array.isArray(snap.callDone), 'la emisión lleva el evento y los OK de CALL (de donde la Live saca el CALL)');
+    for (const v of ['manager', 'backstage']) {
+      const env = await liveCon(v, JSON.parse(JSON.stringify(snap)), null, T0);
+      const h = env.innerLog.filter(([n]) => n === 'call-list').slice(-1)[0];
+      ok(h && /BANDA A/.test(h[1]), v + ': CALL «BANDA A» en pantalla');
+      eq(env.errors.length, 0, v + ': ' + env.errors.join(' | '));
+    }
+  });
+
+  test('20 · Solo el Dashboard reproduce el sonido de CALL; Manager y Backstage nunca', async () => {
+    const T0 = at2320(), F = festCall(T0);
+    for (const v of ['manager', 'backstage']) {
+      const rec = {}, env = await liveCon(v, { festival: F, config: { mode: 'all' }, callDone: [], flash: null, avisos: [], meteo: null }, fakeAC2(rec), T0);
+      env.fire('document', 'pointerdown', GEST);
+      eq(rec.notes.length, 0, v + ': ningún tono'); ok(!env.win.ShowtimeAudio, v + ': sin audio.js');
+    }
+    ok(!/audio\.js|AudioContext|ShowtimeAudio/.test(D.src('live.html') + D.src('live.js') + D.src('remote.html') + D.src('remote.js')), 'ni la Live ni el Mando tocan Web Audio');
+    const rec = {}, t = dashboard({ [KEY]: JSON.stringify({ on: true }) }, fakeAC2(rec));
+    t.env.fire('document', 'pointerdown', GEST); t.T.audioTick(null); t.adv(1000); t.T.audioTick(['k'], [], []);
+    eq(rec.notes.join(), '660,880', 'el Dashboard sí');
+  });
+
+  /** Dashboard con «Banda A» en sobretiempo real (Tiempo extra activado, pasada su hora) y su repetición sonando. */
+  function overrunDash(rec) {
+    const T0 = (() => { const d = new Date(); d.setHours(23, 10, 0, 0); return d.getTime(); })();
+    const F = festCall(T0); F.artists[0].inicio = '23:00'; F.artists[0].fin = '23:15'; F.artists[0].showtimeAlargar = true;
+    const t = dashboard({ 'showtime.festival': JSON.stringify(F), [KEY]: JSON.stringify({ on: true, rep: { overrun: true } }) }, fakeAC2(rec), T0);
+    t.env.fire('document', 'pointerdown', GEST);
+    t.adv(10 * 60000); t.env.win.ShowtimePanel.reload(); t.adv(1000); t.env.win.ShowtimePanel.reload();   // 23:20: entra en sobretiempo
+    const key = C.buildBlocks(F, { mode: 'all', day: 'all' })[0].key;
+    return { t, key };
+  }
+
+  test('21 · Silenciar sobretiempo: control propio (altavoz tachado) fuera de cualquier botón; no termina la banda ni toca el Tiempo extra', () => {
+    const rec = {}, { t, key } = overrunDash(rec);
+    ok(t.A.RING.repeating('overrun:' + key), 'el sobretiempo se repite');
+    const vn = t.env.innerLog.filter(([n]) => n === 'v-now').slice(-1)[0][1];
+    ok(/TIEMPO EXTRA · \+5 min/.test(vn), 'EN ESCENA en sobretiempo');
+    const mute = vn.match(/<button class="au-mute"[^>]*>[\s\S]*?<\/button>/), stretch = vn.match(/<button class="xtrabtn[^"]*"[^>]*data-act="stretch"[^>]*>[\s\S]*?<\/button>/);
+    ok(mute && stretch, 'hay control de silenciar y botón Tiempo extra');
+    ok(/#i-mute/.test(mute[0]) && !/#i-check|✓/.test(mute[0]) && !/data-act|data-key/.test(mute[0]), 'silenciar: altavoz tachado, sin ✓ ni acción del show');
+    ok(!/au-mute|data-au-ack|au-ack/.test(stretch[0]), 'nada de audio dentro del botón Tiempo extra');
+    ok(vn.indexOf(mute[0]) < vn.indexOf('<div class="v-rem"') && vn.indexOf('class="au-mute"') > vn.indexOf('<div class="v-name">') && vn.indexOf(mute[0]) < vn.indexOf(stretch[0]), 'silenciar va en la línea del nombre, lejos del botón');
+    const fest = t.env.storage.get('showtime.festival'), log = t.env.storage.get('showtime.log'), cfg = t.env.storage.get('showtime.config');
+    const tgt = { closest: q => q === '[data-au-ack]' ? { dataset: { auAck: 'overrun:' + key } } : null };
+    t.env.fire('v-now', 'click', { target: tgt }); t.env.fire('document', 'click', { target: tgt });   // el clic sube por EN ESCENA y llega al documento
+    ok(!t.A.RING.repeating('overrun:' + key), 'se para el audio');
+    eq(t.env.storage.get('showtime.festival'), fest, 'la banda sigue igual (Tiempo extra activado, sin ■, sin tiempos nuevos)');
+    eq(t.env.storage.get('showtime.log'), log, 'nada en el log'); eq(t.env.storage.get('showtime.config'), cfg, 'nada en la configuración');
+    t.adv(1000); t.env.win.ShowtimePanel.reload();
+    ok(!/class="au-mute"/.test(t.env.innerLog.filter(([n]) => n === 'v-now').slice(-1)[0][1]), 'el control desaparece al silenciar');
+  });
+
+  test('22 · El botón original de Tiempo extra hace exactamente lo de antes (mismo HTML y mismo manejador que la v20261156)', () => {
+    const cj = D.src('control.js');
+    ok(cj.indexOf(`  function xtraBtn(b, compact) {
+    return '<button class="xtrabtn' + (compact ? ' sq' : '') + (b.alargar ? ' on' : '') + '" data-act="stretch" data-key="' + esc(b.key) + '" data-on="' + (b.alargar ? '0' : '1') + '" title="' +`) > 0 &&
+      cj.indexOf(`      '"><svg class="ic"><use href="#i-stretch"/></svg>' + (compact ? '' : tx(b.alargar ? 'Tiempo extra ✓' : 'Tiempo extra')) + '</button>';`) > 0, 'xtraBtn idéntico (su «✓» de activado es de la dec. 83, no del audio)');
+    ok(cj.indexOf(`  ['v-now', 'v-next'].forEach(id => $(id).addEventListener('click', e => {
+    const sg = e.target.closest('[data-act="stretch"]'); if (!sg) return;
+    applyStretch(sg.dataset.key, sg.dataset.on === '1');
+  }));`) > 0, 'manejador idéntico');
+    const rec = {}, { t, key } = overrunDash(rec);
+    const read = () => JSON.parse(t.env.storage.get('showtime.festival')).artists[0].showtimeAlargar;
+    eq(read(), true, 'antes: Tiempo extra activado');
+    t.env.fire('v-now', 'click', { target: { closest: q => q === '[data-act="stretch"]' ? { dataset: { key, on: '0' } } : null } });
+    ok(!read(), 'el botón sigue desactivando el Tiempo extra, como siempre');
+  });
+
+  // ── Dec. 148 · OK de CALL y reprogramación manual de la hora de CALL ──────────
+  /** Dashboard a las 23:20 con «Banda A» (23:30; CALL por defecto 15 min → ventana 23:15–23:30) y su OK ya dado. */
+  function callOkDash(rec) {
+    const T0 = at2320(), F = festCall(T0);
+    const t = dashboard({ 'showtime.festival': JSON.stringify(F), [KEY]: JSON.stringify({ on: true }) }, rec ? fakeAC2(rec) : null, T0);
+    t.env.fire('document', 'pointerdown', GEST);
+    const key = C.callKey(C.buildBlocks(F, { mode: 'all', day: 'all' })[0]), id = F.artists[0].id;
+    t.env.fire('v-call', 'click', { target: { closest: q => q === '.okbtn' ? { dataset: { ck: key } } : null } });   // OK de siempre
+    const done = () => C.callIsDone(t.read('showtime.callDone') || [], C.buildBlocks(JSON.parse(t.env.storage.get('showtime.festival')), { mode: 'all', day: 'all' })[0]);
+    const vcall = () => (t.env.innerLog.filter(([n]) => n === 'v-call').slice(-1)[0] || ['', ''])[1];
+    /** Edita una casilla de la tabla como el regidor (Intro / salir de la casilla). */
+    const edit = (k, value, orig) => t.T.applyEdit({ value, dataset: { k, orig: orig === undefined ? '' : orig }, title: '', classList: { add() {}, remove() {} },
+      closest: q => q === 'tr' ? { dataset: { id: String(id), mode: 'show' } } : null });
+    const callLog = () => ((t.read('showtime.log') || {}).entries || []).filter(e => e.type === 'call');
+    return { t, T0, F, key, id, done, vcall, edit, callLog };
+  }
+
+  test('23 · OK de CALL + retraso de la banda: sigue avisado (el retraso no reabre CALL)', () => {
+    const c = callOkDash();
+    ok(c.done(), 'OK dado'); ok(!/Banda A/.test(c.vcall()), 'fuera de la tarjeta CALL');
+    const d = new Date(c.T0), iso = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    const r = C.addRetraso(JSON.parse(c.t.env.storage.get('showtime.festival')), { minutes: 10, zone: 'all', day: iso, at: Math.floor(C.nowAbs(new Date(c.T0))) });
+    const S = r.state || r; ok(S && S.artists, 'retraso aplicado');
+    ok((S.showtimeRetrasos || []).length === 1, 'retraso de +10 guardado en el evento (mueve el estimado, no el previsto)');
+    c.t.env.storage.set('showtime.festival', JSON.stringify(S)); c.t.env.win.ShowtimePanel.reload();
+    ok(c.done(), 'sigue avisada'); ok(!/Banda A/.test(c.vcall()), 'y no vuelve a la tarjeta CALL');
+  });
+
+  test('24 · OK de CALL + hora de CALL nueva y válida escrita a mano: deja de estar avisado (solo esa banda; el log se conserva)', () => {
+    const c = callOkDash(), logAntes = c.callLog().length;
+    ok(c.done() && logAntes >= 1, 'OK dado y apuntado');
+    c.edit('call', '23:18');
+    ok(!c.done(), 'sin OK: vuelve a avisar');
+    eq(c.callLog().length, logAntes, 'el «CALL OK» histórico sigue en el log');
+    ok(/Banda A/.test(c.vcall()), 'vuelve a la tarjeta CALL del Dashboard');
+    c.t.env.fire('v-call', 'click', { target: { closest: q => q === '.okbtn' ? { dataset: { ck: c.key } } : null } });
+    ok(c.done() && c.callLog().length === logAntes + 1, 'un OK nuevo se apunta otra vez');
+  });
+
+  test('25 · El CALL reprogramado aparece con su hora nueva en el Dashboard, en Manager y en Backstage', async () => {
+    const c = callOkDash();
+    c.edit('call', '23:18');
+    ok(/Banda A/.test(c.vcall()) && /23:30/.test(c.vcall()), 'Dashboard');
+    const snap = JSON.parse(JSON.stringify(c.t.T.emSnapshot()));
+    eq(snap.callDone.length, 0, 'la emisión ya no lleva el OK');
+    eq(C.callAt(C.buildBlocks(snap.festival, { mode: 'all', day: 'all' })[0], 15) % 1440, 23 * 60 + 18, 'la hora de CALL nueva viaja con el evento');
+    for (const v of ['manager', 'backstage']) {
+      const env = await liveCon(v, snap, null, c.T0);
+      const h = env.innerLog.filter(([n]) => n === 'call-list').slice(-1)[0][1];
+      ok(/BANDA A/.test(h) && !/AVISADO/.test(h), v + ': CALL de nuevo, sin «avisado»');
+    }
+  });
+
+  test('26 · Al editar no suena; suena solo al entrar de verdad en la ventana nueva (una vez)', () => {
+    const rec = {}, c = callOkDash(rec);
+    rec.notes = []; c.edit('call', '23:19');                          // ya dentro de la ventana nueva al editar
+    c.t.adv(1000); c.t.env.win.ShowtimePanel.reload(); c.t.adv(1000); c.t.env.win.ShowtimePanel.reload();
+    eq(rec.notes.length, 0, 'hora nueva ya pasada: reaparece sin sonar al editar');
+    const rec2 = {}, d = callOkDash(rec2);
+    rec2.notes = []; d.edit('call', '23:25');                         // ventana nueva en el futuro
+    d.t.adv(1000); d.t.env.win.ShowtimePanel.reload();
+    eq(rec2.notes.length, 0, 'al editar: nada'); ok(!/Banda A/.test(d.vcall()), 'aún fuera de su ventana nueva');
+    d.t.adv(4 * 60000); d.t.env.win.ShowtimePanel.reload();          // 23:24
+    eq(rec2.notes.length, 0, 'a las 23:24: nada');
+    d.t.adv(60000); d.t.env.win.ShowtimePanel.reload();              // 23:25: entra
+    eq(rec2.notes.join(), '660,880', 'a las 23:25 entra en la ventana nueva: suena una vez'); ok(/Banda A/.test(d.vcall()), 'y sale en la tarjeta');
+    d.t.adv(60000); d.t.env.win.ShowtimePanel.reload(); eq(rec2.notes.length, 2, 'no repite');
+  });
+
+  test('27 · Otro campo, la misma hora o una hora de CALL inválida: el OK se queda', () => {
+    const c = callOkDash();
+    c.edit('notas', 'Backline listo'); ok(c.done(), 'notas: sigue avisado');
+    c.edit('call', '23:15'); ok(c.done(), 'misma hora de CALL (la que ya salía): sigue avisado');
+    c.edit('call', '23:45'); ok(c.done(), 'hora después del inicio (inválida para CALL): sigue avisado');
+    c.edit('call', '99:99'); ok(c.done(), 'hora mal escrita: no se aplica y sigue avisado');
+    c.edit('call', '', '23:45'); ok(c.done(), 'CALL vacía (vuelve a la cuenta por defecto): sigue avisado');
+    c.edit('nombre', 'Banda A2'); ok(c.done(), 'nombre (cambia la clave): el OK pasa a la clave nueva');
+    c.edit('inicio', '23:32', '23:30'); ok(c.done(), 'inicio previsto (cambia la clave): el OK sigue');
+    ok(!/Banda A/.test(c.vcall()), 'y no vuelve a la tarjeta CALL');
+  });
+
+  test('28 · OK → hora de CALL nueva → Deshacer: vuelve exactamente lo de antes (hora, OK, pantallas, sin sonido, log intacto)', async () => {
+    const rec = {}, c = callOkDash(rec);
+    const fest0 = c.t.env.storage.get('showtime.festival'), done0 = c.t.env.storage.get('showtime.callDone'), log0 = c.callLog().map(e => e.text || e.msg || JSON.stringify(e));
+    const snap0 = JSON.parse(JSON.stringify(c.t.T.emSnapshot()));
+    const screens = async snap => { const o = {}; for (const v of ['manager', 'backstage']) { const env = await liveCon(v, snap, null, c.T0); o[v] = env.innerLog.filter(([n]) => n === 'call-list').slice(-1)[0][1]; } return o; };
+    const sc0 = await screens(snap0);
+    ok(!/BANDA A/.test(sc0.manager) && /BANDA A/.test(sc0.backstage) && /AVISADO/.test(sc0.backstage), 'antes (OK dado): fuera de Manager; Backstage «AVISADO» (dec. 150)');
+    const vcall0 = c.vcall();
+    rec.notes = []; c.edit('call', '23:18');
+    ok(!c.done() && /Banda A/.test(c.vcall()), 'tras editar: reabierto');
+    const sc1 = await screens(JSON.parse(JSON.stringify(c.t.T.emSnapshot())));
+    ok(/BANDA A/.test(sc1.manager) && !/AVISADO/.test(sc1.backstage), 'tras editar: Manager con CALL, Backstage sin «avisado»');
+    c.t.adv(1000); c.t.T.undo(); c.t.adv(1000); c.t.env.win.ShowtimePanel.reload(); c.t.adv(1000); c.t.env.win.ShowtimePanel.reload();
+    eq(c.t.env.storage.get('showtime.festival'), fest0, 'hora de CALL original (el evento, igual que antes)');
+    ok(c.done(), 'vuelve a estar avisado');
+    eq(c.t.env.storage.get('showtime.callDone'), done0, 'callDone exactamente como antes');
+    eq(c.vcall(), vcall0, 'el Dashboard vuelve a su tarjeta CALL de antes');
+    const snap2 = JSON.parse(JSON.stringify(c.t.T.emSnapshot()));
+    eq(JSON.stringify(snap2.callDone), JSON.stringify(snap0.callDone), 'la emisión vuelve a llevar el OK');
+    const sc2 = await screens(snap2);
+    eq(sc2.manager, sc0.manager, 'Manager como antes'); eq(sc2.backstage, sc0.backstage, 'Backstage como antes («AVISADO»)');
+    ok(!/BANDA A/.test(sc2.manager) && /AVISADO/.test(sc2.backstage) && !/Banda A/.test(c.vcall()), 'tras Deshacer: fuera del Dashboard y Manager; Backstage «AVISADO»');
+    eq(rec.notes.length, 0, 'ni la edición ni el Deshacer suenan');
+    const log2 = c.callLog().map(e => e.text || e.msg || JSON.stringify(e));
+    eq(log2.length, log0.length, 'el historial de «CALL OK» no se borra ni se duplica'); eq(log2.join('|'), log0.join('|'));
+    ok(((c.t.read('showtime.log') || {}).entries || []).some(e => e.type === 'undo'), 'el Deshacer queda en el log como siempre');
+    c.t.adv(1000); c.t.T.undo(); ok(c.done(), 'un Deshacer más (el OK no es un paso de Deshacer): el OK sigue');
+  });
+
+  test('28b · Deshacer otros cambios no toca el OK; deshacer un cambio de nombre devuelve el OK a como estaba', () => {
+    const c = callOkDash(), done0 = c.t.env.storage.get('showtime.callDone');
+    c.edit('notas', 'x'); c.t.T.undo(); eq(c.t.env.storage.get('showtime.callDone'), done0, 'notas + Deshacer: callDone igual');
+    c.edit('nombre', 'Banda A2'); ok(c.done(), 'nombre: el OK sigue'); c.t.T.undo();
+    eq(c.t.env.storage.get('showtime.callDone'), done0, 'nombre + Deshacer: callDone exactamente como antes'); ok(c.done(), 'y avisado');
+  });
+
+  // ── Dec. 150 · un OK de CALL vale para UNA hora efectiva de CALL ──────────────────
+  /** Retraso real desde el Dashboard (misma ruta que el mando: plan + resumen + Deshacer). */
+  async function retraso(c, minutes) {
+    const W = c.t.env.win, F = c.t.read('showtime.festival'), cfg = W.ShowtimeDatos.getConfig();
+    const args = { minutes, zones: 'all', from: Math.floor(W.ShowtimeCore.nowAbs()) };
+    const p = W.ShowtimeMando.delayPlan(F, cfg, args);
+    const r = await c.t.T.emCommand({ id: 'd' + Math.random(), op: 'delay', args: Object.assign({}, args, { stamp: W.ShowtimeMando.delayStamp(p) }), t: Date.now() === c.t.clk.t ? c.t.clk.t : c.t.clk.t });
+    ok(r.ok, 'retraso aplicado: ' + r.msg);
+  }
+  async function pantallas(c) {
+    const snap = JSON.parse(JSON.stringify(c.t.T.emSnapshot())), o = { dash: c.vcall() };
+    for (const v of ['manager', 'backstage']) { const env = await liveCon(v, snap, null, c.t.clk.t); o[v] = env.innerLog.filter(([n]) => n === 'call-list').slice(-1)[0][1]; }
+    return o;
+  }
+  const tick = c => { c.t.env.win.ShowtimePanel.reload(); };
+
+  test('29 · CALL OK sin cambio de hora efectiva: fuera del Dashboard y de Manager; Backstage «AVISADO»', async () => {
+    const c = callOkDash(), s = await pantallas(c);
+    ok(!/Banda A/.test(s.dash) && !/BANDA A/.test(s.manager), 'Dashboard y Manager lo ocultan');
+    ok(/BANDA A/.test(s.backstage) && /AVISADO/.test(s.backstage), 'Backstage «AVISADO»');
+    ok(c.t.read('showtime.callDone').some(k => /~\d+$/.test(k)), 'el OK lleva el sello de su hora efectiva');
+  });
+
+  test('30 · CALL OK + retraso que mueve el CALL calculado: vuelve a CALL pendiente en las tres pantallas y suena solo al entrar en su ventana nueva', async () => {
+    const rec = {}, c = callOkDash(rec); rec.notes = [];
+    await retraso(c, 10);   // Banda A 23:30 → 23:40; su CALL 23:15 → 23:25 (ahora son las 23:20)
+    tick(c);
+    ok(!c.done(), 'el OK ya no vale para la hora nueva'); eq(rec.notes.length, 0, 'al retrasar: nada suena');
+    let s = await pantallas(c);
+    ok(!/Banda A/.test(s.dash) && !/BANDA A/.test(s.manager + s.backstage), 'a las 23:20 aún no está en su ventana nueva (23:25): no sale en ninguna');
+    c.t.adv(4 * 60000); tick(c); eq(rec.notes.length, 0, '23:24: nada');
+    c.t.adv(60000); tick(c);
+    eq(rec.notes.join(), '660,880', '23:25: entra en su ventana nueva → suena una vez');
+    s = await pantallas(c);
+    ok(/Banda A/.test(s.dash) && /OK/.test(s.dash), 'Dashboard: CALL pendiente con su OK');
+    ok(/BANDA A/.test(s.manager) && /callok/.test(s.manager), 'Manager: CALL pendiente');
+    ok(/BANDA A/.test(s.backstage) && !/AVISADO/.test(s.backstage), 'Backstage: pendiente, sin «AVISADO»');
+    c.t.adv(60000); tick(c); eq(rec.notes.length, 2, 'no repite');
+    c.t.env.fire('v-call', 'click', { target: { closest: q => q === '.okbtn' ? { dataset: { ck: c.key } } : null } });
+    ok(c.done() && c.callLog().length === 2, 'un OK nuevo vale para la hora nueva y se apunta otra vez (el primero sigue en el log)');
+  });
+
+  test('30b · Retraso pequeño que deja el CALL nuevo ya abierto: reaparece pendiente sin sonar (no es una entrada en su ventana)', async () => {
+    const rec = {}, c = callOkDash(rec); rec.notes = [];
+    await retraso(c, 3);    // CALL 23:15 → 23:18, ya pasado a las 23:20
+    tick(c); c.t.adv(1000); tick(c);
+    const s = await pantallas(c);
+    ok(/Banda A/.test(s.dash) && /BANDA A/.test(s.manager) && /BANDA A/.test(s.backstage) && !/AVISADO/.test(s.backstage), 'pendiente en las tres');
+    eq(rec.notes.length, 0, 'sin sonido');
+  });
+
+  test('31 · CALL manual en una banda fija + retraso que no mueve esa hora: sigue «AVISADO»', async () => {
+    const T0 = at2320(); let F = festCall(T0); F.artists[0].showtimeCall = '23:12'; F.artists[0].showtimeFija = true;
+    F = C.addArtist(F, 'show', { jornada: F.event.fechaInicio, nombre: 'Banda B', escenarioId: F.escenarios[0].id, inicio: '23:45', fin: '23:58' }).state;   // la que sí se mueve
+    const rec = {}, t = dashboard({ 'showtime.festival': JSON.stringify(F), [KEY]: JSON.stringify({ on: true }) }, fakeAC2(rec), T0);
+    t.env.fire('document', 'pointerdown', GEST);
+    const blk = () => C.buildBlocks(JSON.parse(t.env.storage.get('showtime.festival')), { mode: 'all', day: 'all' }).find(b => b.name === 'Banda A'), key = C.callKey(blk());
+    t.env.fire('v-call', 'click', { target: { closest: q => q === '.okbtn' ? { dataset: { ck: key } } : null } });
+    const c = { t, vcall: () => (t.env.innerLog.filter(([n]) => n === 'v-call').slice(-1)[0] || ['', ''])[1] };
+    rec.notes = [];
+    await retraso(c, 10); t.env.win.ShowtimePanel.reload();
+    eq(C.callAt(blk(), 15), C.callAt(C.buildBlocks(F, { mode: 'all', day: 'all' }).find(b => b.name === 'Banda A'), 15), 'la hora de CALL no se mueve (banda fija)');
+    ok(C.buildBlocks(JSON.parse(t.env.storage.get('showtime.festival')), { mode: 'all', day: 'all' }).find(b => b.name === 'Banda B').si > C.buildBlocks(F, { mode: 'all', day: 'all' }).find(b => b.name === 'Banda B').si, 'el retraso sí se ha aplicado (Banda B se mueve)');
+    ok(C.callIsDone(t.read('showtime.callDone'), blk(), 15), 'el OK sigue valiendo');
+    const s = await pantallas(c);
+    ok(!/Banda A/.test(s.dash) && !/BANDA A/.test(s.manager), 'Dashboard y Manager: fuera'); ok(/AVISADO/.test(s.backstage), 'Backstage: «AVISADO»');
+    eq(rec.notes.length, 0, 'sin sonido');
+  });
+
+  test('32 · Deshacer el retraso: vuelve la hora efectiva y el OK anterior — fuera del Dashboard y Manager, Backstage «AVISADO», sin audio', async () => {
+    const rec = {}, c = callOkDash(rec), s0 = await pantallas(c), done0 = c.t.env.storage.get('showtime.callDone'), log0 = c.callLog().length; rec.notes = [];
+    await retraso(c, 3); tick(c);   // reabierto y dentro de su ventana
+    ok(!c.done(), 'reabierto');
+    c.t.adv(1000); c.t.T.undo(); c.t.adv(1000); tick(c); c.t.adv(1000); tick(c);
+    ok(c.done(), 'el OK anterior vale otra vez'); eq(c.t.env.storage.get('showtime.callDone'), done0, 'callDone como antes');
+    const s = await pantallas(c);
+    eq(s.manager, s0.manager, 'Manager como antes'); eq(s.backstage, s0.backstage, 'Backstage como antes'); eq(s.dash, s0.dash, 'Dashboard como antes');
+    ok(/AVISADO/.test(s.backstage), 'Backstage «AVISADO»');
+    eq(rec.notes.length, 0, 'ni el retraso ni el Deshacer suenan'); eq(c.callLog().length, log0, 'log de «CALL OK» intacto');
   });
 
   (async () => {

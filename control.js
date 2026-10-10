@@ -29,6 +29,7 @@
   const LIVE_NAMES_KEY = 'showtime.liveNames';   // { id: nombre } de las ventanas abiertas, para recordar el nombre tras recargar
   const VISTA_OPCIONES = [['manager', 'Manager'], ['confidence', 'Confidence'], ['backstage', 'Backstage']];
   const Vs = window.ShowtimeVistas;
+  let CALL_UNDO = null;   // dec. 148: { add: [OK de CALL que vuelven], del: [claves que se quitan] } para el paso de Deshacer de una edición
   const AU = window.ShowtimeAudio || null;   // avisos de audio locales (dec. 145, audio.js)
   const AU_EDGE = AU ? { call: AU.edge(), overrun: AU.edge(), meteo: AU.edge() } : null;   // el primer tick solo arma: nunca suena al cargar
   if (AU) AU.armGestures(document);   // el navegador solo deja sonar tras un clic o una tecla
@@ -159,6 +160,7 @@
     const mm = obj ? [msg0.ui] : Array.isArray(msg0) ? msg0 : [msg0], msg = obj ? msg0.es : mm[0] ? txEs(mm[0], mm[1]) : mm[0];
     const prev = FEST, next = M.withBlk(next0, CONFIG);   // los bloqueos del menú Retrasos viajan con el evento (el desborde los respeta)
     UNDO.push({ s: JSON.stringify(FEST), m: undoTxt(msg) });
+    if (CALL_UNDO) { UNDO[UNDO.length - 1].cd = CALL_UNDO; CALL_UNDO = null; }   // dec. 148: el OK de CALL va en el MISMO paso de Deshacer
     if (UNDO.length > UNDO_MAX) UNDO.shift();
     FEST = next;
     Dt.setFestival(FEST);
@@ -174,6 +176,7 @@
     if (!UNDO.length) return;
     const u = UNDO.pop();
     FEST = M.withBlk(JSON.parse(u.s), CONFIG);
+    if (u.cd) undoCallDone(u.cd);   // antes de pintar: el OK vuelve a la vez que la hora (sin sonido, sin apunte nuevo de «CALL OK»)
     Dt.setFestival(FEST);
     if (u.m) logEvent('undo', u.m);      // el log nunca borra: apunta lo que se deshizo («Deshecho: …»)
     compute(); renderAll();
@@ -725,65 +728,68 @@
     return '<button class="xtrabtn bis' + (sc ? ' sc' : '') + '" data-act="stretch" data-key="' + esc(c.b.key) + '" data-on="1" title="' + esc(title) + '"' + (st.ok ? '' : ' disabled') + '><svg class="ic"><use href="#i-undo"/></svg>' + esc(label) + '</button>';
   }
 
+  // Dec. 149 · jerarquía por escenario en En escena, Siguiente y CALL: NOMBRE DE LA ZONA (una vez, en su color) → contenido →
+  // hora · tiempo. «Principal» nunca queda implícito; sin zona, «SIN ZONA». La última línea no repite la zona.
+  function zoneHtml(rows) {
+    return Vs.zoneGroups(rows).map(g => '<div class="v-zg" style="--zc:' + (g.color || 'var(--muted)') + '"><div class="v-zone">' + esc(g.name || tx('SIN ZONA')) + '</div>' + g.items.join('') + '</div>').join('');
+  }
   // Vista en vivo (mismas reglas que la Pantalla Live)
   function renderLive(nowMins, nowInt) {
     const order = id => { const i = ((FEST && FEST.escenarios) || []).findIndex(e => e.id === id); return i < 0 ? 999 : i; };
     const rows = [];
-    const kindTag = b => C.engineMode(CONFIG.mode) === 'all' && b.kind === 'sc' ? tx('Soundcheck') + ' · ' : '';
+    const zc = b => b && b.stage ? safeColor(b.stageColor || b.color, '#888') : '';
+    const kindTxt = b => b.kind === 'sc' ? tx('Soundcheck') : b.kind === 'show' ? tx('Show') : '';
+    const nameKind = b => esc(b.name) + (kindTxt(b) ? '<span class="v-kind"> · ' + esc(kindTxt(b)) + '</span>' : '');
+    const span = b => C.fmtHM(b.si) + '–' + C.fmtHM(b.sf);
     C.playingNow(LIVE, nowInt).forEach(b => {
-      const col = safeColor(b.stageColor || b.color, '#888'), p = C.progress(b, nowInt);
-      rows.push({ o: order(b.stageId), h: '<div class="v-row" style="--c:' + col + '"><div class="v-name">' + esc(b.name) + '</div>' +
-        '<div class="v-meta">' + kindTag(b) + C.fmtHM(b.si) + '–' + C.fmtHM(b.sf) + (b.stage ? ' · ' + esc(b.stage) : '') + '</div>' +
-        '<div class="v-rem" style="color:' + col + '">' + (xtraOver(b, nowInt) !== null ? tx('TIEMPO EXTRA · +{n} min', { n: xtraOver(b, nowInt) }) + auAckBtn('overrun:' + b.key, b.name) : tx('{n} min restantes', { n: p.remaining }) + (b.alargar && b.rf === null ? ' · ' + tx('tiempo extra') : '')) + '</div>' + (b.rf === null ? xtraBtn(b) : '') + '</div>' });
+      const col = safeColor(b.stageColor || b.color, '#888'), p = C.progress(b, nowInt), xo = xtraOver(b, nowInt);
+      rows.push({ o: order(b.stageId), z: b.stageId, zn: b.stage, zc: zc(b), h: '<div class="v-row" style="--c:' + col + '"><div class="v-name">' + nameKind(b) + (xo !== null ? auMuteBtn('overrun:' + b.key, b.name) : '') + '</div>' +   // silenciar: solo audio, lejos del botón Tiempo extra (dec. 148)
+        '<div class="v-rem" style="color:' + col + '">' + span(b) + ' · ' + (xo !== null ? tx('TIEMPO EXTRA · +{n} min', { n: xo }) : tx('{n} min restantes', { n: p.remaining }) + (b.alargar && b.rf === null ? ' · ' + tx('tiempo extra') : '')) + '</div>' + (b.rf === null ? xtraBtn(b) : '') + '</div>' });
     });
     const bis = bisCands(nowInt), bisShown = new Set(), bisFor = z => { z = z || ''; if (!bis[z]) return ''; bisShown.add(z); return bisBtnHtml(bis[z]); };
     C.playingNow(LIVE, nowInt).forEach(b => bisShown.add(b.stageId || ''));   // la zona ya suena: ahí no se ofrece el bis
     C.changeoversNow(LIVE, nowMins, TAREAS).forEach(co => {
-      const col = safeColor(co.stageColor || co.next.color, '#888');
-      if (!co.standby && co.kind === 'idle') {      // hueco sin cambio real (decisión 76)
-        // dec. 138: la zona como título y «— Sin actividad —» debajo (sin «después»: lo dice SIGUIENTE)
-        rows.push({ o: order(co.stageId), h: '<div class="v-row co idle" style="--c:' + col + '">' + (co.stage
-          ? '<div class="v-name" style="color:' + col + '">' + esc(co.stage) + '</div><div class="v-meta">— ' + tx('Sin actividad') + ' —</div>'
-          : '<div class="v-name" style="color:var(--muted)">' + tx('— SIN ACTIVIDAD —') + '</div>') + (co.prev ? '' : bisFor(co.stageId)) + '</div>' });
+      const col = safeColor(co.stageColor || co.next.color, '#888'), z = { o: order(co.stageId), z: co.stageId, zn: co.stage, zc: co.stage ? col : '' };
+      if (!co.standby && co.kind === 'idle') {      // hueco sin cambio real (decisión 76): zona arriba y «— Sin actividad —»
+        rows.push(Object.assign(z, { h: '<div class="v-row co idle" style="--c:' + col + '"><div class="v-meta">— ' + tx('Sin actividad') + ' —</div>' + (co.prev ? '' : bisFor(co.stageId)) + '</div>' }));
         return;
       }
-      rows.push({ o: order(co.stageId), h: '<div class="v-row co' + (co.standby ? ' sb' : '') + '" style="--c:' + col + '"><div class="v-name" style="color:' + (co.standby ? 'var(--muted)' : col) + '">' +
-        (co.standby ? 'STANDBY' : 'CHANGEOVER') + (co.stage ? ' · ' + esc(co.stage) : '') + '</div>' +
-        '<div class="v-meta">' + tx(co.standby ? 'después' : 'entra') + ' <b>' + esc(co.next.name) + '</b> · ' + C.fmtHM(co.next.si) + '</div>' +
-        '<div class="v-rem">' + tx('quedan {t}', { t: fmtCountdown(co.remaining) }) + '</div>' + bisFor(co.stageId) + '</div>' });
+      rows.push(Object.assign(z, { h: '<div class="v-row co' + (co.standby ? ' sb' : '') + '" style="--c:' + col + '"><div class="v-name" style="color:' + (co.standby ? 'var(--muted)' : col) + '">' +
+        (co.standby ? 'STANDBY' : 'CHANGEOVER') + ' · <span class="v-co">' + tx(co.standby ? 'después' : 'entra') + ' <b>' + esc(co.next.name) + '</b></span></div>' +
+        '<div class="v-rem">' + C.fmtHM(co.next.si) + ' · ' + tx('quedan {t}', { t: fmtCountdown(co.remaining) }) + '</div>' + bisFor(co.stageId) + '</div>' }));
     });
     // Zonas cuya última banda acaba de terminar sin tarjeta de cambio (fin de la noche, o pasada la hora de corte): el bis sigue a mano
     Object.keys(bis).filter(z => !bisShown.has(z)).forEach(z => {
       const c = bis[z], col = safeColor(c.b.stageColor || c.b.color, '#888');
-      rows.push({ o: order(z), h: '<div class="v-row co ended" style="--c:' + col + '"><div class="v-name" style="color:var(--muted)">' + tx('ACABÓ') + ' · ' + esc(c.b.name) + (c.b.stage ? ' · ' + esc(c.b.stage) : '') + '</div>' +
+      rows.push({ o: order(z), z, zn: c.b.stage, zc: zc(c.b), h: '<div class="v-row co ended" style="--c:' + col + '"><div class="v-name" style="color:var(--muted)">' + tx('ACABÓ') + ' · ' + esc(c.b.name) + '</div>' +
         '<div class="v-meta">' + tx('a las {h} · hace {n} min', { h: C.fmtHM(c.b.nf), n: c.late }) + '</div>' + bisBtnHtml(c) + '</div>' });
     });
-    // Tareas en curso (operativa del día): debajo de los escenarios, sin cuenta de cambio
+    // Tareas en curso (operativa del día): bajo su zona (o «SIN ZONA», al final), sin cuenta de cambio
     C.tasksNow(LIVE, nowInt).forEach(b => {
-      const p = C.progress(b, nowInt);   // dec. 138: dos líneas — nombre / zona · horario · quedan (sin «Tarea ·» ni «después»)
-      rows.push({ o: b.stageId ? order(b.stageId) : 1000, h: '<div class="v-row tarea"><div class="v-name">' + esc(b.name) + '</div>' +
-        '<div class="v-meta">' + (b.stage ? '<span class="tstage" style="color:#7dd3fc">' + esc(b.stage) + '</span> · ' : '') + C.fmtHM(b.si) + '–' + C.fmtHM(C.blockEnd(b)) + ' · ' + tx('quedan {n} min', { n: p.remaining }) + '</div></div>' });
+      const p = C.progress(b, nowInt);
+      rows.push({ o: b.stageId ? order(b.stageId) : 1000, z: b.stageId || '', zn: b.stage, zc: b.stage ? '#7dd3fc' : '', h: '<div class="v-row tarea"><div class="v-name">' + esc(b.name) + '</div>' +
+        '<div class="v-meta">' + C.fmtHM(b.si) + '–' + C.fmtHM(C.blockEnd(b)) + ' · ' + tx('quedan {n} min', { n: p.remaining }) + '</div></div>' });
     });
     rows.sort((a, b) => a.o - b.o);
     const r = C.pickBlocks(LIVE, nowInt, 1);
-    $('v-now').innerHTML = rows.length ? rows.map(x => x.h).join('') : '<div class="v-empty">' + (LIVE_MISSING ? tx('Jornada sin datos') : r.ended ? tx('FIN DE JORNADA') : '—') + '</div>';
+    $('v-now').innerHTML = rows.length ? zoneHtml(rows) : '<div class="v-empty">' + (LIVE_MISSING ? tx('Jornada sin datos') : r.ended ? tx('FIN DE JORNADA') : '—') + '</div>';
 
     const next = C.nextPerStage(LIVE, nowInt);
-    $('v-next').innerHTML = next.length ? next.map(b => {
+    $('v-next').innerHTML = next.length ? zoneHtml(next.map(b => {
       const col = safeColor(b.stageColor || b.color, '#888'), co = C.changeoverBefore(LIVE, b, TAREAS);
       const badge = co ? (co.mins < 0 ? tx('Solapa {n} min', { n: -co.mins }) : b.standby ? tx('Standby {n} min', { n: co.mins }) : co.idle ? '' : tx('Cambio {n} min', { n: co.mins })) : '';
-      return '<div class="v-row" style="--c:' + col + '"><div class="v-name">' + esc(b.name) + '</div>' +
-        '<div class="v-meta">' + kindTag(b) + C.fmtHM(b.si) + '–' + C.fmtHM(b.sf) + (b.stage ? ' · ' + esc(b.stage) : '') + (badge ? ' · ' + badge : '') + '</div></div>';   // sin Tiempo extra: solo tiene sentido para la que suena (o el bis)
-    }).join('') : '<div class="v-empty">—</div>';
+      return { o: order(b.stageId), z: b.stageId, zn: b.stage, zc: zc(b), h: '<div class="v-row" style="--c:' + col + '"><div class="v-name">' + nameKind(b) + '</div>' +
+        '<div class="v-meta">' + span(b) + (badge ? ' · ' + badge : '') + '</div></div>' };   // sin Tiempo extra: solo tiene sentido para la que suena (o el bis)
+    }).sort((a, b) => a.o - b.o)) : '<div class="v-empty">—</div>';
 
     const done = new Set(Dt.getCallDone());
     const calls = C.callList(LIVE, nowInt, Dt.callMinsOf(FEST, CONFIG), done);
-    $('v-call').innerHTML = calls.length ? calls.map(b => {
+    $('v-call').innerHTML = calls.length ? zoneHtml(calls.map(b => {
       const col = safeColor(b.stageColor || b.color, '#ffc533');
-      return '<div class="v-row v-call" style="--c:' + col + '"><div><div class="v-name" style="color:' + col + '">' + esc(b.name) + '</div>' +
-        '<div class="v-meta">' + (b.stage ? esc(b.stage) + ' · ' : '') + tx('en {n} min', { n: Math.max(1, Math.round(b.si - nowInt)) }) + ' · ' + C.fmtHM(b.si) + '</div></div>' +
-        '<button class="okbtn" data-ck="' + esc(C.callKey(b)) + '" title="' + tx('Marcar como avisado') + '">OK</button></div>';
-    }).join('') : '<div class="v-empty">—</div>';
+      return { o: order(b.stageId), z: b.stageId, zn: b.stage, zc: b.stage ? col : '', h: '<div class="v-row v-call" style="--c:' + col + '"><div><div class="v-name" style="color:' + col + '">' + esc(b.name) + '</div>' +
+        '<div class="v-meta">' + C.fmtHM(b.si) + ' · ' + tx('en {n} min', { n: Math.max(1, Math.round(b.si - nowInt)) }) + '</div></div>' +
+        '<button class="okbtn" data-ck="' + esc(C.callKey(b)) + '" title="' + tx('Marcar como avisado') + '">OK</button></div>' };
+    }).sort((a, b) => a.o - b.o)) : '<div class="v-empty">—</div>';
     $('card-call').classList.toggle('hot', calls.length > 0);
   }
 
@@ -807,8 +813,10 @@
     LAST_MIN = mNow;
     const mst = renderMeteo();
     const nowMins = C.nowAbs(d), nowInt = Math.floor(nowMins);
+    stampCallOks();   // dec. 150: OK sin sello → se sella con su hora efectiva
     renderLive(nowMins, nowInt);
-    audioTick(C.callList(LIVE, nowInt, Dt.callMinsOf(FEST, CONFIG), new Set(Dt.getCallDone())).map(b => ({ key: C.callKey(b), label: b.name })),   // misma ventana CALL que la tarjeta
+    const cmins = Dt.callMinsOf(FEST, CONFIG);
+    audioTick(C.callList(LIVE, nowInt, cmins, new Set(Dt.getCallDone())).map(b => ({ key: C.callKey(b), label: b.name, at: C.callAt(b, cmins) })),   // misma ventana CALL que la tarjeta
       LIVE.filter(b => xtraOver(b, nowInt) !== null).map(b => ({ key: b.key, label: b.name })),                                            // Tiempo extra pasado de su fin previsto
       mst && mst.c.on ? mst.pending.map(a => ({ key: a.kind, label: a.text })) : []);                                                       // avisos meteo pendientes (sin «Visto»)
     renderDrift(nowInt);
@@ -832,6 +840,7 @@
       el.dataset.orig = el.value;
       if (document.activeElement && document.activeElement.closest && document.activeElement.closest('#tbody, #tbody-sin')) document.activeElement.blur();
       const nm = (rz.state.artists.find(a => String(a.id) === String(id)) || {}).nombre || '';
+      callEditFix(FEST, rz.state, id, rmode, 'zona');   // el OK de CALL sigue con la banda (dec. 148)
       commitFestival(rz.state, [z.id ? (z.created ? '{name}: zona → {zona} (zona nueva creada)' : '{name}: zona → {zona}') : '{name}: zona → sin zona', { name: nm, zona: z.id ? (z.created ? z.name : C.getEscenario(rz.state, z.id).nombre) : '' }]);
       if (then) { const t = document.querySelector('tr[data-id="' + CSS.escape(then.id) + '"] [data-k="' + then.k + '"]'); if (t) t.focus(); }
       return;
@@ -848,6 +857,7 @@
     if (k === 'jornada') shown = fmtDay(r.value);
     else if (k === 'escenario') { const e = C.getEscenario(r.state, r.value); shown = e ? e.nombre : 'sin zona'; trv = !e; }
     else if (k === 'tipo') { shown = TIPO_TXT[r.value]; trv = true; }
+    callEditFix(FEST, r.state, id, rmode, k);   // dec. 148: CALL reprogramado a mano → vuelve a avisar; otro campo → el OK sigue
     const fuera = k === 'tipo' && CONFIG.mode !== 'all' && (C.isKindMode(CONFIG.mode) ? r.value !== CONFIG.mode : r.value !== 'banda');
     commitFestival(r.state, [fuera ? '{name}: {campo} → {valor} (se ve en Jornada completa)' : '{name}: {campo} → {valor}', { name, campo: KEY_LABEL[k], valor: shown, tr: trv ? ['campo', 'valor'] : ['campo'] }]);
     const row = document.querySelector('#tbody tr[data-id="' + CSS.escape(String(id)) + '"], #tbody-sin tr[data-id="' + CSS.escape(String(id)) + '"]');
@@ -981,8 +991,7 @@
   // OK de CALL desde el Panel
   $('v-call').addEventListener('click', e => {
     const b = e.target.closest('.okbtn'); if (!b) return;
-    Dt.markCallDone(b.dataset.ck, Math.floor(C.nowAbs()));
-    logCallOk(b.dataset.ck, 'Stage Manager', 'panel');
+    callOk(b.dataset.ck, 'Stage Manager', 'panel');   // dec. 150: OK para su hora efectiva (clave + sello)
     tick();
   });
 
@@ -2867,7 +2876,7 @@
       return { ok: true, msg: 'Mensaje retirado' };
     }
     if (cmd.op === 'callOk') {
-      Dt.markCallDone(a.key, Math.floor(C.nowAbs())); logCallOk(a.key, 'Stage Manager (mando)', 'mando'); tick(); toast(fromUi + tx('CALL confirmado'));
+      callOk(a.key, 'Stage Manager (mando)', 'mando'); tick(); toast(fromUi + tx('CALL confirmado'));
       return { ok: true, msg: 'CALL confirmado' };
     }
     return { ok: false, msg: 'Orden desconocida' };
@@ -2890,15 +2899,71 @@
   let CALL_LOGGED = new Set(Dt.getCallDone());   // OK ya apuntados (los que había al abrir no se reescriben)
   function bandOfKey(key) { return C.callKeyName(key); }
   function prodName(id) { const p = (typeof PRODUCERS !== 'undefined' ? PRODUCERS : []).find(x => x.id === id); return p ? p.name : id; }
-  function logCallOk(key, who, src) {
-    if (CALL_LOGGED.has(key)) return;   // el primero que lo da es el que queda apuntado
-    CALL_LOGGED.add(key);
-    logEvent('call', 'CALL OK · ' + bandOfKey(key) + ' · ' + who, { src });
+  /** Dec. 150 · un OK de CALL vale para UNA hora efectiva de CALL: se guarda la clave y su sello («clave~minuto»). Si un retraso
+   *  mueve esa hora, el CALL vuelve a pendiente (en todas las pantallas, porque el sello viaja con los OK); si se deshace y
+   *  vuelve la hora, el OK vale otra vez. Apuntado en el log una vez por hora confirmada; el log nunca se borra. */
+  function callAtOfKey(key) {
+    const b = (LIVE || []).concat(ALL_MODE || []).find(x => C.isBand(x) && (C.callKey(x) === key || C.legacyCallKey(x) === key));
+    return b ? C.callAt(b, Dt.callMinsOf(FEST, CONFIG)) : null;
+  }
+  function callOk(key, who, src) {
+    const at = callAtOfKey(key), st = at !== null ? C.callStamp(key, at) : null, id = st || key, done = Dt.getCallDone();
+    if (CALL_LOGGED.has(id) && done.indexOf(id) >= 0 && done.indexOf(key) >= 0) return false;   // ya tenía OK para esta hora
+    const n = Math.floor(C.nowAbs());
+    Dt.markCallDone(st ? [key, st] : key, n);
+    if (!CALL_LOGGED.has(id)) { CALL_LOGGED.add(id); CALL_LOGGED.add(key); logEvent('call', 'CALL OK · ' + bandOfKey(key) + ' · ' + who, { src }); }
+    return true;
+  }
+  /** OK sin sello (OK antiguo, o de una ventana con el código anterior): se sella con su hora efectiva de ahora, sin apuntarlo otra vez. */
+  function stampCallOks() {
+    const done = Dt.getCallDone(), cm = Dt.callMinsOf(FEST, CONFIG);
+    LIVE.forEach(b => {
+      if (!C.isBand(b)) return;
+      const k = done.indexOf(C.callKey(b)) >= 0 ? C.callKey(b) : done.indexOf(C.legacyCallKey(b)) >= 0 ? C.legacyCallKey(b) : null;
+      if (!k || done.some(x => String(x).indexOf(k + '~') === 0)) return;
+      const at = C.callAt(b, cm); if (at === null) return;
+      const st = C.callStamp(k, at); CALL_LOGGED.add(st); Dt.markCallDone(st, Math.floor(C.nowAbs()));
+    });
+  }
+  /** Dec. 148 · OK de CALL y ediciones a mano en la tabla (antes de aplicar el cambio, para que todo se pinte ya con él):
+   *  - el regidor escribe en CALL una hora VÁLIDA (anterior al inicio) y DISTINTA de la que tenía → se quita el OK de esa banda:
+   *    vuelve a salir con su nueva hora en el Dashboard, Manager y Backstage. El sonido solo cuando entre de verdad en la
+   *    ventana nueva (si al editar ya está dentro, no suena: AU_QUIET). El log de «CALL OK» no se borra.
+   *  - misma hora, hora inválida u otro campo → el OK se queda. Si el otro campo cambia la clave del CALL (nombre, zona,
+   *    inicio previsto), el OK pasa a la clave nueva. Los retrasos no pasan por aquí: no tocan el previsto ni la clave. */
+  function undoCallDone(cd) {
+    if (cd.del && cd.del.length) Dt.unmarkCallDone(Dt.getCallDone().filter(x => cd.del.some(k => x === k || String(x).indexOf(k + '~') === 0)).concat(cd.del));   // con sus sellos (dec. 150)
+    (cd.add || []).forEach(k => { CALL_LOGGED.add(k); Dt.markCallDone(k, Math.floor(C.nowAbs())); });   // ya apuntados en su día: no se repite «CALL OK»
+  }
+  function callBlk(state, id, rmode) { return state ? C.buildBlocks(state, { mode: 'all', day: 'all' }).find(b => b.key === String(id) + ':' + rmode) || null : null; }
+  function callEditFix(prev, next, id, rmode, k) {
+    CALL_UNDO = null;
+    const a = callBlk(prev, id, rmode), b = callBlk(next, id, rmode);
+    if (!a || !b || !C.isBand(a) || !C.isBand(b) || !C.callIsDone(Dt.getCallDone(), a, Dt.callMinsOf(prev, CONFIG))) return null;
+    const valid = b.callAbs !== null && b.callAbs !== undefined && Number.isFinite(b.callAbs) && b.callAbs < b.si;
+    if (k === 'call' && valid && C.callAt(b, Dt.callMinsOf(next, CONFIG)) !== C.callAt(a, Dt.callMinsOf(prev, CONFIG))) {
+      const base = [C.callKey(a), C.legacyCallKey(a), C.callKey(b), C.legacyCallKey(b)];
+      const keys = Dt.getCallDone().filter(x => base.some(k => x === k || String(x).indexOf(k + '~') === 0));   // claves y sellos (dec. 150)
+      CALL_UNDO = { add: keys.slice(), del: [] };   // Deshacer devuelve exactamente los OK que había
+      Dt.unmarkCallDone(keys.concat(base)); keys.concat(base).forEach(x => CALL_LOGGED.delete(x));   // un OK nuevo se volverá a apuntar
+      AU_QUIET.add(C.callKey(b));
+      return 'reopen';
+    }
+    if (C.callKey(b) !== C.callKey(a)) {
+      if (!C.callIsDone(Dt.getCallDone(), b, Dt.callMinsOf(next, CONFIG))) CALL_UNDO = { add: [], del: [C.callKey(b)] };
+      CALL_LOGGED.add(C.callKey(b)); Dt.markCallDone(C.callKey(b), Math.floor(C.nowAbs())); return 'moved';
+    }
+    return 'kept';
   }
   /** OK que llegan de otra ventana (la Live del Stage Manager): se apuntan como suyos. Y se olvidan los que caducan. */
   function logLiveCallOks() {
     const now = Dt.getCallDone();
-    now.forEach(k => logCallOk(k, 'Stage Manager (pantalla Live)', 'panel'));
+    now.forEach(k => {
+      k = String(k); if (CALL_LOGGED.has(k)) return;
+      CALL_LOGGED.add(k);
+      if (!C.isCallStamp(k) && now.some(x => String(x).indexOf(k + '~') === 0)) return;   // con sello: se apunta por su sello
+      logEvent('call', 'CALL OK · ' + bandOfKey(k.split('~')[0]) + ' · Stage Manager (pantalla Live)', { src: 'panel' });
+    });
     CALL_LOGGED.forEach(k => { if (now.indexOf(k) < 0) CALL_LOGGED.delete(k); });
   }
 
@@ -2958,6 +3023,8 @@
   //    «Repetir» por tipo: vuelve cada N s (los suyos) hasta que se para DESDE EL AVISO QUE YA EXISTE: OK de CALL, «Visto»
   //    de meteo, ■ / ✓ local del sobretiempo en EN ESCENA, ✓ local del mensaje urgente en el chat. Esos controles no cambian.
   let AU_SIG;   // evento de la última lectura (undefined = aún ninguna)
+  const AU_QUIET = new Set();
+  let AU_PREVNOW;   // dec. 150: minuto de la lectura anterior: un CALL solo suena si su ventana se abre AHORA (no si reaparece dentro)   // dec. 148: CALL reprogramados que ya estaban dentro de su ventana al editar: no suenan hasta salir y volver a entrar
   function audioRearm() { if (AU_EDGE) ['call', 'overrun', 'meteo'].forEach(k => { AU_EDGE[k] = AU.edge(); }); }
   const auItems = list => (list || []).map(x => typeof x === 'string' ? { key: x, label: x } : x);
   /** Una lectura del estado. null = sin evento. Ítems: [{ key, label }] (o claves sueltas). */
@@ -2968,9 +3035,15 @@
     const p = AU.load(), now = Date.now();
     [['call', calls], ['overrun', overs], ['meteo', meteos]].forEach(([k, raw]) => {
       const items = auItems(raw), fresh = new Set(AU_EDGE[k](items.map(x => x.key)));   // solo lo que ENTRA ahora
+      if (k === 'call') {
+        const here = new Set(items.map(x => String(x.key))); AU_QUIET.forEach(q => { if (!here.has(q)) AU_QUIET.delete(q); else fresh.delete(q); });
+        // reaparece ya dentro de su ventana (OK que deja de valer por un retraso, hora reprogramada, Deshacer): sin sonido
+        items.forEach(x => { if (Number.isFinite(x.at) && AU_PREVNOW !== undefined && x.at <= AU_PREVNOW) fresh.delete(String(x.key)); });
+      }
       if (AU.enabled(p, k)) items.filter(x => fresh.has(String(x.key))).forEach(x => AU.RING.add({ id: k + ':' + x.key, kind: k, key: x.key, label: x.label, repeat: AU.repeats(p, k) }, now));
       AU.RING.retain(k, items.map(x => x.key));   // estado terminado (OK de CALL, ■, «Visto», fuera de ventana): se para solo
     });
+    if (calls) AU_PREVNOW = Math.floor(C.nowAbs());
     audioStep(now);
   }
   function audioStep(now) { if (AU) { const p = AU.load(); AU.RING.step(now || Date.now(), k => AU.everyOf(p, k)); } }
@@ -2987,6 +3060,14 @@
     if (!AU || !AU.RING.repeating(id)) return '';
     const t = esc(tx('Silenciar el aviso de audio') + (what ? ' · ' + what : ''));
     return '<button class="au-ack" type="button" data-au-ack="' + esc(id) + '" title="' + t + '" aria-label="' + t + '"><svg class="ic"><use href="#i-check"/></svg></button>';
+  }
+  /** Dec. 148: silenciar el sonido de sobretiempo. Control propio (altavoz tachado, no ✓), en la línea del nombre de EN ESCENA,
+   *  fuera de cualquier botón que cambie el show. Solo mientras se repite. Solo detiene ese audio local: no toca la banda,
+   *  ni el Tiempo extra, ni los tiempos, ni ningún dato. */
+  function auMuteBtn(id, what) {
+    if (!AU || !AU.RING.repeating(id)) return '';
+    const t = esc(tx('Silenciar el sonido de sobretiempo') + (what ? ' · ' + what : ''));
+    return '<button class="au-mute" type="button" data-au-ack="' + esc(id) + '" title="' + t + '" aria-label="' + t + '"><svg class="ic"><use href="#i-mute"/></svg></button>';
   }
   function audioConfirm(id) { if (!AU || !AU.RING.confirm(String(id))) return false; renderChat(); return true; }
   document.addEventListener('click', e => {
@@ -3034,9 +3115,7 @@
     const who = 'Producción (' + prodName(msg.from) + ')', whoUi = tx('Producción ({p})', { p: prodName(msg.from) });   // log en español; aviso en el idioma del Panel
     if (msg.type === 'call') {
       if (!FEST || !C.buildBlocks(FEST, { mode: 'all', day: 'all' }).some(b => C.callKey(b) === msg.key)) return;   // solo CALL que existen
-      if (CALL_LOGGED.has(msg.key)) return;
-      Dt.markCallDone(msg.key, Math.floor(C.nowAbs()));
-      logCallOk(msg.key, who, 'produccion');
+      if (!callOk(msg.key, who, 'produccion')) return;   // ya tenía OK para esta hora
       tick(); toast('CALL OK · ' + bandOfKey(msg.key) + ' · ' + whoUi);
     } else if (msg.type === 'flash') {
       const to = Vs.normTargets(msg.to);
@@ -3614,5 +3693,5 @@
   });
   window.ShowtimePanel = { reload: () => { loadState(); renderAll(); }, _test: { winState: () => Array.from(WIN.entries()).map(([id, x]) => ({ id, name: x.name, vista: x.vista, zona: x.zona, filas: x.filas || null, standby: !!x.standby, fs: x.fs })), setWinVista, setWinRows, resetWinLayout, setWinStandby, closeLive, openGestor, gestorVisible, emProdMessage, emRegenProd, hitoChips, emUrl, prodBigTitle, fileKind, handleFile, emCommand, importSummary, hidesSome, tipoPill, setWake, wakeState: () => ({ on: wakeOn, lock: !!wakeLock }), showSplash, hideSplash, setStandby, standbyOn, room: () => emRoom,
     emSnapshot, emCloseDay, emDay, qrDevices, rmZones, setRmZone: z => { RM_ZONE = z; renderCast(); }, setRoom: r => { emRoom = r; }, fakeEm: (em, st) => { EM = em; EMST = st; }, emStateHtml, renderCastBar, renderHubLed, mtIn, mtOut, cfSimState, renderCfSim, cfSim: () => CFSIM,
-    dayStep, monthLabel, spotItems, spotDays, spotEntries, fmtDayFull, refreshStale, net: () => NET, setNet: o => { NET = netNorm(o); }, netNorm, emLink, emBrokers, emUrl, netHtml, renderCast, audioTick, fillAudioCfg, saveAudioCfg, audioPreview, audioConfirm, audioRearm, auAckBtn, renderChat, loadNew, impDoImport } };   // _test: solo para tests/control.test.js
+    dayStep, monthLabel, spotItems, spotDays, spotEntries, fmtDayFull, refreshStale, net: () => NET, setNet: o => { NET = netNorm(o); }, netNorm, emLink, emBrokers, emUrl, netHtml, renderCast, audioTick, fillAudioCfg, saveAudioCfg, audioPreview, audioConfirm, audioRearm, auAckBtn, auMuteBtn, renderChat, callEditFix, applyEdit, undo, loadNew, impDoImport } };   // _test: solo para tests/control.test.js
 })();

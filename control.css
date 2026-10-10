@@ -70,6 +70,15 @@ main[hidden]{display:none}
 .v-meta b{color:var(--text)}
 .v-rem{font-weight:800;font-size:13px}
 .v-empty{color:var(--dim);font-weight:700}
+/* Dec. 149: jerarquía por escenario — zona arriba (una vez, en su color), contenido, hora · tiempo */
+.v-zg{margin-bottom:10px}
+.v-zg:last-child{margin-bottom:0}
+.v-zone{color:var(--zc,var(--muted));font-size:11px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;margin:0 0 3px 14px;overflow-wrap:anywhere}
+.v-zg .v-row{margin-bottom:6px}
+.v-zg .v-row:last-child{margin-bottom:0}
+.v-kind{color:var(--muted);font-weight:700}
+.v-row.co .v-co{color:var(--text);font-weight:600}
+.v-row.co .v-co b{font-weight:800}
 .v-call{display:flex;align-items:center;gap:10px}
 .v-call>div{flex:1;min-width:0}
 .okbtn{min-width:52px;height:40px;border-radius:7px;border:1px solid rgba(255,197,51,.55);background:rgba(255,197,51,.14);color:var(--call);font:inherit;font-weight:900;cursor:pointer}
@@ -648,6 +657,11 @@ body[data-ps="stage"] .qr-big-box{background:#000;border-color:rgba(255,214,0,.4
 .au-ack .ic{width:11px;height:11px}
 body[data-ps="stage"] .au-ack{border-color:#FFD600;color:#FFD600}
 body[data-ps="stage"] .au-ack:hover{background-color:#FFD600;color:#000}
+/* Dec. 148: silenciar sobretiempo — altavoz tachado, cuadrado y neutro, a la derecha del nombre (lejos del botón Tiempo extra) */
+.au-mute{float:right;display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;margin:0 0 0 8px;padding:0;border-radius:6px;border:1px solid var(--line);background-color:rgba(255,255,255,.04);color:var(--muted);cursor:pointer;font-size:0;line-height:0}
+.au-mute:hover{color:var(--text);background-color:rgba(255,255,255,.1)}
+.au-mute .ic{width:15px;height:15px}
+body[data-ps="stage"] .au-mute{border-color:rgba(255,214,0,.7);color:#FFD600;background-color:#000}
 .form.mt input,.form.mt select{min-width:0;max-width:100%}
 
 /* «⋯» (Duplicar · Borrar) siempre visible: pegado al borde derecho aunque la tabla no quepa */

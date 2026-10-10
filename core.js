@@ -386,8 +386,22 @@
   function callKey(b) { return (b.stageId || '') + '|' + b.name + '@' + (b.psi !== undefined && b.psi !== null ? b.psi : b.si); }
   /** Clave de antes (sin zona): los OK guardados con la versión anterior siguen valiendo. */
   function legacyCallKey(b) { return b.name + '@' + (b.psi !== undefined && b.psi !== null ? b.psi : b.si); }
-  /** ¿Tiene ya OK de CALL? (clave nueva o la antigua). */
-  function callIsDone(done, b) { const d = done instanceof Set ? done : new Set(done || []); return d.has(callKey(b)) || d.has(legacyCallKey(b)); }
+  /** Dec. 150: un OK de CALL vale para UNA hora efectiva de CALL. Junto a la clave se guarda su sello «clave~minutoAbsoluto»
+   *  (lo pone el Dashboard al ver el OK). Si un retraso mueve la hora efectiva, el sello deja de coincidir: el CALL vuelve
+   *  a estar pendiente; si se deshace y vuelve esa hora, el OK vale otra vez. Sin sello (OK recién dado u OK antiguo): vale. */
+  function callStamp(key, at) { return String(key) + '~' + Math.round(at); }
+  function isCallStamp(k) { return String(k).indexOf('~') >= 0; }
+  /** ¿Tiene ya OK de CALL para su hora efectiva? (clave nueva o la antigua). callMins: para la hora calculada. */
+  function callIsDone(done, b, callMins) {
+    const d = done instanceof Set ? done : new Set(done || []);
+    const keys = [callKey(b), legacyCallKey(b)].filter(k => d.has(k));
+    if (!keys.length) return false;
+    const pre = keys.map(k => k + '~'), stamps = [];
+    d.forEach(x => { x = String(x); if (pre.some(p => x.indexOf(p) === 0)) stamps.push(Number(x.slice(x.lastIndexOf('~') + 1))); });
+    if (!stamps.length) return true;
+    const at = callAt(b, callMins);
+    return at !== null && stamps.indexOf(Math.round(at)) >= 0;
+  }
   /** Nombre de la banda a partir de su clave de CALL (nueva o antigua). */
   function callKeyName(key) { key = String(key); const at = key.lastIndexOf('@'), bar = key.indexOf('|'); return key.slice(bar >= 0 && bar < at ? bar + 1 : 0, at >= 0 ? at : key.length); }
 
@@ -410,7 +424,7 @@
       const at = callAt(b, callMins);
       if (at === null) return false;
       if (!(now >= at && now < b.si)) return false;
-      return !callIsDone(d, b);
+      return !callIsDone(d, b, callMins);
     }).sort((a, b) => a.si - b.si);
   }
 
@@ -1191,7 +1205,7 @@
 
   const API = {
     DEFAULT_CUTOFF, DEFAULT_CALL_MINS, DEFAULT_DURATION, DEFAULT_CO_MIN, isFija, setFija, coMinFor,
-    MARGIN_WARN, UNNAMED, isUnnamed, eventName, LOGO_MAX, validLogo, eventLogo, setEventLogo, scopeToJornada, jornadaOver, isLibre, setDelayFlag, setReal, jornadaOfAbs, activeJornada, legacyCallKey, callIsDone, callKeyName, driftByZone, delayByZone, addRetraso, retrasosOf, blockedIn, movesBy, setAlargar, hitoMargins, MAX_NEXT, ARTIST_COLORS, TIPO_COLORS,
+    MARGIN_WARN, UNNAMED, isUnnamed, eventName, LOGO_MAX, validLogo, eventLogo, setEventLogo, scopeToJornada, jornadaOver, isLibre, setDelayFlag, setReal, jornadaOfAbs, activeJornada, legacyCallKey, callIsDone, callStamp, isCallStamp, callKeyName, driftByZone, delayByZone, addRetraso, retrasosOf, blockedIn, movesBy, setAlargar, hitoMargins, MAX_NEXT, ARTIST_COLORS, TIPO_COLORS,
     pad2, parseHM, fmtHM, dayIndex, isoOfDay, shiftDate, toAbs, adjustEnd, nowAbs,
     cutoffMins, festivalDateOf, entersMode, festivalDays, MAX_DAYS, TIPOS, tipoOf, isBand, isAll, isKindMode, engineMode, entriesOf, tasksNow, hitosOf,
     getEscenario, artistColor, callAbsFor, buildBlocks,

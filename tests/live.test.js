@@ -623,9 +623,9 @@
     const js = D.src('live.js');
     const task = js.slice(js.indexOf('function taskHtml'), js.indexOf('function changeoverHtml'));
     ok(!/despues|tx\('TAREA'\)|metaHtml/.test(task), 'tarea: fuera «TAREA», la línea de meta de siempre y «después»');
-    ok(/'<div class="tmeta tkline">' \+ \(b\.stage \? '<span class="tstage" style="color:#7dd3fc">'/.test(task) && /tx\('quedan \{n\} min', \{ n: p\.remaining \}\)/.test(task), 'línea 2: zona en cian · horario · quedan');
+    ok(/'<div class="tmeta tkline">' \+ spanHM\(b\) \+ ' · <span class="nw">' \+ tx\('quedan \{n\} min', \{ n: p\.remaining \}\)/.test(task) && !/tstage/.test(task), 'línea 2: horario · quedan (la zona va arriba del grupo, dec. 149)');
     const co = js.slice(js.indexOf('function changeoverHtml'), js.indexOf('function nextHtml'));
-    ok(/<div class="tname" style="color:var\(--c\)">' \+ esc\(co\.stage\.toUpperCase\(\)\) \+ '<\/div><div class="tmeta">— ' \+ tx\('Sin actividad'\) \+ ' —<\/div>/.test(co), 'hueco: la zona en grande y «— Sin actividad —» debajo');
+    ok(/if \(idle\) return '<div class="trow co idle" style="--c:' \+ col \+ '"><div class="tmeta">— ' \+ tx\('Sin actividad'\) \+ ' —<\/div><\/div>';/.test(co), 'hueco: «— Sin actividad —» bajo la zona del grupo (dec. 149)');
     ok(!/despuesHtml/.test(js), 'fuera la función que ya nadie usa');
   });
 

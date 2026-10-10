@@ -202,9 +202,22 @@
   }
 
   /** CALL en Backstage: visibles desde su hora hasta que arranca el show, aunque ya tengan OK (salen como «avisado»). */
+  /** Backstage: el CALL sigue a la vista hasta que arranca el show; con OK para su hora efectiva sale «AVISADO» (dec. 150).
+   *  Si un retraso mueve esa hora, el OK ya no vale: vuelve a salir como CALL pendiente. */
   function backstageCalls(blocks, now, callMins, done) {
     const d = done instanceof Set ? done : new Set(done || []);
-    return C.callList(blocks, now, callMins, []).map(b => ({ block: b, done: C.callIsDone(d, b) }));
+    return C.callList(blocks, now, callMins, []).map(b => ({ block: b, done: C.callIsDone(d, b, callMins) }));
+  }
+  /** Dec. 149 · jerarquía por escenario: filas ya ordenadas [{ z, zn, zc, h }] → grupos consecutivos por zona
+   *  [{ z, name, color, items: [h] }]: el nombre de la zona UNA vez arriba y debajo sus filas (contenido → tiempo). */
+  function zoneGroups(rows) {
+    const out = [];
+    (rows || []).forEach(r => {
+      const z = r.z || '', last = out[out.length - 1];
+      if (last && last.z === z) last.items.push(r.h);
+      else out.push({ z, name: r.zn || '', color: r.zc || '', items: [r.h] });
+    });
+    return out;
   }
 
   // ── Enlaces y monitor externo ────────────────────────────────────────
@@ -234,7 +247,7 @@
     return '';
   }
   const API = { byLabel, VISTAS, VISTA_TXT, VISTA_SUB, DEFAULT_SCREENS, normVista, nextVista, normProdVista, nextProdVista, normScreens, MGR_ROWS, MGR_ROWS_TXT, normRows, parkState, PARK_MINS, PARK_END_MS, normTargets, normZones, flashFor, targetsTxt,
-    level, fmtClock, confidence, tickerItems, backstageCalls, liveUrl, parseLive, pickScreen };
+    level, fmtClock, confidence, tickerItems, backstageCalls, zoneGroups, liveUrl, parseLive, pickScreen };
   if (isNode) module.exports = API;
   else root.ShowtimeVistas = API;
 })(typeof window !== 'undefined' ? window : globalThis);

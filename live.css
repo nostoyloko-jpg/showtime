@@ -33,6 +33,12 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSy
 .vsplit:hover,.vsplit.active{background:var(--hover)}
 .vsplit::after{content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:2px;height:28px;background:rgba(255,255,255,.2);border-radius:1px}
 .trow{border-left:4px solid var(--c,#888);padding-left:12px;min-width:0}
+/* Dec. 149: jerarquía por escenario — la zona una vez arriba (en su color), debajo sus filas: contenido → hora · tiempo */
+.tzg{border-left:4px solid var(--c,#888);padding-left:12px;min-width:0}
+.tzg > .trow{border-left:0;padding-left:0}
+.tzg > .trow + .trow{margin-top:.5em}
+.tzone{font-size:calc(min(5cqw,2vh) * var(--ps,1));font-weight:900;letter-spacing:.12em;color:var(--c,var(--muted));margin-bottom:2px;overflow-wrap:anywhere}
+.tname .tkind{font-size:.5em;letter-spacing:1px;vertical-align:.25em;white-space:nowrap}
 .tname{font-size:min(11cqw,4.4vh);font-weight:900;line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* Nombres de artista en las tarjetas: hasta 2 líneas; si aún no caben, live.js reduce la letra (fitNames). */
 .tname.fit{white-space:normal;text-overflow:clip;display:block;overflow:visible;overflow-wrap:normal;font-size:calc(min(11cqw,4.4vh) * var(--fs,1) * var(--ps,1))}
@@ -87,6 +93,8 @@ body[data-lv="stage"] .tbadge{color:#fff;border-color:rgba(255,214,0,.6)}
 /* CALL */
 @keyframes callblink{0%,100%{opacity:1}50%{opacity:.25}}
 #panel-call .trow{display:flex;align-items:center;gap:10px}
+.calldone{flex:0 0 auto;display:inline-flex;align-items:center;gap:.4em;padding:6px 12px;border-radius:7px;background:rgba(16,185,129,.16);color:#34d399;font-weight:900;letter-spacing:.06em;font-size:min(4.5cqw,2vh)}
+.calldone .ic{width:1.1em;height:1.1em}
 #panel-call .callmain{flex:1;min-width:0;animation:callblink 1.1s ease-in-out infinite}
 .callok{flex:0 0 auto;align-self:center;min-width:56px;min-height:44px;padding:8px 14px;border-radius:7px;border:1px solid color-mix(in srgb,var(--call) 55%,transparent);
   background:color-mix(in srgb,var(--call) 16%,transparent);color:var(--call);font:inherit;font-size:min(4.5cqw,1.9vh);font-weight:900;letter-spacing:1px;cursor:pointer;touch-action:manipulation}
@@ -323,8 +331,6 @@ body.bs-nocards #top,body.bs-nocards #hsplit{display:none!important}
 body.bs-nolines #bot,body.bs-nolines #hsplit{display:none!important}
 body.bs-nolines #top{flex:1 1 auto!important}
 body[data-vista="backstage"] #bot{overflow:hidden}
-.calldone{flex:0 0 auto;display:inline-flex;align-items:center;gap:.4em;padding:6px 12px;border-radius:7px;background:rgba(16,185,129,.16);color:#34d399;font-weight:900;letter-spacing:.06em;font-size:min(4.5cqw,2vh)}
-.calldone .ic{width:1.1em;height:1.1em}
 .ticker{flex:0 0 auto;height:clamp(48px,9vh,120px);align-items:center;overflow:hidden;background:var(--tbg,#000);color:var(--tfg,#ffb347);
   border-top:2px solid color-mix(in srgb,var(--tfg,#ffb347) 45%,transparent);font-weight:900;letter-spacing:.05em;font-size:clamp(20px,4.4vh,56px);white-space:nowrap}
 body.bs-nocards.bs-nolines .ticker{flex:1 1 auto;height:auto;font-size:clamp(28px,9vh,150px)}

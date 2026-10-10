@@ -154,7 +154,7 @@
   /** Quita avisos de hace más de 2 días (la clave termina en @minutosAbsolutos). */
   function pruneCallDone(list, nowAbs) {
     return list.filter(k => {
-      const m = Number(String(k).split('@').pop());
+      const m = Number(String(k).split('@').pop().split('~')[0]);   // dec. 150: «clave~sello» caduca con su clave
       return !Number.isFinite(m) || m > nowAbs - 2880;
     });
   }
@@ -260,10 +260,17 @@
     const out = keepNewer(raw, c, patch || {});   // lo que no toca este cambio y esta versión no conoce, se queda como estaba
     write(K.config, out); send({ type: 'config', config: out }); return c;
   }
+  /** Dec. 148: quitar el OK de CALL de UNA banda (solo cuando el regidor reprograma su hora de CALL a mano).
+   *  El log de «CALL OK» no se toca: es historia. */
+  function unmarkCallDone(keys) {
+    if (READONLY) return getCallDone();
+    const out = new Set((keys || []).map(String)), list = getCallDone().filter(k => !out.has(String(k)));
+    write(K.callDone, list); send({ type: 'callDone', callDone: list }); return list;
+  }
   function markCallDone(key, nowAbs) {
     if (READONLY) return getCallDone();
     const list = pruneCallDone(getCallDone(), nowAbs || 0);
-    if (list.indexOf(key) < 0) list.push(key);
+    (Array.isArray(key) ? key : [key]).forEach(k => { if (list.indexOf(k) < 0) list.push(k); });   // dec. 150: clave y sello de una vez
     write(K.callDone, list); send({ type: 'callDone', callDone: list }); return list;
   }
   /** Mensaje flash a la Pantalla Live (texto) o retirarlo (null). `to`: vistas de destino (null = todas). */
@@ -324,7 +331,7 @@
   root.ShowtimeDatos = {
     KEYS: K, STYLES, normStyle, normConfig,
     getFestival, getConfig, getCallDone, getFlash, setFlash, getAvisos, addAviso, removeAviso, normAvisos, getChat, addChat, getMeteo, setMeteo, getStandby, setStandby, normStandby, FLASH_MS, MSG_SECS, AVISO_SECS, flashMs, flashLeft, callMinsOf, getOriginal, setOriginal,
-    setFestival, setConfig, markCallDone, pruneCallDone,
+    setFestival, setConfig, markCallDone, unmarkCallDone, pruneCallDone,
     onChange, onPeer, addPeer, send, hello, ping,
     READONLY, onWrite, onSaveState, getSnapshot, loadSnapshot, getScope, normScope, normBy
   };

@@ -2068,9 +2068,9 @@ const miss = [...found].filter(k => !I.txHas(k) && !/^(OK|CALL|SC|Live|Raycast|S
 
   test('Dec. 138: En escena del Dashboard — mismo criterio que la Live (tarea en 2 líneas, hueco con la zona como título, sin «después»)', () => {
     const js = D.src('control.js'), a = js.indexOf('hueco sin cambio real (decisión 76)'), blk = js.slice(a, js.indexOf('rows.sort((a, b) => a.o - b.o);', a));
-    ok(/'<div class="v-name" style="color:' \+ col \+ '">' \+ esc\(co\.stage\) \+ '<\/div><div class="v-meta">— ' \+ tx\('Sin actividad'\) \+ ' —<\/div>'/.test(blk), 'hueco: zona y «— Sin actividad —»');
+    ok(/zn: co\.stage/.test(js) && /'<div class="v-row co idle" style="--c:' \+ col \+ '"><div class="v-meta">— ' \+ tx\('Sin actividad'\) \+ ' —<\/div>'/.test(blk), 'hueco: la zona arriba del grupo (dec. 149) y «— Sin actividad —»');
     ok(/'<div class="v-row tarea"><div class="v-name">' \+ esc\(b\.name\) \+ '<\/div>'/.test(blk) && !/tx\('Tarea'\) \+ ' · '/.test(blk), 'tarea: sin «Tarea ·»');
-    const idleAndTask = blk.slice(0, blk.indexOf("rows.push({ o: order(co.stageId), h: '<div class=\"v-row co' + (co.standby")) + blk.slice(blk.indexOf('C.tasksNow('));
+    const idleAndTask = blk.slice(0, blk.indexOf("rows.push(Object.assign(z, { h: '<div class=\"v-row co' + (co.standby")) + blk.slice(blk.indexOf('C.tasksNow('));
     ok(!/tx\('después'\)/.test(idleAndTask), 'sin «después» en el hueco ni en la tarea (CHANGEOVER y STANDBY lo conservan)');
   });
 

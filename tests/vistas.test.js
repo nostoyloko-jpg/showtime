@@ -195,12 +195,15 @@
     eq(V.tickerItems(F.s, { ticker: { delays: false, hitos: false, meteo: false } }, at('20:00'), { text: 'x' }).length, 0);
   });
 
-  test('Backstage: el CALL sigue visible hasta que arranca el show, marcado si ya se avisó', () => {
+  test('Backstage: el CALL sigue visible hasta que arranca el show; con OK para su hora efectiva, «avisado» (dec. 150)', () => {
     const F = fest(), b = C.buildBlocks(F.s, { mode: 'all', day: 'all' });
     let c = V.backstageCalls(b, at('20:10'), 15, []);
     eq(c.length, 1); eq(c[0].block.name, 'Banda A'); eq(c[0].done, false);
     c = V.backstageCalls(b, at('20:10'), 15, [C.callKey(c[0].block)]);
     eq(c.length, 1, 'con OK sigue'); eq(c[0].done, true);
+    const k = C.callKey(c[0].block);
+    eq(V.backstageCalls(b, at('20:10'), 15, [k, C.callStamp(k, C.callAt(c[0].block, 15))])[0].done, true, 'sello de su hora: avisado');
+    eq(V.backstageCalls(b, at('20:10'), 15, [k, C.callStamp(k, C.callAt(c[0].block, 15) - 10)])[0].done, false, 'sello de otra hora: pendiente');
     eq(V.backstageCalls(b, at('20:31'), 15, []).length, 0, 'empezado: fuera');
   });
 

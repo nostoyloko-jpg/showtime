@@ -447,55 +447,47 @@
 
   /** Tarjetas de arriba: tipo y horario en una línea, escenario completo en otra (todo fluye, sin «…»). */
   const KIND_CARD = { show: 'SHOW', sc: 'SOUNDCHECK', tarea: 'TAREA' };
-  function metaHtml(b, col) {
-    const k = b.kind || 'show';
-    return '<div class="tmeta tkline"><span class="tkind ' + k + '">' + tx(KIND_CARD[k] || 'SHOW') + '</span>&nbsp;&nbsp;&middot;&nbsp;&nbsp;' +
-      C.fmtHM(b.si) + '–' + C.fmtHM(C.blockEnd(b)) + '</div>' +
-      (b.stage ? '<div class="tmeta"><span class="tstage" style="color:' + col + '">' + esc(b.stage.toUpperCase()) + '</span></div>' : '');
-  }
 
   /** Minutos de tiempo extra (activado y pasada su hora), o null. */
   function xtraOver(b, now) { return b && b.alargar && b.rf === null && b.nf !== null && b.nf !== undefined && now >= b.nf ? Math.max(0, Math.floor(now - b.nf)) : null; }
   // EN ESCENA: banda que suena (con minutos restantes)
+  // Dec. 149 · jerarquía por escenario: la ZONA va una vez arriba del grupo (zoneHtml); cada fila es contenido → hora · tiempo,
+  // sin repetir la zona. «Principal» nunca queda implícito; sin zona, «SIN ZONA».
+  const kindSpan = b => { const k = b.kind || 'show'; return k === 'show' || k === 'sc' ? '<span class="tkind ' + k + '">&nbsp;·&nbsp;' + tx(KIND_CARD[k]) + '</span>' : ''; };
+  const spanHM = b => '<span class="nw">' + C.fmtHM(b.si) + '–' + C.fmtHM(C.blockEnd(b)) + '</span>';
   function playingHtml(b, nowInt) {
     const col = safeColor(b.stageColor || b.color, '#888');
     const p = C.progress(b, nowInt), xo = xtraOver(b, nowInt), xt = b.alargar && b.rf === null;
-    if (xo !== null) return '<div class="trow xtra" style="--c:' + col + '"><div class="tname fit">' + esc(b.name.toUpperCase()) + '</div>' +
-      metaHtml(b, col) +
-      '<div class="trem xtra">' + tx('TIEMPO EXTRA · +{n} MIN', { n: xo }) + '</div>' +
+    if (xo !== null) return '<div class="trow xtra" style="--c:' + col + '"><div class="tname fit">' + esc(b.name.toUpperCase()) + kindSpan(b) + '</div>' +
+      '<div class="trem xtra">' + spanHM(b) + ' · ' + tx('TIEMPO EXTRA · +{n} MIN', { n: xo }) + '</div>' +
       '<div class="tbar"><div style="width:100%;background:#ffb347"></div></div></div>';
-    return '<div class="trow" style="--c:' + col + '"><div class="tname fit">' + esc(b.name.toUpperCase()) + '</div>' +
-      metaHtml(b, col) +
-      '<div class="trem" style="color:' + col + '">' + (p.remaining > 0 ? tx('{n} min restantes', { n: p.remaining }) : tx('Finalizado')) + (xt ? '<span class="xtag">' + tx('TIEMPO EXTRA') + '</span>' : '') + '</div>' +
+    return '<div class="trow" style="--c:' + col + '"><div class="tname fit">' + esc(b.name.toUpperCase()) + kindSpan(b) + '</div>' +
+      '<div class="trem" style="color:' + col + '">' + spanHM(b) + ' · ' + (p.remaining > 0 ? tx('{n} min restantes', { n: p.remaining }) : tx('Finalizado')) + (xt ? '<span class="xtag">' + tx('TIEMPO EXTRA') + '</span>' : '') + '</div>' +
       '<div class="tbar"><div style="width:' + p.pct + '%;background:' + col + '"></div></div></div>';
   }
 
   // EN ESCENA: tarea en curso (operativa del día, solo en Jornada completa). Manda sobre el hueco de su zona (decisión 76)
   function taskHtml(b, nowInt) {
     const p = C.progress(b, nowInt);
-    // dec. 138: dos líneas — nombre / zona · horario · quedan (sin «TAREA» ni «después»: la columna SIGUIENTE ya lo dice)
+    // dec. 138/149: nombre / horario · quedan (la zona va arriba del grupo; sin «TAREA» ni «después»)
     return '<div class="trow tarea"><div class="tname fit">' + esc(b.name.toUpperCase()) + '</div>' +
-      '<div class="tmeta tkline">' + (b.stage ? '<span class="tstage" style="color:#7dd3fc">' + esc(b.stage.toUpperCase()) + '</span> · ' : '') + '<span class="nw">' + C.fmtHM(b.si) + '–' + C.fmtHM(C.blockEnd(b)) + '</span> · <span class="nw">' + tx('quedan {n} min', { n: p.remaining }) + '</span></div></div>';
+      '<div class="tmeta tkline">' + spanHM(b) + ' · <span class="nw">' + tx('quedan {n} min', { n: p.remaining }) + '</span></div></div>';
   }
 
   // EN ESCENA: hueco de una zona. CHANGEOVER solo entre dos bandas distintas seguidas; STANDBY si el regidor lo marca;
-  // si no, «— SIN ACTIVIDAD —» con la banda que viene (decisión 76)
+  // si no, «— Sin actividad —» (decisión 76). La zona va arriba del grupo (dec. 149).
   function changeoverHtml(co) {
     const col = safeColor(co.stageColor || co.next.color, '#888');
     const sb = co.standby, idle = !sb && co.kind === 'idle';
-    const stage = co.stage ? '<div class="tmeta"><span class="tstage" style="color:' + col + '">' + esc(co.stage.toUpperCase()) + '</span></div>' : '';
-    // dec. 138: la zona como título y «— Sin actividad —» debajo, atenuado (sin «después»: lo dice SIGUIENTE)
-    if (idle) return co.stage
-      ? '<div class="trow co idle" style="--c:' + col + '"><div class="tname" style="color:var(--c)">' + esc(co.stage.toUpperCase()) + '</div><div class="tmeta">— ' + tx('Sin actividad') + ' —</div></div>'
-      : '<div class="trow co idle" style="--c:' + col + '"><div class="tname">' + tx('— SIN ACTIVIDAD —') + '</div></div>';
+    if (idle) return '<div class="trow co idle" style="--c:' + col + '"><div class="tmeta">— ' + tx('Sin actividad') + ' —</div></div>';
     return '<div class="trow co' + (sb ? ' sb' : '') + '" style="--c:' + col + '">' +
-      '<div class="tname"><svg class="ic"><use href="' + (sb ? '#i-pause' : '#i-swap') + '"/></svg>' + (sb ? 'STANDBY' : 'CHANGEOVER') + '</div>' + stage +
-      '<div class="tmeta entra">' + tx(sb ? 'después' : 'entra') + ' <b>' + esc(co.next.name.toUpperCase()) + '</b>&nbsp;&nbsp;&middot;&nbsp;&nbsp;' + C.fmtHM(co.next.si) + '</div>' +
-      '<div class="trem">' + tx('quedan {n}', { n: fmtCountdown(co.remaining) }) + '</div>' +
+      '<div class="tname"><svg class="ic"><use href="' + (sb ? '#i-pause' : '#i-swap') + '"/></svg>' + (sb ? 'STANDBY' : 'CHANGEOVER') + '</div>' +
+      '<div class="tmeta entra">' + tx(sb ? 'después' : 'entra') + ' <b>' + esc(co.next.name.toUpperCase()) + '</b></div>' +
+      '<div class="trem">' + C.fmtHM(co.next.si) + '&nbsp;&nbsp;&middot;&nbsp;&nbsp;' + tx('quedan {n}', { n: fmtCountdown(co.remaining) }) + '</div>' +
       '<div class="tbar"><div style="width:' + co.pct + '%;background:' + col + '"></div></div></div>';
   }
 
-  // SIGUIENTE: tres líneas — nombre / horario · escenario / píldora de cambio (o standby; sin píldora si no hay cambio real)
+  // SIGUIENTE: nombre · tipo / horario / píldora de cambio (o standby; sin píldora si no hay cambio real). Zona arriba (dec. 149).
   function nextHtml(b) {
     const col = safeColor(b.stageColor || b.color, '#888');
     const co = C.changeoverBefore(BLOCKS, b, ALLB);
@@ -506,9 +498,14 @@
         ? '<div class="tbadge sb"><svg class="ic"><use href="#i-pause"/></svg>' + tx('Standby: {n} min', { n: co.mins }) + '</div>'
         : co.idle ? ''
         : '<div class="tbadge"><svg class="ic"><use href="#i-swap"/></svg>' + tx('Cambio: {n} min', { n: co.mins }) + '</div>';
-    return '<div class="trow" style="--c:' + col + '"><div class="tname fit">' + esc(b.name.toUpperCase()) + '</div>' +
-      metaHtml(b, col) + badge + '</div>';
+    return '<div class="trow" style="--c:' + col + '"><div class="tname fit">' + esc(b.name.toUpperCase()) + kindSpan(b) + '</div>' +
+      '<div class="tmeta tkline">' + spanHM(b) + '</div>' + badge + '</div>';
   }
+  /** Grupos por zona: [{ o, z, zn, zc, h }] ordenadas → «ZONA» una vez y debajo sus filas. */
+  function zoneHtml(rows) {
+    return Vs.zoneGroups(rows).map(g => '<div class="tzg" style="--c:' + (g.color || 'var(--muted)') + '"><div class="tzone">' + esc((g.name || tx('SIN ZONA')).toUpperCase()) + '</div>' + g.items.join('') + '</div>').join('');
+  }
+  const zOf = (b, col) => ({ z: b.stageId || '', zn: b.stage || '', zc: b.stage ? col : '' });
 
   /** Orden de escenarios: el del festival; sin escenario, al final. */
   function stageOrder(stageId) {
@@ -517,29 +514,29 @@
   }
 
   function renderTopPanels(nowMins, nowInt, ended) {
-    const playing = C.playingNow(BLOCKS, nowInt).map(b => ({ o: stageOrder(b.stageId), h: playingHtml(b, nowInt) }));
-    const changing = C.changeoversNow(BLOCKS, nowMins, ALLB).map(co => ({ o: stageOrder(co.stageId), h: changeoverHtml(co) }));
-    const tasks = (C.tasksNow ? C.tasksNow(BLOCKS, nowInt) : []).map(b => ({ o: b.stageId ? stageOrder(b.stageId) : 1000, h: taskHtml(b, nowInt) }));
+    const colOf = b => safeColor(b.stageColor || b.color, '#888');
+    const playing = C.playingNow(BLOCKS, nowInt).map(b => Object.assign({ o: stageOrder(b.stageId), h: playingHtml(b, nowInt) }, zOf(b, colOf(b))));
+    const changing = C.changeoversNow(BLOCKS, nowMins, ALLB).map(co => Object.assign({ o: stageOrder(co.stageId), h: changeoverHtml(co) }, zOf(co, safeColor(co.stageColor || co.next.color, '#888'))));
+    const tasks = (C.tasksNow ? C.tasksNow(BLOCKS, nowInt) : []).map(b => Object.assign({ o: b.stageId ? stageOrder(b.stageId) : 1000, h: taskHtml(b, nowInt) }, zOf(b, '#7dd3fc')));
     const scene = playing.concat(changing).concat(tasks).sort((a, b) => a.o - b.o);   // sort estable: misma posición, primero el que suena
-    const next = C.nextPerStage(BLOCKS, nowInt);
-    // Backstage: el CALL sigue a la vista hasta que arranca el show (con OK sale como «avisado»)
+    const next = C.nextPerStage(BLOCKS, nowInt).map(b => Object.assign({ o: stageOrder(b.stageId), h: nextHtml(b) }, zOf(b, colOf(b)))).sort((a, b) => a.o - b.o);
+    // Backstage: con OK para su hora efectiva, «AVISADO» (dec. 150); Manager lo quita
     const calls = VISTA === 'backstage' ? Vs.backstageCalls(BLOCKS, nowInt, CALL_MINS, CALL_DONE) : C.callList(BLOCKS, nowInt, CALL_MINS, CALL_DONE).map(b => ({ block: b, done: false }));
     const fin = '<div class="tempty fin">' + tx('FIN DE JORNADA') + '</div>', none = '<div class="tempty">—</div>';
     const empty = NOFEST ? '<div class="tempty fin">' + tx('SIN EVENTO CARGADO') + '</div>' : DAY_MISSING ? '<div class="tempty fin">' + tx('DÍA SIN DATOS') + '</div>' : (ended ? fin : none);
     const idle = (NOFEST || DAY_MISSING || ended) ? empty : '<div class="tempty idle">' + tx('— SIN ACTIVIDAD —') + '</div>';
-    $('now-list').innerHTML = scene.length ? scene.map(x => x.h).join('') : idle;
-    $('next-list').innerHTML = next.length ? next.map(nextHtml).join('') : none;
-    $('call-list').innerHTML = calls.map(cb => {
+    $('now-list').innerHTML = scene.length ? zoneHtml(scene) : idle;
+    $('next-list').innerHTML = next.length ? zoneHtml(next) : none;
+    $('call-list').innerHTML = zoneHtml(calls.map(cb => {
       const b = cb.block;
       const col = safeColor(b.stageColor || b.color, CALLC);
       const falta = Math.max(1, Math.round(b.si - nowInt));
-      return '<div class="trow callrow" style="--c:' + col + '"><div class="callmain">' +
+      return Object.assign({ o: stageOrder(b.stageId), h: '<div class="trow callrow" style="--c:' + col + '"><div class="callmain">' +
         '<div class="tname fit" style="color:' + col + '">' + esc(b.name.toUpperCase()) + '</div>' +
-        (b.stage ? '<div class="tmeta"><span class="tstage" style="color:' + col + '">' + esc(b.stage.toUpperCase()) + '</span></div>' : '') +
-        '<div class="trem" style="color:' + col + '">' + tx('en {n} min', { n: falta }) + ' &middot; ' + C.fmtHM(b.si) + '</div>' +
+        '<div class="trem" style="color:' + col + '">' + C.fmtHM(b.si) + ' &middot; ' + tx('en {n} min', { n: falta }) + '</div>' +
         '</div>' + (VISTA === 'backstage' ? (cb.done ? '<span class="calldone"><svg class="ic"><use href="#i-check"/></svg>' + tx('AVISADO') + '</span>' : '')
-          : '<button class="callok" data-ck="' + esc(C.callKey(b)) + '" title="' + tx('Marcar como avisado') + '">OK</button>') + '</div>';
-    }).join('');
+          : '<button class="callok" data-ck="' + esc(C.callKey(b)) + '" title="' + tx('Marcar como avisado') + '">OK</button>') + '</div>' }, zOf(b, col));
+    }).sort((a, b) => a.o - b.o));
     $('panel-call').classList.toggle('hot', calls.length > 0);
     fitNames();
   }
@@ -669,7 +666,8 @@
     const btn = e.target.closest && e.target.closest('.callok');
     if (!btn || !btn.dataset.ck) return;
     if (Dt.READONLY) { if (PRODID) prodSend({ type: 'call', from: PRODID, key: btn.dataset.ck }, 'OK de CALL enviado'); return; }   // Producción: lo manda al Dashboard, que lo apunta en el log
-    CALL_DONE = new Set(Dt.markCallDone(btn.dataset.ck, Math.floor(C.nowAbs())));
+    const ck = btn.dataset.ck, cb = BLOCKS.find(x => C.callKey(x) === ck), cat = cb ? C.callAt(cb, CALL_MINS) : null;
+    CALL_DONE = new Set(Dt.markCallDone(cat !== null ? [ck, C.callStamp(ck, cat)] : ck, Math.floor(C.nowAbs())));   // dec. 150: OK para esta hora de CALL (clave + sello, de una vez)
     tick();
   });
 
