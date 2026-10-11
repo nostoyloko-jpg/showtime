@@ -2084,12 +2084,16 @@
     return st ? { id: st.id, name: '' } : { id: '', name: v };
   }
   /** Cerrar / Cancelar: descarta EXPLÍCITAMENTE el borrador entero (texto, mapa, ediciones y filas manuales). */
-  function closeImport() { $('imp').hidden = true; IMP = null; impManShow(false); impManClear(); errPopHide(); }
+  function closeImport() { $('imp').hidden = true; IMP = null; IMP_DRAG = null; IMP_ED = null; IMP_EDPEND = null; impColCtlClose(false); impManShow(false); impManClear(); errPopHide(); cellPopHide(); impColApply(); }
 
   function impResetRows() { IMP.include = {}; IMP.edits = {}; }
 
   function impRecompute() {
     if (!IMP) return;
+    // Un clic en un botón o casilla de la tabla con el editor ampliado abierto: el dato ya está confirmado, pero la tabla no se rehace
+    // hasta que ese clic termine (si no, el botón desaparecería bajo el dedo y el clic se perdería)
+    if (IMP_HOLD) { IMP_PEND = true; return; }
+    IMP_PEND = false;
     const forced = {};
     if (IMP.header !== undefined) forced.header = IMP.header;
     if (IMP.map) forced.map = IMP.map;
@@ -2155,7 +2159,8 @@
     IMP.manual.push({ uid, rec }); IMP.mEdits[uid] = ed;
     impManClear(); impRecompute();   // tipo y jornada se quedan: listas de filas seguidas
     // La fila nueva es la última de la vista previa: su scroll interno baja hasta ella para que se vea el resultado
-    const w = $('imp-prevwrap'); if (w) w.scrollTop = w.scrollHeight;
+    // Con orden activo aparece en su sitio ordenado: el scroll de la vista previa va hasta ella por su id estable
+    impScrollToRid(uid);
     try { $('imp-man').scrollIntoView({ block: 'nearest' }); } catch (e) {}   // la ficha entera a la vista, sin quedar bajo el pie fijo
     try { $('imp-m-nombre').focus({ preventScroll: true }); } catch (e) { $('imp-m-nombre').focus(); }
     return true;
@@ -2189,9 +2194,13 @@
   /** Lo que el detalle nunca tapa: Cancelar, Importar, «+ Añadir fila manual» y la acción de su fila (Excluir / Restaurar). */
   function errPopAvoid(btn) {
     const td = btn.closest && btn.closest('td'), act = td && td.querySelector && td.querySelector('[data-exc],[data-rest]');
-    return [$('imp-cancel'), $('imp-go'), $('imp-man-open'), act].filter(n => n && n.getBoundingClientRect).map(n => {
+    return impRects([$('imp-cancel'), $('imp-go'), $('imp-man-open'), act]);
+  }
+  /** Rectángulos (+4 px) de lo que no se puede tapar; solo lo que está pintado. */
+  function impRects(nodes) {
+    return nodes.filter(n => n && n.getBoundingClientRect).map(n => {
       const r = n.getBoundingClientRect(); return { left: r.left - 4, top: r.top - 4, right: r.right + 4, bottom: r.bottom + 4 }; })
-      .filter(a => [a.left, a.top, a.right, a.bottom].every(Number.isFinite) && a.right > a.left && a.bottom > a.top);   // solo lo que está pintado
+      .filter(a => [a.left, a.top, a.right, a.bottom].every(Number.isFinite) && a.right > a.left && a.bottom > a.top);
   }
   /** Zona segura (alto): la pantalla hasta el pie del importador (resumen y acciones no se tapan nunca). */
   function errPopSafeH() {
@@ -2216,6 +2225,7 @@
   }
   function errPopShow(btn, pinned) {
     const pop = $('imp-errpop');
+    cellPopHide();   // un solo detalle a la vez
     if (ERRPOP.btn) errPopHide();
     ERRPOP.btn = btn; ERRPOP.pinned = !!pinned; ERRPOP.inline = false;
     const why = (btn.dataset && btn.dataset.why) || '';
@@ -2308,8 +2318,313 @@
     rows.forEach(r => { if (r.include && r.status !== 'err') k.imp++; else if (off(r)) k.exc++; else k.err++; });
     return k;
   }
-  function impRender() {
+  // ── v20261166 · herramientas de la vista previa: orden SOLO visual y ancho de columnas ─────────────
+  // Nada de esto toca el borrador: IMP.pv.rows, el orden pegado/manual y lo que entra al importar siguen igual.
+  // Columnas de datos (ordenables y con tirador); i = posición en la tabla (0 casilla, 1 Estado … 10 Avisos).
+  const IMP_COLS = [{ k: 'tipo', l: 'Tipo', i: 2 }, { k: 'escenario', l: 'Zona', i: 3 }, { k: 'banda', l: 'Nombre', i: 4 }, { k: 'jornada', l: 'Jornada', i: 5 },
+    { k: 'inicio', l: 'Inicio', i: 6 }, { k: 'fin', l: 'Fin', i: 7 }, { k: 'call', l: 'CALL', i: 8 }, { k: 'notas', l: 'Notas', i: 9 }];
+  const IMP_NCOL = 11, IMP_TIPO_ORDEN = ['show', 'sc', 'tarea', 'hito'];   // Show → Soundcheck → Tarea → Marcador
+  const IMP_COL_PASO = 16;   // px por pulsación de − / + en el microcontrol del tirador (sin máximo)
+  let IMP_DRAG = null, IMP_PAINT = false;   // IMP_PAINT: la tabla se está rehaciendo (el foco del control que se quita no cuenta como «salir»)
+  // ── v20261166 · textos recortados en Zona, Nombre, CALL y Notas: lectura pasiva con ratón (hover) y editor ampliado al editar ──
+  // Hover: solo ratón, solo si el texto no cabe y el campo no tiene foco; mismas reglas que el detalle de «Error ⓘ» (fuera de la caja
+  // que recorta, posición segura, no tapa acciones; si no cabe flotante, en línea bajo la fila). Editor: el MISMO hueco del campo se
+  // amplía (área de texto que ajusta líneas solo a la vista; el dato sigue siendo de una línea) sin cambiar el ancho de la columna.
+  const IMP_WIDE_K = ['escenario', 'banda', 'call', 'notas'];
+  const CELLPOP = { inp: null, inline: false };
+  let IMP_ED = null, IMP_NOEXP = false, IMP_PTR = null, IMP_EDPEND = null, IMP_CLICKTO = null, IMP_CLICKEL = null, IMP_FOCUSSEL = null, IMP_HOLD = false, IMP_PEND = false, IMP_HOLDOWN = false;
+  /** Selección del campo tal y como la dejó el navegador (cursor o trozo seleccionado). */
+  const impSelOf = n => { try { return { s: n.selectionStart, e: n.selectionEnd, d: n.selectionDirection || 'none' }; } catch (e) { return null; } };
+  /** ¿Campo de texto de una de esas cuatro columnas, en una fila de la vista previa? */
+  function impWideK(n) { return !!(n && n.dataset && IMP_WIDE_K.indexOf(n.dataset.k) >= 0 && n.matches && n.matches('#imp-prev tbody input[type=text][data-row]')); }
+  /** ¿Su texto (no vacío) no cabe a la vista? */
+  function impCut(n) { return !!(n && String(n.value || '').trim() && Number(n.scrollWidth) > Number(n.clientWidth) + 1); }
+  function impColName(k) { const c = IMP_COLS.find(x => x.k === k); return c ? tx(c.l) : ''; }
+  /** Lo que el detalle de lectura nunca tapa: pie (Cancelar, Importar, + Añadir fila manual) y todos los Excluir / Restaurar. */
+  function cellPopAvoid() {
+    const acts = document.querySelectorAll ? Array.from(document.querySelectorAll('#imp-prev [data-exc], #imp-prev [data-rest], #imp-errctx')) : [];
+    return impRects([$('imp-cancel'), $('imp-go'), $('imp-man-open')].concat(acts));
+  }
+  function cellPopShow(inp) {
+    if (!IMP || IMP_ED || IMP_DRAG || (ERRPOP.btn && ERRPOP.pinned)) return;
+    if (ERRPOP.btn) errPopHide();
+    cellPopHide();
+    const pop = $('imp-cellpop'), txt = String(inp.value || '');
+    CELLPOP.inp = inp; CELLPOP.inline = false;
+    pop.textContent = txt; pop.hidden = false;
+    const r = inp.getBoundingClientRect ? inp.getBoundingClientRect() : { left: 0, right: 0, top: 0, bottom: 0 };
+    const p = errPopPlace(r, pop.offsetWidth || 0, pop.offsetHeight || 0, window.innerWidth || 0, errPopSafeH(), 8, cellPopAvoid());
+    if (p) { pop.style.left = Math.round(p.left) + 'px'; pop.style.top = Math.round(p.top) + 'px'; pop.dataset.side = p.side; }
+    else {   // sin sitio flotante: en línea, justo bajo su fila (ocupa su propio sitio; no tapa nada)
+      pop.hidden = true; CELLPOP.inline = true;
+      const tr = inp.closest && inp.closest('tr');
+      if (tr && tr.insertAdjacentHTML) tr.insertAdjacentHTML('afterend', '<tr id="imp-cellrow" class="imp-errrow imp-cellrow"><td colspan="11"><div id="imp-cellinline" class="imp-errinline" role="tooltip">' + esc(txt) + '</div></td></tr>');
+    }
+    if (inp.setAttribute) inp.setAttribute('aria-describedby', CELLPOP.inline ? 'imp-cellinline' : 'imp-cellpop');
+  }
+  function cellPopHide() {
+    if (CELLPOP.inp && CELLPOP.inp.removeAttribute) CELLPOP.inp.removeAttribute('aria-describedby');
+    CELLPOP.inp = null; CELLPOP.inline = false;
+    const pop = $('imp-cellpop'); if (pop) pop.hidden = true;
+    const row = document.getElementById && document.getElementById('imp-cellrow'); if (row && row.parentNode) row.parentNode.removeChild(row);
+  }
+  const inCellPop = n => !!(n && n.closest && n.closest('#imp-cellpop, #imp-cellrow'));
+  /** Editor ampliado: un área de texto en el mismo hueco (el campo compacto se queda debajo, oculto, guardando el ancho de la celda). */
+  function impEdOpen(inp, sel) {
+    if (IMP_ED || !IMP || !inp.parentNode) return;
+    cellPopHide(); if (ERRPOP.btn) errPopHide();
+    const td = inp.closest('td'), ta = document.createElement('textarea');
+    ta.className = 'imp-wide';
+    ta.setAttribute('data-row', inp.dataset.row); ta.setAttribute('data-k', inp.dataset.k);
+    ta.setAttribute('rows', '1'); ta.setAttribute('spellcheck', 'false'); ta.setAttribute('autocomplete', 'off');
+    ta.setAttribute('aria-label', tx('Editar {_c} (texto completo)', { _c: impColName(inp.dataset.k) }));
+    ta.setAttribute('aria-describedby', 'imp-edhint');
+    ta.value = String(inp.value || '');
+    if (td && td.classList) td.classList.add('imp-wcell');
+    inp.classList.add('imp-wsrc'); inp.setAttribute('tabindex', '-1'); inp.setAttribute('aria-hidden', 'true');
+    inp.after(ta);
+    IMP_ED = { ta, inp, td };
+    impEdLayout();
+    try { ta.focus({ preventScroll: true }); } catch (e) { ta.focus(); }
+    // Hereda EXACTAMENTE la selección del campo compacto (nunca «seleccionar todo» por su cuenta)
+    try { const n = ta.value.length, s = sel && Number.isFinite(sel.s) ? Math.min(sel.s, n) : n, f = sel && Number.isFinite(sel.e) ? Math.min(sel.e, n) : s; ta.setSelectionRange(s, f, (sel && sel.d) || 'none'); } catch (e) {}
+  }
+  /** Tamaño del editor: tan ancho como su texto, sin pasar del borde visible de la vista previa (si no cabe, ajusta líneas) y tan
+   *  alto como haga falta dentro de lo visible (debajo de la cabecera fija); luego la vista previa se mueve lo justo para verlo. */
+  function impEdLayout() {
+    if (!IMP_ED) return;
+    const { ta, inp } = IMP_ED, w = $('imp-prevwrap');
+    try {
+      const wr = w.getBoundingClientRect(), cr = inp.getBoundingClientRect(), cs = getComputedStyle(ta), px = v => parseFloat(v) || 0;
+      if (![wr.left, wr.top, cr.left, cr.width].every(Number.isFinite)) return;
+      const cv = impEdLayout.cv || (impEdLayout.cv = document.createElement('canvas')), cx = cv.getContext ? cv.getContext('2d') : null;
+      let tw = 0; if (cx) { cx.font = cs.font; tw = Number(cx.measureText(ta.value).width) || 0; }
+      const pad = px(cs.paddingLeft) + px(cs.paddingRight) + px(cs.borderLeftWidth) + px(cs.borderRightWidth);
+      const avail = Math.max(cr.width, wr.left + w.clientWidth - 8 - cr.left);
+      ta.style.left = inp.offsetLeft + 'px'; ta.style.top = inp.offsetTop + 'px';
+      ta.style.width = Math.min(avail, Math.max(cr.width, Math.ceil(tw + pad + 2))) + 'px';
+      const head = w.querySelector('thead'), hb = head && head.getBoundingClientRect ? Math.max(wr.top, head.getBoundingClientRect().bottom) : wr.top;
+      const vb = wr.top + w.clientHeight, maxH = Math.max(cr.height, vb - hb - 8);
+      ta.style.height = 'auto';
+      const need = ta.scrollHeight + px(cs.borderTopWidth) + px(cs.borderBottomWidth);
+      ta.style.height = Math.max(cr.height, Math.min(need, maxH)) + 'px'; ta.style.overflowY = need > maxH ? 'auto' : 'hidden';
+      const r = ta.getBoundingClientRect();
+      if (r.bottom > vb - 4) w.scrollTop += r.bottom - (vb - 4);
+      else if (r.top < hb + 4) w.scrollTop -= (hb + 4) - r.top;
+    } catch (e) {}
+  }
+  /** Cierra el editor y vuelve el campo compacto; si el texto cambió, se confirma como siempre (mismo camino que el «change»). */
+  function impEdClose() {
+    const ed = IMP_ED; if (!ed) return;
+    IMP_ED = null;
+    const { ta, inp, td } = ed, v = String(ta.value || '').replace(/[\r\n]+/g, ' ');
+    inp.classList.remove('imp-wsrc'); inp.removeAttribute('tabindex'); inp.removeAttribute('aria-hidden');
+    if (td && td.classList) td.classList.remove('imp-wcell');
+    if (ta.parentNode) ta.parentNode.removeChild(ta);
+    if (v !== String(inp.defaultValue == null ? '' : inp.defaultValue)) { inp.value = v; impCellChange(inp); }
+  }
+  /** Identidad estable de una fila del borrador: pegada → «p<n>» (su lugar en el texto); manual → su id propio. */
+  function impRid(r) { return IMP && r.idx >= IMP.nPaste && IMP.manual[r.idx - IMP.nPaste] ? IMP.manual[r.idx - IMP.nPaste].uid : 'p' + r.idx; }
+  /** Valor con el que se ordena una celda; null = vacía o incompleta (va SIEMPRE al final).
+   *  Horas: jornada operativa y, dentro, la hora del día operativo según el corte del evento (00:30 va detrás de 23:00);
+   *  con hora pero sin jornada = incompleta. Lo que se ve como «—» (Fin de un marcador, CALL de tareas y marcadores) = vacío. */
+  function impSortVal(r, k, cut) {
+    if (k === 'tipo') { const t = IMP_TIPO_ORDEN.indexOf(r.tipo); return t < 0 ? null : t; }
+    if (k === 'jornada') return C.dayIndex(r.jornada);
+    if (k === 'inicio' || k === 'fin' || k === 'call') {
+      if ((k === 'fin' && r.tipo === 'hito') || (k === 'call' && r.tipo !== 'show' && r.tipo !== 'sc')) return null;
+      const d = C.dayIndex(r.jornada), t = C.parseHM(r[k]);
+      return d === null || t === null ? null : d * 1440 + ((t - cut + 1440) % 1440);
+    }
+    const s = String(r[k] == null ? '' : r[k]).trim();
+    return s || null;
+  }
+  /** Vista ordenada: una COPIA de rows (no la muta). sort = { k, dir: 'asc'|'desc' } o null (orden original).
+   *  Texto: comparación natural sin mayúsculas ni acentos. Empates y vacíos: en el orden de incorporación. Pura (tests). */
+  function impSortRows(rows, sort, o) {
+    const v = rows.slice();
+    if (!sort) return v;
+    const coll = new Intl.Collator((o && o.lang) || 'es', { numeric: true, sensitivity: 'base' }), sgn = sort.dir === 'desc' ? -1 : 1, cut = (o && o.cut) || 0;
+    const kv = v.map((r, n) => ({ r, n, x: impSortVal(r, sort.k, cut) }));
+    kv.sort((a, b) => {
+      if (a.x === null || b.x === null) return a.x === null && b.x === null ? a.n - b.n : a.x === null ? 1 : -1;
+      const c = typeof a.x === 'number' ? a.x - b.x : coll.compare(a.x, b.x);
+      return c ? sgn * c : a.n - b.n;
+    });
+    return kv.map(e => e.r);
+  }
+  const impLang = () => (window.ShowtimeI18n && window.ShowtimeI18n.getLang && window.ShowtimeI18n.getLang()) || 'es';
+  /** Orden de la vista. Si el foco está en un campo de una fila (p. ej. su Tipo, cambiado con el desplegable), la vista NO se
+   *  recoloca: se queda como estaba hasta confirmar (Intro) o perder el foco (release). */
+  function impView(release) {
+    const rows = IMP.pv.rows, a = document.activeElement;
+    const sorted = impSortRows(rows, IMP.sort, { cut: C.cutoffMins(IMP.base), lang: impLang() });
+    if (!release && IMP.sort && IMP.view && a && a.matches && a.matches('#imp-prev tbody [data-row]')) {
+      const by = new Map(rows.map(r => [impRid(r), r])), keep = IMP.view.filter(id => by.has(id));
+      if (keep.length === rows.length) { IMP.held = sorted.some((r, n) => impRid(r) !== keep[n]); return keep.map(id => by.get(id)); }
+    }
+    IMP.held = false; IMP.view = sorted.map(impRid);
+    return sorted;
+  }
+  /** Controles a los que llega Tab, en orden del documento (la app no usa tabindex positivos). */
+  function impTabbables() {
+    return Array.from(document.querySelectorAll('a[href], button, input, select, textarea, [tabindex]')).filter(n =>
+      !n.disabled && n.tabIndex >= 0 && !(n.closest && n.closest('[hidden], [inert]')) && n.getClientRects && n.getClientRects().length > 0 && !(n.type === 'hidden'));
+  }
+  /** Identidad estable de un destino de Tab dentro de la tabla: su control (fila por índice estable + campo) y su fila (data-rid). */
+  function impTabKey(n) {
+    if (!n || !n.dataset) return null;
+    const d = n.dataset, tr = n.closest && n.closest('tr[data-rid]'), rid = tr && tr.dataset ? tr.dataset.rid : '';
+    const sel = d.row !== undefined && d.k ? '[data-row="' + d.row + '"][data-k="' + d.k + '"]' : d.inc !== undefined ? '[data-inc="' + d.inc + '"]'
+      : d.errtip !== undefined ? '[data-errtip="' + d.errtip + '"]' : d.exc !== undefined || d.rest !== undefined ? 'td.st [data-exc="' + (d.exc !== undefined ? d.exc : d.rest) + '"], td.st [data-rest="' + (d.exc !== undefined ? d.exc : d.rest) + '"]'
+      : d.sort ? '[data-sort="' + d.sort + '"]' : d.grip !== undefined ? '[data-grip="' + d.grip + '"]' : '';
+    return sel || rid ? { sel, rid } : null;
+  }
+  /** Enfoca el destino ya redibujado; si su control cambió de forma (p. ej. la fila dejó de tener error), el primero de su fila. */
+  function impFocusTo(key, sel) {
+    const t = $('imp-prev');
+    let n = key.sel ? t.querySelector(key.sel) : null;
+    if (!n && key.rid) { const tr = t.querySelector('tr[data-rid="' + key.rid + '"]'); n = tr && impTabbables().find(x => tr.contains && tr.contains(x)); }
+    if (!n || !n.focus) return;
+    // Con la selección que el navegador calculó para el clic (sel): se pone ANTES de enfocar y la hereda también el editor ampliado
+    if (sel && n.setSelectionRange) { try { const L = String(n.value || '').length; n.setSelectionRange(Math.min(sel.s, L), Math.min(sel.e, L), sel.d || 'none'); } catch (e) {} IMP_FOCUSSEL = sel; }
+    try { n.focus(); } finally { IMP_FOCUSSEL = null; }
+  }
+  /** Selector del control equivalente tras rehacer la tabla (el foco no se pierde). */
+  function impFocusKey(a) {
+    if (!a || !a.closest || !a.closest('#imp-prev') || !a.dataset) return null;
+    const d = a.dataset;
+    if (d.row !== undefined && d.k) return '[data-row="' + d.row + '"][data-k="' + d.k + '"]';
+    if (d.inc !== undefined) return '[data-inc="' + d.inc + '"]';
+    if (d.sort) return '[data-sort="' + d.sort + '"]';
+    if (d.grip !== undefined) return '[data-grip="' + d.grip + '"]';
+    return null;
+  }
+  const IC_SORT = s => '<svg class="ic so' + (s ? ' on' : '') + '" viewBox="0 0 10 12" aria-hidden="true" focusable="false">' +
+    (s !== 'desc' ? '<path d="M5 1.5 8.5 5h-7z" fill="currentColor"' + (s ? '' : ' opacity=".45"') + '/>' : '') +
+    (s !== 'asc' ? '<path d="M5 10.5 1.5 7h7z" fill="currentColor"' + (s ? '' : ' opacity=".45"') + '/>' : '') + '</svg>';
+  /** Cabecera ordenable: botón real (Enter/Espacio) + tirador SEPARADO en el borde derecho. El tirador es un BOTÓN: arrastrarlo
+   *  cambia el ancho; un clic sin arrastre (o Intro / Espacio) abre el microcontrol [ − ] 163 px [ + ] anclado a él. Sin rango ARIA. */
+  function impTh(c) {
+    const s = IMP.sort && IMP.sort.k === c.k ? IMP.sort.dir : '', lbl = tx(c.l);
+    const ttl = s === 'asc' ? tx('Ordenado de forma ascendente. Pulsa para descendente') : s === 'desc' ? tx('Ordenado de forma descendente. Pulsa para volver al orden original') : tx('Ordenar por {_c} (ascendente)', { _c: lbl });
+    return '<th class="srt" data-colk="' + c.k + '"' + (s ? ' aria-sort="' + (s === 'asc' ? 'ascending' : 'descending') + '"' : '') + '>' +
+      '<button type="button" class="imp-sortbtn" data-sort="' + c.k + '" title="' + esc(ttl) + '">' + lbl + IC_SORT(s) + '</button>' +
+      '<button type="button" class="imp-colgrip" data-grip="' + c.i + '" aria-expanded="false" aria-controls="imp-colctl" aria-label="' + esc(tx('Ancho de la columna {_c}', { _c: lbl })) + '" title="' + esc(tx('Arrastra para cambiar el ancho; clic, Intro o Espacio para ajustarlo con − / +')) + '"></button></th>';
+  }
+  /** Anchos: null = automáticos (los de siempre). Al primer ajuste se fijan los anchos actuales de las 11 columnas y la tabla pasa a
+   *  diseño fijo; solo cambia la columna tocada. Mínimo de cada columna: su cabecera (texto, flecha y tirador) o su control. */
+  function impColFreeze() {
+    if (!IMP) return false;
+    if (IMP.colW) return true;
+    const m = impColMeasure();
+    if (!m) return false;
+    IMP.colMin = m.min; IMP.colW = m.w.slice();
+    impColApply();
+    return true;
+  }
+  /** Anchos actuales de las 11 columnas y mínimo real de cada una (null si no se puede medir). */
+  function impColMeasure() {
+    const t = $('imp-prev'), ths = Array.from(t.querySelectorAll('thead th'));
+    if (ths.length !== IMP_NCOL) return null;
+    const w = ths.map(th => th.getBoundingClientRect().width);
+    if (!w.every(x => Number.isFinite(x) && x > 0)) return null;
+    const px = v => parseFloat(v) || 0;
+    const min = ths.map((th, i) => {
+      const cs = getComputedStyle(th), b = th.querySelector('.imp-sortbtn');   // el tirador vive en el relleno derecho de la cabecera
+      const head = (b ? b.scrollWidth : 0) + px(cs.paddingLeft) + px(cs.paddingRight);
+      const td = t.querySelector('tbody tr[data-rid] > td:nth-child(' + (i + 1) + ')'), ctl = td && td.querySelector('input[type=text], select');
+      const tcs = td ? getComputedStyle(td) : null, pad = tcs ? px(tcs.paddingLeft) + px(tcs.paddingRight) : 0;
+      const ctrl = ctl ? (ctl.tagName === 'SELECT' ? ctl.offsetWidth : px(getComputedStyle(ctl).minWidth)) + pad : 0;
+      return Math.min(w[i], Math.ceil(Math.max(head, ctrl)));   // nunca por encima de lo que ya mide: fijar no mueve nada
+    });
+    return { w, min };
+  }
+  function impColApply() {
+    const t = $('imp-prev'), w = IMP && IMP.colW;
+    t.classList.toggle('colfix', !!w);
+    t.style.width = w ? w.reduce((s, x) => s + x, 0) + 'px' : '';
+    Array.from(t.querySelectorAll('col')).forEach((c, i) => { c.style.width = w ? w[i] + 'px' : ''; });
+    impGripAria();
+  }
+  /** El nombre de cada tirador dice sus valores VERDADEROS: columna, ancho actual y mínimo real (el que se aplica al arrastrar y
+   *  con − / +). No hay máximo: no se anuncia ninguno. Sin medidas, queda el nombre sin cifras. */
+  function impGripAria() {
+    const t = $('imp-prev'), m = IMP && IMP.colW ? { w: IMP.colW, min: IMP.colMin } : IMP ? impColMeasure() : null;
+    Array.from(t.querySelectorAll('[data-grip]')).forEach(g => {
+      const i = +g.dataset.grip, col = IMP_COLS.find(x => x.i === i), c = col ? tx(col.l) : '', ok = m && Number.isFinite(m.w[i]);
+      g.setAttribute('aria-label', ok ? tx('Ancho de la columna {_c}: {n} píxeles (mínimo {m})', { _c: c, n: Math.round(m.w[i]), m: Math.round(m.min[i]) }) : tx('Ancho de la columna {_c}', { _c: c }));
+    });
+  }
+  function impColSet(i, w) {
+    if (!IMP || !IMP.colW) return;
+    IMP.colW[i] = Math.max(IMP.colMin[i] || 0, w);
+    impColApply();
+    if (COLCTL.g && COLCTL.i === i) { impColCtlPaint(); impColCtlPlace(); }
+  }
+  function impColReset() { if (!IMP) return; impColCtlClose(false); IMP.colW = null; IMP.colMin = null; IMP_DRAG = null; impColApply(); }
+  // ── Microcontrol del tirador: [ − ] 163 px [ + ] (fuera de la caja que recorta; posición segura: no tapa acciones) ──
+  const COLCTL = { g: null, i: -1 };
+  function impColCtlOpen(g, kb) {
+    if (!IMP || !impColFreeze()) return;
+    impColCtlClose(false); cellPopHide(); if (ERRPOP.btn) errPopHide();
+    COLCTL.g = g; COLCTL.i = +g.dataset.grip;
+    g.setAttribute('aria-expanded', 'true');
+    const box = $('imp-colctl'); box.hidden = false;
+    impColCtlPaint();
+    if (!impColCtlPlace()) { impColCtlClose(false); return; }
+    if (kb) { const at = IMP.colW[COLCTL.i] <= (IMP.colMin[COLCTL.i] || 0); const b = box.querySelector('[data-colstep="' + (at ? 1 : -1) + '"]'); if (b && b.focus) b.focus(); }
+  }
+  function impColCtlClose(back) {
+    const g = COLCTL.g; if (!g) return;
+    COLCTL.g = null; COLCTL.i = -1;
+    if (g.setAttribute) g.setAttribute('aria-expanded', 'false');
+    const box = $('imp-colctl'); if (box) box.hidden = true;
+    if (back && g.focus && g.isConnected !== false) g.focus();
+  }
+  /** Valores verdaderos: ancho actual en px; − desactivado (aria-disabled, sigue enfocable) en el mínimo real; + sin máximo. */
+  function impColCtlPaint() {
+    if (!COLCTL.g || !IMP || !IMP.colW) return;
+    const i = COLCTL.i, col = IMP_COLS.find(x => x.i === i), c = col ? tx(col.l) : '', w = IMP.colW[i], min = IMP.colMin[i] || 0, box = $('imp-colctl');
+    box.setAttribute('aria-label', tx('Ancho de la columna {_c}', { _c: c }));
+    $('imp-colw').textContent = tx('{n} px', { n: Math.round(w) });
+    const minus = box.querySelector('[data-colstep="-1"]'), plus = box.querySelector('[data-colstep="1"]');
+    if (minus) { minus.setAttribute('aria-label', tx('Estrechar {_c} 16 píxeles', { _c: c })); minus.setAttribute('aria-disabled', w <= min ? 'true' : 'false'); }
+    if (plus) plus.setAttribute('aria-label', tx('Ensanchar {_c} 16 píxeles', { _c: c }));
+  }
+  /** Junto al tirador, dentro de la pantalla y sin tapar el pie ni ningún Excluir / Restaurar (mismas reglas que los detalles). */
+  function impColCtlPlace() {
+    const box = $('imp-colctl'), g = COLCTL.g; if (!g || !box) return false;
+    const r = g.getBoundingClientRect ? g.getBoundingClientRect() : null;
+    if (!r || ![r.left, r.top, r.right, r.bottom].every(Number.isFinite)) return true;   // sin medidas (entorno sin maquetación)
+    const p = errPopPlace(r, box.offsetWidth || 0, box.offsetHeight || 0, window.innerWidth || 0, errPopSafeH(), 8, cellPopAvoid());
+    if (!p) return false;
+    box.style.left = Math.round(p.left) + 'px'; box.style.top = Math.round(p.top) + 'px';
+    return true;
+  }
+  /** Lleva el scroll INTERNO de la vista previa hasta la fila (por su id estable): lo justo para verla, bajo la cabecera fija. */
+  function impScrollToRid(rid) {
+    const w = $('imp-prevwrap'), tr = w && w.querySelector ? w.querySelector('tr[data-rid="' + rid + '"]') : null;
+    if (!w || !tr || !tr.getBoundingClientRect || !w.getBoundingClientRect) return;
+    const head = w.querySelector('thead'), hh = head && head.getBoundingClientRect ? head.getBoundingClientRect().height || 0 : 0;
+    const wr = w.getBoundingClientRect(), r = tr.getBoundingClientRect();
+    if (![wr.top, wr.bottom, r.top, r.bottom].every(Number.isFinite)) return;
+    if (r.top < wr.top + hh) w.scrollTop -= (wr.top + hh) - r.top;
+    else if (r.bottom > wr.top + w.clientHeight) w.scrollTop += r.bottom - (wr.top + w.clientHeight);
+  }
+  /** Rótulo del estado de orden (visible y anunciado): qué columna y en qué sentido; el orden de importación no cambia. */
+  function impSortNote() {
+    const n = $('imp-sortnote'); if (!n) return;
+    const c = IMP && IMP.sort ? IMP_COLS.find(x => x.k === IMP.sort.k) : null;
+    n.textContent = c ? tx('Vista ordenada por {_c} ({_d}). El orden de importación no cambia.', { _c: tx(c.l), _d: tx(IMP.sort.dir === 'asc' ? 'ascendente' : 'descendente') })
+      : IMP && IMP.sortUsed ? tx('Vista en el orden original.') : '';
+  }
+
+  function impRender(release) {
     if (ERRPOP.btn) errPopHide();   // la tabla se rehace: el botón del detalle ya no existe
+    cellPopHide(); IMP_ED = null; IMP_EDPEND = null; impColCtlClose(false);   // ni detalle, ni editor, ni microcontrol sobreviven al repintado
+    IMP_DRAG = null;
+    const act = document.activeElement, fkey = impFocusKey(act);
     const rd = IMP.read, pv = IMP.pv;
     // Origen detectado
     $('imp-kind').textContent = rd.kind === 'tabla' ? tx(rd.records.length === 1 ? 'Tabla · {c} columnas · {s} · {n} fila' : 'Tabla · {c} columnas · {s} · {n} filas',
@@ -2355,15 +2670,17 @@
     if (pv.outside.length) nh += '<label><input type="checkbox" id="imp-extend"' + (IMP.extend ? ' checked' : '') + '> ' + tx('<b>Ampliar el evento</b> a {d}', { d: pv.outside.map(fmtDay).map(esc).join(', ') }) + '</label>';
     $('imp-new').innerHTML = nh;
     // Vista previa
-    const head = '<thead><tr><th></th>' + ['Estado', 'Tipo', 'Zona', 'Nombre', 'Jornada', 'Inicio', 'Fin', 'CALL', 'Notas', 'Avisos'].map(h => '<th>' + tx(h) + '</th>').join('') + '</tr></thead>';
+    const head = '<colgroup>' + '<col>'.repeat(IMP_NCOL) + '</colgroup><thead><tr><th></th><th>' + tx('Estado') + '</th>' + IMP_COLS.map(impTh).join('') + '<th>' + tx('Avisos') + '</th></tr></thead>';
     if (!pv.rows.length) {
       $('imp-prev').innerHTML = head + '<tbody><tr><td colspan="11" class="vacio">' + tx(rd.kind === 'vacio' ? 'Pega un horario arriba, elige un archivo .csv / .tsv o añade una fila manual.' : 'No se ha encontrado ninguna fila con hora.') + '</td></tr></tbody>';
     } else {
       const dot = '<svg class="ic dot"><use href="#i-dot"/></svg>';
       const st = { ok: dot + 'OK', warn: dot + tx('Revisar'), err: dot + tx('Error') };
       const inp = (r, k, v, cls) => '<td class="' + (cls || '') + '"><input type="text" data-row="' + r.idx + '" data-k="' + k + '" value="' + esc(v || '') + '" spellcheck="false" autocomplete="off"></td>';
-      $('imp-prev').innerHTML = head + '<tbody>' + pv.rows.map(r =>
-        '<tr class="st-' + r.status + (r.include ? '' : ' off') + '" title="' + esc(r.raw || '') + '">' +
+      IMP_PAINT = true;
+      try {
+      $('imp-prev').innerHTML = head + '<tbody>' + impView(release).map(r =>
+        '<tr class="st-' + r.status + (r.include ? '' : ' off') + '" data-rid="' + esc(impRid(r)) + '" title="' + esc(r.raw || '') + '">' +
         // Dec. 155: una fila con error NO lleva casilla (se guarda el hueco): dice su estado y por qué, y se excluye o se restaura
         // con su botón. Al corregirla vuelve la casilla: marcada si estaba pendiente, desmarcada si se excluyó a mano.
         (r.status === 'err' ? '<td class="chk"><span class="sr-only">' + esc(tx(impOff(r) ? 'Excluida a mano: no se importará' : 'Esta fila no se importará')) + '</span></td>'
@@ -2383,7 +2700,11 @@
         inp(r, 'inicio', r.inicio, 't') + (r.tipo === 'hito' ? '<td class="t"><span class="dash">—</span></td>' : inp(r, 'fin', r.fin, 't')) +
         (r.tipo === 'show' || r.tipo === 'sc' ? inp(r, 'call', r.call, 't') : '<td class="t"><span class="dash">—</span></td>') + inp(r, 'notas', r.notas) +
         '<td class="av">' + r.errs.map(x => '<div class="e">' + esc(back(x)) + '</div>').join('') + r.warns.map(x => '<div>' + esc(back(x)) + '</div>').join('') + '</td></tr>').join('') + '</tbody>';
+      } finally { IMP_PAINT = false; }
     }
+    impColApply(); impSortNote();
+    // El foco sigue en el mismo control (rehecho); si la fila se recoloca al confirmar, el scroll la acompaña
+    if (fkey) { const n = $('imp-prev').querySelector(fkey); if (n && n !== act && n.focus) { try { n.focus({ preventScroll: !(release && /data-row/.test(fkey)) }); } catch (e) { n.focus(); } } }
     // Líneas ignoradas (texto libre)
     const ign = rd.ignored || [];
     $('imp-ign').hidden = !ign.length;
@@ -2556,8 +2877,28 @@
   // Dec. 155: «Excluir» (fila con error → Excluidas, explícito) y «Restaurar» (vuelve a Error pendiente). Solo el borrador.
   $('imp-prev').addEventListener('click', e => {
     // «Error ⓘ»: el toque (o clic) fija / cierra su detalle. Es el «click» del navegador: un scroll o un arrastre no lo abren.
+    // Tirador: clic sin arrastre, Intro o Espacio → microcontrol (abre / cierra). Ratón que se movió = arrastre (no abre). Dedo o
+    // lápiz: si el navegador lo da por TOQUE (dispara «click», dentro de su propio margen), se deshace el temblor y se abre.
+    let gr = e.target.closest && e.target.closest('[data-grip]');
+    if (gr && gr.isConnected === false) gr = $('imp-prev').querySelector('[data-grip="' + gr.dataset.grip + '"]');   // tabla rehecha en este clic
+    if (gr && IMP) {
+      const gest = IMP_GEST; IMP_GEST = null;
+      if (gest && gest.g === gr && gest.moved) { if (gest.pt === 'mouse') return; impColSet(gest.i, gest.w); }
+      if (COLCTL.g === gr) impColCtlClose(false); else impColCtlOpen(gr, e.detail === 0);
+      return;
+    }
+    const sb = e.target.closest && e.target.closest('[data-sort]');
+    if (sb && IMP) {   // ascendente → descendente → orden original (solo la vista)
+      const k = sb.dataset.sort, s = IMP.sort;
+      IMP.sort = !s || s.k !== k ? { k, dir: 'asc' } : s.dir === 'asc' ? { k, dir: 'desc' } : null;
+      IMP.sortUsed = true; impRender(true); return;
+    }
     const tip = e.target.closest && e.target.closest('[data-errtip]');
-    if (tip && IMP) { if (ERRPOP.btn === tip && ERRPOP.pinned) errPopHide(); else errPopShow(tip, true); return; }
+    if (tip && IMP) {
+      const live = tip.isConnected === false ? $('imp-prev').querySelector('[data-errtip="' + tip.dataset.errtip + '"]') : tip;   // tabla rehecha en este clic
+      if (!live) return;
+      if (ERRPOP.btn === live && ERRPOP.pinned) errPopHide(); else errPopShow(live, true); return;
+    }
     const b = e.target.closest && e.target.closest('[data-exc],[data-rest]'); if (!b || !IMP) return;
     const i = +(b.dataset.exc !== undefined ? b.dataset.exc : b.dataset.rest), exc = b.dataset.exc !== undefined;
     // Acción contextual del detalle en línea activada con TECLADO (Enter/Espacio → click con detail 0): la tabla se rehace y el
@@ -2568,8 +2909,9 @@
     impRecompute();
     if (kbCtx) { const n = $('imp-prev').querySelector && $('imp-prev').querySelector('td.st [data-rest="' + i + '"], td.st [data-exc="' + i + '"]'); if (n && n.focus) n.focus(); }
   });
-  $('imp-prev').addEventListener('change', e => {
-    const el = e.target;
+  // El editor ampliado (y el campo compacto que guarda su hueco) confirman al cerrarse el editor, no con su «change» nativo
+  $('imp-prev').addEventListener('change', e => { const c = e.target.classList; if (!(c && (c.contains('imp-wide') || c.contains('imp-wsrc')))) impCellChange(e.target); });
+  function impCellChange(el) {
     // Fila manual (detrás de las pegadas): su casilla y sus ediciones van por su id
     const man = i => i >= IMP.nPaste && IMP.manual[i - IMP.nPaste] ? IMP.manual[i - IMP.nPaste].uid : null;
     if (el.dataset.inc !== undefined) { const i = +el.dataset.inc, u = man(i); if (u) IMP.mInc[u] = el.checked; else IMP.include[i] = el.checked; impRecompute(); return; }
@@ -2580,8 +2922,182 @@
     IMP.edits[i] = IMP.edits[i] || {}; IMP.edits[i][el.dataset.k] = el.value;
     if ((el.dataset.k === 'escenario' || el.dataset.k === 'banda' || el.dataset.k === 'tipo') && IMP.include[i] !== false) delete IMP.include[i];
     impRecompute();
+  }
+  // Confirmar una edición rehace la tabla: Intro (confirmar y seguir en el mismo campo) y Tab / Shift+Tab (al control siguiente /
+  // anterior) apuntan ANTES del repintado al control de destino por su identidad estable y lo enfocan ya redibujado.
+  $('imp-prev').addEventListener('keydown', e => {
+    if (e.key !== 'Enter' || !e.target.matches('input[type=text], textarea.imp-wide')) return;
+    e.preventDefault();   // en el editor ampliado, Intro (también con Mayús) confirma: nunca mete un salto de línea
+    const el = e.target, key = impTabKey(el);
+    IMP_NOEXP = true;   // confirmado: el foco vuelve al campo COMPACTO (no se reabre el editor hasta que deje de caber al escribir)
+    try { el.blur(); if (key && IMP) impFocusTo(key); } finally { IMP_NOEXP = false; }
   });
-  $('imp-prev').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches('input[type=text]')) { e.preventDefault(); e.target.blur(); } });
+  $('imp-prev').addEventListener('keydown', e => {
+    if (e.key !== 'Tab' || e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || !IMP) return;
+    const el = e.target;
+    if (!el.matches || !el.matches('tbody input[type=text][data-row], tbody textarea.imp-wide, tbody select[data-row]')) return;
+    const list = impTabbables(), at = list.indexOf(el);
+    if (at < 0) return;
+    const to = list[at + (e.shiftKey ? -1 : 1)];
+    if (!to || !(to.closest && to.closest('#imp-prev'))) return;   // fuera de la tabla (o no hay más): orden normal del navegador
+    const key = impTabKey(to);
+    if (!key) return;
+    e.preventDefault();
+    el.blur();   // confirma (change → repintado y recolocación si corresponde)
+    if (IMP) impFocusTo(key);
+  });
+  // v20261166 · orden retenido mientras un campo tiene el foco: Intro en el desplegable lo confirma (la fila va a su sitio y el
+  // foco la acompaña); salir del campo, también. Si el foco pasa a otro control de la tabla, se recoloca al llegar a él.
+  $('imp-prev').addEventListener('keydown', e => {
+    if (!IMP) return;
+    if (e.key === 'Enter' && IMP.held && e.target.matches && e.target.matches('select[data-row]')) { e.preventDefault(); impRender(true); return; }
+  });
+  // Microcontrol: − / + (16 px; mínimo real; sin máximo). Esc lo cierra y vuelve al tirador; Tab sigue el orden del tirador.
+  $('imp-colctl').addEventListener('click', e => {
+    const b = e.target.closest && e.target.closest('[data-colstep]');
+    if (!b || !COLCTL.g || !IMP || !IMP.colW || b.getAttribute('aria-disabled') === 'true') return;
+    impColSet(COLCTL.i, IMP.colW[COLCTL.i] + (+b.dataset.colstep) * IMP_COL_PASO);
+  });
+  $('imp-colctl').addEventListener('keydown', e => {
+    if (!COLCTL.g) return;
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); impColCtlClose(true); return; }
+    if (e.key !== 'Tab') return;
+    const box = $('imp-colctl'), first = box.querySelector('[data-colstep="-1"]'), last = box.querySelector('[data-colstep="1"]');
+    if (e.shiftKey && e.target === first) { e.preventDefault(); impColCtlClose(true); }
+    else if (!e.shiftKey && e.target === last) {   // al siguiente control tras el tirador, en el orden normal
+      e.preventDefault(); const g = COLCTL.g, list = impTabbables(), to = list[list.indexOf(g) + 1];
+      impColCtlClose(false); if (to && to.focus) to.focus();
+    }
+  });
+  $('imp-colctl').addEventListener('focusout', e => { const to = e.relatedTarget; if (COLCTL.g && to && !(to.closest && to.closest('#imp-colctl')) && to !== COLCTL.g) impColCtlClose(false); });
+  document.addEventListener('pointerdown', e => { if (COLCTL.g && !(e.target.closest && (e.target.closest('#imp-colctl') || e.target.closest('[data-grip]') === COLCTL.g))) impColCtlClose(false); }, true);
+  window.addEventListener('scroll', e => { if (COLCTL.g && !(e.target && e.target.closest && e.target.closest('#imp-colctl'))) impColCtlClose(false); }, true);
+  window.addEventListener('resize', () => { if (COLCTL.g) impColCtlClose(false); });
+  // Lectura pasiva (hover): SOLO ratón. En tablet no hay hover ni pulsación larga: un toque edita como siempre.
+  $('imp-prev').addEventListener('pointerover', e => {
+    if (e.pointerType !== 'mouse') return;
+    const n = e.target;
+    if (impWideK(n) && n !== CELLPOP.inp && n !== document.activeElement && impCut(n)) cellPopShow(n);
+  });
+  $('imp-prev').addEventListener('pointerout', e => {   // del campo a su detalle (flotante o en línea) no se cierra; a otro sitio, sí
+    if (e.pointerType !== 'mouse' || !CELLPOP.inp) return;
+    // En línea, el camino del campo a su detalle cruza el resto de su fila: la fila entera cuenta como zona
+    const row = CELLPOP.inline && CELLPOP.inp.closest ? CELLPOP.inp.closest('tr') : null;
+    const zone = n => n === CELLPOP.inp || inCellPop(n) || !!(row && n && n.closest && n.closest('tr') === row);
+    if (zone(e.target) && !zone(e.relatedTarget)) cellPopHide();
+  });
+  $('imp-cellpop').addEventListener('pointerleave', e => { if (e.pointerType === 'mouse' && CELLPOP.inp && e.relatedTarget !== CELLPOP.inp) cellPopHide(); });
+  document.addEventListener('click', e => { if (CELLPOP.inp && !inCellPop(e.target)) cellPopHide(); });
+  window.addEventListener('scroll', e => { if (CELLPOP.inp && !CELLPOP.inline && !inCellPop(e.target)) cellPopHide(); }, true);
+  window.addEventListener('resize', () => { if (CELLPOP.inp) cellPopHide(); if (IMP_ED) impEdLayout(); });
+  // Editor ampliado: al recibir el foco con el texto recortado, o cuando deja de caber al escribir
+  $('imp-prev').addEventListener('pointerdown', e => { IMP_PTR = e.target; });
+  document.addEventListener('keydown', () => { IMP_PTR = null; }, true);
+  $('imp-prev').addEventListener('focusin', e => {
+    const n = e.target;
+    if (!impWideK(n)) return;
+    cellPopHide();
+    if (IMP_NOEXP || IMP_PAINT || !impCut(n)) return;
+    // Con ratón o dedo, el navegador sitúa el cursor con el propio clic: se espera a que termine (click / pointerup) y el editor
+    // hereda esa posición o selección. Con la selección de un clic ya calculada (tabla rehecha), esa. Con teclado (Tab / Shift+Tab)
+    // nunca se hereda el «todo seleccionado» automático: cursor al final, listo para escribir sin borrar nada.
+    if (IMP_PTR === n) IMP_EDPEND = n;
+    else if (IMP_FOCUSSEL) impEdOpen(n, IMP_FOCUSSEL);
+    else {
+      const L = String(n.value || '').length, s = impSelOf(n);
+      impEdOpen(n, s && s.e > s.s && !(s.s === 0 && s.e === L) ? s : { s: L, e: L, d: 'none' });   // un trozo seleccionado a propósito se respeta
+    }
+  });
+  const impEdPending = () => { const n = IMP_EDPEND; IMP_EDPEND = null; if (n && !IMP_ED && n === document.activeElement && impCut(n)) impEdOpen(n, impSelOf(n)); };
+  $('imp-prev').addEventListener('click', e => { if (IMP_EDPEND && e.target === IMP_EDPEND) impEdPending(); });
+  document.addEventListener('pointerup', () => { if (!IMP_HOLD && IMP_EDPEND && IMP_EDPEND === document.activeElement) impEdPending(); });   // arrastre para seleccionar que acaba fuera del campo
+  // Clic directo en otro campo de texto o Tipo con un editor abierto: se apunta el destino (su identidad) ANTES de que el editor
+  // confirme y la tabla se rehaga. Solo campos de texto y Tipo: los botones siguen su camino.
+  /** Repinta UNA vez lo ya confirmado. Si el destino del gesto tiene el foco, vuelve a él (redibujado) con su cursor / selección;
+   *  si no lo tiene, el foco no se toca. */
+  function impHoldRepaint(key, el, always) {
+    const on = !!el && el === document.activeElement, sel = on ? impSelOf(el) : null;
+    IMP_EDPEND = null;
+    if (on && el.blur) el.blur();   // la fila confirmada se recoloca sin foco retenido (como con Tab)
+    impRecompute();
+    if (IMP && key && (on || always)) impFocusTo(key, sel);
+  }
+  /** El gesto no va a acabar en el «click» esperado (cancelado, captura perdida, ventana sin foco u oculta, otra tecla u otro
+   *  gesto): el repintado pendiente se hace YA, una sola vez (IMP_HOLD se apaga antes). */
+  const impHoldFlush = () => {
+    if (!IMP_HOLD) return;
+    IMP_HOLD = false;
+    const key = IMP_CLICKTO, el = IMP_CLICKEL; IMP_CLICKTO = null; IMP_CLICKEL = null;
+    if (IMP_PEND) impHoldRepaint(key, el, false);
+  };
+  document.addEventListener('keydown', impHoldFlush, true);
+  document.addEventListener('lostpointercapture', impHoldFlush, true);
+  window.addEventListener('blur', impHoldFlush);   // sin captura: solo el blur de la ventana (el de un campo no sube hasta aquí)
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') impHoldFlush(); });
+  document.addEventListener('pointerdown', e => {
+    impHoldFlush();
+    IMP_CLICKTO = null; IMP_CLICKEL = null;
+    const n = e.target;
+    if (!IMP_ED || n === IMP_ED.ta || !n.matches) return;
+    // Otro campo de texto o Tipo: el editor confirma, pero la tabla no se rehace hasta que el navegador haya puesto el cursor (o la
+    // selección) del clic en ese campo; entonces se guarda su identidad + selección, se repinta y se restaura exactamente
+    if (n.matches('#imp-prev tbody input[type=text][data-row], #imp-prev tbody select[data-row]')) { IMP_CLICKTO = impTabKey(n); IMP_CLICKEL = n; IMP_HOLD = true; }
+    // Botón o casilla de la tabla (Excluir, Restaurar, casilla, Error ⓘ, cabeceras, tiradores): el editor confirma, pero la tabla
+    // espera a que termine el clic. Nada de esto toca el foco ni el clic: el botón hace lo suyo al primer clic.
+    else if (n.closest && n.closest('#imp-prev') && n.closest('button, input[type=checkbox]') && !n.closest('[data-grip]')) IMP_HOLD = true;   // el tirador no quita el foco
+  }, true);
+  document.addEventListener('click', e => {
+    if (!IMP_HOLD) return;
+    IMP_HOLD = false;
+    if (IMP_CLICKTO) {   // el clic acabó: el cursor / la selección del destino ya son los del navegador
+      const key = IMP_CLICKTO, el = IMP_CLICKEL; IMP_CLICKTO = null; IMP_CLICKEL = null; IMP_HOLDOWN = true;
+      const on = !!el && el === document.activeElement, sel = on ? impSelOf(el) : null;
+      if (!IMP_PEND) { if (on && IMP_EDPEND === el) impEdPending(); return; }   // nada que repintar: el campo sigue siendo el mismo
+      impHoldRepaint(key, el, true);   // el clic llegó: el foco vuelve al destino con lo que puso el navegador
+      return;
+    }
+    const n = e.target;
+    // Excluir / Restaurar / casilla rehacen la tabla ellos mismos (con el dato ya confirmado); el resto la ve rehecha antes
+    IMP_HOLDOWN = !!(n && n.closest && n.closest('[data-exc], [data-rest], [data-inc]'));
+    if (IMP_PEND && !IMP_HOLDOWN) impRecompute();
+  }, true);
+  document.addEventListener('click', () => { if (IMP_PEND && !IMP_HOLDOWN) impRecompute(); IMP_HOLDOWN = false; });
+  document.addEventListener('pointercancel', impHoldFlush, true);
+  $('imp-prev').addEventListener('input', e => {
+    const n = e.target;
+    if (IMP_ED && n === IMP_ED.ta) {   // un dato de una línea: lo pegado con saltos se queda en una línea
+      if (/[\r\n]/.test(n.value)) { const p = n.selectionStart; n.value = n.value.replace(/\r\n?|\n/g, ' '); try { n.setSelectionRange(p, p); } catch (err) {} }
+      impEdLayout(); return;
+    }
+    if (impWideK(n) && n === document.activeElement && !IMP_ED && impCut(n)) impEdOpen(n, { s: n.selectionStart, e: n.selectionEnd });
+  });
+  $('imp-prev').addEventListener('focusout', e => { if (!IMP_PAINT && IMP_ED && e.target === IMP_ED.ta) impEdClose(); });
+  $('imp-prev').addEventListener('focusout', e => {
+    if (IMP_PAINT || !IMP || !IMP.held || !(e.target.matches && e.target.matches('tbody [data-row]'))) return;
+    const to = e.relatedTarget;
+    if (to && to.closest && to.closest('#imp-prev')) IMP.resortIn = true; else impRender(true);
+  });
+  $('imp-prev').addEventListener('focusin', () => { if (!IMP_PAINT && IMP && IMP.resortIn) { IMP.resortIn = false; impRender(true); } });
+  // Tirador: SOLO un arrastre que empieza en él cambia el ancho (touch-action: none en el tirador; el resto de la tabla hace
+  // scroll como siempre). Con captura del puntero; un clic o un toque en el texto de la cabecera ordena, en el tirador no.
+  $('imp-prev').addEventListener('pointerdown', e => {
+    const g = e.target.closest && e.target.closest('[data-grip]');
+    if (!g || !IMP || (e.pointerType === 'mouse' && e.button !== 0) || !impColFreeze()) return;
+    e.preventDefault();
+    const i = +g.dataset.grip;
+    IMP_DRAG = { id: e.pointerId, i, x: e.clientX, w: IMP.colW[i], g, pt: e.pointerType, moved: false };
+    try { g.setPointerCapture(e.pointerId); } catch (err) {}
+    if (g.classList) g.classList.add('drag');
+  });
+  $('imp-prev').addEventListener('pointermove', e => {
+    if (!IMP_DRAG || e.pointerId !== IMP_DRAG.id) return;
+    if (e.clientX !== IMP_DRAG.x) { if (!IMP_DRAG.moved) impColCtlClose(false); IMP_DRAG.moved = true; }
+    impColSet(IMP_DRAG.i, IMP_DRAG.w + e.clientX - IMP_DRAG.x);
+  });
+  let IMP_GEST = null;   // el último gesto sobre un tirador (para distinguir clic de arrastre)
+  const impDragEnd = e => { if (!IMP_DRAG || e.pointerId !== IMP_DRAG.id) return; if (IMP_DRAG.g.classList) IMP_DRAG.g.classList.remove('drag'); IMP_GEST = IMP_DRAG; IMP_DRAG = null; };
+  ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(t => $('imp-prev').addEventListener(t, impDragEnd));
+  $('imp-colreset').addEventListener('click', impColReset);
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && IMP && $('modal').hidden) closeImport(); });
   // Arrastrar un .csv/.tsv sobre la ventana de importar
   const impBox = $('imp').querySelector('.imp-box');
@@ -4119,5 +4635,5 @@
   });
   window.ShowtimePanel = { reload: () => { loadState(); renderAll(); }, _test: { winState: () => Array.from(WIN.entries()).map(([id, x]) => ({ id, name: x.name, vista: x.vista, zona: x.zona, filas: x.filas || null, standby: !!x.standby, fs: x.fs })), setWinVista, setWinRows, resetWinLayout, setWinStandby, closeLive, openGestor, gestorVisible, emProdMessage, emRegenProd, hitoChips, emUrl, prodBigTitle, fileKind, handleFile, emCommand, importSummary, hidesSome, tipoPill, setWake, wakeState: () => ({ on: wakeOn, lock: !!wakeLock }), showSplash, hideSplash, setStandby, standbyOn, room: () => emRoom,
     emSnapshot, emCloseDay, emDay, qrDevices, rmZones, setRmZone: z => { RM_ZONE = z; renderCast(); }, setRoom: r => { emRoom = r; }, fakeEm: (em, st) => { EM = em; EMST = st; }, emStateHtml, renderCastBar, renderHubLed, mtIn, mtOut, cfSimState, renderCfSim, cfSim: () => CFSIM,
-    dayStep, monthLabel, spotItems, spotDays, spotEntries, fmtDayFull, refreshStale, net: () => NET, setNet: o => { NET = netNorm(o); }, netNorm, emLink, emBrokers, emUrl, netHtml, renderCast, audioTick, fillAudioCfg, saveAudioCfg, audioPreview, audioConfirm, audioRearm, audioUrgentAnswered, sendChat, fitMtAlerts, mtJump, mtFreshOff, mtRearm, setImportText, impTally, errPopPlace, errPop: () => ({ open: !!ERRPOP.btn, pinned: ERRPOP.pinned, inline: !!ERRPOP.inline }), mtAnchorSave, mtAnchorApply, mtAnchor: () => MT_ANCHOR, mtTapState: () => ({ touch: Array.from(MT_TOUCH), tap: MT_TAP && { pid: MT_TAP.pid, id: MT_TAP.id, cap: MT_TAP.cap } }), setAppLang, mtNew: () => Array.from(MT_NEW), mtIds, mtOrder: () => MT_ORDER && MT_ORDER.map(e => Object.assign({}, e)), auMuteBtn, renderChat, callEditFix, applyEdit, undo, loadNew, impDoImport } };   // _test: solo para tests/control.test.js
+    dayStep, monthLabel, spotItems, spotDays, spotEntries, fmtDayFull, refreshStale, net: () => NET, setNet: o => { NET = netNorm(o); }, netNorm, emLink, emBrokers, emUrl, netHtml, renderCast, audioTick, fillAudioCfg, saveAudioCfg, audioPreview, audioConfirm, audioRearm, audioUrgentAnswered, sendChat, fitMtAlerts, mtJump, mtFreshOff, mtRearm, setImportText, impTally, errPopPlace, impSortRows, imp: () => IMP, impEd: () => IMP_ED && { k: IMP_ED.inp.dataset.k, row: IMP_ED.inp.dataset.row }, cellPop: () => ({ open: !!CELLPOP.inp, inline: CELLPOP.inline }), errPop: () => ({ open: !!ERRPOP.btn, pinned: ERRPOP.pinned, inline: !!ERRPOP.inline }), mtAnchorSave, mtAnchorApply, mtAnchor: () => MT_ANCHOR, mtTapState: () => ({ touch: Array.from(MT_TOUCH), tap: MT_TAP && { pid: MT_TAP.pid, id: MT_TAP.id, cap: MT_TAP.cap } }), setAppLang, mtNew: () => Array.from(MT_NEW), mtIds, mtOrder: () => MT_ORDER && MT_ORDER.map(e => Object.assign({}, e)), auMuteBtn, renderChat, callEditFix, applyEdit, undo, loadNew, impDoImport } };   // _test: solo para tests/control.test.js
 })();

@@ -13,8 +13,8 @@
 <meta name="apple-mobile-web-app-title" content="Showtime">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
-<link rel="stylesheet" href="control.css?v=20261165">
-<link rel="stylesheet" href="marca.css?v=20261165">
+<link rel="stylesheet" href="control.css?v=20261166">
+<link rel="stylesheet" href="marca.css?v=20261166">
 </head>
 <body>
 <div id="splash" class="splash" hidden></div>
@@ -495,7 +495,7 @@
 <!-- Pegar horario (ESPEC-2c A) -->
 <div id="imp" class="modal" hidden>
   <!-- Dec. 155: detalle de «Error ⓘ», FUERA de la caja con scroll para que nunca se recorte -->
-  <div id="imp-errpop" class="imp-errpop" role="tooltip" hidden></div>
+  <div id="imp-errpop" class="imp-errpop" role="tooltip" hidden></div><div id="imp-cellpop" class="imp-errpop imp-cellpop" role="tooltip" hidden></div><div id="imp-colctl" class="imp-colctl" role="group" hidden><button type="button" class="imp-colstep" data-colstep="-1">−</button><output id="imp-colw" class="imp-colw" aria-live="polite"></output><button type="button" class="imp-colstep" data-colstep="1">+</button></div>
   <div class="modal-box imp-box" role="dialog" aria-modal="true" aria-labelledby="imp-title">
     <div class="imp-head"><h2 id="imp-title" data-i18n><svg class="ic"><use href="#i-bolt"/></svg>Pegar horario completo <small data-i18n>Excel · CSV · PDF</small></h2><button id="imp-close" class="iconsq" title="Cerrar (Esc)" data-i18n-title><svg class="ic"><use href="#i-x"/></svg></button></div>
     <p id="imp-notice" class="imp-notice" role="status" hidden></p>
@@ -521,7 +521,7 @@
     <div id="imp-new" class="imp-new"></div>
     </div>
     <div class="mcard imp-card imp-mapcard"><div class="mcard-h" data-i18n>Columnas del archivo</div><div id="imp-map" class="imp-map"></div></div>
-    <div class="mcard imp-card imp-prevcard"><div class="mcard-h" data-i18n>Vista previa</div><div id="imp-prevwrap" class="imp-prevwrap"><table id="imp-prev" class="imp-prev"></table></div></div>
+    <div class="mcard imp-card imp-prevcard"><div class="imp-prevhead"><div class="mcard-h" data-i18n>Vista previa</div><span id="imp-sortnote" class="imp-sortnote" role="status" aria-live="polite"></span><button id="imp-colreset" class="linkbtn imp-colreset" type="button" data-i18n>Restablecer columnas</button><span id="imp-edhint" class="sr-only" data-i18n>Intro confirma. El texto sigue siendo de una sola línea.</span></div><div id="imp-prevwrap" class="imp-prevwrap"><table id="imp-prev" class="imp-prev"></table></div></div>
     <details id="imp-ign" class="imp-ign" hidden><summary></summary><ul></ul></details>
     <!-- Dec. 155: fila manual DENTRO del importador (sin otro modal), DEBAJO de la vista previa y encima del pie. Se abre desde el pie;
          cada fila se suma al final del borrador y solo entra con «Importar» -->
@@ -546,21 +546,21 @@
 <datalist id="zones-dl"></datalist>
 <div id="toast" class="toast" hidden></div>
 
-<script src="i18n.js?v=20261165"></script>
-<script src="core.js?v=20261165"></script>
-<script src="meteo.js?v=20261165"></script>
-<script src="datos.js?v=20261165"></script>
-<script src="importar.js?v=20261165"></script>
-<script src="xlsx.js?v=20261165"></script>
-<script src="qr.js?v=20261165"></script>
-<script src="emision.js?v=20261165"></script>
-<script src="mando.js?v=20261165"></script>
-<script src="vistas.js?v=20261165"></script>
-<script src="log.js?v=20261165"></script>
-<script src="print.js?v=20261165"></script>
-<script src="marca.js?v=20261165"></script>
-<script src="audio.js?v=20261165"></script>
-<script src="control.js?v=20261165"></script>
-<script src="pwa.js?v=20261165"></script>
+<script src="i18n.js?v=20261166"></script>
+<script src="core.js?v=20261166"></script>
+<script src="meteo.js?v=20261166"></script>
+<script src="datos.js?v=20261166"></script>
+<script src="importar.js?v=20261166"></script>
+<script src="xlsx.js?v=20261166"></script>
+<script src="qr.js?v=20261166"></script>
+<script src="emision.js?v=20261166"></script>
+<script src="mando.js?v=20261166"></script>
+<script src="vistas.js?v=20261166"></script>
+<script src="log.js?v=20261166"></script>
+<script src="print.js?v=20261166"></script>
+<script src="marca.js?v=20261166"></script>
+<script src="audio.js?v=20261166"></script>
+<script src="control.js?v=20261166"></script>
+<script src="pwa.js?v=20261166"></script>
 </body>
 </html>

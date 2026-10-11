@@ -769,10 +769,12 @@
     manFill(t, { tipo: 'sc', nombre: 'Uno', zona: 'Principal', jor: JOR, ini: '18:00', fin: '18:30' }); t.env.fire('imp-m-add', 'click', {});
     eq(t.env.getEl('imp-m-tipo').value, 'sc', 'el tipo elegido se queda'); eq(t.env.getEl('imp-m-jor').value, JOR, 'y la jornada');
     eq(t.env.getEl('imp-m-nombre').value, '', 'nombre limpio para la siguiente'); eq(t.env.getEl('imp-man').hidden, false, 'la ficha sigue abierta');
-    W.scrollHeight = 480; W.scrollTop = 0;
+    // v20261166: el scroll va hasta la fila nueva por su id estable (aquí, la última: debajo de lo visible)
+    const pedidas = []; W.scrollTop = 0; W.clientHeight = 300; W.getBoundingClientRect = () => ({ top: 100, bottom: 400 });
+    W.querySelector = q => { pedidas.push(q); return q === 'thead' ? { getBoundingClientRect: () => ({ height: 30 }) } : /^tr\[data-rid="m2"\]$/.test(q) ? { getBoundingClientRect: () => ({ top: 700, bottom: 730 }) } : null; };
     t.env.getEl('imp-m-nombre').value = 'Dos'; t.env.getEl('imp-m-zona').value = 'Principal'; t.env.getEl('imp-m-ini').value = '18:40'; t.env.getEl('imp-m-fin').value = '+20';
     t.env.fire('imp-m-add', 'click', {});
-    eq(W.scrollTop, 480, 'la vista previa baja hasta la fila nueva (la última)');
+    ok(pedidas.indexOf('tr[data-rid="m2"]') >= 0, 'busca la fila nueva por su id estable'); eq(W.scrollTop, 330, 'la vista previa baja lo justo hasta la fila nueva (la última)');
     t.env.getEl('imp-m-nombre').value = 'Tres'; t.env.getEl('imp-m-zona').value = 'Principal'; t.env.getEl('imp-m-ini').value = '19:10'; t.env.getEl('imp-m-fin').value = '19:30';
     t.env.fire('imp-m-add', 'click', {});
     const pv = ultimo(t, 'imp-prev'), at = n => pv.indexOf('value="' + n + '"');
@@ -870,6 +872,474 @@
     ok(/errPopAvoid\(btn\)/.test(D.src('control.js')) && /\$\('imp-cancel'\), \$\('imp-go'\), \$\('imp-man-open'\), act\]/.test(D.src('control.js')), 'el detalle esquiva Cancelar, Importar, Añadir fila manual y la acción de su fila');
     const zonaPop = D.src('control.js').slice(D.src('control.js').indexOf('function errPopShow'), D.src('control.js').indexOf('/** ¿Fila desmarcada a mano'));
     ok(!/stopPropagation/.test(zonaPop) && (zonaPop.match(/preventDefault/g) || []).length === 1 && /if \(e\.key !== 'Tab' \|\| e\.shiftKey[^\n]*\n[^\n]*e\.preventDefault\(\); c\.focus\(\);/.test(zonaPop), 'el detalle no consume ningún gesto (solo encamina Tab de Error a su acción contextual)');
+  });
+  // ── v20261166 · orden visual y ancho de columnas de la vista previa ──
+  const SORT_TXT = 'Banda\tZona\tInicio\tFin\nÁlvaro\tPrincipal\t23:00\t23:40\nbanda 10\tPrincipal\t00:30\t01:00\nbanda 2\tPrincipal\t20:00\t21:00\n\tPrincipal\t21:00\t\nZeta\tPrincipal\t\t';
+  const sortPanel = () => { const F = fest(), t = panel({ 'showtime.festival': JSON.stringify(F.s) }); t.env.fire('btn-paste', 'click', {}); t.env.win.ShowtimePanel._test.setImportText(SORT_TXT); return { F, t }; };
+  const ridsOf = t => (ultimo(t, 'imp-prev').match(/data-rid="[^"]+"/g) || []).map(x => x.slice(10, -1)).join(' ');
+  const headOf = t => { const h = ultimo(t, 'imp-prev'); return h.slice(0, h.indexOf('</thead>')); };
+  const sortClick = (t, k) => t.env.fire('imp-prev', 'click', { target: { closest: q => q === '[data-sort]' ? { dataset: { sort: k } } : null } });
+  test('Importador v20261166 · orden visual (puro): asc / desc / original, vacíos e incompletos al final, jornada + hora operativa, Tipo semántico, empates estables, texto natural', () => {
+    const T = panel().env.win.ShowtimePanel._test, S = (rows, k, dir, lang) => T.impSortRows(rows, k ? { k, dir } : null, { cut: 360, lang: lang || 'es' }).map(r => r.id).join(' ');
+    const J1 = '2026-07-10', J2 = '2026-07-11';
+    const rows = [
+      { id: 'a', idx: 0, tipo: 'tarea', banda: 'Álvaro', escenario: 'carpa', jornada: J1, inicio: '23:00', fin: '23:40', call: '', notas: '' },
+      { id: 'b', idx: 1, tipo: 'show', banda: 'banda 10', escenario: 'Carpa', jornada: J1, inicio: '00:30', fin: '01:00', call: '00:00', notas: 'x' },
+      { id: 'c', idx: 2, tipo: 'hito', banda: 'banda 2', escenario: 'Principal', jornada: J2, inicio: '20:00', fin: '21:00', call: '19:00', notas: '' },
+      { id: 'd', idx: 3, tipo: 'sc', banda: '', escenario: '', jornada: '', inicio: '21:00', fin: '', call: '', notas: '' },
+      { id: 'e', idx: 4, tipo: 'show', banda: 'zeta', escenario: 'carpa', jornada: J1, inicio: '', fin: '', call: '22:00', notas: 'ÉPICO' }];
+    const snap = JSON.stringify(rows);
+    // Horas: jornada operativa y, dentro, la hora tras el corte (06:00): 00:30 del 10 va después de 23:00 del 10; sin jornada o sin hora, al final
+    eq(S(rows, 'inicio', 'asc'), 'a b c d e', 'Inicio ↑: 23:00 → 00:30 (misma jornada) → jornada siguiente; incompletos al final en su orden');
+    eq(S(rows, 'inicio', 'desc'), 'c b a d e', 'Inicio ↓: incompletos siguen al final');
+    eq(S(rows, null), 'a b c d e', 'sin orden: el original');
+    eq(S(rows, 'fin', 'asc'), 'a b c d e', 'Fin ↑: 23:40 → 01:00 del día siguiente (misma jornada); el marcador (c) muestra «—» → vacío, al final');
+    eq(S(rows, 'fin', 'desc'), 'b a c d e', 'Fin ↓; vacíos al final en su orden');
+    eq(S(rows, 'call', 'asc'), 'e b a c d', 'CALL ↑: 22:00 antes que 00:00 (tras el corte, misma jornada); tareas y marcadores («—») al final');
+    eq(S(rows, 'call', 'desc'), 'b e a c d', 'CALL ↓');
+    eq(S(rows, 'jornada', 'asc'), 'a b e c d', 'Jornada ↑ (empates en orden original; sin jornada al final)');
+    eq(S(rows, 'jornada', 'desc'), 'c a b e d', 'Jornada ↓ (empates en orden original; sin jornada al final)');
+    eq(S(rows, 'tipo', 'asc'), 'b e d a c', 'Tipo ↑: Show → Soundcheck → Tarea → Marcador (empates estables)');
+    eq(S(rows, 'tipo', 'desc'), 'c a d b e', 'Tipo ↓: al revés, empates estables');
+    eq(S(rows, 'banda', 'asc'), 'a c b e d', 'Nombre ↑: natural (2 < 10), sin mayúsculas ni acentos; vacío al final');
+    eq(S(rows, 'banda', 'desc'), 'e b c a d', 'Nombre ↓; vacío al final');
+    eq(S(rows, 'escenario', 'asc'), 'a b e c d', 'Zona ↑: «carpa» = «Carpa» → empate estable');
+    eq(S(rows, 'notas', 'asc'), 'e b a c d', 'Notas ↑: «ÉPICO» = «epico» < «x»; vacíos al final');
+    eq(S(rows, 'banda', 'asc', 'en'), S(rows, 'banda', 'asc', 'es'), 'mismo orden en inglés');
+    eq(S(rows, 'notas', 'desc', 'en'), 'b e a c d', 'Notas ↓ en inglés');
+    eq(JSON.stringify(rows), snap, 'nunca muta las filas ni su orden');
+  });
+  test('Importador v20261166 · cabeceras: Tipo…Notas ordenan (botón real, aria-sort, ciclo asc → desc → original) y llevan tirador separado; casilla, Estado y Avisos no; rótulo de estado; ES/EN', () => {
+    const { t } = sortPanel(), T = t.env.win.ShowtimePanel._test;
+    const h0 = headOf(t);
+    ['tipo', 'escenario', 'banda', 'jornada', 'inicio', 'fin', 'call', 'notas'].forEach((k, n) => {
+      ok(new RegExp('<th class="srt" data-colk="' + k + '"><button type="button" class="imp-sortbtn" data-sort="' + k + '" title="Ordenar por [^"]+ \\(ascendente\\)">[^<]+<svg class="ic so"[^>]*aria-hidden="true"[\\s\\S]*?</svg></button><button type="button" class="imp-colgrip" data-grip="' + (n + 2) + '" aria-expanded="false" aria-controls="imp-colctl" aria-label="Ancho de la columna [^"]+" title="Arrastra para cambiar el ancho; clic, Intro o Espacio para ajustarlo con − / \\+"></button></th>').test(h0), 'cabecera ' + k);
+    });
+    ok(/<thead><tr><th><\/th><th>Estado<\/th>/.test(h0) && /<th>Avisos<\/th><\/tr>/.test(h0), 'casilla, Estado y Avisos: sin botón ni tirador');
+    eq((h0.match(/data-sort=/g) || []).length, 8); eq((h0.match(/data-grip=/g) || []).length, 8); ok(!/aria-sort/.test(h0), 'sin orden: ningún aria-sort');
+    const orig = ridsOf(t);
+    eq(orig, 'p0 p1 p2 p3 p4');
+    sortClick(t, 'inicio');
+    eq(ridsOf(t), 'p2 p3 p0 p1 p4', 'Inicio ↑: 20:00, 21:00, 23:00, 00:30 (misma jornada, tras el corte); sin hora al final');
+    ok(/<th class="srt" data-colk="inicio" aria-sort="ascending"><button[^>]*title="Ordenado de forma ascendente\. Pulsa para descendente"/.test(headOf(t)), 'aria-sort ascending + título');
+    eq(t.env.getEl('imp-sortnote').textContent, 'Vista ordenada por Inicio (ascendente). El orden de importación no cambia.');
+    sortClick(t, 'inicio');
+    ok(/data-colk="inicio" aria-sort="descending"><button[^>]*title="Ordenado de forma descendente\. Pulsa para volver al orden original"/.test(headOf(t)), 'aria-sort descending');
+    eq(t.env.getEl('imp-sortnote').textContent, 'Vista ordenada por Inicio (descendente). El orden de importación no cambia.');
+    sortClick(t, 'inicio');
+    eq(ridsOf(t), orig, 'tercer clic: orden original'); ok(!/aria-sort/.test(headOf(t))); eq(t.env.getEl('imp-sortnote').textContent, 'Vista en el orden original.');
+    sortClick(t, 'banda'); eq(ridsOf(t), 'p0 p2 p1 p4 p3', 'Nombre ↑: Álvaro, banda 2, banda 10, Zeta; sin nombre al final');
+    sortClick(t, 'jornada'); ok(/data-colk="jornada" aria-sort="ascending"/.test(headOf(t)) && !/data-colk="banda" aria-sort/.test(headOf(t)), 'otra columna: empieza en ascendente y solo ella lleva aria-sort');
+    // Clic en el tirador: NO ordena
+    const antes = JSON.stringify(T.imp().sort);
+    t.env.fire('imp-prev', 'click', { target: { closest: q => q === '[data-grip]' ? { dataset: { grip: '4' } } : null } });
+    eq(JSON.stringify(T.imp().sort), antes, 'el tirador no ordena');
+    // Inglés
+    T.setAppLang('en');
+    ok(/data-sort="jornada" title="Sorted ascending\. Press for descending">Day/.test(headOf(t)), 'EN: título y rótulo de cabecera: ' + headOf(t).slice(0, 0));
+    ok(/data-sort="banda" title="Sort by Name \(ascending\)">Name/.test(headOf(t)) && /data-grip="4" aria-expanded="false" aria-controls="imp-colctl" aria-label="Width of column Name" title="Drag to change the width; click, Enter or Space to adjust it with − \/ \+"/.test(headOf(t)), 'EN: tirador');
+    eq(t.env.getEl('imp-sortnote').textContent, 'View sorted by Day (ascending). The import order does not change.');
+    sortClick(t, 'jornada'); eq(t.env.getEl('imp-sortnote').textContent, 'View sorted by Day (descending). The import order does not change.');
+    sortClick(t, 'jornada'); eq(t.env.getEl('imp-sortnote').textContent, 'View in original order.');
+    T.setAppLang('es');
+    const src = D.src('control.js'), a = src.indexOf('// ── v20261166'), z = src.indexOf('function impRender(');
+    ok(a > 0 && z > a, 'bloque nuevo localizado');
+    const bloque = src.slice(a, z);
+    ok(!/'[A-ZÁÉÍÓÚ][a-záéíóúñ]+ [a-záéíóúñ]+[^']*'(?!\))/.test(bloque.replace(/tx\('[^']*'/g, '').replace(/l: '[^']*'/g, '').replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '')), 'ningún texto nuevo sin tx() en control.js');
+    ok(!/touchstart/.test(src), 'sin touchstart');
+  });
+  test('Importador v20261166 · ordenar no cambia el borrador: IMP.pv.rows, lo que se importa y el Dashboard quedan en el orden original', () => {
+    const run = sorted => {
+      const { t } = sortPanel(), T = t.env.win.ShowtimePanel._test;
+      const pv0 = T.imp().pv.rows.map(r => r.idx).join(',');
+      if (sorted) { sortClick(t, 'banda'); sortClick(t, 'banda'); eq(ridsOf(t), 'p4 p1 p2 p0 p3', 'vista ↓'); }
+      eq(T.imp().pv.rows.map(r => r.idx).join(','), pv0, 'IMP.pv.rows intacto');
+      t.env.fire('imp-go', 'click', {});
+      return { arts: t.read('showtime.festival').artists.map(a => a.nombre).join('|'), dash: (ultimo(t, 'tbody').match(/banda 10|banda 2|Álvaro|Banda A/g) || []).join('|') };
+    };
+    const a = run(false), b = run(true);
+    eq(b.arts, a.arts, 'misma secuencia importada'); ok(a.dash.length > 0); eq(b.dash, a.dash, 'Dashboard idéntico');
+  });
+  test('Importador v20261166 · un campo con foco no se recoloca; al confirmar (Intro) o al salir, la fila va a su sitio; texto: se recoloca al confirmar', () => {
+    const { t } = sortPanel(), T = t.env.win.ShowtimePanel._test, doc = t.env.win.document;
+    sortClick(t, 'tipo'); eq(ridsOf(t), 'p0 p1 p2 p3 p4', 'todas Show: empate → original');
+    // El desplegable Tipo de la fila 1 tiene el foco y cambia a Marcador
+    const sel = { dataset: { row: '1', k: 'tipo' }, value: 'hito', tagName: 'SELECT', matches: q => q === '#imp-prev tbody [data-row]' || q === 'select[data-row]' || q === 'tbody [data-row]', closest: q => q === '#imp-prev' ? {} : null };
+    doc.activeElement = sel;
+    t.env.fire('imp-prev', 'change', { target: sel });
+    eq(T.imp().pv.rows[1].tipo, 'hito', 'el cambio se aplica');
+    eq(ridsOf(t), 'p0 p1 p2 p3 p4', 'con el foco en su campo: la fila NO se mueve');
+    ok(T.imp().held, 'orden retenido');
+    let pd = 0; t.env.fire('imp-prev', 'keydown', { key: 'Enter', target: sel, preventDefault: () => { pd++; } });
+    eq(ridsOf(t), 'p0 p2 p3 p4 p1', 'Intro: confirma y la fila va a su sitio (Marcador al final)'); eq(pd, 1); ok(!T.imp().held);
+    // Otra vez: cambiar a Tarea con foco y salir del campo hacia fuera de la tabla
+    sel.dataset.row = '2'; sel.value = 'tarea'; t.env.fire('imp-prev', 'change', { target: sel });
+    eq(ridsOf(t), 'p0 p2 p3 p4 p1', 'retenida'); doc.activeElement = null;
+    t.env.fire('imp-prev', 'focusout', { target: sel, relatedTarget: { closest: () => null } });
+    eq(ridsOf(t), 'p0 p3 p4 p2 p1', 'al perder el foco: Tarea antes de Marcador');
+    // Y saliendo hacia otro control de la tabla: se recoloca cuando el foco llega a él
+    doc.activeElement = sel; sel.dataset.row = '0'; sel.value = 'sc'; t.env.fire('imp-prev', 'change', { target: sel });
+    eq(ridsOf(t), 'p0 p3 p4 p2 p1', 'retenida');
+    const otro = { closest: q => q === '#imp-prev' ? {} : null };
+    t.env.fire('imp-prev', 'focusout', { target: sel, relatedTarget: otro }); eq(ridsOf(t), 'p0 p3 p4 p2 p1', 'aún no (el foco está llegando a otro control)');
+    doc.activeElement = otro; t.env.fire('imp-prev', 'focusin', { target: otro });
+    eq(ridsOf(t), 'p3 p4 p0 p2 p1', 'al llegar: Soundcheck tras los Show');
+    // Texto (Nombre): el cambio llega al confirmar (Intro o salir: el campo ya no tiene el foco) → se recoloca a la vez
+    doc.activeElement = null; sortClick(t, 'banda'); eq(ridsOf(t), 'p0 p2 p1 p4 p3');
+    t.env.fire('imp-prev', 'change', { target: { dataset: { row: '0', k: 'banda' }, value: 'zz último' } });
+    eq(ridsOf(t), 'p2 p1 p4 p0 p3', 'confirmado: «zz último» detrás de Zeta');
+    // Al rehacer la tabla, el navegador quita el control enfocado (y avisa con focusout): eso no es «salir del campo»
+    const src = D.src('control.js');
+    ok(/IMP_PAINT = true;\s*try \{\s*\$\('imp-prev'\)\.innerHTML = /.test(src) && /\} finally \{ IMP_PAINT = false; \}/.test(src) && /if \(IMP_PAINT \|\| !IMP \|\| !IMP\.held/.test(src), 'el focusout del repintado no recoloca');
+  });
+  test('Importador v20261166 · fila manual con orden activo: se anexa al borrador como siempre, aparece en su sitio ordenado y la vista previa va hasta ella', () => {
+    const { t } = sortPanel(), T = t.env.win.ShowtimePanel._test;
+    sortClick(t, 'banda');
+    const W = t.env.getEl('imp-prevwrap'), pedidas = []; W.scrollTop = 500; W.clientHeight = 300; W.getBoundingClientRect = () => ({ top: 100, bottom: 400 });
+    W.querySelector = q => { pedidas.push(q); return q === 'thead' ? { getBoundingClientRect: () => ({ height: 30 }) } : q === 'tr[data-rid="m1"]' ? { getBoundingClientRect: () => ({ top: 60, bottom: 90 }) } : null; };
+    t.env.fire('imp-man-open', 'click', {});
+    manFill(t, { nombre: 'Aaa', zona: 'Principal', ini: '18:00', fin: '18:30' }); t.env.fire('imp-m-add', 'click', {});
+    eq(T.imp().manual.map(m => m.uid).join(), 'm1'); eq(T.imp().pv.rows[T.imp().pv.rows.length - 1].banda, 'Aaa', 'internamente: al final, como hoy');
+    eq(ridsOf(t), 'm1 p0 p2 p1 p4 p3', 'en la vista: en su sitio ordenado');
+    ok(pedidas.indexOf('tr[data-rid="m1"]') >= 0, 'busca su id estable'); eq(W.scrollTop, 500 - (130 - 60), 'sube hasta ella (bajo la cabecera fija)');
+  });
+  test('Importador v20261166 · anchos: solo mientras el importador está abierto; Restablecer columnas, Cancelar, Esc y un importador nuevo vuelven a los iniciales; tirador sin touchstart y con touch-action propio', () => {
+    const { t } = sortPanel(), T = t.env.win.ShowtimePanel._test, tbl = t.env.getEl('imp-prev');
+    // Sin medidas (entorno sin maquetación): el tirador no hace nada raro
+    t.env.fire('imp-prev', 'pointerdown', { pointerType: 'touch', pointerId: 1, clientX: 10, target: { closest: q => q === '[data-grip]' ? { dataset: { grip: '4' } } : null }, preventDefault() {} });
+    eq(T.imp().colW, undefined, 'sin poder medir: no se fija nada'); eq(t.env.errors.length, 0);
+    // Anchos ajustados (como tras arrastrar): Restablecer los quita
+    const set = () => { T.imp().colW = Array(11).fill(100); T.imp().colMin = Array(11).fill(40); };
+    set(); t.env.fire('imp-colreset', 'click', {}); eq(T.imp().colW, null, 'Restablecer columnas'); ok(!tbl._classes.has('colfix'), 'diseño automático'); eq(tbl.style.width, '');
+    set(); t.env.fire('imp-cancel', 'click', {}); ok(!tbl._classes.has('colfix') && tbl.style.width === '', 'Cancelar: anchos iniciales');
+    t.env.fire('btn-paste', 'click', {}); eq(T.imp().colW, undefined, 'importador nuevo: sin anchos ajustados'); eq(T.imp().sort, undefined, 'ni orden');
+    set(); t.env.fire('document', 'keydown', { key: 'Escape', preventDefault() {}, stopPropagation() {}, stopImmediatePropagation() {} }); ok(T.imp() === null && !tbl._classes.has('colfix'), 'Esc: igual');
+    const css = D.src('control.css');
+    ok(/\.imp-colgrip\{[^}]*touch-action:none/.test(css) && !/\.imp-prev(wrap)?\{[^}]*touch-action/.test(css), 'touch-action:none SOLO en el tirador: la tabla hace scroll como siempre');
+    ok(/\.imp-prev\.colfix\{table-layout:fixed\}/.test(css), 'con anchos ajustados, diseño fijo');
+    ok(/<button id="imp-colreset" class="linkbtn imp-colreset" type="button"[^>]*>Restablecer columnas<\/button>/.test(D.src("index.html")), 'botón Restablecer columnas (i18n)');
+    const I18 = t.env.win.ShowtimeI18n;
+    eq(I18.tx('Restablecer columnas', null, 'en'), 'Reset columns');
+    ['Ordenar por {_c} (ascendente)', 'Ordenado de forma ascendente. Pulsa para descendente', 'Ordenado de forma descendente. Pulsa para volver al orden original',
+      'Vista ordenada por {_c} ({_d}). El orden de importación no cambia.', 'Vista en el orden original.', 'ascendente', 'descendente', 'Ancho de la columna {_c}',
+      'Arrastra para cambiar el ancho; clic, Intro o Espacio para ajustarlo con − / +', 'Ancho de la columna {_c}: {n} píxeles (mínimo {m})', 'Estrechar {_c} 16 píxeles', 'Ensanchar {_c} 16 píxeles'].forEach(k => ok(I18.tx(k, null, 'en') !== k, 'EN: ' + k));
+  });
+  test('Importador v20261166 · tirador: botón real; clic sin arrastre, Intro o Espacio abren [ − ] N px [ + ] (16 px, mínimo real, sin máximo); arrastrar cambia el ancho; nada del enfoque numérico', () => {
+    const { t } = sortPanel(), T = t.env.win.ShowtimePanel._test, h = headOf(t), src = D.src('control.js'), html = D.src('index.html'), css = D.src('control.css');
+    ok(/<button type="button" class="imp-colgrip" data-grip="4" aria-expanded="false" aria-controls="imp-colctl" aria-label="Ancho de la columna Nombre" title="Arrastra para cambiar el ancho; clic, Intro o Espacio para ajustarlo con − \/ \+"><\/button><\/th>/.test(h), 'el tirador es un botón');
+    eq((h.match(/data-grip=/g) || []).length, 8, 'una parada de Tab por tirador');
+    ok(/<div id="imp-colctl" class="imp-colctl" role="group" hidden><button type="button" class="imp-colstep" data-colstep="-1">−<\/button><output id="imp-colw" class="imp-colw" aria-live="polite"><\/output><button type="button" class="imp-colstep" data-colstep="1">\+<\/button><\/div>/.test(html) && html.indexOf('id="imp-colctl"') < html.search(/class="[^"]*imp-box/), 'microcontrol con botones reales, fuera de la caja que recorta');
+    // Nada del enfoque descartado
+    ok(!/type="number"|aria-invalid|aria-value(now|min|max|text)|role="(spinbutton|slider|separator)"|inputmode="none"/.test(h + html.slice(html.indexOf('<div id="imp"'), html.indexOf('<div class="imp-foot"'))), 'sin input numérico, aria-invalid, rango ARIA ni roles de rango');
+    ok(!/type="number" class="imp-colgrip"|aria-invalid|aria-value(now|min|max|text)|'spinbutton'|role="separator"/.test(src), 'ni en control.js');
+    ok(!/input\.imp-colgrip|::-webkit-inner-spin-button/.test(css), 'ni sus estilos');
+    const I18 = t.env.win.ShowtimeI18n, ks = I18.keys('es').concat(Object.keys(I18.UI_EN || {}).reduce((a, g) => a.concat(Object.keys(I18.UI_EN[g])), []));
+    ['Arrastra o usa ← → para cambiar el ancho', '{_c}: {n} píxeles (mínimo {m})', '{n} píxeles'].forEach(k => ok(ks.indexOf(k) < 0 && I18.tx(k, null, 'en') === k, 'clave descartada fuera: ' + k));
+    // Microcontrol (stub): tirador y piezas «reales»
+    const W = T.imp(); W.colW = [24, 68, 126, 158, 160, 94, 73, 68, 68, 76, 220]; W.colMin = [24, 68, 126, 158, 87, 94, 73, 68, 68, 76, 220];
+    const at = {}, g = { dataset: { grip: '4' }, at, setAttribute: (k, v) => { at[k] = v; }, getBoundingClientRect: () => ({ left: 400, right: 410, top: 100, bottom: 130 }) };
+    let focoEn = null; g.focus = () => { focoEn = 'tirador'; }; g.closest = q => q === '[data-grip]' ? g : null;
+    const mk = st => { const a2 = {}, b = { dataset: { colstep: String(st) }, a2, setAttribute: (k, v) => { a2[k] = v; }, getAttribute: k => a2[k], focus: () => { focoEn = st < 0 ? '−' : '+'; } }; b.closest = q => q === '[data-colstep]' ? b : q === '#imp-colctl' ? {} : null; return b; };
+    const minus = mk(-1), plus = mk(1), box = t.env.getEl('imp-colctl'), prev = t.env.getEl('imp-prev');
+    box.querySelector = q => /-1/.test(q) ? minus : plus; box.offsetWidth = 150; box.offsetHeight = 44; t.env.win.innerWidth = 1280; t.env.win.innerHeight = 800;
+    prev.querySelectorAll = q => q === '[data-grip]' ? [g] : [];
+    const clickGrip = det => t.env.fire('imp-prev', 'click', { target: g, detail: det });
+    const step = b => t.env.fire('imp-colctl', 'click', { target: b });
+    box.hidden = true; clickGrip(1);
+    ok(box.hidden === false && at['aria-expanded'] === 'true', 'clic: abre; aria-expanded'); eq(t.env.getEl('imp-colw').textContent, '160 px');
+    eq(box.getAttribute ? 'x' : 'x', 'x'); eq(minus.a2['aria-label'], 'Estrechar Nombre 16 píxeles'); eq(plus.a2['aria-label'], 'Ensanchar Nombre 16 píxeles'); eq(minus.a2['aria-disabled'], 'false');
+    eq(focoEn, null, 'con ratón el foco no salta');
+    step(minus); eq(W.colW[4], 144, '− estrecha 16'); eq(t.env.getEl('imp-colw').textContent, '144 px'); eq(at['aria-label'], 'Ancho de la columna Nombre: 144 píxeles (mínimo 87)', 'el tirador dice el valor verdadero');
+    for (let k = 0; k < 10; k++) step(minus);
+    eq(W.colW[4], 87, 'respeta el mínimo real'); eq(minus.a2['aria-disabled'], 'true', '− desactivado en el mínimo (sigue enfocable)');
+    step(minus); eq(W.colW[4], 87);
+    for (let k = 0; k < 200; k++) step(plus);
+    eq(W.colW[4], 87 + 200 * 16, '+ sin máximo'); eq(t.env.getEl('imp-colw').textContent, '3287 px'); eq(minus.a2['aria-disabled'], 'false');
+    clickGrip(1); ok(box.hidden && at['aria-expanded'] === 'false', 'otro clic en el tirador: cierra');
+    // Intro / Espacio (click de teclado, detail 0): abre y lleva el foco dentro; Esc cierra y vuelve al tirador sin cerrar el importador
+    clickGrip(0); ok(!box.hidden); eq(focoEn, '−', 'teclado: foco en −');
+    let sp = 0; t.env.fire('imp-colctl', 'keydown', { key: 'Escape', target: minus, preventDefault() {}, stopPropagation() { sp++; } });
+    ok(box.hidden && focoEn === 'tirador' && sp === 1 && T.imp(), 'Esc: cierra el microcontrol, vuelve al tirador; el importador sigue');
+    clickGrip(0); t.env.fire('imp-colctl', 'keydown', { key: 'Tab', shiftKey: true, target: minus, preventDefault() {} }); ok(box.hidden && focoEn === 'tirador', 'Shift+Tab desde −: vuelve al tirador');
+    // Arrastre con ratón: cambia el ancho y su clic final NO abre
+    const down = (pt, x) => t.env.fire('imp-prev', 'pointerdown', { pointerType: pt, pointerId: 7, button: 0, clientX: x, target: g, preventDefault() {} });
+    const move = x => t.env.fire('imp-prev', 'pointermove', { pointerId: 7, clientX: x });
+    const up = () => t.env.fire('imp-prev', 'pointerup', { pointerId: 7 });
+    W.colW[4] = 160; down('mouse', 500); move(540); up(); clickGrip(1);
+    eq(W.colW[4], 200, 'arrastre: +40'); ok(box.hidden, 'el clic que cierra el arrastre no abre');
+    down('mouse', 500); up(); clickGrip(1); ok(!box.hidden, 'clic sin moverse: abre'); clickGrip(1);
+    // Dedo: si el navegador lo da por toque (hay «click»), se deshace el temblor y abre; si no hay click, es arrastre
+    W.colW[4] = 160; down('touch', 500); move(502); up(); clickGrip(1);
+    eq(W.colW[4], 160, 'toque con temblor: el ancho vuelve'); ok(!box.hidden, 'y abre'); clickGrip(1);
+    down('touch', 500); move(560); up(); eq(W.colW[4], 220, 'arrastre con el dedo'); ok(box.hidden);
+    // Restablecer columnas cierra el microcontrol
+    clickGrip(1); t.env.fire('imp-colreset', 'click', {}); ok(box.hidden && W.colW === null);
+    delete prev.querySelectorAll;
+    ok(/\.imp-colgrip\{position:absolute;[^}]*width:10px;[^}]*touch-action:none/.test(css) && /\.imp-colstep\{[^}]*min-width:32px;height:32px/.test(css), 'tirador estrecho; − / + de 32 px');
+    eq(t.env.errors.length, 0);
+  });
+  test('Importador v20261166 · preventivo: ningún tabindex positivo en la vista previa (el cálculo de Tab/Shift+Tab sigue el orden del documento)', () => {
+    const { t } = sortPanel(), src = D.src('control.js'), html = D.src('index.html');
+    sortClick(t, 'banda');
+    const prev = ultimo(t, 'imp-prev'), imp = html.slice(html.indexOf('<div id="imp"'), html.indexOf('<div class="imp-foot"'));
+    ok(prev.length > 0 && !/tabindex="\s*[1-9]/i.test(prev), 'tabla de la vista previa: sin tabindex positivo');
+    ok(!/tabindex="\s*[1-9]/i.test(imp), 'importador (index.html): sin tabindex positivo');
+    ok(!/tabindex="\s*[1-9]|tabIndex\s*=\s*[1-9]|setAttribute\('tabindex',\s*'?[1-9]/i.test(src), 'control.js no crea tabindex positivos');
+    const tb = src.slice(src.indexOf('function impTabbables'), src.indexOf('function impTabKey'));
+    ok(/querySelectorAll\('a\[href\], button, input, select, textarea, \[tabindex\]'\)\)\.filter\(/.test(tb) && !/\.sort\(/.test(tb) && /n\.tabIndex >= 0/.test(tb), 'orden del documento, sin reordenar');
+  });
+  test('Importador v20261166 · foco al editar: Tab / Shift+Tab / Intro / Tipo apuntan al destino por identidad estable y lo enfocan ya redibujado (con y sin orden); fuera de la tabla, orden normal', () => {
+    const { t } = sortPanel(), T = t.env.win.ShowtimePanel._test, doc = t.env.win.document, prev = t.env.getEl('imp-prev');
+    // Mini DOM: los controles de la tabla en orden de Tab; blur() hace lo que el navegador (change si cambió, luego focusout)
+    let focused = null; const pedidos = [];
+    const ctl = (ds, rid, fuera) => { const n = { dataset: ds, tabIndex: 0, disabled: false, value: ds.v, _v0: ds.v, getClientRects: () => [1], focus() { focused = n; },
+      matches: q => !fuera && q === 'tbody input[type=text][data-row], tbody textarea.imp-wide, tbody select[data-row]' && ds.k !== undefined || (q === '#imp-prev tbody [data-row]' && ds.k !== undefined) || (q === 'tbody [data-row]' && ds.k !== undefined) || ((q === 'input[type=text]' || q === 'input[type=text], textarea.imp-wide') && ds.k && ds.k !== 'tipo') || (q === 'select[data-row]' && ds.k === 'tipo'),
+      closest: q => q === '#imp-prev' ? (fuera ? null : {}) : q === 'tr[data-rid]' ? (rid ? { dataset: { rid } } : null) : null,
+      blur() { if (doc.activeElement === n) doc.activeElement = null; if (n.value !== n._v0) t.env.fire('imp-prev', 'change', { target: n }); t.env.fire('imp-prev', 'focusout', { target: n, relatedTarget: null }); } };
+      return n; };
+    const f0b = ctl({ row: '0', k: 'banda', v: 'Álvaro' }, 'p0'), f0j = ctl({ row: '0', k: 'jornada', v: '' }, 'p0'), f0n = ctl({ row: '0', k: 'notas', v: '' }, 'p0');
+    const c1 = ctl({ inc: '1' }, 'p1'), f1t = ctl({ row: '1', k: 'tipo', v: 'show' }, 'p1'), f1b = ctl({ row: '1', k: 'banda', v: 'banda 10' }, 'p1'), fuera = ctl({}, '', true);
+    const lista = [f0b, f0j, f0n, c1, f1t, f1b, fuera];
+    const qsa0 = doc.querySelectorAll; doc.querySelectorAll = q => q === 'a[href], button, input, select, textarea, [tabindex]' ? lista : qsa0(q);
+    prev.querySelector = q => { pedidos.push(q); return { focus() { focused = { redibujado: q }; } }; };
+    const tab = (n, shift) => { let pd = 0; doc.activeElement = n; focused = n; t.env.fire('imp-prev', 'keydown', { key: 'Tab', shiftKey: !!shift, target: n, preventDefault() { pd++; } }); return pd; };
+    // 1) Sin orden: editar Nombre y Tab → el dato se aplica y el foco va a la Jornada de esa fila, ya redibujada
+    f0b.value = 'Álvaro bis';
+    eq(tab(f0b), 1, 'Tab interceptado (el destino se iba a rehacer)');
+    eq(T.imp().pv.rows[0].banda, 'Álvaro bis', 'dato confirmado'); eq(ridsOf(t), 'p0 p1 p2 p3 p4', 'sin orden: misma posición');
+    eq(JSON.stringify(focused), JSON.stringify({ redibujado: '[data-row="0"][data-k="jornada"]' }), 'foco en el siguiente control, redibujado');
+    // 2) Con orden por Nombre: editar y Tab → la fila se recoloca y el foco la sigue (identidad, no posición)
+    sortClick(t, 'banda'); eq(ridsOf(t), 'p0 p2 p1 p4 p3');
+    f0b._v0 = 'Álvaro bis'; f0b.value = 'zz';
+    eq(tab(f0b), 1); eq(T.imp().pv.rows[0].banda, 'zz'); eq(ridsOf(t), 'p2 p1 p4 p0 p3', 'recolocada al confirmar');
+    eq(focused.redibujado, '[data-row="0"][data-k="jornada"]', 'el foco va a la Jornada de ESA fila, en su sitio nuevo');
+    // 3) Shift+Tab: al anterior
+    f0j._v0 = f0j.value = ''; f0b._v0 = f0b.value = 'zz';
+    f0j.value = '';
+    eq(tab(f0j, true), 1); eq(focused.redibujado, '[data-row="0"][data-k="banda"]', 'Shift+Tab: al Nombre de la misma fila');
+    // 4) Extremo de fila: de Notas a la casilla de la fila siguiente (en el orden del documento)
+    f0n.value = 'nota';
+    eq(tab(f0n), 1); eq(T.imp().pv.rows[0].notas, 'nota'); eq(focused.redibujado, '[data-inc="1"]', 'Notas → casilla de la siguiente fila');
+    eq(tab(c1, true), 0, 'desde la casilla (no es un campo de texto ni Tipo): el navegador');
+    // 5) Último control antes de salir de la tabla: Tab sigue el orden normal (sin trampa)
+    f1b._v0 = f1b.value = 'banda 10'; eq(tab(f1b), 0, 'destino fuera de la tabla: no se intercepta');
+    // 6) Intro: confirma y el foco sigue en el mismo campo, redibujado
+    sortClick(t, 'banda'); sortClick(t, 'banda'); eq(ridsOf(t), 'p0 p1 p2 p3 p4', 'sin orden');
+    sortClick(t, 'banda');
+    f1b.value = 'aaa'; doc.activeElement = f1b; let pd = 0;
+    t.env.fire('imp-prev', 'keydown', { key: 'Enter', target: f1b, preventDefault() { pd++; } });
+    eq(pd, 1); eq(T.imp().pv.rows[1].banda, 'aaa'); eq(ridsOf(t), 'p1 p2 p4 p0 p3', 'Intro: recolocada (aaa primero)');
+    eq(focused.redibujado, '[data-row="1"][data-k="banda"]', 'Intro: el foco vuelve a su Nombre, ya en su sitio');
+    // 7) Tipo: cambiado con foco (retenido), luego Tab → se recoloca y el foco va al siguiente (Nombre de esa fila)
+    sortClick(t, 'tipo'); eq(ridsOf(t), 'p0 p1 p2 p3 p4');
+    doc.activeElement = f1t; f1t.value = 'hito'; t.env.fire('imp-prev', 'change', { target: f1t });
+    eq(ridsOf(t), 'p0 p1 p2 p3 p4', 'con foco: no se mueve'); f1t._v0 = 'hito';
+    eq(tab(f1t), 1); eq(T.imp().pv.rows[1].tipo, 'hito'); eq(ridsOf(t), 'p0 p2 p3 p4 p1', 'al salir con Tab: Marcador al final');
+    eq(focused.redibujado, '[data-row="1"][data-k="banda"]', 'el foco, en el Nombre de esa fila');
+    doc.querySelectorAll = qsa0; delete prev.querySelector; doc.activeElement = null;
+    eq(t.env.errors.length, 0);
+  });
+  // ── v20261166 · textos recortados: lectura pasiva (hover) y editor ampliado ──
+  const LARGA = 'Backline compartido con la banda anterior; el técnico de monitores llega a las 18:00; catering en el camerino 3';
+  const fakeInp = (t, o) => { const at = {}, cls = new Set(), ins = [], tr = { insertAdjacentHTML: (w, h) => ins.push([w, h]) };
+    const n = { dataset: { row: o.row || '1', k: o.k || 'notas' }, value: o.v === undefined ? LARGA : o.v, defaultValue: o.v === undefined ? LARGA : o.v, scrollWidth: o.sw || 900, clientWidth: o.cw || 80,
+      at, ins, cls, parentNode: {}, classList: { add: c => cls.add(c), remove: c => cls.delete(c), contains: c => cls.has(c) },
+      setAttribute: (k, v) => { at[k] = v; }, removeAttribute: k => { delete at[k]; }, getAttribute: k => at[k],
+      getBoundingClientRect: () => ({ left: 300, right: 380, top: 200, bottom: 228, width: 80, height: 28 }), offsetLeft: 4, offsetTop: 3,
+      matches: q => q === '#imp-prev tbody input[type=text][data-row]' || q === 'input[type=text], textarea.imp-wide' || q === 'tbody input[type=text][data-row], tbody textarea.imp-wide, tbody select[data-row]' || q === '#imp-prev tbody [data-row]' || q === 'tbody [data-row]',
+      closest: q => q === 'tr' ? tr : q === 'td' ? { classList: { add() {}, remove() {} } } : q === '#imp-prev' ? {} : null, after: ta => { n.ta = ta; } };
+    return n; };
+  test('Importador v20261166 · lectura pasiva: solo ratón, solo si el texto no cabe y el campo no tiene foco; detalle fuera de la caja, posición segura o en línea; sin title ni touchstart', () => {
+    const { t } = sortPanel(), T = t.env.win.ShowtimePanel._test, doc = t.env.win.document;
+    const html = D.src('index.html'), src = D.src('control.js');
+    ok(/<div id="imp-errpop" class="imp-errpop" role="tooltip" hidden><\/div><div id="imp-cellpop" class="imp-errpop imp-cellpop" role="tooltip" hidden><\/div>/.test(html) && html.indexOf('id="imp-cellpop"') < html.search(/class="[^"]*imp-box/), 'detalle único, fuera de la caja con scroll (no se recorta)');
+    ok(!/data-k="(escenario|banda|call|notas)"[^>]*title=/.test(ultimo(t, 'imp-prev')), 'sin title nativo en los campos');
+    ok(!/touchstart/.test(src), 'sin touchstart');
+    const pop = t.env.getEl('imp-cellpop'); pop.offsetWidth = 320; pop.offsetHeight = 60; t.env.win.innerWidth = 1280; t.env.win.innerHeight = 800;
+    const over = (n, pt) => t.env.fire('imp-prev', 'pointerover', { pointerType: pt || 'mouse', target: n });
+    // Texto que cabe / vacío / campo con foco / dedo: nada
+    over(fakeInp(t, { v: 'corto', sw: 60, cw: 80 })); ok(!T.cellPop().open, 'cabe: sin detalle');
+    over(fakeInp(t, { v: '' , sw: 0, cw: 80 })); ok(!T.cellPop().open, 'vacío: sin detalle');
+    let a = fakeInp(t, {}); doc.activeElement = a; over(a); ok(!T.cellPop().open, 'con foco: sin detalle'); doc.activeElement = null;
+    over(fakeInp(t, {}), 'touch'); over(fakeInp(t, {}), 'pen'); ok(!T.cellPop().open, 'dedo / lápiz: sin hover');
+    // Largo: flotante con el texto completo; aria-describedby al detalle
+    a = fakeInp(t, {}); over(a);
+    ok(T.cellPop().open && !T.cellPop().inline && pop.hidden === false, 'texto recortado: detalle'); eq(pop.textContent, LARGA, 'contenido completo');
+    eq(a.at['aria-describedby'], 'imp-cellpop', 'el campo lo describe'); eq(pop.style.left, '380px', 'pegado al campo (sin hueco)');
+    t.env.fire('imp-prev', 'pointerout', { pointerType: 'mouse', target: a, relatedTarget: { closest: q => /#imp-cellpop/.test(q) ? pop : null } }); ok(T.cellPop().open, 'del campo al detalle: sigue');
+    t.env.fire('imp-cellpop', 'pointerleave', { pointerType: 'mouse', relatedTarget: a }); ok(T.cellPop().open, 'del detalle al campo: sigue');
+    t.env.fire('imp-cellpop', 'pointerleave', { pointerType: 'mouse', relatedTarget: { closest: () => null } });
+    ok(!T.cellPop().open && pop.hidden && a.at['aria-describedby'] === undefined, 'fuera de los dos: se cierra');
+    // Nunca tapa acciones: con el pie y un Excluir donde iría, busca otra posición o va en línea
+    over(a); t.env.fire('window', 'scroll', { target: { closest: () => null } }); ok(!T.cellPop().open, 'scroll: se cierra');
+    // Sin sitio flotante (pantalla baja, texto muy largo): en línea, bajo su fila
+    t.env.win.innerHeight = 300; pop.offsetWidth = 752; pop.offsetHeight = 290;
+    a = fakeInp(t, {}); over(a);
+    ok(T.cellPop().inline && pop.hidden === true, 'en línea'); eq(a.ins[0][0], 'afterend');
+    ok(/^<tr id="imp-cellrow" class="imp-errrow imp-cellrow"><td colspan="11"><div id="imp-cellinline" class="imp-errinline" role="tooltip">Backline compartido/.test(a.ins[0][1]), 'fila en línea con el texto completo');
+    eq(a.at['aria-describedby'], 'imp-cellinline');
+    t.env.fire('window', 'scroll', { target: { closest: () => null } }); ok(T.cellPop().open, 'en línea va con su fila: el scroll no lo cierra');
+    t.env.fire('imp-prev', 'pointerout', { pointerType: 'mouse', target: a, relatedTarget: { closest: q => q === 'tr' ? a.closest('tr') : null } }); ok(T.cellPop().open, 'en línea: cruzar su fila hacia el detalle no lo cierra');
+    t.env.fire('imp-prev', 'pointerout', { pointerType: 'mouse', target: a, relatedTarget: { closest: () => null } }); ok(!T.cellPop().open, 'fuera: se cierra');
+    // Con el detalle de Error fijado no se abre; y abrir Error cierra este
+    t.env.win.innerHeight = 800; pop.offsetWidth = 320; pop.offsetHeight = 60;
+    over(fakeInp(t, {})); ok(T.cellPop().open);
+    const ep = t.env.getEl('imp-errpop'); ep.offsetWidth = 200; ep.offsetHeight = 40;
+    const eb = { dataset: { errtip: '3', why: 'x' }, setAttribute() {}, getBoundingClientRect: () => ({ left: 60, right: 110, top: 500, bottom: 520 }) }; eb.closest = q => q === '[data-errtip]' ? eb : null;
+    t.env.fire('imp-prev', 'click', { target: eb }); ok(!T.cellPop().open && T.errPop().pinned, 'Error abierto: un solo detalle');
+    over(fakeInp(t, {})); ok(!T.cellPop().open, 'con Error fijado: sin hover');
+    t.env.fire('imp-prev', 'click', { target: eb });
+    eq(t.env.errors.length, 0);
+  });
+  test('Importador v20261166 · editor ampliado: se abre solo con texto recortado (al enfocar o cuando deja de caber); confirma al cerrarse por el camino de siempre; sin saltos de línea; no reordena mientras se edita', () => {
+    const { t } = sortPanel(), T = t.env.win.ShowtimePanel._test, doc = t.env.win.document;
+    const mkTA = () => { const at = {}, ta = { at, style: {}, value: '', className: '', dataset: {}, selectionStart: 0, scrollHeight: 60,
+        setAttribute: (k, v) => { at[k] = v; if (k === 'data-row') ta.dataset.row = v; if (k === 'data-k') ta.dataset.k = v; }, focus() { doc.activeElement = ta; }, blur() { doc.activeElement = null; t.env.fire('imp-prev', 'focusout', { target: ta, relatedTarget: null }); }, select() { ta.sel = 'all'; }, setSelectionRange(s, e) { ta.sel = [s, e]; },
+        getBoundingClientRect: () => ({ left: 300, right: 600, top: 200, bottom: 260 }), classList: { contains: c => c === 'imp-wide' } };
+      ta.parentNode = { removeChild: () => { ta.parentNode = null; } };
+      ta.matches = q => q === 'input[type=text], textarea.imp-wide' || q === 'tbody input[type=text][data-row], tbody textarea.imp-wide, tbody select[data-row]' || q === '#imp-prev tbody [data-row]' || q === 'tbody [data-row]';
+      ta.closest = q => q === '#imp-prev' ? {} : q === 'tr[data-rid]' ? { dataset: { rid: 'p' + ta.dataset.row } } : null;
+      return ta; };
+    let tas = []; const ce0 = doc.createElement; doc.createElement = tag => { if (tag === 'textarea') { const x = mkTA(); tas.push(x); return x; } return ce0(tag); };
+    // Corto: foco sin editor
+    let a = fakeInp(t, { v: 'corto', sw: 60, cw: 80, row: '0', k: 'banda' });
+    t.env.fire('imp-prev', 'focusin', { target: a }); ok(!T.impEd(), 'cabe: sin editor');
+    sortClick(t, 'banda'); const ord = ridsOf(t);
+    // Recortado: al enfocar con teclado, editor en el mismo hueco, todo seleccionado; el campo compacto se queda oculto y fuera del Tab
+    a = fakeInp(t, { row: '0', k: 'banda', v: 'Álvaro con la orquesta sinfónica invitada' }); a.selectionStart = 5; a.selectionEnd = 12; a.selectionDirection = 'forward';
+    t.env.fire('imp-prev', 'focusin', { target: a });
+    let ta = tas[0]; ok(T.impEd() && T.impEd().k === 'banda', 'editor abierto'); ok(a.ta === ta, 'en el mismo hueco (justo tras el campo)');
+    eq(ta.value, 'Álvaro con la orquesta sinfónica invitada'); eq(JSON.stringify(ta.sel), '[5,12]', 'hereda EXACTAMENTE la selección del campo compacto (nunca «todo»)');
+    eq(ta.at['aria-label'], 'Editar Nombre (texto completo)', 'nombre accesible'); eq(ta.at['aria-describedby'], 'imp-edhint', 'descripción accesible');
+    eq(ta.at['data-row'], '0'); eq(ta.at['data-k'], 'banda'); eq(ta.at.rows, '1');
+    ok(a.cls.has('imp-wsrc') && a.at.tabindex === '-1' && a.at['aria-hidden'] === 'true', 'el compacto: oculto, fuera del Tab y del árbol accesible');
+    // Hover con el editor abierto: no
+    const over2 = n => t.env.fire('imp-prev', 'pointerover', { pointerType: 'mouse', target: n }); over2(fakeInp(t, { row: '2' })); ok(!T.cellPop().open, 'hover y editor no conviven');
+    // Ordenado por Nombre: escribir no recoloca; su «change» nativo no confirma (lo hace el cierre)
+    ta = tas[0]; ta.value = 'zz al final'; t.env.fire('imp-prev', 'input', { target: ta }); t.env.fire('imp-prev', 'change', { target: ta });
+    eq(ridsOf(t), ord, 'mientras se edita, la fila no se mueve'); eq(T.imp().pv.rows[0].banda, 'Álvaro', 'aún sin confirmar');
+    // Pegar con saltos: se queda en una línea
+    ta.value = 'zz al final\nlínea 2\r\nlínea 3'; ta.selectionStart = 5; t.env.fire('imp-prev', 'input', { target: ta }); eq(ta.value, 'zz al final línea 2 línea 3', 'sin saltos de línea');
+    // Salir (blur): confirma por el camino de siempre y vuelve el compacto
+    doc.activeElement = null; t.env.fire('imp-prev', 'focusout', { target: ta, relatedTarget: null });
+    ok(!T.impEd() && ta.parentNode === null && !a.cls.has('imp-wsrc') && a.at.tabindex === undefined && a.at['aria-hidden'] === undefined, 'editor cerrado, campo compacto de vuelta');
+    eq(T.imp().pv.rows[0].banda, 'zz al final línea 2 línea 3', 'dato confirmado'); eq(ridsOf(t), 'p2 p1 p4 p0 p3', 'y recolocada al confirmar');
+    // Sin cambios: se cierra sin confirmar nada
+    a = fakeInp(t, { row: '2', k: 'notas' }); t.env.fire('imp-prev', 'focusin', { target: a }); ta = tas[tas.length - 1];
+    const notas0 = T.imp().pv.rows[2].notas; t.env.fire('imp-prev', 'focusout', { target: ta, relatedTarget: null }); ok(!T.impEd()); eq(T.imp().pv.rows[2].notas, notas0);
+    // Con teclado y TODO seleccionado por el navegador (Tab): nunca se hereda; cursor al final, sin borrar nada al escribir
+    a = fakeInp(t, { row: '0', k: 'banda', v: 'Álvaro con la orquesta sinfónica invitada' }); a.selectionStart = 0; a.selectionEnd = 41;
+    t.env.fire('imp-prev', 'focusin', { target: a }); ta = tas[tas.length - 1]; eq(JSON.stringify(ta.sel), '[41,41]', 'todo seleccionado por Tab → cursor al final');
+    t.env.fire('imp-prev', 'focusout', { target: ta, relatedTarget: null });
+    a = fakeInp(t, { row: '0', k: 'banda', v: 'Álvaro con la orquesta sinfónica invitada' }); a.selectionStart = a.selectionEnd = 0;
+    t.env.fire('imp-prev', 'focusin', { target: a }); ta = tas[tas.length - 1]; eq(JSON.stringify(ta.sel), '[41,41]', 'llegada por teclado con el cursor al principio → al final');
+    t.env.fire('imp-prev', 'focusout', { target: ta, relatedTarget: null }); ok(!T.impEd());
+    // Deja de caber al escribir: se abre conservando el cursor
+    a = fakeInp(t, { row: '1', k: 'banda', v: 'banda 10', sw: 60, cw: 80 }); doc.activeElement = a;
+    t.env.fire('imp-prev', 'focusin', { target: a }); ok(!T.impEd(), 'aún cabe');
+    a.value = 'banda 10 con la orquesta'; a.scrollWidth = 200; a.selectionStart = a.selectionEnd = 24;
+    t.env.fire('imp-prev', 'input', { target: a }); ta = tas[tas.length - 1];
+    ok(T.impEd(), 'deja de caber: editor'); eq(JSON.stringify(ta.sel), '[24,24]', 'el cursor sigue donde estaba');
+    // Intro: confirma, vuelve al campo COMPACTO (no se reabre)
+    let pd = 0; const prev = t.env.getEl('imp-prev'), pedidos = []; prev.querySelector = q => { pedidos.push(q); return { focus() {} }; };
+    t.env.fire('imp-prev', 'keydown', { key: 'Enter', shiftKey: true, target: ta, preventDefault() { pd++; } });
+    eq(pd, 1, 'Intro (también Mayús+Intro) no mete salto'); ok(!T.impEd()); eq(T.imp().pv.rows[1].banda, 'banda 10 con la orquesta');
+    ok(pedidos.indexOf('[data-row="1"][data-k="banda"]') >= 0, 'el foco vuelve a su campo');
+    const src = D.src('control.js');
+    ok(/IMP_NOEXP = true;[^\n]*\n\s*try \{ el\.blur\(\); if \(key && IMP\) impFocusTo\(key\); \} finally \{ IMP_NOEXP = false; \}/.test(src) && /if \(IMP_NOEXP \|\| IMP_PAINT \|\| !impCut\(n\)\) return;/.test(src), 'tras Intro el campo queda compacto');
+    ok(/'tbody input\[type=text\]\[data-row\], tbody textarea\.imp-wide, tbody select\[data-row\]'/.test(src), 'Tab / Shift+Tab desde el editor: mismo cálculo que desde el campo');
+    const css = D.src('control.css');
+    ok(/\.imp-prev textarea\.imp-wide\{position:absolute;z-index:9;[^}]*white-space:pre-wrap;[^}]*\}/.test(css) && /\.imp-prev thead th\{position:sticky;top:0;z-index:10;/.test(css), 'editor por encima de las celdas y por debajo de la cabecera fija (dentro de la vista previa: el pie nunca queda tapado)');
+    ok(/\.imp-prev td\.imp-wcell,\.imp-prev\.colfix td\.imp-wcell\{position:relative;overflow:visible\}/.test(css) && !/\.imp-prev(\.colfix)? (col|table)[^{]*\{[^}]*imp-wide/.test(css), 'no cambia el ancho de la columna ni de la tabla');
+    ok(/<span id="imp-edhint" class="sr-only" data-i18n>Intro confirma\. El texto sigue siendo de una sola línea\.<\/span>/.test(D.src('index.html').replace(/ data-i18n(?=[ >])/g, ' data-i18n')) || /id="imp-edhint"/.test(D.src('index.html')), 'descripción del editor');
+    const I18 = t.env.win.ShowtimeI18n;
+    eq(I18.tx('Editar {_c} (texto completo)', { _c: 'Notes' }, 'en'), 'Edit Notes (full text)'); eq(I18.tx('Intro confirma. El texto sigue siendo de una sola línea.', null, 'en'), 'Enter confirms. The text stays on a single line.');
+    // Ratón / dedo: espera a que el clic sitúe el cursor (en medio del texto) y el editor hereda esa posición
+    pedidos.length = 0;
+    a = fakeInp(t, { row: '2', k: 'notas' }); a.selectionStart = a.selectionEnd = 0;
+    t.env.fire('imp-prev', 'pointerdown', { target: a, pointerType: 'mouse', button: 0 }); doc.activeElement = a;
+    t.env.fire('imp-prev', 'focusin', { target: a }); ok(!T.impEd(), 'al enfocar con el puntero aún no (el navegador no ha puesto el cursor)');
+    a.selectionStart = a.selectionEnd = 40;   // el navegador lo deja donde se hizo clic
+    t.env.fire('imp-prev', 'click', { target: a }); ta = tas[tas.length - 1];
+    ok(T.impEd(), 'tras el clic: editor'); eq(JSON.stringify(ta.sel), '[40,40]', 'el cursor, en medio del texto, donde se hizo clic');
+    ta.value = LARGA.slice(0, 40) + 'X' + LARGA.slice(40);   // escribir no borra el resto
+    // Clic directo en OTRO campo (largo, corto o Tipo) con el editor abierto: la tabla espera a que el navegador ponga el cursor del
+    // clic en el destino; luego se repinta y el destino (redibujado) recibe EXACTAMENTE esa selección, nunca la posición 0
+    let restaurado = null; prev.querySelector = q => { pedidos.push(q); return { value: LARGA, setSelectionRange(s1, e1, d1) { restaurado = { q, sel: [s1, e1, d1] }; }, focus() { if (restaurado && restaurado.q === q) restaurado.foco = true; else restaurado = { q, foco: true }; } }; };
+    const dest = (k, row, tag) => { const d = { dataset: { row, k }, tagName: tag || 'INPUT', value: LARGA, matches: q => q === '#imp-prev tbody input[type=text][data-row], #imp-prev tbody select[data-row]', closest: q => q === 'tr[data-rid]' ? { dataset: { rid: 'p' + row } } : null, blur() { if (doc.activeElement === d) doc.activeElement = null; } }; return d; };
+    const clicEn = (d, s0, e0, dir) => {   // la secuencia del navegador: pointerdown → (foco: el editor confirma) → cursor del clic → click
+      t.env.fire('document', 'pointerdown', { target: d }); doc.activeElement = null;
+      t.env.fire('imp-prev', 'focusout', { target: ta, relatedTarget: d });
+      doc.activeElement = d; if (s0 !== undefined) { d.selectionStart = s0; d.selectionEnd = e0; d.selectionDirection = dir || 'none'; }
+      restaurado = null; t.env.fire('document', 'click', { target: d });
+    };
+    let d3 = dest('banda', '3'); clicEn(d3, 23, 23);
+    ok(!T.impEd()); eq(T.imp().pv.rows[2].notas.indexOf('X'), 40, 'dato confirmado sin perder el resto');
+    ok(restaurado && restaurado.q === '[data-row="3"][data-k="banda"]' && restaurado.foco, 'el foco va al campo donde se hizo clic, ya redibujado');
+    eq(JSON.stringify(restaurado.sel), '[23,23,"none"]', 'con el cursor que puso el clic (no en 0)');
+    // Selección parcial por arrastre en el destino: se conserva
+    a = fakeInp(t, { row: '0', k: 'notas' }); doc.activeElement = a; t.env.fire('imp-prev', 'focusin', { target: a }); ta = tas[tas.length - 1]; ta.value = 'cambio arrastre';
+    clicEn(dest('notas', '4'), 12, 31, 'forward'); eq(JSON.stringify(restaurado.sel), '[12,31,"forward"]', 'selección parcial por arrastre intacta');
+    // Tipo: entra al primer clic
+    a = fakeInp(t, { row: '0', k: 'notas' }); doc.activeElement = a; t.env.fire('imp-prev', 'focusin', { target: a }); ta = tas[tas.length - 1]; ta.value = 'cambio tipo';
+    const dt = dest('tipo', '1', 'SELECT'); clicEn(dt); ok(restaurado && restaurado.q === '[data-row="1"][data-k="tipo"]' && restaurado.foco, 'clic en Tipo: entra al primer clic');
+    // Sin cambios en el editor: nada que repintar; el navegador deja el foco y el cursor en el destino tal cual
+    a = fakeInp(t, { row: '0', k: 'notas' }); doc.activeElement = a; t.env.fire('imp-prev', 'focusin', { target: a }); ta = tas[tas.length - 1];
+    const n1 = pedidos.length; clicEn(dest('banda', '3'), 9, 9); eq(pedidos.length, n1, 'sin repintado, sin restauración');
+    // Botones (Excluir, Restaurar, Cancelar, Importar, + Añadir fila manual): la restauración de foco no los toca
+    for (const b of [{ dataset: { exc: '1' } }, { dataset: { rest: '1' } }, { id: 'imp-cancel' }, { id: 'imp-go' }, { id: 'imp-man-open' }]) {
+      b.matches = () => false; b.closest = () => null;
+      a = fakeInp(t, { row: '0', k: 'notas' }); doc.activeElement = a; t.env.fire('imp-prev', 'focusin', { target: a }); ta = tas[tas.length - 1]; ta.value = 'otro ' + (b.id || JSON.stringify(b.dataset));
+      const n0 = pedidos.length;
+      t.env.fire('document', 'pointerdown', { target: b }); doc.activeElement = null; t.env.fire('imp-prev', 'focusout', { target: ta, relatedTarget: null });
+      eq(pedidos.length, n0, 'clic en ' + (b.id || JSON.stringify(b.dataset)) + ': sin robo de foco');
+    }
+    ok(!/\bta\.select\(\)/.test(src), 'nunca «seleccionar todo»');
+    doc.createElement = ce0; delete prev.querySelector; doc.activeElement = null;
+    eq(t.env.errors.length, 0);
+  });
+  test('Importador v20261166 · gesto hacia otro campo que NO acaba en click (pointercancel, captura perdida, ventana sin foco u oculta): repinta YA y una sola vez; foco solo si el destino lo tenía', () => {
+    const { t } = sortPanel(), T = t.env.win.ShowtimePanel._test, doc = t.env.win.document, prev = t.env.getEl('imp-prev');
+    const ce0 = doc.createElement; let tas = [];
+    doc.createElement = tag => { if (tag !== 'textarea') return ce0(tag); const at = {}, ta = { at, style: {}, value: '', dataset: {}, scrollHeight: 30, classList: { contains: c => c === 'imp-wide' },
+      setAttribute: (k, v) => { at[k] = v; if (k === 'data-row') ta.dataset.row = v; if (k === 'data-k') ta.dataset.k = v; }, focus() { doc.activeElement = ta; }, setSelectionRange() {}, getBoundingClientRect: () => ({ left: 0, right: 0, top: 0, bottom: 0 }) };
+      ta.parentNode = { removeChild: () => { ta.parentNode = null; } }; ta.matches = () => false; ta.closest = () => null; tas.push(ta); return ta; };
+    let restaurado = null; prev.querySelector = q => ({ value: LARGA, setSelectionRange(s1, e1) { restaurado = { q, sel: [s1, e1] }; }, focus() { restaurado = Object.assign(restaurado || { q }, { foco: true }); } });
+    const pinturas = () => t.env.innerLog.filter(x => x[0] === 'imp-prev').length;
+    const dest = (k, row) => { const d = { dataset: { row, k }, tagName: 'INPUT', value: LARGA, selectionStart: 17, selectionEnd: 17, matches: q => q === '#imp-prev tbody input[type=text][data-row], #imp-prev tbody select[data-row]', closest: q => q === 'tr[data-rid]' ? { dataset: { rid: 'p' + row } } : null, blur() { if (doc.activeElement === d) doc.activeElement = null; } }; return d; };
+    const gesto = (valor, conFoco) => {   // editor abierto en Notas de la fila 0, valor nuevo, pointerdown en el Nombre de la fila 3 → el editor confirma (repintado retenido)
+      const a = fakeInp(t, { row: '0', k: 'notas' }); doc.activeElement = a; t.env.fire('imp-prev', 'focusin', { target: a });
+      const ta = tas[tas.length - 1]; ta.value = valor; const d = dest('banda', '3');
+      t.env.fire('document', 'pointerdown', { target: d }); doc.activeElement = null;
+      t.env.fire('imp-prev', 'focusout', { target: ta, relatedTarget: d });
+      if (conFoco) doc.activeElement = d;
+      return d;
+    };
+    const casos = [['pointercancel', () => t.env.fire('document', 'pointercancel', {})],
+      ['captura perdida', () => t.env.fire('document', 'lostpointercapture', {})],
+      ['ventana sin foco', () => t.env.fire('window', 'blur', { target: t.env.win })],
+      ['ventana oculta', () => { doc.visibilityState = 'hidden'; t.env.fire('document', 'visibilitychange', {}); doc.visibilityState = 'visible'; }]];
+    casos.forEach(([nombre, cancela], n) => {
+      [false, true].forEach(conFoco => {
+        const v = 'confirmado ' + n + (conFoco ? ' F' : '');
+        gesto(v, conFoco);
+        const p0 = pinturas();
+        eq(T.imp().pv.rows[0].notas === v, false, nombre + ': antes, retenido (aún sin repintar)');
+        restaurado = null; cancela();
+        eq(T.imp().pv.rows[0].notas, v, nombre + ': dato confirmado en la vista previa YA'); eq(pinturas() - p0, 1, nombre + ': un solo repintado');
+        ok(new RegExp('value="' + v + '"').test(ultimo(t, 'imp-prev')), nombre + ': la tabla lo muestra');
+        if (conFoco) ok(restaurado && restaurado.q === '[data-row="3"][data-k="banda"]' && restaurado.foco && JSON.stringify(restaurado.sel) === '[17,17]', nombre + ' con el destino enfocado: vuelve a él con su cursor');
+        else eq(restaurado, null, nombre + ' sin foco en el destino: no se roba el foco');
+        const p1 = pinturas(); t.env.fire('document', 'click', { target: { closest: () => null } }); cancela(); eq(pinturas(), p1, nombre + ': ni el click tardío ni otra cancelación repintan otra vez');
+        doc.activeElement = null;
+      });
+    });
+    // Si el click SÍ llega, el camino de siempre (cursor del navegador, repintado, restauración)
+    const d = gesto('con click', true); d.selectionStart = 30; d.selectionEnd = 30; const p0 = pinturas(); restaurado = null;
+    t.env.fire('document', 'click', { target: d });
+    eq(T.imp().pv.rows[0].notas, 'con click'); ok(pinturas() - p0 >= 1); eq(JSON.stringify(restaurado.sel), '[30,30]');
+    doc.createElement = ce0; delete prev.querySelector; doc.activeElement = null;
+    eq(t.env.errors.length, 0);
   });
   test('Importador · detalle de Error sin sitio flotante (pantalla muy baja, motivo muy largo): se abre EN LÍNEA bajo su fila, no tapa nada y las acciones responden al primer toque', () => {
     const P = panel().env.win.ShowtimePanel._test.errPopPlace;
@@ -2597,7 +3067,7 @@ const miss = [...found].filter(k => !I.txHas(k) && !/^(OK|CALL|SC|Live|Raycast|S
     ok(/,select,textarea\):focus\{outline:none;border-color:rgba\(255,255,255,\.42\);box-shadow:0 0 0 3px rgba\(255,255,255,\.07\)\}/.test(css), 'halo blanco al escribir');
     const imp = html.slice(html.indexOf('<div id="imp"'), html.indexOf('<datalist id="zones-dl"'));
     eq((imp.match(/<div class="mcard-h"[^>]*>([^<]+)<\/div>/g) || []).map(x => x.replace(/<[^>]+>/g, '')).join(' · '), 'Horario a importar · Opciones de importación · Columnas del archivo · Vista previa · Fila manual', 'Pegar horario: 4 tarjetas en orden y, debajo de la vista previa, la ficha manual (plegada hasta pedirla)');
-    ok(/class="mcard imp-card imp-srccard">[\s\S]*id="imp-text"/.test(imp) && /class="mcard imp-card imp-prevcard"><div class="mcard-h"[^>]*>Vista previa<\/div><div id="imp-prevwrap" class="imp-prevwrap"><table id="imp-prev"/.test(imp), 'texto y vista previa en su tarjeta; los id no cambian');
+    ok(/class="mcard imp-card imp-srccard">[\s\S]*id="imp-text"/.test(imp) && /class="mcard imp-card imp-prevcard"><div class="imp-prevhead"><div class="mcard-h"[^>]*>Vista previa<\/div>[\s\S]*?<\/div><div id="imp-prevwrap" class="imp-prevwrap"><table id="imp-prev"/.test(imp), 'texto y vista previa en su tarjeta; los id no cambian');
     ok(/\.imp-prevcard\{flex:1 0 auto;display:flex;flex-direction:column\}/.test(css) && /\.imp-prevwrap\{flex:1;min-height:120px;/.test(css), 'la vista previa ocupa el alto que sobra y nunca baja de su mínimo (dec. 155)');
     ok(/\.imp-box\{[^}]*overflow:auto;scroll-padding-bottom:128px\}/.test(css) && /\.imp-foot\{[^}]*position:sticky;bottom:0;/.test(css), 'si no cabe, la ventana hace scroll y el pie queda a la vista');
   });
