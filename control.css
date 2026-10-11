@@ -290,11 +290,14 @@ body[data-ps="stage"] tbody tr.playing td.mo{background:color-mix(in srgb,#FFD60
 body[data-ps="stage"] .mpanel,body[data-ps="stage"] .cfg,body[data-ps="stage"] .modal-box,body[data-ps="stage"] .qr-big-box{background-image:none}
 
 /* ── Pegar horario ── */
-.imp-box{max-width:min(1240px,96vw);width:100%;max-height:94vh;display:flex;flex-direction:column;gap:10px;overflow:hidden}
+/* Dec. 155: si todo no cabe, la ventana entera hace scroll y el pie (Cancelar · Importar) queda siempre a la vista; la vista previa
+   nunca se aplasta por debajo de su alto mínimo (antes podía quedar debajo del pie) */
+.imp-box{max-width:min(1240px,96vw);width:100%;max-height:94vh;display:flex;flex-direction:column;gap:10px;overflow:auto;scroll-padding-bottom:128px}
 .imp-head{display:flex;align-items:center;justify-content:space-between}
-.imp-head h2{margin:0}
+.imp-head h2{margin:0;display:flex;align-items:center;gap:8px;font-size:16px}
+.imp-head h2 small{font-size:11px;font-weight:600;color:var(--dim,var(--muted))}
 .imp-src{display:flex;gap:12px;align-items:stretch}
-.imp-src textarea{flex:1;min-height:96px;max-height:180px;resize:vertical;border-radius:8px;border:1px solid var(--line2);background:var(--field);color:var(--text);font:13px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;padding:8px 10px}
+.imp-src textarea{flex:1;min-height:96px;max-height:180px;resize:vertical;border-radius:8px;border:1px solid var(--line2);background:var(--field);color:var(--text);font-family:inherit;font-size:15px;line-height:1.6;padding:14px 16px}
 .imp-src textarea:focus{outline:none}
 .imp-side{width:210px;display:flex;flex-direction:column;gap:6px}
 .imp-kind{font-size:12px;font-weight:700;color:var(--muted)}
@@ -332,12 +335,37 @@ body[data-ps="stage"] .mpanel,body[data-ps="stage"] .cfg,body[data-ps="stage"] .
 .imp-prev tr.st-warn{box-shadow:inset 3px 0 0 var(--call)}
 .imp-prev tr.st-err{box-shadow:inset 3px 0 0 var(--err);background:rgba(255,107,107,.05)}
 .imp-prev tr.off td:not(.chk){opacity:.45}
+/* Dec. 155: fila con error: sin casilla (el hueco se queda); estado y causa legibles (no atenuados) y su acción Excluir/Restaurar */
+.imp-prev tr.st-err td.st{opacity:1;white-space:normal;min-width:96px;position:relative}
+/* «Error ⓘ»: texto compacto (sin píldora) con un icono SVG decorativo; su detalle es #imp-errpop (flotante, fuera de la tabla) */
+.imp-errbtn{display:inline-flex;align-items:center;gap:4px;background:none;border:0;padding:2px 0;font:inherit;font-weight:800;font-size:12px;color:var(--err);cursor:pointer;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+.imp-errbtn .ii{width:13px;height:13px;flex:0 0 auto}
+/* Detalle flotante: posición fija calculada (dentro de la pantalla); el borde transparente hace de puente con el botón (sin hueco) */
+.imp-errpop{position:fixed;z-index:450;box-sizing:border-box;width:max-content;max-width:min(320px,calc(100vw - 16px));padding:7px 10px;border:6px solid transparent;background-clip:padding-box;border-radius:14px;
+  background-color:var(--modal-bg,#16191f);box-shadow:inset 0 0 0 1px var(--line2),0 8px 24px rgba(0,0,0,.45);color:var(--text);font-size:12px;font-weight:600;line-height:1.35;white-space:normal;overflow-wrap:anywhere}
+.imp-errpop[hidden]{display:none}
+/* Fallback en línea (no cabe flotante sin tapar nada): una fila propia bajo la del error, dentro de la vista previa */
+.imp-prev tr.imp-errrow td{padding:0 8px 8px 30px;border-top:0}
+.imp-prev tr.imp-errrow .imp-errctx{display:block;margin:0 0 6px;padding:6px 0;font-size:12px;font-weight:700;color:var(--text);text-decoration:underline}
+.imp-prev tr.imp-errrow .imp-errctx[hidden]{display:none}
+.imp-prevwrap{scroll-padding-top:40px}   /* la cabecera fija de la tabla no tapa la fila a la que se lleva el scroll */
+.imp-errinline{padding:7px 10px;border-radius:8px;box-shadow:inset 0 0 0 1px var(--line2);background:var(--modal-bg,#16191f);color:var(--text);font-size:12px;font-weight:600;line-height:1.35;white-space:normal;overflow-wrap:anywhere;max-width:min(560px,100%)}
+body[data-ps="stage"] .imp-errinline{background:#000;box-shadow:inset 0 0 0 1px #FFD600;color:#fff}
+body[data-ps="stage"] .imp-errpop{background-color:#000;box-shadow:inset 0 0 0 1px #FFD600;color:#fff}
+.imp-prev td.st .why{font-weight:600;font-size:11px;color:var(--muted)}
+.imp-prev td.st .st-x{color:var(--muted)}
+.imp-prev td.st .imp-rowact{display:block;margin-top:3px;font-size:12px;font-weight:700;color:var(--text);text-decoration:underline}
 .imp-prev td.vacio{padding:18px;color:var(--dim)}
 .imp-ign{font-size:12px;color:var(--muted)}
 .imp-ign ul{margin:6px 0 0 18px}
-.imp-foot{display:flex;align-items:center;gap:8px}
-.imp-sum{font-size:13px;font-weight:700;color:var(--muted)}
-.imp-sum .ok{color:var(--ok)} .imp-sum .warn{color:var(--call)} .imp-sum .err{color:var(--err)}
+/* Dec. 155: pie fijo en dos niveles. Arriba, el resumen a todo el ancho (discreto, con una raya fina); debajo, a la izquierda
+   «+ Añadir fila manual» (secundaria) y a la derecha, juntas, Cancelar · Importar (la única primaria). En tablet el resumen puede
+   partirse; las dos acciones finales bajan juntas y siguen a la vista */
+.imp-foot{display:flex;flex-direction:column;gap:8px;position:sticky;bottom:0;z-index:20;padding-top:8px;background:var(--modal-bg,#16191f)}
+.imp-foot-row{display:flex;align-items:center;flex-wrap:wrap;gap:8px 16px}
+.imp-foot-acts{display:flex;align-items:center;gap:8px;margin-left:auto}
+.imp-sum{margin:0;padding-bottom:7px;border-bottom:1px solid var(--hair,rgba(255,255,255,.08));font-size:12px;font-weight:600;color:var(--muted);overflow-wrap:anywhere}
+.imp-sum .s-exc{color:var(--call)} .imp-sum .s-err{color:var(--err)}
 .imp-box.drag{outline:3px dashed var(--accent);outline-offset:-6px}
 @media (max-width:900px){ .imp-src{flex-direction:column} .imp-side{width:auto;flex-direction:row;align-items:center;flex-wrap:wrap} }
 .imp-prev td.e input{min-width:150px}
@@ -678,6 +706,12 @@ tbody tr.done td.mo{opacity:1}
 .list-h .addnew{margin-left:auto;flex:0 0 auto;align-self:center}
 .addbox{max-width:520px}
 .addform{grid-template-columns:auto 1fr}
+/* Dec. 155: «Añadiendo a: …» (informativo) y, sin evento, el contexto del primero; sin evento la jornada es la fecha de arriba */
+.add-target{margin:0 0 12px;font-size:13px;color:var(--muted)}
+.add-target[hidden],.add-newev[hidden]{display:none}
+.add-newev{margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--hair,rgba(255,255,255,.08))}
+.add-newev-h{grid-column:1/-1;margin:0}
+#addm.noev .addjor{display:none}
 .addform input[type=text],.addform select{width:100%}
 .addform .addt{display:flex;align-items:center;gap:8px}
 .addform .addt input{width:100px;text-align:center;font-weight:700}
@@ -908,16 +942,19 @@ body.focus #tbl .gapbtn{font-size:14px}
 .onb-manual{font-size:12px;color:var(--muted);height:30px}
 .onb-alt{font-size:12px;color:var(--dim,var(--muted));margin-top:4px}
 .onb-alt .linkbtn{color:var(--muted);font-size:12px}
-.onb-alt .linkbtn:hover,.addtip .linkbtn:hover{color:var(--text)}
-/* Pestañas arriba de «Pegar horario» y de «Añadir 1 fila» */
-.addtabs{display:flex;gap:4px;padding:3px;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid var(--hair,rgba(255,255,255,.08));margin-bottom:12px;width:max-content;max-width:100%}
-.imp-head .addtabs{margin-bottom:0}
-.addtabs button{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 14px;border:0;border-radius:7px;background:transparent;color:var(--muted);font:inherit;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}
-.addtabs button small{font-weight:600;font-size:11px;color:var(--dim,var(--muted))}
-.addtabs button:hover{color:var(--text)}
-.addtabs button.on{box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
-.addtip{margin:12px 0 0;font-size:12px;color:var(--muted)}
-.addtip .linkbtn{color:var(--text);font-size:12px}
+.onb-alt .linkbtn:hover{color:var(--text)}
+/* Dec. 155: fila manual dentro de «Pegar horario completo» (sin pestañas ni otro modal) */
+.imp-mancard[hidden]{display:none}
+.imp-manhead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.imp-manhead .mcard-h{margin-bottom:8px}
+.imp-manform{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px 10px;align-items:end}
+.imp-mf{display:flex;flex-direction:column;gap:4px;min-width:0;font-size:11px;font-weight:700;color:var(--muted)}
+.imp-mf.w2{grid-column:span 2}
+.imp-mf input,.imp-mf select{width:100%;min-width:0}
+.imp-mf.t input{text-align:center;font-weight:700}
+.imp-manacts{grid-column:1/-1;display:flex;align-items:center;justify-content:flex-end;gap:8px}
+.imp-manacts .err{margin-right:auto;font-size:12px}
+.imp-prev td.st .man{display:block;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim,var(--muted))}
 .imp-notice{margin:0;padding:9px 12px;border-radius:8px;font-size:13px;font-weight:600;color:var(--text);border:1px solid color-mix(in srgb,var(--accent-fill,var(--accent)) 45%,transparent)}
 .imp-notice[hidden]{display:none}
 .imp-fresh{flex-basis:100%;color:var(--muted)}
@@ -928,7 +965,6 @@ body.focus #tbl .gapbtn{font-size:14px}
 .drop-box b{font-size:20px;letter-spacing:.02em}
 .drop-box span{font-size:13px;color:var(--muted);font-weight:500}
 body[data-ps="stage"] .onb{background:#000;border-color:rgba(255,214,0,.55)}
-body[data-ps="stage"] .addtabs button.on{background:#FFD600;color:#000}
 
 /* Vista previa de «Pegar horario»: cabecera fija al hacer scroll (con su raya), y aviso de éxito en verde */
 .imp-prev thead th{position:sticky;top:0;z-index:10;background:#14151b;box-shadow:inset 0 -1px 0 var(--hair2,rgba(255,255,255,.14))}
@@ -1016,7 +1052,7 @@ main.vacia .list-empty{padding:16px 16px 9vh}
 
 /* ═══ Jerarquía de color (Raycast/Linear): el rojo SOLO para borrar (.btn.danger) y el Live ▾ de emisión.
    Primario = blanco sólido · selección = gris elevado translúcido · foco = borde blanco translúcido ═══ */
-.seg button.on,.days button.on,.dtb.on,.addtabs button.on{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.16);color:#fff;font-weight:700}
+.seg button.on,.days button.on,.dtb.on{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.16);color:#fff;font-weight:700}
 .mitem.on{color:#fff;font-weight:700}
 .mitem.on::after{background:#fff}
 .mpanel .days button.on{background:rgba(255,255,255,.08);color:#fff;border:0}
@@ -1026,7 +1062,6 @@ td input:focus,td select:focus,.imp-src textarea:focus,.imp-prev td input[type=t
 .drop>.drop-box{border-color:rgba(255,255,255,.3)}
 .drop-box .ic{color:var(--text)}
 .imp-notice{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.16)}
-.addtabs button[data-addtab="paste"] .ic{color:#fff}
 
 /* ═══ Paleta de comandos (⌘K / «/») — estilo Raycast/Linear ═══ */
 .spot{position:fixed;inset:0;z-index:300;display:flex;align-items:flex-start;justify-content:center;padding:12vh 16px 16px;background:rgba(0,0,0,.45);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
@@ -1202,7 +1237,7 @@ td input:focus,td select:focus,.imp-src textarea:focus,.imp-prev td input[type=t
 :where(body:not([data-ps="stage"])) :is(.modal-box,.imp-box) :is(input[type=text],input[type=number],input[type=date],input[type=time],input[type=search],input:not([type]),select,textarea):focus{outline:none;border-color:rgba(255,255,255,.42);box-shadow:0 0 0 3px rgba(255,255,255,.07)}
 /* Pegar horario en tarjetas: lo pegado, opciones, columnas y vista previa */
 .imp-srccard,.imp-prevcard{margin-bottom:0}
-.imp-prevcard{flex:1;min-height:0;display:flex;flex-direction:column}
+.imp-prevcard{flex:1 0 auto;display:flex;flex-direction:column}
 .imp-prevcard .imp-prevwrap{border-color:rgba(255,255,255,.08)}
 .mcard-h{font-size:11px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:#8a8f98;margin:0 0 10px}
 .mcard .form{margin:0}
@@ -1268,3 +1303,13 @@ body[data-ps="stage"] .ntip{background:#000;border:1.5px solid rgba(255,214,0,.7
 .dmonth::before,.dmonth::after{content:"";flex:1;height:1px;background:var(--hair2,rgba(255,255,255,.13))}
 body[data-ps="stage"] .dstep-b{color:#FFD600}
 body[data-ps="stage"] .dmonth{background:#000;color:#FFD600}
+
+/* Dec. 155 · «Horario a importar» como una superficie de composición, no un terminal: tipografía de Showtime (sin monoespaciada),
+   lectura cómoda, aire alrededor del texto y una sola superficie suave dentro de su tarjeta. Solo aspecto: el textarea y lo pegado
+   (saltos y tabulaciones incluidos) no cambian. */
+.imp-box .imp-src textarea{font-family:inherit;font-size:15px;line-height:1.6;font-weight:400;letter-spacing:normal;tab-size:4;padding:14px 16px;border-radius:12px;min-height:120px;max-height:240px}
+.imp-box .imp-src textarea::placeholder{color:var(--dim,var(--muted));opacity:1}
+:where(body:not([data-ps="stage"])) .imp-box .imp-src textarea{background-color:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.08)}
+:where(body:not([data-ps="stage"])) .imp-box .imp-src textarea:focus{outline:none;background-color:rgba(255,255,255,.05);border-color:rgba(255,255,255,.38);box-shadow:0 0 0 3px rgba(255,255,255,.08)}
+body[data-ps="stage"] .imp-box .imp-src textarea{background-color:#000;border:1px solid rgba(255,214,0,.35);color:#fff}
+body[data-ps="stage"] .imp-box .imp-src textarea:focus{outline:none;border-color:#FFD600;box-shadow:0 0 0 2px rgba(255,214,0,.3)}

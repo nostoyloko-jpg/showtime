@@ -678,32 +678,578 @@
     t.env.fire('document', 'paste', pasteEv('x'));
     eq(t.env.getEl('imp').hidden, true, 'con un modal abierto, nada');
   });
-  test('«+ Añadir»: 2 pestañas — la primera vez «Pegar horario completo»; luego recuerda la última; el tip lleva a Pegar', () => {
-    ['<div id="addm"', '<div id="imp"'].forEach(m => {
-      const h = sec(m, '</div>\n</div>');
-      ok(/class="addtabs" role="tablist"[\s\S]*data-addtab="paste"[^>]*>[\s\S]*Pegar horario completo <small>Excel · CSV · PDF<\/small>[\s\S]*data-addtab="row"[\s\S]*Añadir 1 fila a mano/.test(h), m + ': pestañas en orden');
-    });
-    ok(/class="addtip">💡 ¿Tienes varias bandas\? Usa <button[^>]*data-addtab="paste">Pegar horario completo<\/button>/.test(sec('<div id="addm"', '<div id="modal"')), 'tip en la pestaña de 1 fila');
-    const F = fest(), t = panel({ 'showtime.festival': JSON.stringify(F.s) });
+  test('Dec. 155 · sin pestañas: «+ Añadir» abre solo el alta manual; «Pegar horario completo» tiene una cabecera única; «showtime.addtab» ya no interviene', () => {
+    const H = srcRaw('index.html'), js = D.src('control.js'), css = D.src('control.css');
+    ok(!/addtabs|data-addtab|role="tablist" aria-label="Añadir"|class="addtip"/.test(H), 'ni pestañas ni el «tip» que saltaba de un modal a otro');
+    ok(!/addtab|ADDTAB|setAddTabs|openAddTab|lastAddTab/.test(js.replace(/\/\/[^\n]*/g, '').replace(/localStorage\.removeItem\('showtime\.addtab'\)/, '')), 'ni su lógica');
+    ok(/try \{ localStorage\.removeItem\('showtime\.addtab'\); \} catch \(e\) \{\}/.test(js), 'la preferencia antigua se borra');
+    ok(!/\.addtabs|\.addtip/.test(css), 'ni sus estilos');
+    ok(!/Tienes varias bandas|Several bands\? Use/.test(D.src('i18n.js')), 'ni su texto huérfano en i18n.js (ningún idioma)');
+    ok(/<h2 id="imp-title" data-i18n><svg class="ic"><use href="#i-bolt"\/><\/svg>Pegar horario completo <small data-i18n>Excel · CSV · PDF<\/small><\/h2><button id="imp-close"/.test(H), 'cabecera única y visible del importador');
+    eq((sec('<div id="imp"', '<datalist id="zones-dl">').match(/role="tab"/g) || []).length, 0, 'sin role="tab" en el importador');
+    // Con evento: «+ Añadir» → alta manual, siempre (aunque haya una preferencia vieja guardada)
+    const F = fest(), t = panel({ 'showtime.festival': JSON.stringify(F.s), 'showtime.addtab': 'paste' });
+    eq(t.env.storage.get('showtime.addtab'), undefined, 'preferencia vieja borrada al arrancar');
     t.env.fire('btn-new-row', 'click', {});
-    eq(t.env.getEl('imp').hidden, false, 'primera vez: Pegar'); eq(t.env.getEl('addm').hidden, true);
-    clickData(t, '[data-addtab]', { addtab: 'row' });
-    eq(t.env.getEl('addm').hidden, false, 'pestaña de 1 fila'); eq(t.env.getEl('imp').hidden, true, 'cierra la de pegar');
-    eq(t.env.storage.get('showtime.addtab'), 'row');
+    eq(t.env.getEl('addm').hidden, false, 'alta manual'); eq(t.env.getEl('imp').hidden, true, 'nunca el importador');
+    eq(t.env.storage.get('showtime.addtab'), undefined, 'y no se vuelve a guardar');
     t.env.getEl('addm').hidden = true;
-    t.env.fire('btn-new-row', 'click', {});
-    eq(t.env.getEl('addm').hidden, false, 'recuerda la última: 1 fila');
-    clickData(t, '[data-addtab]', { addtab: 'paste' });
-    eq(t.env.getEl('imp').hidden, false, 'el tip/pestaña lleva a Pegar'); eq(t.env.getEl('addm').hidden, true);
+    t.env.fire('btn-new-row', 'click', {}); eq(t.env.getEl('addm').hidden, false, 'siempre el alta manual');
+    // Con el importador abierto, nada lo cierra para abrir otro modal
+    t.env.getEl('addm').hidden = true;
+    t.env.fire('document', 'paste', pasteEv('23:00-23:45 Banda Nueva Principal'));
+    eq(t.env.getEl('imp').hidden, false);
+    clickData(t, '[data-ob]', { ob: 'manual' });
+    eq(t.env.getEl('imp').hidden, false, 'el importador sigue abierto'); eq(t.env.getEl('addm').hidden, true, 'sin saltar al alta manual');
+    eq(t.env.getEl('imp-text').value, '23:00-23:45 Banda Nueva Principal', 'y el borrador intacto');
     eq(t.env.errors.length, 0, t.env.errors.join(' | '));
   });
-  test('Tarjeta central: «Pegar horario» abre la vista previa; «Añadir fila a mano» sin evento pide crearlo primero', () => {
+  // ── Dec. 155 · fila manual dentro de «Pegar horario completo» (borrador único, se aplica entero con «Importar») ──
+  const manFill = (t, o) => { ['tipo', 'nombre', 'zona', 'jor', 'ini', 'fin', 'call', 'notas'].forEach(k => { t.env.getEl('imp-m-' + k).value = o[k] !== undefined ? o[k] : (k === 'tipo' ? 'show' : ''); }); };
+  const dump = t => { const o = {}; t.env.storage.forEach((v, k) => { o[k] = v; }); return JSON.stringify(o); };
+  test('Importador sin evento: pegar + fila manual en línea → nada se guarda hasta «Importar»; vista previa conjunta; se importa todo junto', () => {
+    const t = panel(), T = t.env.win.ShowtimePanel._test;
+    const s0 = dump(t), undo0 = t.env.getEl('btn-undo').disabled;
+    t.env.fire('document', 'paste', pasteEv(CARTEL));
+    t.env.fire('imp-new', 'input', { target: { id: 'imp-name', value: 'Noches' } });                      // nombre provisional
+    t.env.fire('imp-prev', 'change', { target: { dataset: { row: '0', k: 'notas' }, value: 'Backline propio' } });   // edición de una fila pegada
+    t.env.fire('imp-prev', 'change', { target: { dataset: { inc: '1' }, checked: false } });                 // e inclusión quitada
+    t.env.fire('imp-jor', 'change', { target: { value: '2026-07-11' } });                                    // jornada por defecto
+    eq(t.env.getEl('imp-man').hidden, true, 'la ficha empieza plegada');
+    ok(/<div class="imp-foot">[\s\S]*?<button id="imp-man-open"[^>]*>[\s\S]*?Añadir fila manual<\/button>/.test(srcRaw('index.html')), '«+ Añadir fila manual» visible, en el pie');
+    t.env.fire('imp-man-open', 'click', {});
+    eq(t.env.getEl('imp-man').hidden, false, 'se despliega dentro del importador'); eq(t.env.getEl('imp').hidden, false, 'sin cerrar #imp'); eq(t.env.getEl('addm').hidden, true, 'sin otro modal');
+    manFill(t, { tipo: 'sc', nombre: 'Fila Mano', zona: 'Carpa', jor: '2026-07-11', ini: '19:00', fin: '+30', notas: 'a mano' });
+    t.env.fire('imp-m-add', 'click', {});
+    eq(t.env.getEl('imp-m-err').textContent, '', 'sin error');
+    eq(t.env.getEl('imp-m-nombre').value, '', 'la ficha se limpia'); eq(t.env.getEl('imp-man').hidden, false, 'y sigue abierta para otra');
+    eq(t.env.getEl('imp-man-n').textContent, '1 fila manual en el borrador');
+    const pv = ultimo(t, 'imp-prev');
+    ok(/value="Los Ácratas"/.test(pv) && /value="DJ Uno"/.test(pv) && /value="Fila Mano"/.test(pv), 'pegadas y manual juntas');
+    ok(pv.indexOf('value="DJ Uno"') < pv.indexOf('value="Fila Mano"') && /<span class="man">manual<\/span>/.test(pv), 'la manual detrás, marcada');
+    ok(/value="Backline propio"/.test(pv), 'la edición de la fila pegada se conserva');
+    ok(/<input type="checkbox" data-inc="1">/.test(pv), 'la inclusión quitada se conserva');
+    ok(/id="imp-name"[^>]*value="Noches"/.test(ultimo(t, 'imp-new')), 'el nombre provisional se conserva');
+    eq(t.env.getEl('imp-jor').value, '2026-07-11', 'la jornada por defecto se conserva');
+    eq(t.env.getEl('imp-text').value, CARTEL, 'el texto, intacto');
+    eq(t.env.getEl('imp-go').title, 'Importar: 2 filas', 'total: Los Ácratas + la manual (DJ Uno desmarcada)');
+    eq(dump(t), s0, 'hasta «Importar», nada en el almacén (ni evento, ni log, ni emisión)'); eq(t.read('showtime.festival'), null);
+    eq(t.env.getEl('btn-undo').disabled, undo0, 'ni Deshacer');
+    // Cambiar el texto pegado no se lleva la fila manual
+    t.env.getEl('imp-text').value = CARTEL + '\n11/07/2026\tCarpa\tTres\t22:00\t23:00';
+    T.setImportText(t.env.getEl('imp-text').value);
+    ok(/value="Fila Mano"/.test(ultimo(t, 'imp-prev')) && /value="Tres"/.test(ultimo(t, 'imp-prev')), 'tras cambiar el texto, la manual sigue');
+    t.env.fire('imp-go', 'click', {});
+    const s = t.read('showtime.festival');
+    ok(s, 'evento creado al importar'); eq(s.event.nombre, 'Noches');
+    eq(s.artists.map(a => a.nombre).sort().join(), 'DJ Uno,Fila Mano,Los Ácratas,Tres', 'todo junto, de una vez');
+    const sc = C.buildBlocks(s, { mode: 'sc', day: 'all' }).find(b => b.name === 'Fila Mano');
+    ok(sc && sc.jornada === '2026-07-11' && sc.stage === 'Carpa', 'la manual entra como soundcheck, en su jornada y zona');
+    ok(!C.buildBlocks(s, { mode: 'show', day: 'all' }).some(b => b.name === 'Fila Mano'), 'y no como show');
+    eq(t.env.getEl('imp').hidden, true); eq(t.env.errors.length, 0, t.env.errors.join(' | '));
+  });
+  test('Importador · jerarquía final: «+ Añadir fila manual» en el pie a la izquierda; Cancelar · Importar a la derecha; la ficha debajo de la vista previa', () => {
+    const H = srcRaw('index.html'), css = D.src('control.css');
+    const imp = H.slice(H.indexOf('<div id="imp"'), H.indexOf('<datalist id="zones-dl"'));
+    ok(/<div class="imp-foot"><p id="imp-sum" class="imp-sum" role="status" aria-live="polite"><\/p><div class="imp-foot-row"><button id="imp-man-open" class="btn ghost imp-man-open" type="button" aria-expanded="false" aria-controls="imp-man" data-i18n><svg class="ic"><use href="#i-plus"\/><\/svg>Añadir fila manual<\/button><div class="imp-foot-acts"><button id="imp-cancel" class="btn" data-i18n>Cancelar<\/button><button id="imp-go" class="btn primary">Importar<\/button><\/div><\/div><\/div>/.test(imp), 'pie en dos niveles: resumen arriba; [+ Añadir fila manual] … [Cancelar] [Importar] debajo');
+    eq((imp.match(/id="imp-man-open"/g) || []).length, 1, 'un solo botón (fuera de debajo de Opciones)');
+    ok(imp.indexOf('imp-prevcard') < imp.indexOf('id="imp-man"') && imp.indexOf('id="imp-man"') < imp.indexOf('class="imp-foot"'), 'la ficha va DESPUÉS de la vista previa y justo encima del pie');
+    ok(imp.indexOf('class="imp-opts"') < imp.indexOf('imp-prevcard') && !/imp-mapcard[\s\S]*id="imp-man"[\s\S]*imp-prevcard/.test(imp), 'nada de la ficha entre Opciones y Vista previa');
+    ok(/\.imp-foot\{display:flex;flex-direction:column;gap:8px;position:sticky;bottom:0;/.test(css) && /\.imp-foot-row\{display:flex;align-items:center;flex-wrap:wrap;gap:8px 16px\}/.test(css) && /\.imp-foot-acts\{display:flex;align-items:center;gap:8px;margin-left:auto\}/.test(css), 'dos niveles; Cancelar e Importar juntos a la derecha; si el pie envuelve, bajan juntas (Importar siempre a la vista)');
+    ok(/\.imp-sum\{margin:0;padding-bottom:7px;border-bottom:1px solid var\(--hair[^)]*\)\);font-size:12px;/.test(css) && !/\.imp-sum\{[^}]*(background|border-radius)/.test(css), 'resumen discreto: raya fina, sin caja ni píldora');
+    ok(/\.imp-sum \.s-exc\{color:var\(--call\)\} \.imp-sum \.s-err\{color:var\(--err\)\}/.test(css) && !/\.imp-sum \.s-imp\{/.test(css), 'solo Excluidas y Error llevan color');
+    ok(/<button id="imp-m-add" class="btn" type="button"/.test(imp) && (imp.match(/class="btn primary"/g) || []).length === 1, 'Importar es la única acción primaria del importador');
+  });
+  test('Importador · varias filas manuales seguidas: al final de la vista previa en orden de incorporación; la ficha sigue abierta; total correcto; scroll a la nueva', () => {
+    const F = fest(), t = panel({ 'showtime.festival': JSON.stringify(F.s) }), s0 = dump(t);
+    t.env.fire('document', 'paste', pasteEv('23:00-23:20 Banda Nueva Principal\n23:30-23:50 Otra Pegada Principal'));
+    t.env.fire('imp-man-open', 'click', {});
+    eq(t.env.getEl('imp-man').hidden, false, 'se abre desde el pie');
+    const W = t.env.getEl('imp-prevwrap'); W.scrollTop = 0;
+    manFill(t, { tipo: 'sc', nombre: 'Uno', zona: 'Principal', jor: JOR, ini: '18:00', fin: '18:30' }); t.env.fire('imp-m-add', 'click', {});
+    eq(t.env.getEl('imp-m-tipo').value, 'sc', 'el tipo elegido se queda'); eq(t.env.getEl('imp-m-jor').value, JOR, 'y la jornada');
+    eq(t.env.getEl('imp-m-nombre').value, '', 'nombre limpio para la siguiente'); eq(t.env.getEl('imp-man').hidden, false, 'la ficha sigue abierta');
+    W.scrollHeight = 480; W.scrollTop = 0;
+    t.env.getEl('imp-m-nombre').value = 'Dos'; t.env.getEl('imp-m-zona').value = 'Principal'; t.env.getEl('imp-m-ini').value = '18:40'; t.env.getEl('imp-m-fin').value = '+20';
+    t.env.fire('imp-m-add', 'click', {});
+    eq(W.scrollTop, 480, 'la vista previa baja hasta la fila nueva (la última)');
+    t.env.getEl('imp-m-nombre').value = 'Tres'; t.env.getEl('imp-m-zona').value = 'Principal'; t.env.getEl('imp-m-ini').value = '19:10'; t.env.getEl('imp-m-fin').value = '19:30';
+    t.env.fire('imp-m-add', 'click', {});
+    const pv = ultimo(t, 'imp-prev'), at = n => pv.indexOf('value="' + n + '"');
+    ok(at('Banda Nueva') < at('Otra Pegada') && at('Otra Pegada') < at('Uno') && at('Uno') < at('Dos') && at('Dos') < at('Tres'), 'pegadas primero; manuales al final, en orden de incorporación');
+    eq((pv.match(/<span class="man">manual<\/span>/g) || []).length, 3);
+    eq(t.env.getEl('imp-man-n').textContent, '3 filas manuales en el borrador');
+    eq(t.env.getEl('imp-go').title, 'Importar: 5 filas', '2 pegadas + 3 manuales');
+    eq(dump(t), s0, 'nada guardado aún');
+    t.env.fire('imp-go', 'click', {});
+    const s = t.read('showtime.festival'), sc = C.buildBlocks(s, { mode: 'sc', day: 'all' }).map(b => b.name);
+    eq(s.artists.length, F.s.artists.length + 5); ok(['Uno', 'Dos', 'Tres'].every(n => sc.indexOf(n) >= 0), 'las tres manuales como soundcheck: ' + sc.join());
+    eq(t.env.errors.length, 0, t.env.errors.join(' | '));
+  });
+  test('Importador · resumen por FILAS: «Importar» siempre; «Excluidas» y «Error» solo si hay; avisos importables no son error; ES/EN y botón accesible', () => {
+    const F = fest(), t = panel({ 'showtime.festival': JSON.stringify(F.s) }), go = t.env.getEl('imp-go');
+    const sum = () => t.env.getEl('imp-sum').innerHTML.replace(/<[^>]+>/g, '');
+    t.env.fire('btn-paste', 'click', {});
+    eq(sum(), 'Importar: 0 filas', 'vacío: solo «Importar»'); eq(go.textContent, 'Importar'); eq(go.title, 'Importar: 0 filas'); eq(go.disabled, true);
+    t.env.win.ShowtimePanel._test.setImportText('Banda\tZona\tInicio\tFin\nUno\tPrincipal\t23:00\t23:20\nDos\tPrincipal\t23:30\t23:50\n\tPrincipal\t21:00\t22:00\nTres\tZona Nueva\t20:00\t20:30');
+    ok(/\d+ OK|a revisar|con error|To import|Rows with errors|entradas listas/.test(t.env.getEl('imp-sum').innerHTML) === false, 'nada de los textos de antes');
+    const pv = ultimo(t, 'imp-prev');
+    const nRows = (pv.match(/<tr class="st-/g) || []).length, nErr = (pv.match(/<tr class="st-err/g) || []).length;
+    ok(nRows >= 3, 'filas: ' + nRows);
+    const s1 = sum();
+    ok(/^Importar: \d+ filas?/.test(s1) && !/Excluidas/.test(s1), 'sin excluidas: no sale «Excluidas»: ' + s1);
+    eq(nRows, 4); eq(nErr, 1, 'una fila sin nombre');
+    eq(s1, 'Importar: 3 filas · Error: 1 fila', 'error = filas con error (no mensajes), en singular; sin «Excluidas»');
+    ok(/<span class="s-err">Error: 1 fila<\/span>/.test(t.env.getEl('imp-sum').innerHTML), 'con su color');
+    ok((pv.match(/<tr class="st-warn/g) || []).length >= 1 && !new RegExp('Error: ' + (nErr + 1)).test(s1), 'las filas con advertencias cuentan en Importar');
+    t.env.fire('imp-prev', 'change', { target: { dataset: { inc: '0' }, checked: false } });
+    ok(/· Excluidas: 1 fila(?: ·|$)/.test(sum()), 'desmarcar una: «Excluidas: 1 fila» (singular): ' + sum());
+    t.env.fire('imp-prev', 'change', { target: { dataset: { inc: '1' }, checked: false } });
+    ok(/Excluidas: 2 filas/.test(sum()), 'plural: ' + sum());
+    ok(/<span class="s-exc">Excluidas: 2 filas<\/span>/.test(t.env.getEl('imp-sum').innerHTML), 'con su color');
+    const nImp = +sum().match(/^Importar: (\d+)/)[1];
+    eq(go.title, 'Importar: ' + nImp + (nImp === 1 ? ' fila' : ' filas'), 'title con la cantidad'); eq(go.textContent, 'Importar', 'botón estable, sin número');
+    ok(/\$\('imp-go'\)\.setAttribute\('aria-label', goLbl\)/.test(D.src('control.js')), 'aria-label = title');
+    const cj = D.src('control.js');
+    ok((cj.match(/(Excluidas|Error): \{n\} filas?'/g) || []).length === 4 && !/['"](Excluidas|Error): \d|Excluded: |Error: ' \+|Excluidas: ' \+/.test(cj), 'los textos del resumen solo como claves tx() de i18n.js (nada escrito a mano ni concatenado)');
+    const src18 = D.src('i18n.js');
+    ['"Excluidas: {n} fila": "Excluded: {n} row"', '"Excluidas: {n} filas": "Excluded: {n} rows"', '"Error: {n} fila": "Error: {n} row"', '"Error: {n} filas": "Error: {n} rows"'].forEach(x => ok(src18.indexOf(x) >= 0, 'pareja exacta en i18n.js: ' + x));
+    const I = require('../i18n.js');
+    [['Importar: {n} fila', 'Import: 1 row', 1], ['Importar: {n} filas', 'Import: 3 rows', 3], ['Excluidas: {n} fila', 'Excluded: 1 row', 1], ['Excluidas: {n} filas', 'Excluded: 2 rows', 2], ['Error: {n} fila', 'Error: 1 row', 1], ['Error: {n} filas', 'Error: 4 rows', 4], ['Importar', 'Import']].forEach(([k, en, n]) => eq(I.tx(k, { n }, 'en'), en));
+    const i18 = D.src('i18n.js');
+    ok(!/To import|Rows with errors|"Con error|entradas listas|Tienes varias bandas|Several bands\? Use/.test(i18), 'sin las variantes descartadas ni la clave huérfana');
+    ok(!/"Importar \{n\} entrada|\{a\} OK<\/span>/.test(i18) && !/'Importar \{n\} entrada|\{a\} OK<\/span>/.test(D.src('control.js')), 'fuera los textos del pie anterior (sin claves huérfanas)');
+    t.env.win.ShowtimePanel._test.setAppLang('en');
+    ok(/^Import: \d+ rows? · Excluded: 2 rows/.test(sum()), 'en inglés: ' + sum()); eq(go.textContent, 'Import'); ok(/^Import: \d+ rows?$/.test(go.title));
+    eq(t.env.errors.length, 0, t.env.errors.join(' | '));
+  });
+  test('Importador · «Error ⓘ»: el detalle siempre cabe entero en pantalla (primera y última fila, motivo largo, tablet 768 px)', () => {
+    const P = panel().env.win.ShowtimePanel._test.errPopPlace, inside = (p, w, h, vw, vh) => p.left >= 8 && p.top >= 8 && p.left + w <= vw - 8 && p.top + h <= vh - 8;
+    // Primera fila, escritorio: a la derecha, pegado
+    let p = P({ left: 80, right: 130, top: 300, bottom: 318 }, 220, 40, 1180, 820); eq(p.side, 'right'); eq(p.left, 130); ok(inside(p, 220, 40, 1180, 820));
+    // Última fila pegada al pie de la pantalla: sube lo necesario, nunca se sale por abajo
+    p = P({ left: 80, right: 130, top: 800, bottom: 818 }, 220, 60, 1180, 820); ok(inside(p, 220, 60, 1180, 820), 'última fila: entero (' + JSON.stringify(p) + ')');
+    // Motivo largo en tablet vertical: ocupa como mucho el ancho de la pantalla menos márgenes y no se sale
+    p = P({ left: 60, right: 110, top: 600, bottom: 618 }, 752, 90, 768, 1024); ok(inside(p, 752, 90, 768, 1024) && p.side === 'below', 'largo a 768 px: debajo, entero');
+    p = P({ left: 60, right: 110, top: 990, bottom: 1010 }, 752, 90, 768, 1024); ok(inside(p, 752, 90, 768, 1024) && p.side === 'above', 'largo en la última fila a 768 px: encima, entero');
+    // Botón con la tabla desplazada (parte fuera por la izquierda): se recoloca dentro
+    p = P({ left: -30, right: 20, top: 400, bottom: 418 }, 752, 40, 768, 1024); ok(inside(p, 752, 40, 768, 1024));
+  });
+  test('Importador · detalle de Error fijado: no tapa Cancelar, Importar ni Excluir, y un toque en ellas actúa al primer gesto', () => {
+    const P = panel().env.win.ShowtimePanel._test.errPopPlace;
+    const hit = (p, w, h, a) => p.left < a.right && p.left + w > a.left && p.top < a.bottom && p.top + h > a.top;
+    // Última fila a 768 px, motivo largo: el pie (Cancelar · Importar) justo debajo y «Excluir» bajo el botón
+    const btn = { left: 60, right: 118, top: 860, bottom: 878 }, exc = { left: 56, top: 880, right: 126, bottom: 900 };
+    const cancel = { left: 543, top: 924, right: 638, bottom: 974 }, go = { left: 638, top: 924, right: 731, bottom: 974 }, man = { left: 37, top: 930, right: 217, bottom: 970 };
+    const avoid = [cancel, go, man, exc];
+    let p = P(btn, 320, 72, 768, 1024, 8, avoid);
+    ok(avoid.every(a => !hit(p, 320, 72, a)), 'motivo largo en la última fila: no tapa nada (' + JSON.stringify(p) + ')');
+    ok(p.left >= 8 && p.left + 320 <= 760 && p.top >= 8 && p.top + 72 <= 1016, 'y entero en pantalla');
+    p = P(btn, 700, 110, 768, 1024, 8, avoid);
+    ok(avoid.every(a => !hit(p, 700, 110, a)) && p.side === 'above', 'aún más largo: encima, sin tapar nada');
+    // «Excluir» asoma a la derecha del botón: el detalle se alinea por abajo y lo deja libre
+    p = P({ left: 60, right: 100, top: 400, bottom: 418 }, 220, 60, 1180, 820, 8, [{ left: 56, top: 420, right: 140, bottom: 440 }]);
+    ok(!hit(p, 220, 60, { left: 56, top: 420, right: 140, bottom: 440 }), 'no tapa el Excluir de su fila');
+    // En el importador: con el detalle FIJADO, un toque en Cancelar / Excluir / Importar hace su acción a la primera
+    const F = fest(), mk = () => { const t = panel({ 'showtime.festival': JSON.stringify(F.s) }); t.env.fire('btn-paste', 'click', {});
+      t.env.win.ShowtimePanel._test.setImportText('Banda\tZona\tInicio\tFin\nUno\tPrincipal\t23:00\t23:20\n\tPrincipal\t21:00\t22:00'); return t; };
+    const pin = t => { const at = {}; const b = { dataset: { errtip: '1', why: 'Falta el nombre de la banda' }, setAttribute: (k, v) => { at[k] = v; }, getBoundingClientRect: () => ({ left: 60, right: 110, top: 500, bottom: 520 }) };
+      b.closest = q => q === '[data-errtip]' ? b : null; t.env.fire('imp-prev', 'click', { target: b }); ok(t.env.win.ShowtimePanel._test.errPop().pinned, 'detalle fijado'); return at; };
+    const fuera = { closest: () => null };
+    let t = mk(); pin(t);
+    t.env.fire('imp-cancel', 'click', { target: fuera }); t.env.fire('document', 'click', { target: fuera });
+    eq(t.env.getEl('imp').hidden, true, 'Cancelar: cierra el importador al primer toque'); ok(!t.env.win.ShowtimePanel._test.errPop().open, 'y el detalle con él');
+    t = mk(); pin(t);
+    const sum = () => t.env.getEl('imp-sum').innerHTML.replace(/<[^>]+>/g, '');
+    t.env.fire('imp-prev', 'click', { target: { closest: q => q === '[data-exc],[data-rest]' ? { dataset: { exc: '1' } } : null } }); t.env.fire('document', 'click', { target: fuera });
+    eq(sum(), 'Importar: 1 fila · Excluidas: 1 fila', 'Excluir: actúa al primer toque'); ok(!t.env.win.ShowtimePanel._test.errPop().open, 'el detalle se cierra como consecuencia');
+    t = mk(); pin(t);
+    t.env.fire('imp-go', 'click', { target: fuera }); t.env.fire('document', 'click', { target: fuera });
+    eq(t.read('showtime.festival').artists.length, F.s.artists.length + 1, 'Importar: importa al primer toque (solo la válida)');
+    eq(t.env.errors.length, 0);
+    ok(/errPopAvoid\(btn\)/.test(D.src('control.js')) && /\$\('imp-cancel'\), \$\('imp-go'\), \$\('imp-man-open'\), act\]/.test(D.src('control.js')), 'el detalle esquiva Cancelar, Importar, Añadir fila manual y la acción de su fila');
+    const zonaPop = D.src('control.js').slice(D.src('control.js').indexOf('function errPopShow'), D.src('control.js').indexOf('/** ¿Fila desmarcada a mano'));
+    ok(!/stopPropagation/.test(zonaPop) && (zonaPop.match(/preventDefault/g) || []).length === 1 && /if \(e\.key !== 'Tab' \|\| e\.shiftKey[^\n]*\n[^\n]*e\.preventDefault\(\); c\.focus\(\);/.test(zonaPop), 'el detalle no consume ningún gesto (solo encamina Tab de Error a su acción contextual)');
+  });
+  test('Importador · detalle de Error sin sitio flotante (pantalla muy baja, motivo muy largo): se abre EN LÍNEA bajo su fila, no tapa nada y las acciones responden al primer toque', () => {
+    const P = panel().env.win.ShowtimePanel._test.errPopPlace;
+    // Pura: ninguna de las cinco posiciones cabe entera en la zona segura sin tapar nada → null (nunca «la que menos tapa»)
+    eq(P({ left: 60, right: 110, top: 120, bottom: 138 }, 752, 260, 768, 300, 8, [{ left: 540, top: 250, right: 730, bottom: 292 }]), null, 'sin sitio: null');
+    ok(!/sort\(\(x, y\) => over\(x\) - over\(y\)\)/.test(D.src('control.js')) && /return cands\.find\(c => inView\(c\) && over\(c\) === 0\) \|\| null;/.test(D.src('control.js')), 'fuera «la posición que menos tapa»');
+    // Real (en el importador): pantalla de 300 px de alto y motivo muy largo
+    const F = fest(), LARGO = 'Hora de inicio no reconocida: «' + 'muy largo '.repeat(40).trim() + '»';
+    const mk = () => { const t = panel({ 'showtime.festival': JSON.stringify(F.s) }); t.env.fire('btn-paste', 'click', {});
+      t.env.win.ShowtimePanel._test.setImportText('Banda\tZona\tInicio\tFin\nUno\tPrincipal\t23:00\t23:20\n\tPrincipal\t21:00\t22:00');
+      t.env.win.innerWidth = 768; t.env.win.innerHeight = 300; const pop = t.env.getEl('imp-errpop'); pop.offsetWidth = 752; pop.offsetHeight = 260; return t; };
+    const pin = (t, act) => { const at = {}, ins = []; const tr = { insertAdjacentHTML: (w, h) => ins.push([w, h]) };
+      const b = { dataset: { errtip: '1', why: LARGO }, at, ins, setAttribute: (k, v) => { at[k] = v; }, getBoundingClientRect: () => ({ left: 60, right: 110, top: 120, bottom: 138 }) };
+      const td = { querySelector: q => q === '[data-exc],[data-rest]' ? (act || null) : null };
+      t.env.getEl('imp-errctx').hidden = true;   // nace oculta (atributo hidden del HTML insertado)
+      b.closest = q => q === '[data-errtip]' ? b : q === 'tr' ? tr : q === 'td' ? td : null;
+      t.env.fire('imp-prev', 'click', { target: b }); return b; };
+    let t = mk(); const st = () => t.env.win.ShowtimePanel._test.errPop();
+    let b = pin(t);
+    ok(st().open && st().pinned && st().inline, 'fallback en línea');
+    eq(t.env.getEl('imp-errpop').hidden, true, 'el flotante no se muestra (no tapa nada)');
+    eq(b.ins.length, 1); eq(b.ins[0][0], 'afterend', 'justo debajo de su fila');
+    ok(new RegExp('^<tr id="imp-errrow" class="imp-errrow"><td colspan="11"><button type="button" id="imp-errctx" class="linkbtn imp-rowact imp-errctx" data-exc="1" aria-describedby="imp-errinline" hidden>Excluir</button><div id="imp-errinline" class="imp-errinline" role="tooltip">Hora de inicio no reconocida: «muy largo').test(b.ins[0][1]) && b.ins[0][1].indexOf(LARGO) > 0, 'con el mismo motivo completo y su acción ARRIBA, hermana del diagnóstico');
+    ok(!/role="tooltip"[^>]*>[^<]*<button/.test(b.ins[0][1]) && (b.ins[0][1].match(/<button/g) || []).length === 1, 'ningún botón dentro del role="tooltip"');
+    eq(t.env.getEl('imp-errctx').hidden, false, 'sin poder ver su Excluir original: la acción contextual se muestra');
+    eq(b.at['aria-expanded'], 'true'); eq(b.at['aria-controls'], 'imp-errinline', 'aria coherente: apunta al detalle en línea');
+    t.env.fire('window', 'scroll', { target: { closest: () => null } }); ok(st().open, 'hacer scroll para leerlo no lo cierra (va con su fila)');
+    t.env.fire('imp-prev', 'click', { target: b });
+    ok(!st().open && b.at['aria-expanded'] === 'false' && b.at['aria-controls'] === 'imp-errpop', 'otro toque: se cierra (y aria vuelve)');
+    // Con el detalle en línea abierto, el primer toque en cada acción funciona
+    const fuera = { closest: () => null };
+    pin(t); t.env.fire('imp-cancel', 'click', { target: fuera }); t.env.fire('document', 'click', { target: fuera });
+    eq(t.env.getEl('imp').hidden, true, 'Cancelar al primer toque'); ok(!st().open);
+    t = mk(); pin(t);
+    t.env.fire('imp-prev', 'click', { target: { closest: q => q === '[data-exc],[data-rest]' ? { dataset: { exc: '1' } } : null } });
+    eq(t.env.getEl('imp-sum').innerHTML.replace(/<[^>]+>/g, ''), 'Importar: 1 fila · Excluidas: 1 fila', 'Excluir al primer toque'); ok(!st().open, 'y el detalle desaparece');
+    // La acción contextual ES la de la fila: mismo atributo → mismo handler (Excluir; y Restaurar en una excluida)
+    t = mk(); pin(t);
+    const ctxBtn = { dataset: { exc: '1' } }, ctxNode = { closest: q => q === '[data-exc],[data-rest]' ? ctxBtn : /#imp-errrow/.test(q) ? {} : null };
+    t.env.fire('imp-prev', 'click', { target: ctxNode }); t.env.fire('document', 'click', { target: ctxNode });
+    eq(t.env.getEl('imp-sum').innerHTML.replace(/<[^>]+>/g, ''), 'Importar: 1 fila · Excluidas: 1 fila', 'Excluir contextual al primer toque'); ok(!st().open, 'y el detalle se cierra con la tabla rehecha');
+    ok(/data-rest="1">Restaurar<\/button>/.test(ultimo(t, 'imp-prev')), 'la fila queda excluida con su Restaurar');
+    t.env.fire('imp-prev', 'click', { target: { closest: q => q === '[data-exc],[data-rest]' ? { dataset: { rest: '1' } } : null } });
+    eq(t.env.getEl('imp-sum').innerHTML.replace(/<[^>]+>/g, ''), 'Importar: 1 fila · Error: 1 fila', 'Restaurar (mismo handler) la devuelve a Error');
+    // Restaurar: si la acción de la fila es Restaurar, la contextual también (mismo atributo y texto i18n)
+    t = mk(); b = pin(t, { dataset: { rest: '1' }, getBoundingClientRect: () => ({ left: 0, right: 0, top: NaN, bottom: NaN }) });
+    ok(/<button type="button" id="imp-errctx" class="linkbtn imp-rowact imp-errctx" data-rest="1" aria-describedby="imp-errinline" hidden>Restaurar<\/button>/.test(b.ins[0][1]), 'contextual = Restaurar');
+    t.env.fire('imp-prev', 'click', { target: b });
+    // Su Excluir original a la vista (dentro de la pantalla útil): la contextual NO aparece
+    t = mk(); b = pin(t, { dataset: { exc: '1' }, getBoundingClientRect: () => ({ left: 120, right: 170, top: 140, bottom: 156 }) });
+    ok(st().inline && t.env.getEl('imp-errctx').hidden === true, 'Excluir original visible: sin duplicado');
+    t.env.fire('imp-prev', 'click', { target: b });
+    t = mk(); b = pin(t, { dataset: { exc: '1' }, getBoundingClientRect: () => ({ left: 120, right: 170, top: 290, bottom: 306 }) });
+    eq(t.env.getEl('imp-errctx').hidden, false, 'Excluir original cortado por abajo: aparece la contextual');
+    t = mk(); pin(t); t.env.fire('imp-go', 'click', { target: fuera });
+    eq(t.read('showtime.festival').artists.length, F.s.artists.length + 1, 'Importar al primer toque');
+    // Teclado: foco visible en Error abre en línea; Tab llega a la acción contextual sin cerrar nada; salir del conjunto lo cierra
+    t = mk();
+    const rafQ = []; t.env.win.requestAnimationFrame = f => rafQ.push(f); const frame = () => rafQ.splice(0).forEach(f => f());
+    const kb = () => { const at = {}, tr = { insertAdjacentHTML() {} }, td = { querySelector: () => null };
+      const b = { dataset: { errtip: '1', why: LARGO }, at, setAttribute: (k, v) => { at[k] = v; }, matches: q => q === ':focus-visible', getBoundingClientRect: () => ({ left: 60, right: 110, top: 120, bottom: 138 }) };
+      b.closest = q => q === '[data-errtip]' ? b : q === 'tr' ? tr : q === 'td' ? td : null; return b; };
+    const ctxEl = t.env.getEl('imp-errctx'); let enfocada = 0; ctxEl.focus = () => { enfocada++; };
+    const enCtx = { closest: q => q === '#imp-errrow' ? {} : null }, enDetalle = { closest: q => q === '#imp-errrow' ? {} : null };
+    const tab = (target, shift) => { let pd = 0; t.env.fire('imp-prev', 'keydown', { key: 'Tab', shiftKey: !!shift, target, preventDefault: () => { pd++; } }); return pd; };
+    b = kb(); ctxEl.hidden = true;
+    t.env.fire('imp-prev', 'focusin', { target: b }); frame();
+    ok(st().open && st().inline && !st().pinned && b.at['aria-expanded'] === 'true', 'foco de teclado en Error: detalle en línea, aria-expanded="true"');
+    eq(ctxEl.hidden, false, 'su Excluir original no se ve: acción contextual visible');
+    eq(tab(b, true), 0, 'Shift+Tab desde Error: orden normal'); eq(enfocada, 0);
+    eq(tab(b), 1, 'Tab desde Error: va a la acción contextual'); eq(enfocada, 1);
+    t.env.fire('imp-prev', 'focusout', { target: b, relatedTarget: enCtx });
+    ok(st().open && b.at['aria-expanded'] === 'true', 'de Error a su acción contextual: sigue abierto y aria-expanded="true"');
+    t.env.fire('imp-prev', 'focusout', { target: enCtx, relatedTarget: enDetalle }); ok(st().open, 'dentro del bloque: sigue abierto');
+    t.env.fire('imp-prev', 'focusout', { target: enCtx, relatedTarget: b }); ok(st().open && b.at['aria-expanded'] === 'true', 'de vuelta a Error: sigue abierto');
+    eq(tab(enCtx), 0, 'Tab desde la acción contextual: sin trampa, orden normal');
+    t.env.fire('imp-prev', 'focusout', { target: enCtx, relatedTarget: { closest: () => null } });
+    ok(!st().open && b.at['aria-expanded'] === 'false', 'el foco sale del conjunto: se cierra y aria-expanded="false"');
+    b = kb(); t.env.fire('imp-prev', 'focusin', { target: b }); frame(); t.env.fire('imp-prev', 'focusout', { target: b, relatedTarget: null });
+    ok(!st().open && b.at['aria-expanded'] === 'false', 'foco fuera desde Error: se cierra');
+    // Enter/Espacio en la acción contextual (click de teclado, detail 0): mismo handler, actúa al primer intento y el foco pasa a la
+    // acción nueva de su fila (Restaurar), desde donde Tab sigue el orden normal. Con puntero (detail ≥ 1) el foco no se mueve.
+    const prev = t.env.getEl('imp-prev'), pedidos = []; let foco = 0;
+    prev.querySelector = q => { pedidos.push(q); return { focus: () => { foco++; } }; };
+    b = kb(); ctxEl.hidden = true; t.env.fire('imp-prev', 'focusin', { target: b }); frame(); eq(tab(b), 1);
+    const ctxBoton = { id: 'imp-errctx', dataset: { exc: '1' } }, ctxDentro = { closest: q => q === '[data-exc],[data-rest]' ? ctxBoton : q === '#imp-errrow' ? {} : null };
+    t.env.fire('imp-prev', 'click', { target: ctxDentro, detail: 0 });
+    eq(t.env.getEl('imp-sum').innerHTML.replace(/<[^>]+>/g, ''), 'Importar: 1 fila · Excluidas: 1 fila', 'Enter/Espacio en la contextual: Excluir al primer intento');
+    ok(!st().open, 'el detalle se cierra con la tabla rehecha');
+    eq(pedidos[pedidos.length - 1], 'td.st [data-rest="1"], td.st [data-exc="1"]', 'el foco va a la acción de su fila'); eq(foco, 1);
+    t.env.fire('imp-prev', 'click', { target: { closest: q => q === '[data-exc],[data-rest]' ? { dataset: { rest: '1' } } : null }, detail: 0 });
+    eq(foco, 1, 'la acción ORIGINAL de la fila no toca el foco (sin cambios)');
+    t.env.fire('imp-prev', 'click', { target: ctxDentro, detail: 1 }); eq(foco, 1, 'contextual con puntero: el foco no se mueve');
+    delete prev.querySelector;
+    // Sin acción contextual visible (su Excluir se ve) o con el detalle flotante: Tab no se toca
+    b = kb(); ctxEl.hidden = true; t.env.fire('imp-prev', 'focusin', { target: b }); frame(); ctxEl.hidden = true; eq(tab(b), 0, 'acción contextual oculta: Tab normal');
+    t.env.fire('imp-prev', 'focusout', { target: b, relatedTarget: null });
+    t.env.win.innerHeight = 1024; t.env.getEl('imp-errpop').offsetHeight = 40; t.env.getEl('imp-errpop').offsetWidth = 200;
+    b = kb(); t.env.fire('imp-prev', 'focusin', { target: b });
+    // El scroll con el que el navegador enfoca el botón llega ANTES del fotograma: no hay nada abierto que cerrar
+    t.env.fire('window', 'scroll', { target: { closest: () => null } }); ok(!st().open, 'antes del fotograma: aún cerrado');
+    frame(); ok(st().open && !st().inline && b.at['aria-expanded'] === 'true' && t.env.getEl('imp-errpop').hidden === false, 'flotante por teclado: abierto, aria-expanded="true"');
+    eq(tab(b), 0, 'flotante: Tab normal');
+    // Un scroll real posterior del usuario lo cierra como siempre
+    t.env.fire('window', 'scroll', { target: { closest: () => null } });
+    ok(!st().open && b.at['aria-expanded'] === 'false' && t.env.getEl('imp-errpop').hidden === true, 'scroll del usuario después: se cierra y aria-expanded="false"');
+    // Foco que se va antes del fotograma (Tab rápido): no se abre nada
+    b = kb(); b.matches = () => false; t.env.fire('imp-prev', 'focusin', { target: b }); frame(); ok(!st().open, 'sin foco de teclado al llegar el fotograma: no se abre');
+    // El mismo botón ya abierto: el fotograma no lo reabre
+    b = kb(); t.env.fire('imp-prev', 'focusin', { target: b }); frame(); t.env.fire('imp-prev', 'focusin', { target: b }); frame(); ok(st().open && b.at['aria-expanded'] === 'true');
+    t.env.fire('imp-prev', 'focusout', { target: b, relatedTarget: null }); ok(!st().open && b.at['aria-expanded'] === 'false', 'al dejar Error: se cierra');
+    eq(t.env.errors.length, 0);
+    eq(t.env.errors.length, 0);
+  });
+  test('Importador · filas con error: sin casilla engañosa; «Excluir» las pasa a Excluidas y «Restaurar» a Error; corregir crea la casilla (marcada o desmarcada); el resumen cuadra', () => {
+    const T0 = panel().env.win.ShowtimePanel._test;
+    // Reparto puro: cada fila en un solo grupo; solo una exclusión manual lleva a Excluidas
+    const rows = [{ idx: 0, include: true, status: 'ok' }, { idx: 1, include: true, status: 'warn' }, { idx: 2, include: false, status: 'warn' },
+      { idx: 3, include: false, status: 'err' }, { idx: 4, include: false, status: 'err' }];
+    const off = new Set([2, 4]);
+    eq(JSON.stringify(T0.impTally(rows, r => off.has(r.idx))), JSON.stringify({ imp: 2, exc: 2, err: 1, total: 5 }));
+    const F = fest(), t = panel({ 'showtime.festival': JSON.stringify(F.s) });
+    const sum = () => t.env.getEl('imp-sum').innerHTML.replace(/<[^>]+>/g, '');
+    const pv = () => ultimo(t, 'imp-prev');
+    const total = () => (pv().match(/<tr class="st-/g) || []).length;
+    const nums = () => { const m = k => +((sum().match(new RegExp(k + ': (\\d+)')) || [0, 0])[1]); return m('Importar') + m('Excluidas') + m('Error'); };
+    const cuadra = msg => eq(nums(), total(), msg + ' (' + sum() + ')');
+    const fila = i => { const h = pv(), k = h.indexOf('<td class="chk"><', h.indexOf('<tr class="st-', [...h.matchAll(/<tr class="st-/g)][i].index)); return h.slice([...h.matchAll(/<tr class="st-/g)][i].index, h.indexOf('</tr>', k)); };
+    const click = (attr, i) => t.env.fire('imp-prev', 'click', { target: { closest: q => q === '[data-exc],[data-rest]' ? { dataset: { [attr]: String(i) } } : null } });
+    t.env.fire('btn-paste', 'click', {});
+    // Fila 2: sin nombre (error); fila 3: hora imposible (error)
+    t.env.win.ShowtimePanel._test.setImportText('Banda\tZona\tInicio\tFin\nUno\tPrincipal\t23:00\t23:20\nDos\tPrincipal\t23:30\t23:50\n\tPrincipal\t21:00\t22:00\nCuatro\tPrincipal\t25:99\t');
+    eq(total(), 4); eq(sum(), 'Importar: 2 filas · Error: 2 filas'); cuadra('al empezar');
+    // 1) Error: sin casilla (ni marcada ni desmarcada), hueco conservado y estado/causa legibles
+    [2, 3].forEach(i => {
+      const h = fila(i);
+      ok(/^<tr class="st-err/.test(h) && !/type="checkbox"/.test(h), 'fila ' + i + ': sin casilla');
+      ok(/<td class="chk"><span class="sr-only">Esta fila no se importará<\/span><\/td>/.test(h), 'fila ' + i + ': hueco de la casilla con su explicación accesible');
+      ok(/<button type="button" class="imp-errbtn" data-errtip="\d+" data-why="[^"]+" aria-expanded="false" aria-controls="imp-errpop" aria-label="Error\. Esta fila no se importará\. [^"]+\. Mostrar detalle">Error <svg class="ic ii" viewBox="0 0 16 16" aria-hidden="true" focusable="false">[\s\S]*?<\/svg><\/button><button type="button" class="linkbtn imp-rowact" data-exc="\d+">Excluir<\/button>/.test(h), 'fila ' + i + ': «Error» + icono SVG decorativo + «Excluir»');
+      ok(!/ⓘ/.test(h), 'fila ' + i + ': sin el glifo de fuente');
+      ok(!/No se importará hasta corregirla/.test(h), 'fila ' + i + ': sin la frase larga visible');
+      ok(/data-k="banda"/.test(h) && /data-k="inicio"/.test(h), 'fila ' + i + ': sigue editable');
+    });
+    ok(/type="checkbox" data-inc="0" checked/.test(pv()) && /type="checkbox" data-inc="1" checked/.test(pv()), 'las válidas, con su casilla normal');
+    ok(!/data-inc="\d+"[^>]*disabled/.test(pv()), 'ninguna casilla gris');
+    // «Error ⓘ»: motivo concreto en el detalle y en el nombre accesible; toque/clic abre y cierra; hover y foco por CSS
+    ok(/aria-label="Error\. Esta fila no se importará\. Falta el nombre de la banda\. Mostrar detalle"/.test(fila(2)) && /data-why="Falta el nombre de la banda"/.test(fila(2)), 'fila sin nombre: el motivo exacto');
+    ok(/aria-label="Error\. Esta fila no se importará\. Hora de inicio no reconocida: «25:99»\. Mostrar detalle"/.test(fila(3)), 'fila con hora imposible: su motivo');
+    ok(/<div class="e">Falta el nombre de la banda<\/div>/.test(fila(2)), 'Avisos conserva el diagnóstico completo');
+    // Detalle flotante: aria-expanded sigue lo que se ve (hover, foco, toque); el ratón pasa del botón al detalle sin cerrarlo
+    const pop = t.env.getEl('imp-errpop'); pop.offsetWidth = 200; pop.offsetHeight = 40;
+    t.env.win.innerWidth = 768; t.env.win.innerHeight = 1024;
+    const mkBtn = i => { const at = {}; const b = { dataset: { errtip: String(i), why: 'Falta el nombre de la banda' }, at, setAttribute: (k, v) => { at[k] = v; }, getBoundingClientRect: () => ({ left: 60, right: 110, top: 500, bottom: 520 }) }; b.closest = q => q === '[data-errtip]' ? b : null; return b; };
+    const st = () => t.env.win.ShowtimePanel._test.errPop();
+    const b2 = mkBtn(2), b3 = mkBtn(3), popNode = { closest: q => /#imp-errpop/.test(q) ? pop : null }, fuera = { closest: () => null };
+    t.env.fire('imp-prev', 'pointerover', { pointerType: 'mouse', target: b2 });
+    ok(st().open && pop.hidden === false && b2.at['aria-expanded'] === 'true', 'hover: se ve y aria-expanded="true"');
+    eq(pop.textContent, 'Falta el nombre de la banda', 'con el motivo'); eq(pop.style.left, '110px', 'pegado a la derecha del botón (sin hueco)');
+    t.env.fire('imp-prev', 'pointerout', { pointerType: 'mouse', target: b2, relatedTarget: popNode });
+    ok(st().open, 'del botón al detalle: no se cierra');
+    t.env.fire('imp-errpop', 'pointerleave', { pointerType: 'mouse', relatedTarget: b2 });
+    ok(st().open, 'del detalle al botón: tampoco');
+    t.env.fire('imp-errpop', 'pointerleave', { pointerType: 'mouse', relatedTarget: fuera });
+    ok(!st().open && pop.hidden === true && b2.at['aria-expanded'] === 'false', 'fuera de los dos: se cierra y aria-expanded="false"');
+    t.env.fire('imp-prev', 'pointerover', { pointerType: 'mouse', target: b2 });
+    t.env.fire('imp-prev', 'pointerout', { pointerType: 'mouse', target: b2, relatedTarget: fuera });
+    ok(!st().open && b2.at['aria-expanded'] === 'false', 'del botón a otro sitio: se cierra');
+    const raf = []; t.env.win.requestAnimationFrame = f => raf.push(f); const frame = () => raf.splice(0).forEach(f => f());
+    t.env.fire('imp-prev', 'focusin', { target: b3 });
+    ok(!st().open, 'foco de teclado: aún no (espera al fotograma en que se asienta el foco y su scroll)');
+    frame(); ok(st().open && b3.at['aria-expanded'] === 'true', 'foco de teclado: se ve y aria-expanded="true"');
+    t.env.fire('imp-prev', 'focusout', { target: b3 });
+    ok(!st().open && b3.at['aria-expanded'] === 'false', 'sin foco: se cierra');
+    const s0 = sum();
+    t.env.fire('imp-prev', 'click', { target: b2 });
+    ok(st().open && st().pinned && b2.at['aria-expanded'] === 'true', 'toque/clic: lo fija');
+    t.env.fire('imp-prev', 'pointerout', { pointerType: 'mouse', target: b2, relatedTarget: fuera }); ok(st().open, 'fijado: salir con el ratón no lo cierra');
+    t.env.fire('imp-prev', 'click', { target: b2 });
+    ok(!st().open && b2.at['aria-expanded'] === 'false', 'otro toque: lo cierra');
+    t.env.fire('imp-prev', 'click', { target: b2 }); t.env.fire('imp-prev', 'click', { target: b3 });
+    ok(st().open && b2.at['aria-expanded'] === 'false' && b3.at['aria-expanded'] === 'true', 'abrir otro cierra el anterior (un solo detalle, aria coherente)');
+    t.env.fire('document', 'click', { target: fuera }); ok(!st().open, 'un clic fuera lo cierra');
+    eq(sum(), s0, 'abrir el detalle no cambia nada del borrador');
+    t.env.fire('imp-prev', 'pointerover', { pointerType: 'touch', target: b2 }); ok(!st().open, 'un dedo que pasa por encima (scroll) no lo abre');
+    const css2 = D.src('control.css'), cj2 = D.src('control.js'), html2 = srcRaw('index.html');
+    ok(/<div id="imp" class="modal" hidden>\s*<!--[^>]*-->\s*<div id="imp-errpop" class="imp-errpop" role="tooltip" hidden><\/div>/.test(html2), 'un solo detalle, fuera de la caja con scroll (no lo recorta nada)');
+    ok(/\.imp-errpop\{position:fixed;[^}]*max-width:min\(320px,calc\(100vw - 16px\)\);[^}]*border:6px solid transparent;background-clip:padding-box;/.test(css2), 'fijo, nunca más ancho que la pantalla, con puente transparente al botón');
+    ok(!/addEventListener\('touchstart'/.test(cj2) && !/title="[^"]*' \+ esc\(back\(r\.errs\[0\]/.test(cj2), 'sin touchstart y sin depender de title');
+    ok(!/\.imp-errbtn\{[^}]*(border-radius|background:(?!none))/.test(css2), 'sin píldora');
+    ok(!/data-errtip[\s\S]{0,400}Escape/.test(cj2), 'Esc no se intercepta');
+    t.env.getEl('imp').hidden = false; t.env.fire('document', 'keydown', { key: 'Escape', target: { closest: () => null, tagName: 'BODY' }, preventDefault() {}, stopPropagation() {}, stopImmediatePropagation() {} }); eq(t.env.getEl('imp').hidden, true, 'Esc sigue cerrando (y descartando) el importador');
+    t.env.fire('btn-paste', 'click', {});
+    t.env.win.ShowtimePanel._test.setImportText('Banda\tZona\tInicio\tFin\nUno\tPrincipal\t23:00\t23:20\nDos\tPrincipal\t23:30\t23:50\n\tPrincipal\t21:00\t22:00\nCuatro\tPrincipal\t25:99\t');
+    // 2) Excluir → Excluidas (el detalle del error sigue a la vista) · Restaurar → Error
+    click('exc', 2);
+    eq(sum(), 'Importar: 2 filas · Excluidas: 1 fila · Error: 1 fila', 'Excluir: de Error a Excluidas'); cuadra('tras Excluir');
+    let h = fila(2);
+    ok(!/type="checkbox"/.test(h) && /Excluida<\/span><div class="why">Excluida a mano: no se importará<\/div><button type="button" class="linkbtn imp-rowact" data-rest="2">Restaurar<\/button>/.test(h), 'excluida: sin casilla, con «Restaurar»');
+    ok(/<div class="e">Falta el nombre/.test(h), 'conserva visible su error mientras siga inválida');
+    click('rest', 2);
+    eq(sum(), 'Importar: 2 filas · Error: 2 filas', 'Restaurar: vuelve a Error pendiente'); cuadra('tras Restaurar');
+    ok(/data-exc="2">Excluir</.test(fila(2)));
+    // 3) Corregir desde Error pendiente → casilla normal MARCADA (importable)
+    t.env.fire('imp-prev', 'change', { target: { dataset: { row: '2', k: 'banda' }, value: 'Tres' } });
+    ok(/<input type="checkbox" data-inc="2" checked>/.test(fila(2)) && !/data-exc|data-rest/.test(fila(2)), 'corregida desde Error: casilla marcada');
+    eq(sum(), 'Importar: 3 filas · Error: 1 fila'); cuadra('corregida desde Error');
+    // 4) Corregir desde Excluida → casilla normal DESMARCADA (la exclusión explícita se respeta)
+    click('exc', 3);
+    eq(sum(), 'Importar: 3 filas · Excluidas: 1 fila');
+    ok(!/Error/.test(sum()), 'una fila con error excluida no cuenta como Error');
+    t.env.win.ShowtimePanel._test.setAppLang('en');
+    eq(sum(), 'Import: 3 rows · Excluded: 1 row', 'en inglés'); ok(/data-rest="3">Restore</.test(fila(3)) && /Manually excluded: won’t be imported/.test(fila(3)));
+    t.env.win.ShowtimePanel._test.setAppLang('es');
+    t.env.fire('imp-prev', 'change', { target: { dataset: { row: '3', k: 'inicio' }, value: '23:55' } });
+    ok(/<input type="checkbox" data-inc="3">/.test(fila(3)) && !/data-inc="3" checked/.test(fila(3)), 'corregida desde Excluida: casilla desmarcada');
+    eq(sum(), 'Importar: 3 filas · Excluidas: 1 fila'); cuadra('corregida desde Excluida');
+    t.env.fire('imp-prev', 'change', { target: { dataset: { row: '3', k: 'banda' }, value: 'Cuatro bis' } });
+    ok(!/data-inc="3" checked/.test(fila(3)), 'tampoco una edición del nombre deshace la exclusión');
+    // 5) Solo se importan las importables
+    eq(t.env.getEl('imp-go').title, 'Importar: 3 filas');
+    t.env.fire('imp-go', 'click', {});
+    const s = t.read('showtime.festival');
+    eq(s.artists.length, F.s.artists.length + 3, 'entran Uno, Dos y Tres'); ok(!s.artists.some(a => /Cuatro/.test(a.nombre)), 'la excluida no entra');
+    // i18n de los textos nuevos
+    const I = require('../i18n.js');
+    [['Excluir', 'Exclude'], ['Restaurar', 'Restore'], ['Excluida', 'Excluded'], ['Esta fila no se importará', 'This row won’t be imported'], ['Error. Esta fila no se importará. {_m}. Mostrar detalle', 'Error. This row won’t be imported. {_m}. Show details'], ['Excluida a mano: no se importará', 'Manually excluded: won’t be imported']].forEach(([es, en]) => eq(I.tx(es, null, 'en'), en));
+    const cj = D.src('control.js');
+    ok(!/['"](Exclude|Restore|Won’t be imported)/.test(cj), 'nada en inglés escrito en control.js');
+    // Lo mismo para una fila MANUAL con error (excluir / restaurar por su id)
+    const t2 = panel({ 'showtime.festival': JSON.stringify(F.s) }), sum2 = () => t2.env.getEl('imp-sum').innerHTML.replace(/<[^>]+>/g, '');
+    t2.env.fire('document', 'paste', pasteEv('23:00-23:20 Uno Principal'));
+    t2.env.fire('imp-man-open', 'click', {});
+    manFill(t2, { nombre: 'Manual', zona: 'Principal', ini: '22:00', fin: '22:30' }); t2.env.fire('imp-m-add', 'click', {});
+    t2.env.fire('imp-prev', 'change', { target: { dataset: { row: '1', k: 'banda' }, value: '' } });   // se rompe en la vista previa
+    eq(sum2(), 'Importar: 1 fila · Error: 1 fila');
+    const click2 = (attr, i) => t2.env.fire('imp-prev', 'click', { target: { closest: q => q === '[data-exc],[data-rest]' ? { dataset: { [attr]: String(i) } } : null } });
+    click2('exc', 1); eq(sum2(), 'Importar: 1 fila · Excluidas: 1 fila', 'manual con error: Excluir');
+    t2.env.fire('imp-prev', 'change', { target: { dataset: { row: '1', k: 'banda' }, value: 'Manual' } });
+    ok(/<input type="checkbox" data-inc="1">/.test(ultimo(t2, 'imp-prev')), 'corregida tras excluir: desmarcada');
+    eq(sum2(), 'Importar: 1 fila · Excluidas: 1 fila');
+    eq(t.env.errors.length + t2.env.errors.length, 0);
+  });
+  test('Importador con evento abierto: pegar + fila manual no tocan el evento hasta «Importar»; después conserva sus filas y suma todo', () => {
+    const F = fest(), t = panel({ 'showtime.festival': JSON.stringify(F.s) });
+    const s0 = dump(t), n0 = F.s.artists.length;
+    t.env.fire('document', 'paste', pasteEv('23:00-23:20 Banda Nueva Principal'));
+    t.env.fire('imp-man-open', 'click', {});
+    manFill(t, { nombre: 'Manual Uno', zona: 'Principal', ini: '22:00', fin: '22:30', call: '21:45' });
+    t.env.fire('imp-m-add', 'click', {});
+    manFill(t, { tipo: 'tarea', nombre: 'Cambio de backline', ini: '22:35', fin: '+10' });
+    t.env.fire('imp-m-add', 'click', {});
+    eq(t.env.getEl('imp-man-n').textContent, '2 filas manuales en el borrador');
+    eq(t.env.getEl('imp-go').title, 'Importar: 3 filas');
+    // Las filas manuales se editan y se marcan en la misma vista previa (índices detrás de las pegadas)
+    t.env.fire('imp-prev', 'change', { target: { dataset: { row: '1', k: 'notas' }, value: 'Editada en la vista previa' } });
+    ok(/value="Editada en la vista previa"/.test(ultimo(t, 'imp-prev')), 'edición de la fila manual');
+    t.env.fire('imp-prev', 'change', { target: { dataset: { inc: '2' }, checked: false } });
+    eq(t.env.getEl('imp-go').title, 'Importar: 2 filas', 'desmarcada la tarea manual');
+    t.env.fire('imp-prev', 'change', { target: { dataset: { inc: '2' }, checked: true } });
+    eq(t.env.getEl('imp-go').title, 'Importar: 3 filas', 'y vuelta a marcar');
+    eq(dump(t), s0, 'el evento y el almacén, sin tocar');
+    t.env.fire('imp-go', 'click', {});
+    const s = t.read('showtime.festival');
+    eq(s.artists.length, n0 + 3, 'las de antes + 1 pegada + 2 manuales');
+    ok(s.artists.some(a => a.nombre === 'Banda A') && s.artists.some(a => a.nombre === 'Banda Nueva') && s.artists.some(a => a.nombre === 'Manual Uno') && s.artists.some(a => a.nombre === 'Cambio de backline'));
+    eq(s.artists.find(a => a.nombre === 'Manual Uno').notas, 'Editada en la vista previa', 'con su edición');
+    eq(s.event.nombre, 'Prueba control', 'mismo evento');
+    eq(t.env.errors.length, 0, t.env.errors.join(' | '));
+  });
+  test('Importador: una fila manual inválida no se añade, avisa y no cierra ni borra el borrador; Cancelar descarta todo', () => {
+    const F = fest(), t = panel({ 'showtime.festival': JSON.stringify(F.s) });
+    t.env.fire('document', 'paste', pasteEv('23:00-23:20 Banda Nueva Principal'));
+    t.env.fire('imp-man-open', 'click', {});
+    manFill(t, { nombre: 'Buena', zona: 'Principal', ini: '21:00', fin: '21:30' }); t.env.fire('imp-m-add', 'click', {});
+    const pv0 = ultimo(t, 'imp-prev');
+    manFill(t, { nombre: '', zona: 'Principal', ini: '22:00' }); t.env.fire('imp-m-add', 'click', {});
+    ok(/Falta el nombre/.test(t.env.getEl('imp-m-err').textContent), 'avisa: ' + t.env.getEl('imp-m-err').textContent);
+    eq(t.env.getEl('imp-m-ini').value, '22:00', 'lo escrito en la ficha se queda para corregirlo');
+    manFill(t, { nombre: 'Mala', zona: 'Principal', ini: '27:99' }); t.env.fire('imp-m-add', 'click', {});
+    ok(/Hora de inicio no reconocida/.test(t.env.getEl('imp-m-err').textContent), 'hora inválida: ' + t.env.getEl('imp-m-err').textContent);
+    eq(t.env.getEl('imp').hidden, false, 'el importador sigue abierto'); eq(t.env.getEl('imp-text').value, '23:00-23:20 Banda Nueva Principal', 'texto intacto');
+    eq(t.env.getEl('imp-man-n').textContent, '1 fila manual en el borrador', 'la manual buena sigue'); eq(ultimo(t, 'imp-prev'), pv0, 'la vista previa no cambia');
+    eq(t.env.getEl('imp-go').title, 'Importar: 2 filas');
+    // Enter en la ficha = «Añadir al borrador»
+    manFill(t, { nombre: 'Con Intro', zona: 'Principal', ini: '20:00', fin: '20:30' });
+    let prevented = false; t.env.fire('imp-man', 'keydown', { key: 'Enter', target: { tagName: 'INPUT' }, preventDefault() { prevented = true; } });
+    ok(prevented); eq(t.env.getEl('imp-go').title, 'Importar: 3 filas');
+    // Cancelar descarta EXPLÍCITAMENTE el borrador entero
+    const s0 = dump(t);
+    t.env.fire('imp-cancel', 'click', {});
+    eq(t.env.getEl('imp').hidden, true); eq(dump(t), s0, 'nada guardado');
+    eq(t.env.getEl('imp-man').hidden, true, 'la ficha se pliega'); eq(t.env.getEl('imp-m-nombre').value, '', 'y se vacía');
+    t.env.fire('document', 'paste', pasteEv('23:00-23:20 Otra Principal'));
+    eq(t.env.getEl('imp-man-n').textContent, '', 'un borrador nuevo empieza sin filas manuales'); ok(!/Buena|Con Intro/.test(ultimo(t, 'imp-prev')));
+    eq(t.read('showtime.festival').artists.length, F.s.artists.length, 'el evento, como estaba');
+    eq(t.env.errors.length, 0, t.env.errors.join(' | '));
+  });
+  test('«Horario a importar»: superficie de composición con la letra de Showtime (sin monoespaciada); solo aspecto, lo pegado queda literal', () => {
+    const css = D.src('control.css').replace(/\/\*[\s\S]*?\*\//g, '');
+    const rules = (css.match(/[^{}]*\{[^}]*\}/g) || []).filter(r => /\.imp-src textarea/.test(r.split('{')[0]));
+    ok(rules.length >= 3, 'reglas de la caja: ' + rules.length);
+    ok(!rules.some(r => /monospace|ui-monospace|SFMono|Menlo|Consolas|Courier/i.test(r)), 'ninguna fuente monoespaciada');
+    ok(rules.some(r => /\.imp-box \.imp-src textarea\{[^}]*font-family:inherit;font-size:15px;line-height:1\.6;/.test(r)), 'letra de Showtime, 15 px, interlineado 1,6');
+    ok(rules.some(r => /\.imp-box \.imp-src textarea\{[^}]*padding:14px 16px;border-radius:12px/.test(r)), 'aire y esquinas suaves');
+    ok(rules.some(r => /:where\(body:not\(\[data-ps="stage"\]\)\) \.imp-box \.imp-src textarea\{background-color:rgba\(255,255,255,\.035\);border:1px solid rgba\(255,255,255,\.08\)\}/.test(r)), 'Studio: una sola superficie suave (no la caja negra del campo)');
+    ok(rules.some(r => /\.imp-src textarea:focus\{[^}]*border-color:rgba\(255,255,255,\.38\)/.test(r)) && rules.some(r => /body\[data-ps="stage"\] \.imp-box \.imp-src textarea:focus\{[^}]*border-color:#FFD600/.test(r)), 'foco visible en Studio y en Stage');
+    ok(rules.some(r => /body\[data-ps="stage"\] \.imp-box \.imp-src textarea\{background-color:#000;border:1px solid rgba\(255,214,0,\.35\);color:#fff\}/.test(r)), 'Stage: negro, texto blanco');
+    ok(/<textarea id="imp-text" spellcheck="false"/.test(srcRaw('index.html')), 'el mismo textarea');
+    // Lo pegado entra tal cual (saltos y tabulaciones) y la lectura no cambia
+    const t = panel();
+    t.env.fire('document', 'paste', pasteEv(CARTEL));
+    eq(t.env.getEl('imp-text').value, CARTEL, 'literal, con tabuladores y saltos');
+    ok(/Tabla · 5 columnas · tabuladores · 2 filas/.test(t.env.getEl('imp-kind').textContent), t.env.getEl('imp-kind').textContent);
+  });
+  test('Tarjeta central: «Pegar horario» abre la vista previa; «Añadir fila a mano» sin evento abre la ficha con lo mínimo del evento (sin otro modal)', () => {
     const t = panel();
     clickData(t, '[data-ob]', { ob: 'paste' });
     eq(t.env.getEl('imp').hidden, false);
-    t.env.getEl('imp').hidden = true;
+    t.env.fire('imp-cancel', 'click', {});
     clickData(t, '[data-ob]', { ob: 'manual' });
-    eq(t.env.getEl('modal-title').textContent, 'Nuevo evento', 'sin evento: primero el evento');
+    eq(t.env.getEl('addm').hidden, false, 'la ficha manual'); eq(t.env.getEl('modal').hidden, true, 'sin el modal «Crear evento»');
+    eq(t.env.getEl('modal-title').textContent, '', 'nada de «Nuevo evento»');
+    eq(t.env.getEl('add-newev').hidden, false, 'con el bloque del primer evento'); eq(t.env.getEl('add-target').hidden, true);
+    eq(t.read('showtime.festival'), null, 'abrir la ficha no crea nada');
+  });
+  // ── Dec. 155 · ficha manual: «Añadiendo a: …» con evento; sin evento, crea evento + primera fila en una sola acción ──
+  test('Ficha manual sin evento: nombre opcional y fecha editable; «Añadir» crea el evento y la primera fila a la vez (nada antes)', () => {
+    const t = panel(), d0 = (() => { const o = {}; t.env.storage.forEach((v, k) => { o[k] = v; }); return JSON.stringify(o); })();
+    clickData(t, '[data-ob]', { ob: 'manual' });
+    ok(/^\d{4}-\d{2}-\d{2}$/.test(t.env.getEl('add-ev-fecha').value), 'fecha visible y rellena (hoy): ' + t.env.getEl('add-ev-fecha').value);
+    ok(t.env.getEl('addm').classList.contains('noev'), 'sin evento, la jornada es la fecha del bloque');
+    const H = srcRaw('index.html');
+    ok(/<div id="add-newev"[\s\S]*id="add-ev-nombre"[^>]*placeholder="Evento sin nombre"[\s\S]*id="add-ev-fecha" type="date"[\s\S]*<div id="addrow"/.test(H), 'bloque compacto encima de la ficha');
+    const fill = o => { t.env.getEl('add-tipo').value = o.tipo || 'show'; ['nombre', 'escenario', 'inicio', 'fin', 'call', 'notas'].forEach(k => { t.env.getEl('add-' + k).value = o[k] || ''; }); };
+    // Primero inválida: no crea nada
+    t.env.getEl('add-ev-nombre').value = 'Noches del Botánico'; t.env.getEl('add-ev-fecha').value = '2026-07-10';
+    fill({ nombre: '', inicio: '21:00' }); t.env.fire('btn-add', 'click', {});
+    ok(t.env.getEl('add-err').textContent, 'avisa: ' + t.env.getEl('add-err').textContent); eq(t.env.getEl('addm').hidden, false, 'la ficha sigue');
+    const d1 = (() => { const o = {}; t.env.storage.forEach((v, k) => { o[k] = v; }); return JSON.stringify(o); })();
+    eq(d1, d0, 'entrada inválida: ni evento ni nada guardado');
+    t.env.getEl('add-ev-fecha').value = ''; fill({ nombre: 'Los Ácratas', inicio: '21:00' }); t.env.fire('btn-add', 'click', {});
+    eq(t.env.getEl('add-err').textContent, 'Elige la fecha del evento'); eq(t.read('showtime.festival'), null, 'sin fecha, nada');
+    // Válida: evento + primera fila
+    t.env.getEl('add-ev-fecha').value = '2026-07-10';
+    fill({ nombre: 'Los Ácratas', escenario: 'Principal', inicio: '21:00', fin: '+75' }); t.env.fire('btn-add', 'click', {});
+    const s = t.read('showtime.festival');
+    ok(s, 'evento creado al pulsar «Añadir»'); eq(s.event.nombre, 'Noches del Botánico'); eq(s.event.fechaInicio, '2026-07-10'); eq(s.event.fechaFin, '2026-07-10');
+    eq(s.artists.length, 1); eq(s.artists[0].nombre, 'Los Ácratas'); eq(s.escenarios.map(e => e.nombre).join(), 'Principal');
+    const b = C.buildBlocks(s, { mode: 'show', day: 'all' })[0]; ok(b && b.jornada === '2026-07-10' && b.stage === 'Principal', 'en su jornada y zona');
+    eq(t.read('showtime.original').artists.length, 0, 'la referencia es el evento vacío: la fila cuenta como cambio sin exportar');
+    eq(t.env.getEl('addm').hidden, true, 'la ficha se cierra'); eq(t.env.getEl('modal').hidden, true, 'sin otro modal');
+    eq(t.env.errors.length, 0, t.env.errors.join(' | '));
+    // Sin nombre: «Evento sin nombre»
+    const t2 = panel(); clickData(t2, '[data-ob]', { ob: 'manual' });
+    t2.env.getEl('add-ev-fecha').value = '2026-08-01'; t2.env.getEl('add-tipo').value = 'tarea';
+    ['nombre', 'escenario', 'inicio', 'fin', 'call', 'notas'].forEach(k => { t2.env.getEl('add-' + k).value = ''; });
+    t2.env.getEl('add-nombre').value = 'Montaje'; t2.env.getEl('add-inicio').value = '10:00';
+    t2.env.fire('btn-add', 'click', {});
+    eq(t2.read('showtime.festival').event.nombre, 'Evento sin nombre'); eq(t2.read('showtime.festival').event.fechaInicio, '2026-08-01');
+  });
+  test('Ficha manual con evento: «Añadiendo a: {evento}» solo informativo; añade la fila sin renombrar ni abrir otro modal', () => {
+    const F = fest(), t = panel({ 'showtime.festival': JSON.stringify(F.s) });
+    t.env.fire('btn-new-row', 'click', {});
+    eq(t.env.getEl('addm').hidden, false);
+    eq(t.env.getEl('add-target').hidden, false); eq(t.env.getEl('add-target').textContent, 'Añadiendo a: Prueba control');
+    eq(t.env.getEl('add-newev').hidden, true, 'sin bloque de evento nuevo'); ok(!t.env.getEl('addm').classList.contains('noev'));
+    ok(/<p id="add-target" class="add-target" hidden><\/p>/.test(srcRaw('index.html')), 'texto, no un campo: no se puede renombrar desde aquí');
+    t.env.getEl('add-ev-nombre').value = 'Intento de renombrar';   // aunque quedara algo escrito en el bloque oculto
+    t.env.getEl('add-tipo').value = 'show';
+    ['nombre', 'escenario', 'inicio', 'fin', 'call', 'notas'].forEach(k => { t.env.getEl('add-' + k).value = ''; });
+    t.env.getEl('add-nombre').value = 'Banda Mano'; t.env.getEl('add-escenario').value = 'Principal'; t.env.getEl('add-inicio').value = '22:00'; t.env.getEl('add-fin').value = '22:45';
+    t.env.getEl('add-jornada').value = F.s.event.fechaInicio;
+    t.env.fire('btn-add', 'click', {});
+    const s = t.read('showtime.festival');
+    eq(s.event.nombre, 'Prueba control', 'conserva su nombre'); eq(s.artists.length, F.s.artists.length + 1); ok(s.artists.some(a => a.nombre === 'Banda Mano'));
+    eq(t.env.getEl('modal').hidden, true, 'sin otro modal'); eq(t.env.getEl('imp').hidden, true);
+    eq(t.env.errors.length, 0, t.env.errors.join(' | '));
+    // En inglés
+    t.env.win.ShowtimePanel._test.setAppLang && t.env.win.ShowtimePanel._test.setAppLang('en');
+    t.env.fire('btn-new-row', 'click', {}); eq(t.env.getEl('add-target').textContent, 'Adding to: Prueba control');
   });
   test('Archivos: cada tipo a su sitio (Excel, CSV, PDF, .json, .xls antiguo y desconocidos)', async () => {
     const t = panel(), T = t.T, F = (name, data, type) => new File([data], name, { type: type || '' });
@@ -1010,7 +1556,7 @@
   });
   test('Acento: rojo solo en borrar y Live ▾; selección en gris elevado; foco en blanco translúcido', () => {
     const css = D.src('control.css');
-    ok(/\.seg button\.on,\.days button\.on,\.dtb\.on,\.addtabs button\.on\{background:rgba\(255,255,255,\.12\)/.test(css), 'segmentos activos en gris elevado');
+    ok(/\.seg button\.on,\.days button\.on,\.dtb\.on\{background:rgba\(255,255,255,\.12\)/.test(css), 'segmentos activos en gris elevado');
     ok(/\.mitem\.on\{color:#fff;font-weight:700\}/.test(css) && /\.mitem\.on::after\{background:#fff\}/.test(css), 'menús: seleccionado en blanco, sin rojo');
     ok(/\.mpanel \.days button\.on\{background:rgba\(255,255,255,\.08\);color:#fff/.test(css), 'Día: seleccionado en blanco');
     ok(/td input:focus,td select:focus,\.imp-src textarea:focus[^{]*\{border-color:rgba\(255,255,255,\.35\);box-shadow:0 0 0 1px rgba\(255,255,255,\.15\)\}/.test(css), 'foco de campos en blanco translúcido');
@@ -1596,7 +2142,7 @@
     ok(list.length > 250, 'hay ' + list.length + ' textos marcados');
     const miss = list.filter(x => /[A-Za-zÁÉÍÓÚáéíóúÑñ]{2}/.test(x) && !I.txHas(x) && !/^(Live|OK|CALL|Showtime|Manager|Confidence|Backstage|Staff|SC|Raycast)$/.test(x));
     eq(miss.join(' | '), '', 'sin traducción');
-    ok(/<span class="mlbl" data-i18n>Ver:<\/span>/.test(h) && /data-i18n>Pegar horario/.test(h), 'directivas sin valor: el español es la clave');
+    ok(/<span class="mlbl" data-i18n>Ver:<\/span>/.test(h) && /<h2 id="imp-title" data-i18n><svg class="ic"><use href="#i-bolt"\/><\/svg>Pegar horario completo/.test(h), 'directivas sin valor: el español es la clave');
   });
   test('Idioma (Fase 1): lo que reescribe el JS no lleva data-i18n (la traducción la pone control.js)', () => {
     const h = srcRaw('index.html'), js = D.src('control.js');
@@ -1654,16 +2200,16 @@ const miss = [...found].filter(k => !I.txHas(k) && !/^(OK|CALL|SC|Live|Raycast|S
   test('Idioma (Fase 1): en inglés el Panel se pinta en inglés al momento; en español, idéntico al de siempre', () => {
     const es = dashboard(), en = dashboard({ 'showtime.config': JSON.stringify({ lang: 'en' }) });
     [es, en].forEach(t => t.env.fire('btn-paste', 'click', {}));
-    eq(es.env.getEl('imp-go').textContent, 'Importar 0 entradas', 'español: como siempre');
-    eq(en.env.getEl('imp-go').textContent, 'Import 0 entries', 'inglés');
+    eq(es.env.getEl('imp-go').textContent, 'Importar', 'español'); eq(es.env.getEl('imp-go').title, 'Importar: 0 filas');
+    eq(en.env.getEl('imp-go').textContent, 'Import', 'inglés'); eq(en.env.getEl('imp-go').title, 'Import: 0 rows');
     eq(en.env.getEl('imp-kind').textContent, 'Waiting for a schedule…');
     eq(es.env.getEl('imp-kind').textContent, 'Esperando horario…');
     // cambio en caliente: el aviso y lo que pinta el JS pasan al otro idioma sin recargar
     es.env.fire('btn-lang', 'click', {});
-    eq(es.env.getEl('imp-go').textContent, 'Import 0 entries', 'se repinta al cambiar a inglés');
+    eq(es.env.getEl('imp-go').textContent, 'Import', 'se repinta al cambiar a inglés'); eq(es.env.getEl('imp-go').title, 'Import: 0 rows');
     eq(es.env.getEl('toast').textContent, 'Language: English');
     es.env.fire('btn-lang', 'click', {});
-    eq(es.env.getEl('imp-go').textContent, 'Importar 0 entradas', 'y vuelve al español');
+    eq(es.env.getEl('imp-go').textContent, 'Importar', 'y vuelve al español');
   });
   test('Idioma (Fase 1): Deshacer y log siempre en español; el aviso, en el idioma del Panel', () => {
     const t = dashboard({ 'showtime.config': JSON.stringify({ lang: 'en' }) });
@@ -1684,7 +2230,7 @@ const miss = [...found].filter(k => !I.txHas(k) && !/^(OK|CALL|SC|Live|Raycast|S
     ok(/t\.textContent = I18 && I18\.txBack \? I18\.txBack\(msg\) : tx\(msg\);/.test(js), 'el aviso (toast) pasa por txBack');
     const t = dashboard({ 'showtime.config': JSON.stringify({ lang: 'en' }) });
     t.env.fire('btn-paste', 'click', {});
-    eq(t.env.getEl('imp-go').textContent, 'Import 0 entries');
+    eq(t.env.getEl('imp-go').textContent, 'Import');
   });
 
   test('Dec. 112: inputs/selects sin shorthand «background:» (no resetea repeat/size → sin mosaico de flechas); flechas blindadas', () => {
@@ -2050,9 +2596,10 @@ const miss = [...found].filter(k => !I.txHas(k) && !/^(OK|CALL|SC|Live|Raycast|S
     ok(css.indexOf(':where(body:not([data-ps="stage"])) :is(.modal-box,.imp-box) :is(input[type=text],input[type=number],input[type=date],input[type=time],input[type=search],input:not([type]),select,textarea):where(:not(:disabled)){background-color:#08090c;border:1px solid rgba(255,255,255,.12)}') >= 0, 'campos: fondo #08090c y borde nítido (background-color, dec. 112); Stage conserva su negro y amarillo');
     ok(/,select,textarea\):focus\{outline:none;border-color:rgba\(255,255,255,\.42\);box-shadow:0 0 0 3px rgba\(255,255,255,\.07\)\}/.test(css), 'halo blanco al escribir');
     const imp = html.slice(html.indexOf('<div id="imp"'), html.indexOf('<datalist id="zones-dl"'));
-    eq((imp.match(/<div class="mcard-h"[^>]*>([^<]+)<\/div>/g) || []).map(x => x.replace(/<[^>]+>/g, '')).join(' · '), 'Horario a importar · Opciones de importación · Columnas del archivo · Vista previa', 'Pegar horario: 4 tarjetas en orden');
-    ok(/class="mcard imp-card imp-srccard">[\s\S]*id="imp-text"/.test(imp) && /class="mcard imp-card imp-prevcard"><div class="mcard-h"[^>]*>Vista previa<\/div><div class="imp-prevwrap"><table id="imp-prev"/.test(imp), 'texto y vista previa en su tarjeta; los id no cambian');
-    ok(/\.imp-prevcard\{flex:1;min-height:0;display:flex;flex-direction:column\}/.test(css), 'la vista previa sigue ocupando el alto que sobra');
+    eq((imp.match(/<div class="mcard-h"[^>]*>([^<]+)<\/div>/g) || []).map(x => x.replace(/<[^>]+>/g, '')).join(' · '), 'Horario a importar · Opciones de importación · Columnas del archivo · Vista previa · Fila manual', 'Pegar horario: 4 tarjetas en orden y, debajo de la vista previa, la ficha manual (plegada hasta pedirla)');
+    ok(/class="mcard imp-card imp-srccard">[\s\S]*id="imp-text"/.test(imp) && /class="mcard imp-card imp-prevcard"><div class="mcard-h"[^>]*>Vista previa<\/div><div id="imp-prevwrap" class="imp-prevwrap"><table id="imp-prev"/.test(imp), 'texto y vista previa en su tarjeta; los id no cambian');
+    ok(/\.imp-prevcard\{flex:1 0 auto;display:flex;flex-direction:column\}/.test(css) && /\.imp-prevwrap\{flex:1;min-height:120px;/.test(css), 'la vista previa ocupa el alto que sobra y nunca baja de su mínimo (dec. 155)');
+    ok(/\.imp-box\{[^}]*overflow:auto;scroll-padding-bottom:128px\}/.test(css) && /\.imp-foot\{[^}]*position:sticky;bottom:0;/.test(css), 'si no cabe, la ventana hace scroll y el pie queda a la vista');
   });
 
   test('Dec. 137: Gestor — ↺ por ventana (antes de ✕) y «↺ Reset» igual en los dos idiomas; el de arriba sigue siendo para todas', () => {

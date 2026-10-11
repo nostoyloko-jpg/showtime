@@ -615,7 +615,7 @@
     const g = id => $(id).value;
     const t = g('add-tipo');
     return { tipo: t === 'tarea' || t === 'hito' ? t : 'banda', modo: t === 'sc' ? 'sc' : 'show',
-      nombre: g('add-nombre'), escenarioId: g('add-escenario'), jornada: g('add-jornada'), inicio: g('add-inicio'),
+      nombre: g('add-nombre'), escenarioId: g('add-escenario'), jornada: FEST ? g('add-jornada') : g('add-ev-fecha'), inicio: g('add-inicio'),
       // Fin: hora (23:30) o duración con «+» (+60 = 60 min desde el inicio)
       fin: /^\s*\+/.test(g('add-fin')) ? '' : g('add-fin'), duracion: /^\s*\+/.test(g('add-fin')) ? g('add-fin').replace(/^\s*\+\s*/, '').trim() : '', call: g('add-call'), notas: g('add-notas') };
   }
@@ -623,9 +623,10 @@
   function updateAddHint() {
     const d = addValues(), ini = C.normHM(d.inicio);
     let h = '';
+    const ref = FEST || { event: { dayCutoff: C.DEFAULT_CUTOFF } };   // sin evento: el corte por defecto del que se creará
     if (ini && C.dayIndex(d.jornada) !== null) {
-      const f = C.fechaFor(FEST, d.jornada, ini);
-      if (f !== d.jornada) h = tx('{h} es antes de la hora de corte ({cut}): jornada {jor}, fecha real {fecha}.', { h: ini, cut: FEST.event.dayCutoff || C.DEFAULT_CUTOFF, jor: fmtDay(d.jornada), fecha: fmtDay(f) });
+      const f = C.fechaFor(ref, d.jornada, ini);
+      if (f !== d.jornada) h = tx('{h} es antes de la hora de corte ({cut}): jornada {jor}, fecha real {fecha}.', { h: ini, cut: ref.event.dayCutoff || C.DEFAULT_CUTOFF, jor: fmtDay(d.jornada), fecha: fmtDay(f) });
     }
     const dur = String(d.duracion || '').trim();
     if (ini && /^\d+$/.test(dur)) h += (h ? ' ' : '') + tx('Fin: {h}.', { h: C.fmtHM(C.parseHM(ini) + Number(dur)) });
@@ -633,9 +634,20 @@
   }
 
   function addBand() {
-    document.querySelectorAll('#addrow .bad').forEach(x => x.classList.remove('bad'));
+    document.querySelectorAll('#addrow .bad, #add-newev .bad').forEach(x => x.classList.remove('bad'));
     const v = addValues();
-    const z = resolveZone(FEST, $('add-escenario').value);
+    // Dec. 155: sin evento, se prepara (sin guardar nada) el evento nuevo con su nombre (vacío = «Evento sin nombre») y la fecha
+    // de esta primera entrada. Solo se crea si la entrada también vale: evento + primera fila en una sola acción.
+    let base = FEST, evName = '';
+    if (!FEST) {
+      const fecha = $('add-ev-fecha').value;
+      evName = String($('add-ev-nombre').value || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+      if (C.dayIndex(fecha) === null) { $('add-err').textContent = tx('Elige la fecha del evento'); $('add-ev-fecha').classList.add('bad'); $('add-ev-fecha').focus(); return; }
+      const nf = C.newFestival({ nombre: evName || C.UNNAMED, fechaInicio: fecha, fechaFin: fecha, dayCutoff: C.DEFAULT_CUTOFF });
+      if (!nf.ok) { $('add-err').textContent = back(nf.error); return; }
+      base = nf.state;
+    }
+    const z = resolveZone(base, $('add-escenario').value);
     if (!z.ok) { $('add-err').textContent = back(z.error); $('add-escenario').classList.add('bad'); return; }
     v.escenarioId = z.id;
     const r = C.addArtist(z.state, v.modo, v);
@@ -646,6 +658,10 @@
       return;
     }
     $('add-err').textContent = '';
+    if (!FEST) {   // la referencia es el evento vacío: la primera entrada cuenta como «sin exportar» y se puede deshacer
+      loadNew(base, evName ? tx('Evento creado: {_e}', { _e: evName }) : tx('Evento creado'));
+      $('add-ev-nombre').value = '';
+    }
     const name = (r.state.artists.find(x => x.id === r.id) || {}).nombre || '';
     ['add-nombre', 'add-inicio', 'add-fin', 'add-call', 'add-notas'].forEach(id => { $(id).value = ''; });
     // Si la jornada nueva no es la que se está viendo, no se cambia el filtro: se avisa.
@@ -669,30 +685,22 @@
   $('btn-add').addEventListener('click', addBand);
   /** Ventana «Añadir»: en medio de la pantalla; al aceptar, la entrada se coloca sola por su hora. */
   function openAdd() {
-    if (!FEST) { toast('Primero crea el evento (o pega un horario: se crea solo)', true); askNew(); return; }
+    if (!$('imp').hidden) return;   // dec. 155: nunca se salta de «Pegar horario» a otro modal (el borrador no se pierde)
     closeMenus(); closeConfig();
-    if (IMP) closeImport();
-    setAddTabs('row');
     $('add-err').textContent = '';
+    // Dec. 155: con evento, solo se informa de a cuál se añade (no se renombra aquí); sin evento, la ficha trae lo mínimo para crearlo
+    $('addm').classList.toggle('noev', !FEST);
+    $('add-target').hidden = !FEST; $('add-newev').hidden = !!FEST;
+    if (FEST) $('add-target').textContent = tx('Añadiendo a: {_e}', { _e: C.eventName(FEST, tx) });
+    else if (C.dayIndex($('add-ev-fecha').value) === null) $('add-ev-fecha').value = C.jornadaOfAbs({ event: { dayCutoff: C.DEFAULT_CUTOFF } }, Math.floor(C.nowAbs()));
     renderAddRow();
     $('addm').hidden = false;
     $('add-nombre').focus();
   }
   function closeAdd() { $('addm').hidden = true; }
-  // «+ Añadir»: un solo modal con 2 pestañas (Pegar horario completo · Añadir 1 fila a mano). Abre en la última usada; la primera vez, Pegar.
-  const ADDTAB_KEY = 'showtime.addtab';
-  function setAddTabs(tab) {
-    document.querySelectorAll('.addtabs [data-addtab]').forEach(b => { const on = b.dataset.addtab === tab; b.classList.toggle('on', on); b.setAttribute('aria-selected', String(on)); });
-    try { localStorage.setItem(ADDTAB_KEY, tab); } catch (e) {}
-  }
-  function lastAddTab() { try { return localStorage.getItem(ADDTAB_KEY) === 'row' ? 'row' : 'paste'; } catch (e) { return 'paste'; } }
-  function openAddTab(tab) { if (tab === 'row') openAdd(); else openImport(''); }
-  $('btn-new-row').addEventListener('click', () => openAddTab(lastAddTab()));
-  document.addEventListener('click', e => {
-    const b = e.target.closest && e.target.closest('[data-addtab]'); if (!b) return;
-    if (b.dataset.addtab === 'row') { if (!FEST) { closeImport(); } openAdd(); }
-    else { const keep = IMP ? IMP.text : ''; openImport(keep); }
-  });
+  // Dec. 155: «+ Añadir» abre SOLO el alta manual normal (sin pestañas). La preferencia antigua «showtime.addtab» ya no se usa: se borra.
+  try { localStorage.removeItem('showtime.addtab'); } catch (e) {}
+  $('btn-new-row').addEventListener('click', () => openAdd());
   $('addm-cancel').addEventListener('click', closeAdd);
   $('addm').addEventListener('click', e => { if (e.target.id === 'addm') closeAdd(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('addm').hidden) closeAdd(); });
@@ -2059,9 +2067,10 @@
     const days = FEST ? C.eventDays(FEST) : [], stg = FEST ? FEST.escenarios || [] : [];
     IMP = { text: text || '', mode: CONFIG.mode === 'sc' ? 'sc' : 'show', fresh: !FEST, base: FEST, jorTouched: false,
       defJor: FEST && CONFIG.day !== 'all' ? CONFIG.day : days.length === 1 ? days[0] : '', defEsc: stg.length === 1 ? stg[0].nombre : '',
-      header: undefined, map: null, create: {}, extend: true, include: {}, edits: {}, read: null, pv: null, name: '' };
+      header: undefined, map: null, create: {}, extend: true, include: {}, edits: {}, read: null, pv: null, name: '',
+      manual: [], mInc: {}, mEdits: {}, mSeq: 0, nPaste: 0 };   // dec. 155: filas manuales del borrador (solo en memoria)
     $('imp-notice').hidden = !notice; $('imp-notice').textContent = notice || '';
-    setAddTabs('paste');
+    impManShow(false); impManClear();
     $('imp-text').value = IMP.text;
     $('imp').hidden = false;
     impRecompute();
@@ -2074,7 +2083,8 @@
     const st = (IMP.base.escenarios || []).find(e => I.norm(e.nombre) === I.norm(v));
     return st ? { id: st.id, name: '' } : { id: '', name: v };
   }
-  function closeImport() { $('imp').hidden = true; IMP = null; }
+  /** Cerrar / Cancelar: descarta EXPLÍCITAMENTE el borrador entero (texto, mapa, ediciones y filas manuales). */
+  function closeImport() { $('imp').hidden = true; IMP = null; impManShow(false); impManClear(); errPopHide(); }
 
   function impResetRows() { IMP.include = {}; IMP.edits = {}; }
 
@@ -2094,13 +2104,212 @@
       IMP.map = null; rd = I.read(IMP.text, ctx, IMP.header !== undefined ? { header: IMP.header } : {});
     }
     IMP.read = rd;
+    // Dec. 155: las filas manuales van DETRÁS de las pegadas, en la misma vista previa. Sus casillas y ediciones se guardan por
+    // su id propio (no por posición): cambiar el texto pegado no las toca.
+    const n = rd.records.length, include = Object.assign({}, IMP.include), edits = Object.assign({}, IMP.edits);
+    Object.keys(include).forEach(k => { if (+k >= n) delete include[k]; }); Object.keys(edits).forEach(k => { if (+k >= n) delete edits[k]; });
+    IMP.manual.forEach((m, k) => { if (IMP.mInc[m.uid] !== undefined) include[n + k] = IMP.mInc[m.uid]; edits[n + k] = IMP.mEdits[m.uid]; });
+    IMP.nPaste = n; IMP.incMap = include;   // casillas tal y como las dejó el regidor (false = desmarcada a mano)
     const dz = impDefZone();
-    IMP.pv = I.preview(IMP.base, rd.records, { mode: IMP.mode, ctx: ctx, defaultJornada: IMP.defJor, defaultStageId: dz.id, defaultStageName: dz.name,
-      createStages: IMP.create, include: IMP.include, edits: IMP.edits });
+    IMP.pv = I.preview(IMP.base, rd.records.concat(IMP.manual.map(m => m.rec)), { mode: IMP.mode, ctx: ctx, defaultJornada: IMP.defJor, defaultStageId: dz.id, defaultStageName: dz.name,
+      createStages: IMP.create, include, edits });
     impRender();
   }
 
+  // ── Dec. 155 · fila manual dentro del importador ─────────────────────
+  /** Lo escrito en la ficha → registro como los del texto pegado (las horas se leen igual) y ediciones iniciales (tipo y nombre tal cual). */
+  function impManRecord() {
+    const v = id => String($(id).value || '').replace(/\s+/g, ' ').trim();
+    const tipo = $('imp-m-tipo').value || 'show', fin = v('imp-m-fin'), dur = /^\+\s*\d+$/.test(fin) ? fin.replace(/\D/g, '') : '';
+    const rec = I.interpret({ banda: v('imp-m-nombre'), escenario: v('imp-m-zona'), jornadaTxt: $('imp-m-jor').value || '', inicioTxt: v('imp-m-ini'),
+      finTxt: dur ? '' : fin, duracion: dur, callTxt: v('imp-m-call'), notas: v('imp-m-notas'), raw: tx('Fila manual'), src: 'manual' }, I.contextOf(IMP.base));
+    return { rec, ed: { tipo, banda: v('imp-m-nombre') } };
+  }
+  function impManShow(on) {
+    $('imp-man').hidden = !on; $('imp-man-open').setAttribute('aria-expanded', String(!!on));
+    if (on) {
+      impManJor(); $('imp-m-err').textContent = '';
+      try { $('imp-man').scrollIntoView({ block: 'nearest' }); } catch (e) {}   // la ficha está encima del pie: que se vea entera al abrirla (scroll-padding: el pie fijo no la tapa)
+      $('imp-m-nombre').focus();
+    }
+  }
+  function impManClear() {
+    ['imp-m-nombre', 'imp-m-zona', 'imp-m-ini', 'imp-m-fin', 'imp-m-call', 'imp-m-notas'].forEach(id => { $(id).value = ''; });
+    $('imp-m-err').textContent = '';
+  }
+  /** Jornadas de la ficha: «por defecto» (la del importador) y las del evento (o del evento provisional). */
+  function impManJor() {
+    if (!IMP) return;
+    const jor = IMP.fresh ? C.eventDays(IMP.base) : jornadaOptions(), cur = $('imp-m-jor').value;
+    $('imp-m-jor').innerHTML = '<option value="">' + tx('La jornada por defecto') + '</option>' + jor.map(d => '<option value="' + d + '">' + esc(fmtDay(d)) + '</option>').join('');
+    $('imp-m-jor').value = jor.indexOf(cur) >= 0 ? cur : '';
+  }
+  /** «Añadir al borrador»: se valida con las MISMAS reglas que la vista previa. Si no vale, se dice por qué y no se toca nada más. */
+  function impManAdd() {
+    if (!IMP) return false;
+    const { rec, ed } = impManRecord(), dz = impDefZone();
+    const one = I.preview(IMP.base, [rec], { mode: IMP.mode, ctx: I.contextOf(IMP.base), defaultJornada: IMP.defJor, defaultStageId: dz.id, defaultStageName: dz.name,
+      createStages: IMP.create, edits: { 0: ed } }).rows[0];
+    if (one.status === 'err') { $('imp-m-err').textContent = one.errs.map(back).join(' · '); return false; }
+    const uid = 'm' + (++IMP.mSeq);
+    IMP.manual.push({ uid, rec }); IMP.mEdits[uid] = ed;
+    impManClear(); impRecompute();   // tipo y jornada se quedan: listas de filas seguidas
+    // La fila nueva es la última de la vista previa: su scroll interno baja hasta ella para que se vea el resultado
+    const w = $('imp-prevwrap'); if (w) w.scrollTop = w.scrollHeight;
+    try { $('imp-man').scrollIntoView({ block: 'nearest' }); } catch (e) {}   // la ficha entera a la vista, sin quedar bajo el pie fijo
+    try { $('imp-m-nombre').focus({ preventScroll: true }); } catch (e) { $('imp-m-nombre').focus(); }
+    return true;
+  }
+  $('imp-man-open').addEventListener('click', () => impManShow($('imp-man').hidden));
+  $('imp-m-hide').addEventListener('click', () => impManShow(false));
+  $('imp-m-add').addEventListener('click', impManAdd);
+  $('imp-man').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.tagName === 'INPUT') { e.preventDefault(); impManAdd(); } });
+
+  // ── Dec. 155 · detalle de «Error ⓘ» ─────────────────────────────────
+  // Un solo detalle flotante (#imp-errpop) fuera de la tabla y de la caja con scroll: se coloca junto al botón y DENTRO de la
+  // pantalla (a la derecha; si no cabe, debajo; si tampoco, encima), así nunca se recorta ni obliga a desplazar la tabla.
+  // Ratón: se abre al entrar en el botón y se mantiene al pasar al detalle (pegado al botón, sin hueco). Teclado: con el foco.
+  // Toque: el clic lo fija y otro lo cierra. aria-expanded del botón dice siempre si está a la vista. Esc no se toca.
+  const IC_INFO = ' <svg class="ic ii" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="6.4" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 7.2v4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="8" cy="4.9" r="1" fill="currentColor"/></svg>';
+  const ERRPOP = { btn: null, pinned: false, inline: false };
+  /** Dónde va el detalle (px de pantalla). b: rect del botón; w, h: tamaño del detalle; vw, vh: pantalla; m: margen;
+   *  avoid: rects que NO puede tapar (Cancelar, Importar, «Excluir» de la fila…). Prueba, en orden: a la derecha (arriba o abajo
+   *  alineado con el botón), debajo, encima, a la izquierda; se queda con la primera entera en la zona segura que no tape nada.
+   *  Si ninguna vale, devuelve null: el detalle se abre EN LÍNEA bajo su fila (nunca se tapa nada, ni en parte). Pura (tests). */
+  function errPopPlace(b, w, h, vw, vh, m, avoid) {
+    m = m === undefined ? 8 : m; avoid = (avoid || []).concat([b]);   // tampoco tapa su propio botón (con él se cierra)
+    const fitX = x => Math.max(m, Math.min(x, vw - w - m)), fitY = y => Math.max(m, Math.min(y, vh - h - m));
+    const cands = [{ left: b.right, top: fitY(b.top - 4), side: 'right' }, { left: b.right, top: fitY(b.bottom - h), side: 'right' },
+      { left: fitX(b.left), top: b.bottom, side: 'below' }, { left: fitX(b.left), top: Math.max(m, b.top - h), side: 'above' },
+      { left: fitX(b.left - w), top: fitY(b.top - 4), side: 'left' }];
+    const inView = c => c.left >= m - 0.5 && c.top >= m - 0.5 && c.left + w <= vw - m + 0.5 && c.top + h <= vh - m + 0.5;
+    const over = c => avoid.reduce((s, a) => s + Math.max(0, Math.min(c.left + w, a.right) - Math.max(c.left, a.left)) * Math.max(0, Math.min(c.top + h, a.bottom) - Math.max(c.top, a.top)), 0);
+    return cands.find(c => inView(c) && over(c) === 0) || null;
+  }
+  /** Lo que el detalle nunca tapa: Cancelar, Importar, «+ Añadir fila manual» y la acción de su fila (Excluir / Restaurar). */
+  function errPopAvoid(btn) {
+    const td = btn.closest && btn.closest('td'), act = td && td.querySelector && td.querySelector('[data-exc],[data-rest]');
+    return [$('imp-cancel'), $('imp-go'), $('imp-man-open'), act].filter(n => n && n.getBoundingClientRect).map(n => {
+      const r = n.getBoundingClientRect(); return { left: r.left - 4, top: r.top - 4, right: r.right + 4, bottom: r.bottom + 4 }; })
+      .filter(a => [a.left, a.top, a.right, a.bottom].every(Number.isFinite) && a.right > a.left && a.bottom > a.top);   // solo lo que está pintado
+  }
+  /** Zona segura (alto): la pantalla hasta el pie del importador (resumen y acciones no se tapan nunca). */
+  function errPopSafeH() {
+    const vh = window.innerHeight || 0, f = document.querySelector && document.querySelector('#imp .imp-foot'), r = f && f.getBoundingClientRect ? f.getBoundingClientRect() : null;
+    return r && Number.isFinite(r.top) && r.top > 0 ? Math.min(vh, r.top) : vh;
+  }
+  /** ¿Se ve ENTERO en pantalla? Dentro de la vista previa y de la ventana del importador, por encima del pie y sin nada encima
+   *  (hit test en su centro: la cabecera fija de la tabla también cuenta). Si no se puede medir, se da por NO visible. */
+  function impInView(n) {
+    try {
+      if (!n || !n.getBoundingClientRect) return false;
+      const r = n.getBoundingClientRect();
+      if (![r.left, r.top, r.right, r.bottom].every(Number.isFinite) || !(r.bottom > r.top)) return false;
+      let top = 0, bot = errPopSafeH();
+      [$('imp-prevwrap'), document.querySelector && document.querySelector('#imp .imp-box')].forEach(c => {
+        const q = c && c.getBoundingClientRect ? c.getBoundingClientRect() : null;
+        if (q && Number.isFinite(q.top) && Number.isFinite(q.bottom)) { top = Math.max(top, q.top); bot = Math.min(bot, q.bottom); } });
+      if (r.top < top - 0.5 || r.bottom > bot + 0.5) return false;
+      if (typeof document.elementFromPoint === 'function') { const h = document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2); if (!h || !(h === n || (n.contains && n.contains(h)))) return false; }
+      return true;
+    } catch (e) { return false; }
+  }
+  function errPopShow(btn, pinned) {
+    const pop = $('imp-errpop');
+    if (ERRPOP.btn) errPopHide();
+    ERRPOP.btn = btn; ERRPOP.pinned = !!pinned; ERRPOP.inline = false;
+    const why = (btn.dataset && btn.dataset.why) || '';
+    pop.textContent = why;
+    pop.hidden = false;
+    const r = btn.getBoundingClientRect ? btn.getBoundingClientRect() : { left: 0, right: 0, top: 0, bottom: 0 };
+    const p = errPopPlace(r, pop.offsetWidth || 0, pop.offsetHeight || 0, window.innerWidth || 0, errPopSafeH(), 8, errPopAvoid(btn));
+    if (p) {
+      pop.style.left = Math.round(p.left) + 'px'; pop.style.top = Math.round(p.top) + 'px'; pop.dataset.side = p.side;
+      if (btn.setAttribute) btn.setAttribute('aria-controls', 'imp-errpop');
+    } else {
+      // Fallback determinista: ninguna posición flotante cabe sin tapar algo → el detalle se abre en línea, en una fila justo debajo
+      // de la suya (dentro de la vista previa) y se hace scroll hasta que se lee entero. No tapa nada: ocupa su propio sitio.
+      pop.hidden = true; ERRPOP.inline = true;
+      const tr = btn.closest && btn.closest('tr');
+      // Acción de su fila repetida ARRIBA del bloque (hermana del diagnóstico, nunca dentro del role="tooltip"): mismo atributo
+      // (data-exc / data-rest), mismo handler de la vista previa, mismo texto. Nace oculta: solo se muestra si, tras el scroll,
+      // la original no se ve entera.
+      const td = btn.closest && btn.closest('td'), act = td && td.querySelector ? td.querySelector('[data-exc],[data-rest]') : null;
+      const rest = !!(act && act.dataset && act.dataset.rest !== undefined);
+      const idx = act && act.dataset ? (rest ? act.dataset.rest : act.dataset.exc) : (btn.dataset && btn.dataset.errtip);
+      const ctx = '<button type="button" id="imp-errctx" class="linkbtn imp-rowact imp-errctx" ' + (rest ? 'data-rest' : 'data-exc') + '="' + esc(String(idx)) + '" aria-describedby="imp-errinline" hidden>' + esc(tx(rest ? 'Restaurar' : 'Excluir')) + '</button>';
+      if (tr && tr.insertAdjacentHTML) tr.insertAdjacentHTML('afterend', '<tr id="imp-errrow" class="imp-errrow"><td colspan="11">' + ctx + '<div id="imp-errinline" class="imp-errinline" role="tooltip">' + esc(why) + '</div></td></tr>');
+      // Scroll hasta leerlo, por encima del pie: si cabe entero, lo justo para verlo; si es más alto que el hueco, que empiece arriba
+      // (alto útil = de la parte de arriba de la ventana del importador al pie)
+      const el = $('imp-errrow'), box = document.querySelector && document.querySelector('#imp .imp-box');
+      const toView = () => { try {
+        const r = el && el.getBoundingClientRect ? el.getBoundingClientRect() : null, need = r ? r.bottom - r.top : 0;
+        const boxTop = box && box.getBoundingClientRect ? Math.max(0, box.getBoundingClientRect().top || 0) : 0, avail = errPopSafeH() - boxTop;
+        if (el && el.scrollIntoView) el.scrollIntoView({ block: need > avail ? 'start' : 'nearest' });
+      } catch (e) {} };
+      toView();
+      // ¿Su Excluir / Restaurar se quedó fuera de la vista (o la fila entera)? → la acción aparece al inicio del bloque y se vuelve a
+      // llevar el scroll: si el detalle es más alto que el hueco, el bloque empieza arriba, así que la acción queda a la vista
+      if (!impInView(act)) { const c = $('imp-errctx'); if (c) { c.hidden = false; toView(); } }
+      if (btn.setAttribute) btn.setAttribute('aria-controls', 'imp-errinline');
+    }
+    if (btn.setAttribute) btn.setAttribute('aria-expanded', 'true');
+  }
+  function errPopHide() {
+    if (ERRPOP.btn && ERRPOP.btn.setAttribute) { ERRPOP.btn.setAttribute('aria-expanded', 'false'); ERRPOP.btn.setAttribute('aria-controls', 'imp-errpop'); }
+    ERRPOP.btn = null; ERRPOP.pinned = false; ERRPOP.inline = false;
+    const pop = $('imp-errpop'); if (pop) pop.hidden = true;
+    const row = document.getElementById && document.getElementById('imp-errrow'); if (row && row.parentNode) row.parentNode.removeChild(row);
+  }
+  const inPop = n => !!(n && n.closest && n.closest('#imp-errpop, #imp-errrow'));
+  $('imp-prev').addEventListener('pointerover', e => {
+    if (e.pointerType !== 'mouse') return;
+    const b = e.target.closest && e.target.closest('[data-errtip]'); if (b && ERRPOP.btn !== b) errPopShow(b, false);
+  });
+  $('imp-prev').addEventListener('pointerout', e => {   // salir del botón hacia el detalle (flotante o en línea) no lo cierra; hacia otro sitio, sí (si no está fijado)
+    if (e.pointerType !== 'mouse' || ERRPOP.pinned || !ERRPOP.btn) return;
+    const zone = n => inPop(n) || !!(n && n.closest && n.closest('[data-errtip]') === ERRPOP.btn);
+    if (!zone(e.target) || zone(e.relatedTarget)) return;
+    errPopHide();
+  });
+  $('imp-errpop').addEventListener('pointerleave', e => {
+    if (e.pointerType !== 'mouse' || ERRPOP.pinned) return;
+    const to = e.relatedTarget; if (ERRPOP.btn && to && to.closest && to.closest('[data-errtip]') === ERRPOP.btn) return;
+    errPopHide();
+  });
+  // Foco de TECLADO (focus-visible): un toque también enfoca el botón, pero ese gesto lo resuelve su clic (abrir en línea antes del
+  // clic movería la tabla bajo el dedo y el toque caería en otro sitio). Se abre en el siguiente fotograma: el scroll con el que el
+  // navegador trae el botón a la vista ya se ha asentado (sus eventos «scroll» van antes) y no cierra el detalle recién abierto;
+  // solo si el botón sigue con foco de teclado y no hay ya un detalle suyo abierto.
+  $('imp-prev').addEventListener('focusin', e => {
+    const b = e.target.closest && e.target.closest('[data-errtip]'); if (!b) return;
+    window.requestAnimationFrame(() => { if (IMP && ERRPOP.btn !== b && (!b.matches || b.matches(':focus-visible'))) errPopShow(b, false); });
+  });
+  // El conjunto «Error + su detalle en línea (y su acción contextual)» es uno solo para el foco: moverse dentro no lo cierra;
+  // salir de él, sí (si no está fijado). Tab desde Error va a la acción contextual visible; desde ella, Tab sigue el orden normal.
+  const inErrSet = n => !!(ERRPOP.btn && n && n.closest && (n.closest('#imp-errrow') || n.closest('[data-errtip]') === ERRPOP.btn));
+  $('imp-prev').addEventListener('focusout', e => { if (ERRPOP.btn && !ERRPOP.pinned && inErrSet(e.target) && !inErrSet(e.relatedTarget)) errPopHide(); });
+  $('imp-prev').addEventListener('keydown', e => {
+    if (e.key !== 'Tab' || e.shiftKey || !ERRPOP.inline || !ERRPOP.btn || e.target !== ERRPOP.btn) return;
+    const c = $('imp-errctx'); if (c && !c.hidden && c.focus) { e.preventDefault(); c.focus(); }
+  });
+  // Fijado: un clic fuera, o mover la ventana o la tabla, lo cierra (no se queda flotando en un sitio que ya no le toca)
+  document.addEventListener('click', e => { if (ERRPOP.btn && !(e.target.closest && (e.target.closest('[data-errtip]') || inPop(e.target)))) errPopHide(); });
+  window.addEventListener('scroll', e => { if (ERRPOP.btn && !ERRPOP.inline && !inPop(e.target)) errPopHide(); }, true);   // en línea se mueve con su fila
+  window.addEventListener('resize', () => { if (ERRPOP.btn) errPopHide(); });
+
+  /** ¿Fila desmarcada a mano por el regidor? (las demás se quieren importar; las que tienen error, cuando se corrijan) */
+  function impOff(r) { return !!(IMP && IMP.incMap && IMP.incMap[r.idx] === false); }
+  /** Dec. 155 · reparto del borrador en tres grupos EXCLUYENTES que suman siempre el total (cada fila, en uno solo):
+   *  imp = entra al importar (marcada y válida, aunque tenga avisos); exc = desmarcada a mano (manda sobre el error);
+   *  err = sigue marcada pero no se puede importar. */
+  function impTally(rows, off) {
+    const k = { imp: 0, exc: 0, err: 0, total: rows.length };
+    rows.forEach(r => { if (r.include && r.status !== 'err') k.imp++; else if (off(r)) k.exc++; else k.err++; });
+    return k;
+  }
   function impRender() {
+    if (ERRPOP.btn) errPopHide();   // la tabla se rehace: el botón del detalle ya no existe
     const rd = IMP.read, pv = IMP.pv;
     // Origen detectado
     $('imp-kind').textContent = rd.kind === 'tabla' ? tx(rd.records.length === 1 ? 'Tabla · {c} columnas · {s} · {n} fila' : 'Tabla · {c} columnas · {s} · {n} filas',
@@ -2148,15 +2357,25 @@
     // Vista previa
     const head = '<thead><tr><th></th>' + ['Estado', 'Tipo', 'Zona', 'Nombre', 'Jornada', 'Inicio', 'Fin', 'CALL', 'Notas', 'Avisos'].map(h => '<th>' + tx(h) + '</th>').join('') + '</tr></thead>';
     if (!pv.rows.length) {
-      $('imp-prev').innerHTML = head + '<tbody><tr><td colspan="11" class="vacio">' + tx(rd.kind === 'vacio' ? 'Pega un horario arriba o elige un archivo .csv / .tsv.' : 'No se ha encontrado ninguna fila con hora.') + '</td></tr></tbody>';
+      $('imp-prev').innerHTML = head + '<tbody><tr><td colspan="11" class="vacio">' + tx(rd.kind === 'vacio' ? 'Pega un horario arriba, elige un archivo .csv / .tsv o añade una fila manual.' : 'No se ha encontrado ninguna fila con hora.') + '</td></tr></tbody>';
     } else {
       const dot = '<svg class="ic dot"><use href="#i-dot"/></svg>';
       const st = { ok: dot + 'OK', warn: dot + tx('Revisar'), err: dot + tx('Error') };
       const inp = (r, k, v, cls) => '<td class="' + (cls || '') + '"><input type="text" data-row="' + r.idx + '" data-k="' + k + '" value="' + esc(v || '') + '" spellcheck="false" autocomplete="off"></td>';
       $('imp-prev').innerHTML = head + '<tbody>' + pv.rows.map(r =>
         '<tr class="st-' + r.status + (r.include ? '' : ' off') + '" title="' + esc(r.raw || '') + '">' +
-        '<td class="chk"><input type="checkbox" data-inc="' + r.idx + '"' + (r.include ? ' checked' : '') + (r.status === 'err' ? ' disabled' : '') + '></td>' +
-        '<td class="st">' + st[r.status] + (r.action === 'duplicada' ? '<div class="hint">' + tx('ya existe') + '</div>' : '') + '</td>' +
+        // Dec. 155: una fila con error NO lleva casilla (se guarda el hueco): dice su estado y por qué, y se excluye o se restaura
+        // con su botón. Al corregirla vuelve la casilla: marcada si estaba pendiente, desmarcada si se excluyó a mano.
+        (r.status === 'err' ? '<td class="chk"><span class="sr-only">' + esc(tx(impOff(r) ? 'Excluida a mano: no se importará' : 'Esta fila no se importará')) + '</span></td>'
+          : '<td class="chk"><input type="checkbox" data-inc="' + r.idx + '"' + (impOff(r) ? '' : ' checked') + '></td>') +
+        '<td class="st">' + (r.status !== 'err' ? st[r.status]
+          : impOff(r) ? '<span class="st-x">' + dot + esc(tx('Excluida')) + '</span><div class="why">' + esc(tx('Excluida a mano: no se importará')) + '</div><button type="button" class="linkbtn imp-rowact" data-rest="' + r.idx + '">' + esc(tx('Restaurar')) + '</button>'
+          // «Error ⓘ» compacto: el motivo principal en un detalle FLOTANTE único (#imp-errpop, fuera de la tabla: nunca se recorta);
+          // el diagnóstico completo sigue en Avisos. aria-expanded refleja siempre si el detalle está a la vista.
+          : '<button type="button" class="imp-errbtn" data-errtip="' + r.idx + '" data-why="' + esc(back(r.errs[0] || '')) + '" aria-expanded="false" aria-controls="imp-errpop" aria-label="' +
+            esc(tx('Error. Esta fila no se importará. {_m}. Mostrar detalle', { _m: back(r.errs[0] || '').replace(/[.\s]+$/, '') })) + '">' + esc(tx('Error')) + IC_INFO + '</button>' +
+            '<button type="button" class="linkbtn imp-rowact" data-exc="' + r.idx + '">' + esc(tx('Excluir')) + '</button>') +
+          (r.idx >= IMP.nPaste ? '<span class="man">' + tx('manual') + '</span>' : '') + (r.action === 'duplicada' ? '<div class="hint">' + tx('ya existe') + '</div>' : '') + '</td>' +
         '<td class="tp"><select data-row="' + r.idx + '" data-k="tipo" class="tipo tipo-' + r.tipo + '">' + I.TIPO_KEYS.map(k => '<option value="' + k + '"' + (k === r.tipo ? ' selected' : '') + '>' + tx(I.TIPO_LABEL[k]) + '</option>').join('') + '</select>' +
           (r.tipoWhy ? '<div class="hint" title="' + tx('Tipo propuesto: compruébalo') + '">' + tx('por {w}', { w: esc(r.tipoWhy) }) + '</div>' : '') + '</td>' +
         inp(r, 'escenario', r.escenario, 'e') + inp(r, 'banda', r.banda, 'b') +
@@ -2175,10 +2394,21 @@
       if (summary) summary.textContent = tx(ign.length === 1 ? '{n} línea sin hora ignorada' : '{n} líneas sin hora ignoradas', { n: ign.length });
       if (ul) ul.innerHTML = ign.map(l => '<li>' + tx('Línea {n}: {l}', { n: l.n, l: esc(l.line) }) + '</li>').join('');
     }
+    // Filas manuales en el borrador (dec. 155)
+    const nm = IMP.manual.length;
+    $('imp-man-n').textContent = nm ? tx(nm === 1 ? '{n} fila manual en el borrador' : '{n} filas manuales en el borrador', { n: nm }) : '';
+    if (!$('imp-man').hidden) impManJor();
     // Resumen y botón
     const c = pv.counts;
-    $('imp-sum').innerHTML = c.total ? tx('<span class="ok">{a} OK</span> · <span class="warn">{b} a revisar</span> · <span class="err">{c} con error</span>', { a: c.ok, b: c.warn, c: c.err }) : '';
-    $('imp-go').textContent = tx(c.importar === 1 ? 'Importar {n} entrada' : 'Importar {n} entradas', { n: c.importar });
+    // Dec. 155: resumen por FILAS (no por avisos), en tres grupos que no se pisan y suman el total del borrador.
+    // «Importar» siempre; «Excluidas» y «Error» solo si hay. Los textos son claves de i18n.js (tx), no se escriben aquí.
+    const k = impTally(pv.rows, impOff);
+    const part = (one, many, n, cls) => '<span class="' + cls + '">' + esc(tx(n === 1 ? one : many, { n: n })) + '</span>';
+    $('imp-sum').innerHTML = [part('Importar: {n} fila', 'Importar: {n} filas', k.imp, 's-imp')]
+      .concat(k.exc ? [part('Excluidas: {n} fila', 'Excluidas: {n} filas', k.exc, 's-exc')] : [], k.err ? [part('Error: {n} fila', 'Error: {n} filas', k.err, 's-err')] : []).join(' · ');
+    // Botón estable («Importar» / «Import»); la cantidad, en su title y aria-label
+    const goLbl = tx(c.importar === 1 ? 'Importar: {n} fila' : 'Importar: {n} filas', { n: c.importar });
+    $('imp-go').textContent = tx('Importar'); $('imp-go').title = goLbl; $('imp-go').setAttribute('aria-label', goLbl);
     $('imp-go').disabled = !c.importar;
   }
 
@@ -2323,12 +2553,32 @@
     if (e.target.id === 'imp-extend') IMP.extend = e.target.checked;
     impRecompute();
   });
+  // Dec. 155: «Excluir» (fila con error → Excluidas, explícito) y «Restaurar» (vuelve a Error pendiente). Solo el borrador.
+  $('imp-prev').addEventListener('click', e => {
+    // «Error ⓘ»: el toque (o clic) fija / cierra su detalle. Es el «click» del navegador: un scroll o un arrastre no lo abren.
+    const tip = e.target.closest && e.target.closest('[data-errtip]');
+    if (tip && IMP) { if (ERRPOP.btn === tip && ERRPOP.pinned) errPopHide(); else errPopShow(tip, true); return; }
+    const b = e.target.closest && e.target.closest('[data-exc],[data-rest]'); if (!b || !IMP) return;
+    const i = +(b.dataset.exc !== undefined ? b.dataset.exc : b.dataset.rest), exc = b.dataset.exc !== undefined;
+    // Acción contextual del detalle en línea activada con TECLADO (Enter/Espacio → click con detail 0): la tabla se rehace y el
+    // botón desaparece; el foco pasa a la acción nueva de esa misma fila (Restaurar / Excluir) y Tab sigue desde ahí
+    const kbCtx = b.id === 'imp-errctx' && e.detail === 0;
+    const u = i >= IMP.nPaste && IMP.manual[i - IMP.nPaste] ? IMP.manual[i - IMP.nPaste].uid : null;
+    if (u) { if (exc) IMP.mInc[u] = false; else delete IMP.mInc[u]; } else if (exc) IMP.include[i] = false; else delete IMP.include[i];
+    impRecompute();
+    if (kbCtx) { const n = $('imp-prev').querySelector && $('imp-prev').querySelector('td.st [data-rest="' + i + '"], td.st [data-exc="' + i + '"]'); if (n && n.focus) n.focus(); }
+  });
   $('imp-prev').addEventListener('change', e => {
     const el = e.target;
-    if (el.dataset.inc !== undefined) { IMP.include[+el.dataset.inc] = el.checked; impRecompute(); return; }
+    // Fila manual (detrás de las pegadas): su casilla y sus ediciones van por su id
+    const man = i => i >= IMP.nPaste && IMP.manual[i - IMP.nPaste] ? IMP.manual[i - IMP.nPaste].uid : null;
+    if (el.dataset.inc !== undefined) { const i = +el.dataset.inc, u = man(i); if (u) IMP.mInc[u] = el.checked; else IMP.include[i] = el.checked; impRecompute(); return; }
     if (el.dataset.row === undefined) return;
-    const i = +el.dataset.row; IMP.edits[i] = IMP.edits[i] || {}; IMP.edits[i][el.dataset.k] = el.value;
-    if (el.dataset.k === 'escenario' || el.dataset.k === 'banda' || el.dataset.k === 'tipo') delete IMP.include[i];
+    const i = +el.dataset.row, u = man(i);
+    // Corregir datos nunca deshace una exclusión explícita (false se queda)
+    if (u) { IMP.mEdits[u] = Object.assign({}, IMP.mEdits[u]); IMP.mEdits[u][el.dataset.k] = el.value; if (/^(escenario|banda|tipo)$/.test(el.dataset.k) && IMP.mInc[u] !== false) delete IMP.mInc[u]; impRecompute(); return; }
+    IMP.edits[i] = IMP.edits[i] || {}; IMP.edits[i][el.dataset.k] = el.value;
+    if ((el.dataset.k === 'escenario' || el.dataset.k === 'banda' || el.dataset.k === 'tipo') && IMP.include[i] !== false) delete IMP.include[i];
     impRecompute();
   });
   $('imp-prev').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches('input[type=text]')) { e.preventDefault(); e.target.blur(); } });
@@ -3869,5 +4119,5 @@
   });
   window.ShowtimePanel = { reload: () => { loadState(); renderAll(); }, _test: { winState: () => Array.from(WIN.entries()).map(([id, x]) => ({ id, name: x.name, vista: x.vista, zona: x.zona, filas: x.filas || null, standby: !!x.standby, fs: x.fs })), setWinVista, setWinRows, resetWinLayout, setWinStandby, closeLive, openGestor, gestorVisible, emProdMessage, emRegenProd, hitoChips, emUrl, prodBigTitle, fileKind, handleFile, emCommand, importSummary, hidesSome, tipoPill, setWake, wakeState: () => ({ on: wakeOn, lock: !!wakeLock }), showSplash, hideSplash, setStandby, standbyOn, room: () => emRoom,
     emSnapshot, emCloseDay, emDay, qrDevices, rmZones, setRmZone: z => { RM_ZONE = z; renderCast(); }, setRoom: r => { emRoom = r; }, fakeEm: (em, st) => { EM = em; EMST = st; }, emStateHtml, renderCastBar, renderHubLed, mtIn, mtOut, cfSimState, renderCfSim, cfSim: () => CFSIM,
-    dayStep, monthLabel, spotItems, spotDays, spotEntries, fmtDayFull, refreshStale, net: () => NET, setNet: o => { NET = netNorm(o); }, netNorm, emLink, emBrokers, emUrl, netHtml, renderCast, audioTick, fillAudioCfg, saveAudioCfg, audioPreview, audioConfirm, audioRearm, audioUrgentAnswered, sendChat, fitMtAlerts, mtJump, mtFreshOff, mtRearm, mtAnchorSave, mtAnchorApply, mtAnchor: () => MT_ANCHOR, mtTapState: () => ({ touch: Array.from(MT_TOUCH), tap: MT_TAP && { pid: MT_TAP.pid, id: MT_TAP.id, cap: MT_TAP.cap } }), setAppLang, mtNew: () => Array.from(MT_NEW), mtIds, mtOrder: () => MT_ORDER && MT_ORDER.map(e => Object.assign({}, e)), auMuteBtn, renderChat, callEditFix, applyEdit, undo, loadNew, impDoImport } };   // _test: solo para tests/control.test.js
+    dayStep, monthLabel, spotItems, spotDays, spotEntries, fmtDayFull, refreshStale, net: () => NET, setNet: o => { NET = netNorm(o); }, netNorm, emLink, emBrokers, emUrl, netHtml, renderCast, audioTick, fillAudioCfg, saveAudioCfg, audioPreview, audioConfirm, audioRearm, audioUrgentAnswered, sendChat, fitMtAlerts, mtJump, mtFreshOff, mtRearm, setImportText, impTally, errPopPlace, errPop: () => ({ open: !!ERRPOP.btn, pinned: ERRPOP.pinned, inline: !!ERRPOP.inline }), mtAnchorSave, mtAnchorApply, mtAnchor: () => MT_ANCHOR, mtTapState: () => ({ touch: Array.from(MT_TOUCH), tap: MT_TAP && { pid: MT_TAP.pid, id: MT_TAP.id, cap: MT_TAP.cap } }), setAppLang, mtNew: () => Array.from(MT_NEW), mtIds, mtOrder: () => MT_ORDER && MT_ORDER.map(e => Object.assign({}, e)), auMuteBtn, renderChat, callEditFix, applyEdit, undo, loadNew, impDoImport } };   // _test: solo para tests/control.test.js
 })();

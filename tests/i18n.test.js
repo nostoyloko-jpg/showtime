@@ -80,11 +80,11 @@
     reset();
     eq(I.tx('Pegar horario'), 'Pegar horario', 'español: tal cual');
     eq(I.tx('Texto que no existe'), 'Texto que no existe');
-    eq(I.tx('Importar {n} entradas', { n: 3 }), 'Importar 3 entradas', 'variables en español');
+    eq(I.tx('Importar: {n} filas', { n: 3 }), 'Importar: 3 filas', 'variables en español');
     I.setLang('en');
     try {
       eq(I.tx('Pegar horario'), 'Paste schedule');
-      eq(I.tx('Importar {n} entradas', { n: 3 }), 'Import 3 entries');
+      eq(I.tx('Importar: {n} filas', { n: 3 }), 'Import: 3 rows');
       eq(I.tx('Texto que no existe'), 'Texto que no existe', 'sin traducción: cae al español, nunca en blanco');
       eq(I.tx('Pegar horario', null, 'es'), 'Pegar horario', 'pidiendo el español (log, Deshacer)');
       ok(I.txHas('Pegar horario') && !I.txHas('Texto que no existe'));
