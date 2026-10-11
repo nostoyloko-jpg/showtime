@@ -915,8 +915,8 @@
     ['tipo', 'escenario', 'banda', 'jornada', 'inicio', 'fin', 'call', 'notas'].forEach((k, n) => {
       ok(new RegExp('<th class="srt" data-colk="' + k + '"><button type="button" class="imp-sortbtn" data-sort="' + k + '" title="Ordenar por [^"]+ \\(ascendente\\)">[^<]+<svg class="ic so"[^>]*aria-hidden="true"[\\s\\S]*?</svg></button><button type="button" class="imp-colgrip" data-grip="' + (n + 2) + '" aria-expanded="false" aria-controls="imp-colctl" aria-label="Ancho de la columna [^"]+" title="Arrastra para cambiar el ancho; clic, Intro o Espacio para ajustarlo con − / \\+"></button></th>').test(h0), 'cabecera ' + k);
     });
-    ok(/<thead><tr><th><\/th><th>Estado<\/th>/.test(h0) && /<th>Avisos<\/th><\/tr>/.test(h0), 'casilla, Estado y Avisos: sin botón ni tirador');
-    eq((h0.match(/data-sort=/g) || []).length, 8); eq((h0.match(/data-grip=/g) || []).length, 8); ok(!/aria-sort/.test(h0), 'sin orden: ningún aria-sort');
+    ok(/<thead><tr><th><\/th><th class="srt nogrip" data-colk="estado"><button type="button" class="imp-sortbtn" data-sort="estado"/.test(h0) && /<th>Avisos<\/th><\/tr>/.test(h0), 'casilla y Avisos: sin botón ni tirador; Estado (v20261167): botón sin tirador');
+    eq((h0.match(/data-sort=/g) || []).length, 9); eq((h0.match(/data-grip=/g) || []).length, 8); ok(!/aria-sort/.test(h0), 'sin orden: ningún aria-sort');
     const orig = ridsOf(t);
     eq(orig, 'p0 p1 p2 p3 p4');
     sortClick(t, 'inicio');
@@ -1340,6 +1340,56 @@
     eq(T.imp().pv.rows[0].notas, 'con click'); ok(pinturas() - p0 >= 1); eq(JSON.stringify(restaurado.sel), '[30,30]');
     doc.createElement = ce0; delete prev.querySelector; doc.activeElement = null;
     eq(t.env.errors.length, 0);
+  });
+  test('Importador v20261167 · Estado ordena solo la vista: ↑ Error activo → Revisar → OK → Excluida; empates estables; Excluir / Restaurar recolocan al momento; ↓ y original; ES/EN; sin tirador', () => {
+    const F = fest(), t = panel({ 'showtime.festival': JSON.stringify(F.s) }), T = t.env.win.ShowtimePanel._test;
+    const TXT = 'Banda\tZona\tInicio\tFin\nUno\tPrincipal\t20:00\t20:30\n\tPrincipal\t21:00\t21:30\nDos\tCarpa Nueva\t22:00\t22:30\nTres\tPrincipal\t25:99\t\nCuatro\tPrincipal\t18:00\t18:30\nCinco\tOtra\t19:00\t19:30';
+    t.env.fire('btn-paste', 'click', {}); T.setImportText(TXT);
+    eq(T.imp().pv.rows.map(r => r.status).join(' '), 'ok err warn err ok warn', 'estados de partida');
+    const pv0 = T.imp().pv.rows.map(r => r.idx).join(','), orig = ridsOf(t);
+    const excl = (attr, i) => t.env.fire('imp-prev', 'click', { target: { closest: q => q === '[data-exc],[data-rest]' ? { dataset: { [attr]: String(i) } } : null } });
+    // Cabecera: botón real, título, aria-sort; sin tirador, sin microcontrol, sin rango ARIA ni número
+    const th = () => { const h = headOf(t); return h.slice(h.indexOf('<th class="srt nogrip"'), h.indexOf('</th>', h.indexOf('<th class="srt nogrip"')) + 5); };
+    ok(/^<th class="srt nogrip" data-colk="estado"><button type="button" class="imp-sortbtn" data-sort="estado" title="Ordenar por Estado \(ascendente\)">Estado<svg class="ic so"[^>]*aria-hidden="true"[\s\S]*?<\/svg><\/button><\/th>$/.test(th()), 'Estado: botón real con su título');
+    ok(!/data-grip|imp-colgrip|imp-colctl|aria-value|role="(spinbutton|slider|separator)"|type="number"/.test(th()), 'sin tirador, microcontrol, rango ARIA ni número');
+    sortClick(t, 'estado');
+    eq(ridsOf(t), 'p1 p3 p2 p5 p0 p4', '↑: Error activo (p1 p3) → Revisar (p2 p5) → OK (p0 p4), empates en orden de incorporación');
+    ok(/data-colk="estado" aria-sort="ascending"><button[^>]*title="Ordenado de forma ascendente\. Pulsa para descendente"/.test(headOf(t)), 'aria-sort y título');
+    eq(t.env.getEl('imp-sortnote').textContent, 'Vista ordenada por Estado (ascendente). El orden de importación no cambia.');
+    // Excluir con Estado activo: pasa YA a «Excluida» (tras OK); Restaurar: vuelve a Error activo
+    excl('exc', 3); eq(ridsOf(t), 'p1 p2 p5 p0 p4 p3', 'Excluir: al grupo Excluida, después de OK');
+    excl('exc', 1); eq(ridsOf(t), 'p2 p5 p0 p4 p1 p3', 'dos excluidas: estables entre ellas');
+    excl('rest', 3); eq(ridsOf(t), 'p3 p2 p5 p0 p4 p1', 'Restaurar: vuelve a Error activo');
+    excl('rest', 1); eq(ridsOf(t), 'p1 p3 p2 p5 p0 p4');
+    // Una fila válida desmarcada no cambia de grupo (sigue siendo OK)
+    t.env.fire('imp-prev', 'change', { target: { dataset: { inc: '0' }, checked: false } });
+    eq(ridsOf(t), 'p1 p3 p2 p5 p0 p4', 'OK desmarcada: sigue en OK'); t.env.fire('imp-prev', 'change', { target: { dataset: { inc: '0' }, checked: true } });
+    // ↓ y orden original
+    excl('exc', 3);
+    sortClick(t, 'estado'); eq(ridsOf(t), 'p3 p0 p4 p2 p5 p1', '↓: Excluida → OK → Revisar → Error, empates estables');
+    ok(/data-colk="estado" aria-sort="descending"/.test(headOf(t))); eq(t.env.getEl('imp-sortnote').textContent, 'Vista ordenada por Estado (descendente). El orden de importación no cambia.');
+    sortClick(t, 'estado'); eq(ridsOf(t), orig, 'tercer clic: orden original'); ok(!/aria-sort/.test(headOf(t)));
+    // EN
+    T.setAppLang('en'); sortClick(t, 'estado');
+    ok(/data-sort="estado" title="Sorted ascending\. Press for descending">Status/.test(headOf(t)), 'EN: Status + título');
+    eq(t.env.getEl('imp-sortnote').textContent, 'View sorted by Status (ascending). The import order does not change.');
+    T.setAppLang('es'); sortClick(t, 'estado'); sortClick(t, 'estado');
+    // Nada del borrador cambia
+    eq(T.imp().pv.rows.map(r => r.idx).join(','), pv0, 'IMP.pv.rows intacto');
+    eq((headOf(t).match(/data-grip=/g) || []).length, 8, 'los tiradores siguen solo en las ocho columnas de datos');
+    eq(t.env.errors.length, 0);
+  });
+  test('Importador v20261167 · ordenar por Estado no cambia lo importado ni el Dashboard', () => {
+    const TXT = 'Banda\tZona\tInicio\tFin\nUno\tPrincipal\t20:00\t20:30\nDos\tCarpa Nueva\t22:00\t22:30\nCuatro\tPrincipal\t18:00\t18:30\nCinco\tOtra\t19:00\t19:30';
+    const run = sorted => {
+      const F = fest(), t = panel({ 'showtime.festival': JSON.stringify(F.s) }), T = t.env.win.ShowtimePanel._test;
+      t.env.fire('btn-paste', 'click', {}); T.setImportText(TXT);
+      if (sorted) { sortClick(t, 'estado'); ok(ridsOf(t) !== 'p0 p1 p2 p3', 'la vista sí cambia'); }
+      t.env.fire('imp-go', 'click', {});
+      return { arts: t.read('showtime.festival').artists.map(a => a.nombre).join('|'), dash: (ultimo(t, 'tbody').match(/Banda A|Uno|Dos|Cuatro|Cinco/g) || []).join('|') };
+    };
+    const a = run(false), b = run(true);
+    eq(b.arts, a.arts, 'misma secuencia importada'); ok(a.dash.length > 0); eq(b.dash, a.dash, 'Dashboard idéntico');
   });
   test('Importador · detalle de Error sin sitio flotante (pantalla muy baja, motivo muy largo): se abre EN LÍNEA bajo su fila, no tapa nada y las acciones responden al primer toque', () => {
     const P = panel().env.win.ShowtimePanel._test.errPopPlace;

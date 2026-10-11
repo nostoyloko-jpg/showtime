@@ -352,6 +352,7 @@ body[data-ps="stage"] .mpanel,body[data-ps="stage"] .cfg,body[data-ps="stage"] .
 .imp-sortnote{font-size:12px;color:var(--muted);flex:1 1 auto;min-width:0}
 .imp-colreset{margin-left:auto;font-size:12px;font-weight:700;padding:6px 0}
 .imp-prev th.srt{padding-right:14px}
+.imp-prev th.srt.nogrip{padding-right:5px}
 .imp-sortbtn{display:inline-flex;align-items:center;gap:5px;border:0;background:none;padding:2px 0;margin:0;font:inherit;letter-spacing:inherit;text-transform:inherit;color:inherit;cursor:pointer;white-space:nowrap}
 .imp-sortbtn:hover,.imp-prev th[aria-sort] .imp-sortbtn{color:var(--text)}
 .imp-sortbtn:focus-visible{outline:2px solid currentColor;outline-offset:2px;border-radius:3px}

@@ -2323,6 +2323,8 @@
   // Columnas de datos (ordenables y con tirador); i = posición en la tabla (0 casilla, 1 Estado … 10 Avisos).
   const IMP_COLS = [{ k: 'tipo', l: 'Tipo', i: 2 }, { k: 'escenario', l: 'Zona', i: 3 }, { k: 'banda', l: 'Nombre', i: 4 }, { k: 'jornada', l: 'Jornada', i: 5 },
     { k: 'inicio', l: 'Inicio', i: 6 }, { k: 'fin', l: 'Fin', i: 7 }, { k: 'call', l: 'CALL', i: 8 }, { k: 'notas', l: 'Notas', i: 9 }];
+  // v20261167 · «Estado» también ordena (solo la vista) pero NO es columna de datos: sin tirador ni microcontrol de ancho
+  const IMP_STCOL = { k: 'estado', l: 'Estado', i: 1, nogrip: true }, IMP_SORTCOLS = [IMP_STCOL].concat(IMP_COLS);
   const IMP_NCOL = 11, IMP_TIPO_ORDEN = ['show', 'sc', 'tarea', 'hito'];   // Show → Soundcheck → Tarea → Marcador
   const IMP_COL_PASO = 16;   // px por pulsación de − / + en el microcontrol del tirador (sin máximo)
   let IMP_DRAG = null, IMP_PAINT = false;   // IMP_PAINT: la tabla se está rehaciendo (el foco del control que se quita no cuenta como «salir»)
@@ -2429,6 +2431,8 @@
    *  Horas: jornada operativa y, dentro, la hora del día operativo según el corte del evento (00:30 va detrás de 23:00);
    *  con hora pero sin jornada = incompleta. Lo que se ve como «—» (Fin de un marcador, CALL de tareas y marcadores) = vacío. */
   function impSortVal(r, k, cut) {
+    // Estado ↑: Error activo → Revisar → OK → Excluida (error excluido a mano). Una fila válida desmarcada sigue siendo OK / Revisar.
+    if (k === 'estado') return r.status === 'err' ? (impOff(r) ? 3 : 0) : r.status === 'warn' ? 1 : r.status === 'ok' ? 2 : null;
     if (k === 'tipo') { const t = IMP_TIPO_ORDEN.indexOf(r.tipo); return t < 0 ? null : t; }
     if (k === 'jornada') return C.dayIndex(r.jornada);
     if (k === 'inicio' || k === 'fin' || k === 'call') {
@@ -2508,9 +2512,9 @@
   function impTh(c) {
     const s = IMP.sort && IMP.sort.k === c.k ? IMP.sort.dir : '', lbl = tx(c.l);
     const ttl = s === 'asc' ? tx('Ordenado de forma ascendente. Pulsa para descendente') : s === 'desc' ? tx('Ordenado de forma descendente. Pulsa para volver al orden original') : tx('Ordenar por {_c} (ascendente)', { _c: lbl });
-    return '<th class="srt" data-colk="' + c.k + '"' + (s ? ' aria-sort="' + (s === 'asc' ? 'ascending' : 'descending') + '"' : '') + '>' +
+    return '<th class="srt' + (c.nogrip ? ' nogrip' : '') + '" data-colk="' + c.k + '"' + (s ? ' aria-sort="' + (s === 'asc' ? 'ascending' : 'descending') + '"' : '') + '>' +
       '<button type="button" class="imp-sortbtn" data-sort="' + c.k + '" title="' + esc(ttl) + '">' + lbl + IC_SORT(s) + '</button>' +
-      '<button type="button" class="imp-colgrip" data-grip="' + c.i + '" aria-expanded="false" aria-controls="imp-colctl" aria-label="' + esc(tx('Ancho de la columna {_c}', { _c: lbl })) + '" title="' + esc(tx('Arrastra para cambiar el ancho; clic, Intro o Espacio para ajustarlo con − / +')) + '"></button></th>';
+      (c.nogrip ? '</th>' : '<button type="button" class="imp-colgrip" data-grip="' + c.i + '" aria-expanded="false" aria-controls="imp-colctl" aria-label="' + esc(tx('Ancho de la columna {_c}', { _c: lbl })) + '" title="' + esc(tx('Arrastra para cambiar el ancho; clic, Intro o Espacio para ajustarlo con − / +')) + '"></button></th>');
   }
   /** Anchos: null = automáticos (los de siempre). Al primer ajuste se fijan los anchos actuales de las 11 columnas y la tabla pasa a
    *  diseño fijo; solo cambia la columna tocada. Mínimo de cada columna: su cabecera (texto, flecha y tirador) o su control. */
@@ -2615,7 +2619,7 @@
   /** Rótulo del estado de orden (visible y anunciado): qué columna y en qué sentido; el orden de importación no cambia. */
   function impSortNote() {
     const n = $('imp-sortnote'); if (!n) return;
-    const c = IMP && IMP.sort ? IMP_COLS.find(x => x.k === IMP.sort.k) : null;
+    const c = IMP && IMP.sort ? IMP_SORTCOLS.find(x => x.k === IMP.sort.k) : null;
     n.textContent = c ? tx('Vista ordenada por {_c} ({_d}). El orden de importación no cambia.', { _c: tx(c.l), _d: tx(IMP.sort.dir === 'asc' ? 'ascendente' : 'descendente') })
       : IMP && IMP.sortUsed ? tx('Vista en el orden original.') : '';
   }
@@ -2670,7 +2674,7 @@
     if (pv.outside.length) nh += '<label><input type="checkbox" id="imp-extend"' + (IMP.extend ? ' checked' : '') + '> ' + tx('<b>Ampliar el evento</b> a {d}', { d: pv.outside.map(fmtDay).map(esc).join(', ') }) + '</label>';
     $('imp-new').innerHTML = nh;
     // Vista previa
-    const head = '<colgroup>' + '<col>'.repeat(IMP_NCOL) + '</colgroup><thead><tr><th></th><th>' + tx('Estado') + '</th>' + IMP_COLS.map(impTh).join('') + '<th>' + tx('Avisos') + '</th></tr></thead>';
+    const head = '<colgroup>' + '<col>'.repeat(IMP_NCOL) + '</colgroup><thead><tr><th></th>' + impTh(IMP_STCOL) + IMP_COLS.map(impTh).join('') + '<th>' + tx('Avisos') + '</th></tr></thead>';
     if (!pv.rows.length) {
       $('imp-prev').innerHTML = head + '<tbody><tr><td colspan="11" class="vacio">' + tx(rd.kind === 'vacio' ? 'Pega un horario arriba, elige un archivo .csv / .tsv o añade una fila manual.' : 'No se ha encontrado ninguna fila con hora.') + '</td></tr></tbody>';
     } else {
