@@ -1078,6 +1078,7 @@
       "Ensanchar {_c} 16 píxeles": "Widen {_c} by 16 pixels",
       "Ancho de la columna {_c}: {n} píxeles (mínimo {m})": "Width of column {_c}: {n} pixels (minimum {m})",
       "Restablecer columnas": "Reset columns",
+      "Restablecer el ancho de {_c}": "Reset width of {_c}",
       "Editar {_c} (texto completo)": "Edit {_c} (full text)",
       "Intro confirma. El texto sigue siendo de una sola línea.": "Enter confirms. The text stays on a single line.",
       "Excluida": "Excluded",

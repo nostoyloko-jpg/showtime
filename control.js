@@ -89,6 +89,7 @@
     document.body.classList.toggle('focus', on);
     if (b) { b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); b.title = tx(on ? 'Modo foco ACTIVO: solo lo de directo, filas y letra más grandes. Clic: activar / desactivar (⇧⌘F)' : 'Modo foco: solo lo de directo, filas y letra más grandes. Clic: activar / desactivar (⇧⌘F)'); }
     const l = document.getElementById('view-lbl'); if (l) l.textContent = viewLabel();
+    try { dwRelayout(); } catch (e) {}   // anchos propios del Dashboard: el resto se vuelve a tomar con las columnas de este modo
   }
   function setFocus(on) { try { if (on) localStorage.setItem(FOCUS_KEY, '1'); else localStorage.removeItem(FOCUS_KEY); } catch (e) {} applyFocus(); }
   /** Modo de los campos de una fila (show o soundcheck), según su bloque. */
@@ -540,10 +541,12 @@
       td('fin', 't', tipo === 'hito' ? off : inp('fin', '—')) +
       estCell(b) +
       td('tipo', 'tp', tipoSelect(a, mode, 'data-k="tipo" data-orig="' + tipo + '"')) +
-      td('escenario', 'stage', '<input type="text" list="zones-dl" data-k="zona" value="' + esc(esc0 ? esc0.nombre : '') + '" data-orig="' + esc(esc0 ? esc0.nombre : '') + '" placeholder="' + tx(band ? '— zona —' : '— ninguna —') + '" style="--sc:' + scol + '" title="' + tx('Elige una zona o escribe una nueva para crearla') + '" autocomplete="off" spellcheck="false">') +
+      td('escenario', 'stage', '<input type="text" list="zones-dl" data-k="zona" value="' + esc(esc0 ? esc0.nombre : '') + '" data-orig="' + esc(esc0 ? esc0.nombre : '') + '" placeholder="' + tx(band ? '— zona —' : '— ninguna —') + '" style="--sc:' + scol + '" title="' + tx('Elige una zona o escribe una nueva para crearla') + '" aria-label="' + tx('Zona') + ': ' + tx('Elige una zona o escribe una nueva para crearla') + '" autocomplete="off" spellcheck="false">' +
+        (esc0 && esc0.nombre ? '<span class="ntip ntip-l" aria-hidden="true">' + esc(esc0.nombre) + '</span>' : '')) +   // nombre entero si se corta (v20261169)
       '<td class="name' + (isMod('nombre') || isMod('color') ? ' mod' : '') + '"><div class="nm">' + tipoPill(band ? mode : tipo) +
         '<input type="color" data-k="color" value="' + col + '" data-orig="' + col + '" title="' + tx('Color de la banda') + '">' +
         '<input type="text" data-k="nombre" value="' + esc(a.nombre || '') + '" data-orig="' + esc(a.nombre || '') + '" autocomplete="off" spellcheck="false">' +
+        (a.nombre ? '<span class="ntip ntip-l" aria-hidden="true">' + esc(a.nombre) + '</span>' : '') +
         (isNew ? '<span class="tag" title="' + tx('Creada desde la última importación/exportación') + '">' + tx('NUEVA') + '</span>' : '') + '</div></td>' +
       td('call', 't', band ? inp('call', '—') : off) +
       td('standby', 'gap', gap) +
@@ -564,9 +567,9 @@
     const nuevas = new Set((ORIG ? C.newArtistIds(ORIG, FEST) : []).map(String));
     zonesDatalist();
     $('list-title').textContent = tx(viewOf().title) + (CONFIG.day === 'all' ? ' · ' + tx('todas las jornadas') : ' · ' + fmtDay(CONFIG.day));
-    // Ancho del selector de escenario según el nombre más largo (que «Escenario Alhambra» se lea entero)
-    const longest = Math.max(8, ...(FEST.escenarios || []).map(e => String(e.nombre || '').length));
-    $('tbl').style.setProperty('--escw', 'calc(' + (Math.min(longest, 26) * 1.12).toFixed(1) + 'ch + 26px)');   // negrita: un poco más que 1ch por letra
+    // v20261169: Zona con ancho base compacto y estable (--escw: 112 px en control.css), sin crecer con la zona más larga del evento:
+    // una zona larga se lee al pasar el ratón (si se corta) o ensanchando la columna a mano
+    try { dwAria(); } catch (e) {}   // nombres de tiradores y ↶ en el idioma actual
     const rows = BLOCKS.map(b => {
       const a = FEST.artists.find(x => String(x.id) === String(b.id));
       return a ? rowHtml(a, b, mods, nuevas.has(String(a.id))) : '';
@@ -580,6 +583,7 @@
       ? '<tr class="sec"><td colspan="13">' + tx('Sin horario ({n}) · elige jornada y escribe el inicio', { n: sin.length }) + '</td></tr>' + sin.map(a => rowHtml(a, null, mods, nuevas.has(String(a.id)))).join('')
       : '';
     markRows(Math.floor(C.nowAbs()));
+    try { dwLane(); } catch (e) {}   // ancho real del carril de ··· ya con sus filas
   }
 
   // Fila de alta: mantiene escenario y jornada elegidos; no propone horas.
@@ -908,8 +912,8 @@
       const el = e.target;
       if (el.matches('select, input[type=color]')) applyEdit(el);
     });
-    tb.addEventListener('input', e => {   // la tarjeta flotante de Notas sigue a lo que se escribe (dec. 122)
-      if (!e.target.dataset || e.target.dataset.k !== 'notas') return;
+    tb.addEventListener('input', e => {   // el detalle de Zona, Nombre y Notas sigue a lo que se escribe (dec. 122; v20261169)
+      if (!e.target.dataset || ['zona', 'nombre', 'notas'].indexOf(e.target.dataset.k) < 0) return;
       const td = e.target.closest('td'), tip = td && td.querySelector('.ntip');
       if (tip) { tip.textContent = e.target.value; tip.hidden = !e.target.value; }
     });
@@ -1291,6 +1295,7 @@
     const L = I.getLang(), b = $('btn-lang');
     if (b) { b.textContent = I.t('lang.short'); b.title = I.t('lang.btnTitle'); b.setAttribute('aria-label', I.t('lang.btnTitle')); }
     document.querySelectorAll('#cfg-lang [data-l]').forEach(x => { const on = x.dataset.l === L; x.classList.toggle('on', on); x.setAttribute('aria-pressed', on ? 'true' : 'false'); });
+    try { dwAria(); } catch (e) {}   // tiradores y ↶ del Dashboard en el idioma nuevo (también sin evento cargado)
   }
   function setAppLang(l) {
     const I = window.ShowtimeI18n; if (!I) return;
@@ -2052,6 +2057,250 @@
     if (f) { handleFile(f); return; }
     openImport(cd ? cd.getData('text/plain') : '');
   });
+
+  // ── v20261169 · Dashboard: ancho de Zona, Nombre y Notas SOLO para esta sesión (memoria; ni localStorage ni datos del evento) ──
+  // Cada una tiene su tirador fino. Ratón: clic limpio abre − / +; cualquier movimiento horizontal arrastra. Dedo o lápiz: hasta
+  // DW_TOQUE px de temblor horizontal es toque limpio (abre al soltar); más es arrastre (no abre); un gesto claramente vertical no hace
+  // nada. No se usa el «click» del navegador: se decide en pointerup, una sola vez. Gesto cancelado: no abre; si ya arrastraba, se
+  // queda el último ancho válido. ↶ de cada columna: solo si ESA cambió; la devuelve a su ancho inicial y desaparece.
+  const DCOLS = [{ k: 'zona', l: 'Zona' }, { k: 'nombre', l: 'Nombre' }, { k: 'notas', l: 'Notas' }];
+  const DW = { zona: null, nombre: null, notas: null };   // px (borde a borde de la cabecera) o null = ancho inicial
+  const DW_PASO = 16, DW_TOQUE = 6;   // − / + de 16 px (como el importador); 6 px de temblor (decisión de L.A.)
+  let DW_FRZ = false, DW_G = null;   // DW_G: gesto en curso sobre un tirador
+  const DW0 = {};   // ancho de Zona, Nombre y Notas al congelar: al que vuelve cada ↶ mientras otra sigue con ancho propio
+  const DWCTL = { g: null, k: '', pos: '' };
+  const dwTh = k => document.querySelector('#tbl thead th[data-dwk="' + k + '"]');
+  const dwLbl = k => { const c = DCOLS.find(x => x.k === k); return c ? tx(c.l) : ''; };
+  const dwAny = () => DCOLS.some(c => DW[c.k] != null);
+  function dwNow(k) { const th = dwTh(k), r = th && th.getBoundingClientRect ? th.getBoundingClientRect() : null; return r && Number.isFinite(r.width) ? r.width : 0; }
+  /** Congela las demás columnas a su ancho de ESTE momento (tabla sin el 100 %): así un ancho propio solo cambia su columna. */
+  function dwFreeze() {
+    if (DW_FRZ) return;
+    const tbl = $('tbl'), ths = Array.from(tbl.querySelectorAll('thead th'));
+    const ws = ths.map(th => th.getBoundingClientRect ? th.getBoundingClientRect().width : 0);
+    ths.forEach((th, i) => {
+      const k = th.dataset.dwk;
+      if (k) DW0[k] = ws[i] > 0 ? ws[i] : null;
+      if (k && DW[k] != null) return;
+      if (!(ws[i] > 0)) return;   // oculta (Modo Foco): no ocupa sitio
+      th.setAttribute('data-dwf', ''); th.style.width = th.style.minWidth = ws[i] + 'px';
+    });
+    tbl.classList.add('dwfrz'); DW_FRZ = true;
+  }
+  function dwUnfreeze() {
+    const tbl = $('tbl');
+    Array.from(tbl.querySelectorAll('thead th[data-dwf]')).forEach(th => { th.removeAttribute('data-dwf'); th.style.width = th.style.minWidth = ''; });
+    tbl.classList.remove('dwfrz'); DW_FRZ = false;
+  }
+  /** Pinta los anchos propios (y su ↶). Sin ninguno, la tabla vuelve EXACTAMENTE a su maquetación inicial. */
+  function dwApply() {
+    const tbl = $('tbl');
+    DCOLS.forEach(c => {
+      const th = dwTh(c.k), on = DW[c.k] != null;
+      tbl.classList.toggle('dw-' + c.k, on);
+      if (!th) return;
+      th.classList.toggle('dwchg', on);
+      const back = !on && DW_FRZ && DW0[c.k] ? DW0[c.k] : null;   // sin ancho propio y con el resto congelado: su ancho inicial exacto
+      if (back) th.setAttribute('data-dwf', ''); else th.removeAttribute('data-dwf');
+      th.style.width = th.style.minWidth = on ? DW[c.k] + 'px' : back ? back + 'px' : '';
+      const rs = th.querySelector('[data-dreset]'); if (rs) rs.hidden = !on;
+    });
+    if (!dwAny()) dwUnfreeze();
+    dwAria();
+  }
+  /** Mínimo REAL de la columna (lo que sus controles y su título necesitan): se mide, no se inventa. */
+  function dwMin(k) {
+    const th = dwTh(k); if (!th || !th.getBoundingClientRect) return 0;
+    const wrap = dwWrap(), sl = wrap ? wrap.scrollLeft : 0;
+    const w0 = th.style.width, m0 = th.style.minWidth;
+    th.style.width = th.style.minWidth = '1px';
+    const m = th.getBoundingClientRect().width;
+    th.style.width = w0; th.style.minWidth = m0;
+    if (wrap && wrap.scrollLeft !== sl) wrap.scrollLeft = sl;   // medir no mueve la vista (la tabla encoge un instante)
+    return Number.isFinite(m) ? Math.ceil(m) : 0;
+  }
+  const dwWrap = () => { const t = $('tbl'), w = t && t.closest ? t.closest('.tblwrap') : null; return w && w.getBoundingClientRect ? w : null; };
+  /** Posición de scroll de la vista: el microcontrol se cierra si la vista se mueve de verdad, no por una medida propia. */
+  const dwScrollSig = () => { const w = dwWrap(); return (w ? w.scrollLeft + ',' + w.scrollTop : '') + ',' + (window.scrollX || 0) + ',' + (window.scrollY || 0); };
+  function dwSet(k, w) {
+    if (!Number.isFinite(w)) return;
+    dwFreeze();
+    DW[k] = Math.max(dwMin(k), Math.round(w));
+    dwApply();
+    dwClearLane(k);
+    if (DWCTL.g && DWCTL.k === k) { dwCtlPaint(); dwCtlPlace(); DWCTL.pos = dwScrollSig(); }   // − al final de la tabla puede recolocar la vista: no cierra
+  }
+  function dwReset(k) {
+    const th = dwTh(k), rs = th && th.querySelector('[data-dreset]'), had = rs && document.activeElement === rs;
+    if (DWCTL.k === k) dwCtlClose(false);
+    DW[k] = null; dwApply();
+    if (had) { const g = th.querySelector('[data-dgrip]'); if (g && g.focus) g.focus(); }   // el foco no se pierde con el ↶ que se va
+  }
+  /** Carril fijo de ··· (a la derecha, encima de lo que se desplaza): su ancho real, para que el foco y «llevar a la vista» lo
+   *  dejen libre (scroll-padding). En Modo Foco no hay carril: 0. */
+  function dwLane() {
+    const wrap = dwWrap(), m = document.querySelector('#tbl thead th.mo'), r = m && m.getBoundingClientRect ? m.getBoundingClientRect() : null;
+    if (wrap && wrap.style && wrap.style.setProperty) wrap.style.setProperty('--lanew', (r && r.width > 0 ? Math.ceil(r.width) : 0) + 'px');
+    return r && r.width > 0 ? r : null;
+  }
+  /** Al cambiar SU ancho (arrastre o − / +), el tirador nunca se queda debajo del carril de ···: la vista se corre lo justo. */
+  function dwClearLane(k) {
+    const wrap = dwWrap(), th = dwTh(k), g = th && th.querySelector('[data-dgrip]'), lane = dwLane();
+    if (!wrap || !g || !lane || !g.getBoundingClientRect) return;
+    const over = g.getBoundingClientRect().right - lane.left;
+    if (over > 0) wrap.scrollLeft += Math.ceil(over);
+  }
+  /** Cambió la maquetación (ventana, rotación, Modo Foco): las demás columnas se vuelven a tomar con los anchos propios ya puestos. */
+  function dwRelayout() {
+    dwCtlClose(false);
+    dwLane();
+    if (!dwAny()) return;
+    dwUnfreeze(); dwApply(); dwFreeze();
+  }
+  /** Nombres verdaderos: columna, ancho actual y mínimo real; ↶ dice qué columna devuelve. Sin medidas, sin cifras. */
+  function dwAria() {
+    DCOLS.forEach(c => {
+      const th = dwTh(c.k); if (!th) return;
+      const g = th.querySelector('[data-dgrip]'), rs = th.querySelector('[data-dreset]'), l = dwLbl(c.k), w = DW[c.k];
+      if (g) {
+        g.setAttribute('aria-label', w != null ? tx('Ancho de la columna {_c}: {n} píxeles (mínimo {m})', { _c: l, n: w, m: dwMin(c.k) }) : tx('Ancho de la columna {_c}', { _c: l }));
+        g.title = tx('Arrastra para cambiar el ancho; clic, Intro o Espacio para ajustarlo con − / +');
+      }
+      if (rs) { rs.setAttribute('aria-label', tx('Restablecer el ancho de {_c}', { _c: l })); rs.title = rs.getAttribute('aria-label'); }
+    });
+  }
+  // Microcontrol − / + (16 px; mínimo real; sin máximo), junto al tirador y dentro de la pantalla
+  function dwCtlOpen(g, kb) {
+    dwCtlClose(false);
+    const k = g.dataset.dgrip; DWCTL.g = g; DWCTL.k = k;
+    g.setAttribute('aria-expanded', 'true');
+    const box = $('dash-colctl'); box.hidden = false;
+    dwCtlPaint(); dwCtlPlace(); DWCTL.pos = dwScrollSig();
+    if (kb) { const at = (DW[k] != null ? DW[k] : Math.round(dwNow(k))) <= dwMin(k); const b = box.querySelector('[data-dstep="' + (at ? 1 : -1) + '"]'); if (b && b.focus) b.focus(); }
+  }
+  function dwCtlClose(back) {
+    const g = DWCTL.g; if (!g) return;
+    DWCTL.g = null; DWCTL.k = '';
+    if (g.setAttribute) g.setAttribute('aria-expanded', 'false');
+    const box = $('dash-colctl'); if (box) box.hidden = true;
+    if (back && g.focus) g.focus();
+  }
+  function dwCtlPaint() {
+    if (!DWCTL.g) return;
+    const k = DWCTL.k, l = dwLbl(k), w = DW[k] != null ? DW[k] : Math.round(dwNow(k)), min = dwMin(k), box = $('dash-colctl');
+    box.setAttribute('aria-label', tx('Ancho de la columna {_c}', { _c: l }));
+    $('dash-colw').textContent = tx('{n} px', { n: w });
+    const minus = box.querySelector('[data-dstep="-1"]'), plus = box.querySelector('[data-dstep="1"]');
+    if (minus) { minus.setAttribute('aria-label', tx('Estrechar {_c} 16 píxeles', { _c: l })); minus.setAttribute('aria-disabled', w <= min ? 'true' : 'false'); }
+    if (plus) plus.setAttribute('aria-label', tx('Ensanchar {_c} 16 píxeles', { _c: l }));
+  }
+  function dwCtlPlace() {
+    const box = $('dash-colctl'), g = DWCTL.g; if (!g || !box) return;
+    const r = g.getBoundingClientRect ? g.getBoundingClientRect() : null;
+    if (!r || ![r.left, r.top, r.right, r.bottom].every(Number.isFinite)) return;   // sin medidas (entorno sin maquetación)
+    const w = box.offsetWidth || 0, h = box.offsetHeight || 0, vw = window.innerWidth || 0, vh = window.innerHeight || 0;
+    const m = document.querySelector('#tbl thead th.mo'), lr = m && m.getBoundingClientRect ? m.getBoundingClientRect() : null;
+    const wr = dwWrap() ? dwWrap().getBoundingClientRect() : null, lane = lr && lr.width > 0 ? lr : null;
+    // Nunca encima de los ··· de las filas (carril) ni de lo que hay sobre la tabla (Foco, ?, Añadir)
+    const avoid = (lane ? [{ left: lane.left, right: lane.right, top: lane.top, bottom: vh }] : []).concat(wr && Number.isFinite(wr.top) ? [{ left: 0, right: vw, top: 0, bottom: wr.top }] : []);
+    let p = errPopPlace(r, w, h, vw, vh, 8, avoid);
+    if ((!p || p.side === 'left') && lane) {   // junto al carril: debajo, terminando antes de él (a la izquierda taparía su ↶)
+      const q = { left: Math.max(8, Math.min(r.left, lane.left - 4 - w)), top: r.bottom };
+      if (q.top + h <= vh - 8) p = q;
+    }
+    p = p || errPopPlace(r, w, h, vw, vh, 8, []) || { left: Math.max(8, Math.min(r.left, vw - w - 8)), top: Math.max(8, Math.min(r.bottom, vh - h - 8)) };
+    box.style.left = Math.round(p.left) + 'px'; box.style.top = Math.round(p.top) + 'px';
+  }
+  function dwTabbables() {
+    return Array.from(document.querySelectorAll('a[href], button, input, select, textarea, [tabindex]')).filter(n =>
+      !n.disabled && n.tabIndex >= 0 && !(n.closest && n.closest('[hidden], [inert]')) && n.getClientRects && n.getClientRects().length > 0 && n.type !== 'hidden');
+  }
+  // Gesto sobre el tirador: decisión en pointerup (nunca con el «click», que se ignora: sin doble apertura)
+  const dwHead = $('tbl');   // tiradores y ↶ viven en su cabecera
+  dwHead.addEventListener('pointerdown', e => {
+    const g = e.target.closest && e.target.closest('[data-dgrip]');
+    if (!g || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    e.preventDefault();
+    const k = g.dataset.dgrip;
+    DW_G = { id: e.pointerId, k, g, x: e.clientX, y: e.clientY, w: DW[k] != null ? DW[k] : dwNow(k), pt: e.pointerType || 'mouse', drag: false, vert: false };
+    try { g.setPointerCapture(e.pointerId); } catch (err) {}
+  });
+  dwHead.addEventListener('pointermove', e => {
+    const s = DW_G; if (!s || e.pointerId !== s.id || s.vert) return;
+    const dx = e.clientX - s.x, dy = e.clientY - s.y;
+    if (!s.drag) {
+      if (s.pt === 'mouse' ? dx !== 0 : Math.abs(dx) > DW_TOQUE) { s.drag = true; dwCtlClose(false); if (s.g.classList) s.g.classList.add('drag'); }
+      else if (s.pt !== 'mouse' && Math.abs(dy) > DW_TOQUE && Math.abs(dy) > Math.abs(dx)) { s.vert = true; return; }
+      else return;
+    }
+    dwSet(s.k, s.w + dx);
+  });
+  dwHead.addEventListener('pointerup', e => {
+    const s = DW_G; if (!s || e.pointerId !== s.id) return;
+    DW_G = null; if (s.g.classList) s.g.classList.remove('drag');
+    if (s.drag || s.vert) return;
+    if (DWCTL.g === s.g) dwCtlClose(false); else dwCtlOpen(s.g, false);
+  });
+  const dwCancel = e => { const s = DW_G; if (!s || e.pointerId !== s.id) return; DW_G = null; if (s.g.classList) s.g.classList.remove('drag'); };   // no abre; el ancho se queda
+  dwHead.addEventListener('pointercancel', dwCancel);
+  dwHead.addEventListener('lostpointercapture', dwCancel);
+  dwHead.addEventListener('keydown', e => {
+    const g = e.target.closest && e.target.closest('[data-dgrip]');
+    if (!g || (e.key !== 'Enter' && e.key !== ' ')) return;
+    e.preventDefault();
+    if (DWCTL.g === g) dwCtlClose(false); else dwCtlOpen(g, true);
+  });
+  dwHead.addEventListener('click', e => {
+    const rs = e.target.closest && e.target.closest('[data-dreset]');
+    if (rs) { dwReset(rs.dataset.dreset); return; }
+  });
+  $('dash-colctl').addEventListener('click', e => {
+    const b = e.target.closest && e.target.closest('[data-dstep]');
+    if (!b || !DWCTL.g || b.getAttribute('aria-disabled') === 'true') return;
+    const k = DWCTL.k, w = DW[k] != null ? DW[k] : Math.round(dwNow(k));
+    dwSet(k, w + (+b.dataset.dstep) * DW_PASO);
+  });
+  $('dash-colctl').addEventListener('keydown', e => {
+    if (!DWCTL.g) return;
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); dwCtlClose(true); return; }
+    if (e.key !== 'Tab') return;
+    const box = $('dash-colctl'), first = box.querySelector('[data-dstep="-1"]'), last = box.querySelector('[data-dstep="1"]');
+    if (e.shiftKey && e.target === first) { e.preventDefault(); dwCtlClose(true); }
+    else if (!e.shiftKey && e.target === last) {   // al siguiente control tras el tirador, en el orden normal: Tab no queda atrapado
+      e.preventDefault(); const g = DWCTL.g, list = dwTabbables(), to = list[list.indexOf(g) + 1];
+      dwCtlClose(false); if (to && to.focus) to.focus();
+    }
+  });
+  $('dash-colctl').addEventListener('focusout', e => { const to = e.relatedTarget; if (DWCTL.g && to && !(to.closest && to.closest('#dash-colctl')) && to !== DWCTL.g) dwCtlClose(false); });
+  document.addEventListener('pointerdown', e => { if (DWCTL.g && !(e.target.closest && (e.target.closest('#dash-colctl') || e.target.closest('[data-dgrip]') === DWCTL.g))) dwCtlClose(false); }, true);
+  window.addEventListener('scroll', e => { if (DWCTL.g && !(e.target && e.target.closest && e.target.closest('#dash-colctl')) && dwScrollSig() !== DWCTL.pos) dwCtlClose(false); if (DTIP) dwTipOff(); }, true);
+  window.addEventListener('resize', () => { if (DTIP) dwTipOff(); dwRelayout(); });
+  // ── Lectura pasiva de Zona, Nombre y Notas: SOLO ratón y SOLO si el texto está cortado. En tablet no hay hover ni pulsación
+  // larga: un toque edita como siempre. El detalle no recibe el puntero y se cierra al salir, al editar o al hacer scroll.
+  let DTIP = null;
+  const dwCut = n => !!n && n.scrollWidth > n.clientWidth + 1;
+  function dwTipOff() {
+    const td = DTIP; DTIP = null; if (!td) return;
+    td.classList.remove('tipon');
+    const z = td.querySelector('input[data-k="zona"]');
+    if (z && z.dataset.dtitle !== undefined) { z.title = z.dataset.dtitle; delete z.dataset.dtitle; }   // vuelve la ayuda nativa
+  }
+  ['tbody', 'tbody-sin'].forEach(tid => {
+    const tb = $(tid);
+    tb.addEventListener('pointerover', e => {
+      if (e.pointerType !== 'mouse') return;
+      const td = e.target.closest && e.target.closest('td.stage, td.name, td.n');
+      if (!td || td === DTIP) return;
+      dwTipOff();
+      const inp = td.querySelector('input[type=text]'), tip = td.querySelector('.ntip');
+      if (!inp || !tip || tip.hidden || inp === document.activeElement || !dwCut(inp)) return;
+      DTIP = td; td.classList.add('tipon');
+      if (inp.dataset.k === 'zona' && inp.title) { inp.dataset.dtitle = inp.title; inp.title = ''; }   // sin dos rótulos a la vez (la ayuda sigue en aria-label)
+    });
+    tb.addEventListener('pointerout', e => { if (DTIP && !(e.relatedTarget && DTIP.contains && DTIP.contains(e.relatedTarget))) dwTipOff(); });
+    tb.addEventListener('focusin', () => { if (DTIP) dwTipOff(); });
+  });
+  dwAria(); dwLane();
 
   // ── Pegar horario (ESPEC-2c A) ─────────────────────────────────────────
   // Todo lo que se lee se PROPONE en la vista previa; solo entra lo que el regidor deja marcado.
@@ -4639,5 +4888,5 @@
   });
   window.ShowtimePanel = { reload: () => { loadState(); renderAll(); }, _test: { winState: () => Array.from(WIN.entries()).map(([id, x]) => ({ id, name: x.name, vista: x.vista, zona: x.zona, filas: x.filas || null, standby: !!x.standby, fs: x.fs })), setWinVista, setWinRows, resetWinLayout, setWinStandby, closeLive, openGestor, gestorVisible, emProdMessage, emRegenProd, hitoChips, emUrl, prodBigTitle, fileKind, handleFile, emCommand, importSummary, hidesSome, tipoPill, setWake, wakeState: () => ({ on: wakeOn, lock: !!wakeLock }), showSplash, hideSplash, setStandby, standbyOn, room: () => emRoom,
     emSnapshot, emCloseDay, emDay, qrDevices, rmZones, setRmZone: z => { RM_ZONE = z; renderCast(); }, setRoom: r => { emRoom = r; }, fakeEm: (em, st) => { EM = em; EMST = st; }, emStateHtml, renderCastBar, renderHubLed, mtIn, mtOut, cfSimState, renderCfSim, cfSim: () => CFSIM,
-    dayStep, monthLabel, spotItems, spotDays, spotEntries, fmtDayFull, refreshStale, net: () => NET, setNet: o => { NET = netNorm(o); }, netNorm, emLink, emBrokers, emUrl, netHtml, renderCast, audioTick, fillAudioCfg, saveAudioCfg, audioPreview, audioConfirm, audioRearm, audioUrgentAnswered, sendChat, fitMtAlerts, mtJump, mtFreshOff, mtRearm, setImportText, impTally, errPopPlace, impSortRows, imp: () => IMP, impEd: () => IMP_ED && { k: IMP_ED.inp.dataset.k, row: IMP_ED.inp.dataset.row }, cellPop: () => ({ open: !!CELLPOP.inp, inline: CELLPOP.inline }), errPop: () => ({ open: !!ERRPOP.btn, pinned: ERRPOP.pinned, inline: !!ERRPOP.inline }), mtAnchorSave, mtAnchorApply, mtAnchor: () => MT_ANCHOR, mtTapState: () => ({ touch: Array.from(MT_TOUCH), tap: MT_TAP && { pid: MT_TAP.pid, id: MT_TAP.id, cap: MT_TAP.cap } }), setAppLang, mtNew: () => Array.from(MT_NEW), mtIds, mtOrder: () => MT_ORDER && MT_ORDER.map(e => Object.assign({}, e)), auMuteBtn, renderChat, callEditFix, applyEdit, undo, loadNew, impDoImport } };   // _test: solo para tests/control.test.js
+    dayStep, monthLabel, spotItems, spotDays, spotEntries, fmtDayFull, refreshStale, net: () => NET, setNet: o => { NET = netNorm(o); }, netNorm, emLink, emBrokers, emUrl, netHtml, renderCast, audioTick, fillAudioCfg, saveAudioCfg, audioPreview, audioConfirm, audioRearm, audioUrgentAnswered, sendChat, fitMtAlerts, mtJump, mtFreshOff, mtRearm, setImportText, impTally, errPopPlace, impSortRows, imp: () => IMP, impEd: () => IMP_ED && { k: IMP_ED.inp.dataset.k, row: IMP_ED.inp.dataset.row }, cellPop: () => ({ open: !!CELLPOP.inp, inline: CELLPOP.inline }), errPop: () => ({ open: !!ERRPOP.btn, pinned: ERRPOP.pinned, inline: !!ERRPOP.inline }), mtAnchorSave, mtAnchorApply, mtAnchor: () => MT_ANCHOR, mtTapState: () => ({ touch: Array.from(MT_TOUCH), tap: MT_TAP && { pid: MT_TAP.pid, id: MT_TAP.id, cap: MT_TAP.cap } }), setAppLang, mtNew: () => Array.from(MT_NEW), mtIds, mtOrder: () => MT_ORDER && MT_ORDER.map(e => Object.assign({}, e)), auMuteBtn, renderChat, callEditFix, applyEdit, undo, loadNew, impDoImport, dw: () => Object.assign({}, DW), dwCtl: () => DWCTL.k, dwTip: () => DTIP } };   // _test: solo para tests/control.test.js
 })();
