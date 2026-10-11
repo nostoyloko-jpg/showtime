@@ -292,7 +292,7 @@ body[data-ps="stage"] .mpanel,body[data-ps="stage"] .cfg,body[data-ps="stage"] .
 /* ── Pegar horario ── */
 /* Dec. 155: si todo no cabe, la ventana entera hace scroll y el pie (Cancelar · Importar) queda siempre a la vista; la vista previa
    nunca se aplasta por debajo de su alto mínimo (antes podía quedar debajo del pie) */
-.imp-box{max-width:min(1240px,96vw);width:100%;max-height:94vh;display:flex;flex-direction:column;gap:10px;overflow:auto;scroll-padding-bottom:128px}
+.imp-box{--imp-pad:20px;padding:var(--imp-pad);max-width:min(1240px,96vw);width:100%;max-height:94vh;display:flex;flex-direction:column;gap:10px;overflow:auto;scroll-padding-bottom:128px}
 .imp-head{display:flex;align-items:center;justify-content:space-between}
 .imp-head h2{margin:0;display:flex;align-items:center;gap:8px;font-size:16px}
 .imp-head h2 small{font-size:11px;font-weight:600;color:var(--dim,var(--muted))}
@@ -396,7 +396,9 @@ body[data-ps="stage"] .imp-errpop{background-color:#000;box-shadow:inset 0 0 0 1
 /* Dec. 155: pie fijo en dos niveles. Arriba, el resumen a todo el ancho (discreto, con una raya fina); debajo, a la izquierda
    «+ Añadir fila manual» (secundaria) y a la derecha, juntas, Cancelar · Importar (la única primaria). En tablet el resumen puede
    partirse; las dos acciones finales bajan juntas y siguen a la vista */
-.imp-foot{display:flex;flex-direction:column;gap:8px;position:sticky;bottom:0;z-index:20;padding-top:8px;background:var(--modal-bg,#16191f)}
+/* Pie fijo: superficie opaca desde la raya de «Importar: N filas» hasta el borde del cuadro (también sobre el relleno inferior y
+   lateral del cuadro, por donde antes asomaban las filas al hacer scroll). Las acciones no se mueven: el relleno compensa. */
+.imp-foot{display:flex;flex-direction:column;gap:8px;position:sticky;bottom:calc(-1 * var(--imp-pad,20px));z-index:20;margin:0 calc(-1 * var(--imp-pad,20px)) calc(-1 * var(--imp-pad,20px));padding:8px var(--imp-pad,20px) var(--imp-pad,20px);background:var(--modal-bg,#16191f)}
 .imp-foot-row{display:flex;align-items:center;flex-wrap:wrap;gap:8px 16px}
 .imp-foot-acts{display:flex;align-items:center;gap:8px;margin-left:auto}
 .imp-sum{margin:0;padding-bottom:7px;border-bottom:1px solid var(--hair,rgba(255,255,255,.08));font-size:12px;font-weight:600;color:var(--muted);overflow-wrap:anywhere}

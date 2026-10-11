@@ -755,7 +755,7 @@
     eq((imp.match(/id="imp-man-open"/g) || []).length, 1, 'un solo botón (fuera de debajo de Opciones)');
     ok(imp.indexOf('imp-prevcard') < imp.indexOf('id="imp-man"') && imp.indexOf('id="imp-man"') < imp.indexOf('class="imp-foot"'), 'la ficha va DESPUÉS de la vista previa y justo encima del pie');
     ok(imp.indexOf('class="imp-opts"') < imp.indexOf('imp-prevcard') && !/imp-mapcard[\s\S]*id="imp-man"[\s\S]*imp-prevcard/.test(imp), 'nada de la ficha entre Opciones y Vista previa');
-    ok(/\.imp-foot\{display:flex;flex-direction:column;gap:8px;position:sticky;bottom:0;/.test(css) && /\.imp-foot-row\{display:flex;align-items:center;flex-wrap:wrap;gap:8px 16px\}/.test(css) && /\.imp-foot-acts\{display:flex;align-items:center;gap:8px;margin-left:auto\}/.test(css), 'dos niveles; Cancelar e Importar juntos a la derecha; si el pie envuelve, bajan juntas (Importar siempre a la vista)');
+    ok(/\.imp-foot\{display:flex;flex-direction:column;gap:8px;position:sticky;bottom:calc\(-1 \* var\(--imp-pad,20px\)\);/.test(css) && /\.imp-foot-row\{display:flex;align-items:center;flex-wrap:wrap;gap:8px 16px\}/.test(css) && /\.imp-foot-acts\{display:flex;align-items:center;gap:8px;margin-left:auto\}/.test(css), 'dos niveles; Cancelar e Importar juntos a la derecha; si el pie envuelve, bajan juntas (Importar siempre a la vista)');
     ok(/\.imp-sum\{margin:0;padding-bottom:7px;border-bottom:1px solid var\(--hair[^)]*\)\);font-size:12px;/.test(css) && !/\.imp-sum\{[^}]*(background|border-radius)/.test(css), 'resumen discreto: raya fina, sin caja ni píldora');
     ok(/\.imp-sum \.s-exc\{color:var\(--call\)\} \.imp-sum \.s-err\{color:var\(--err\)\}/.test(css) && !/\.imp-sum \.s-imp\{/.test(css), 'solo Excluidas y Error llevan color');
     ok(/<button id="imp-m-add" class="btn" type="button"/.test(imp) && (imp.match(/class="btn primary"/g) || []).length === 1, 'Importar es la única acción primaria del importador');
@@ -1390,6 +1390,16 @@
     };
     const a = run(false), b = run(true);
     eq(b.arts, a.arts, 'misma secuencia importada'); ok(a.dash.length > 0); eq(b.dash, a.dash, 'Dashboard idéntico');
+  });
+  test('Importador v20261168 · pie fijo opaco: cubre desde la raya del resumen hasta el borde del cuadro (relleno inferior y lateral incluidos); nada de la tabla asoma; las acciones no se mueven', () => {
+    const css = D.src('control.css');
+    const box = (css.match(/\.imp-box\{[^}]*\}/) || [''])[0], foot = (css.match(/\.imp-foot\{[^}]*\}/) || [''])[0];
+    ok(/--imp-pad:20px;padding:var\(--imp-pad\);/.test(box), 'el relleno del cuadro es una sola medida (--imp-pad)');
+    ok(/position:sticky;bottom:calc\(-1 \* var\(--imp-pad,20px\)\);/.test(foot), 'pegado al BORDE del cuadro (no al borde del relleno, por donde asomaban las filas)');
+    ok(/margin:0 calc\(-1 \* var\(--imp-pad,20px\)\) calc\(-1 \* var\(--imp-pad,20px\)\);padding:8px var\(--imp-pad,20px\) var\(--imp-pad,20px\);/.test(foot), 'ocupa también el relleno lateral e inferior; el relleno compensa: las acciones quedan donde estaban');
+    ok(/background:var\(--modal-bg,#16191f\)/.test(foot) && /\.modal-box,\.imp-box,\.spot-box\{--modal-bg:#16191f;/.test(css) && /body\[data-ps="stage"\] \.modal-box,body\[data-ps="stage"\] \.imp-box,body\[data-ps="stage"\] \.spot-box\{--modal-bg:#000;/.test(css), 'fondo opaco en Panel y en Stage');
+    ok(/z-index:20/.test(foot) && /\.imp-prev thead th\{position:sticky;top:0;z-index:10;/.test(css) && /\.imp-prev textarea\.imp-wide\{position:absolute;z-index:9;/.test(css), 'por encima de la tabla, su cabecera fija y el editor ampliado');
+    ok(/scroll-padding-bottom:128px/.test(box), 'lo enfocado se sigue llevando por encima del pie');
   });
   test('Importador · detalle de Error sin sitio flotante (pantalla muy baja, motivo muy largo): se abre EN LÍNEA bajo su fila, no tapa nada y las acciones responden al primer toque', () => {
     const P = panel().env.win.ShowtimePanel._test.errPopPlace;
@@ -3119,7 +3129,7 @@ const miss = [...found].filter(k => !I.txHas(k) && !/^(OK|CALL|SC|Live|Raycast|S
     eq((imp.match(/<div class="mcard-h"[^>]*>([^<]+)<\/div>/g) || []).map(x => x.replace(/<[^>]+>/g, '')).join(' · '), 'Horario a importar · Opciones de importación · Columnas del archivo · Vista previa · Fila manual', 'Pegar horario: 4 tarjetas en orden y, debajo de la vista previa, la ficha manual (plegada hasta pedirla)');
     ok(/class="mcard imp-card imp-srccard">[\s\S]*id="imp-text"/.test(imp) && /class="mcard imp-card imp-prevcard"><div class="imp-prevhead"><div class="mcard-h"[^>]*>Vista previa<\/div>[\s\S]*?<\/div><div id="imp-prevwrap" class="imp-prevwrap"><table id="imp-prev"/.test(imp), 'texto y vista previa en su tarjeta; los id no cambian');
     ok(/\.imp-prevcard\{flex:1 0 auto;display:flex;flex-direction:column\}/.test(css) && /\.imp-prevwrap\{flex:1;min-height:120px;/.test(css), 'la vista previa ocupa el alto que sobra y nunca baja de su mínimo (dec. 155)');
-    ok(/\.imp-box\{[^}]*overflow:auto;scroll-padding-bottom:128px\}/.test(css) && /\.imp-foot\{[^}]*position:sticky;bottom:0;/.test(css), 'si no cabe, la ventana hace scroll y el pie queda a la vista');
+    ok(/\.imp-box\{[^}]*overflow:auto;scroll-padding-bottom:128px\}/.test(css) && /\.imp-foot\{[^}]*position:sticky;bottom:calc\(-1 \* var\(--imp-pad,20px\)\);/.test(css), 'si no cabe, la ventana hace scroll y el pie queda a la vista');
   });
 
   test('Dec. 137: Gestor — ↺ por ventana (antes de ✕) y «↺ Reset» igual en los dos idiomas; el de arriba sigue siendo para todas', () => {
