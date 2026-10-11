@@ -217,6 +217,20 @@
     eq(B('Evento «Noches del Botánico» creado · importado: 3 entradas nuevas'), 'Event “Noches del Botánico” created · ' + B('importado: 3 entradas nuevas'));
   });
 
+  test('Inglés v20261164: las seis correcciones de L.A. (y nada de las versiones descartadas)', () => {
+    const E = k => I.tx(k, null, 'en');
+    eq(E('Añadir fila a mano'), 'Add row manually');
+    eq(E('Añadir 1 fila a mano'), 'Add one row manually');
+    eq(E('Camerinos y catering · tarjetas, 2 líneas y cinta de avisos'), 'Backstage & catering · cards, 2 lines and ticker');
+    eq(E('camerinos y catering (Smart TV)'), 'Backstage & catering (Smart TV)');
+    eq(E('Jornada sin datos'), 'No data for this day');
+    eq(E('Cartel y hora en las Confidence'), 'Showtime poster and clock on Confidence screens');
+    eq(E('Real'), 'Actual', '«Real» sigue siendo «Actual»');
+    ['Añadir fila a mano', 'Jornada sin datos', 'Cartel y hora en las Confidence'].forEach(k => eq(I.tx(k, null, 'es'), k, 'el español no cambia'));
+    const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'i18n.js'), 'utf8');
+    ok(!/by hand|Dressing rooms|dressing rooms|Day without data|Sign and clock on the Confidence screens/.test(src), 'ni «by hand», ni «Dressing rooms», ni «Day without data», ni «Sign and clock…»');
+  });
+
   let fail = 0;
   if (!NT) for (const [name, fn] of tests) {
     try { fn(); console.log('  ✓ ' + name); }

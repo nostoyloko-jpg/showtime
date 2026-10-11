@@ -2108,6 +2108,14 @@ const miss = [...found].filter(k => !I.txHas(k) && !/^(OK|CALL|SC|Live|Raycast|S
     ok(/\.onb\{width:min\(560px,100%\);/.test(css) && /body\[data-ps="stage"\] \.onb\{background:#000;/.test(css), 'la tarjeta (Studio y Stage) igual');
   });
 
+  test('Barra superior: si no cabe, pasa a otra fila en vez de desbordar (el desborde ampliaba y alejaba la página en tablet vertical)', () => {
+    const css = D.src('control.css').replace(/\/\*[\s\S]*?\*\//g, '');
+    ok(/\.bar\{flex-wrap:wrap;row-gap:6px\}/.test(css), '.bar con flex-wrap:wrap');
+    ok(!/\.bar\{[^}]*flex-wrap:nowrap/.test(css) && !/\.bar\{[^}]*(min-width:\s*\d|width:\s*\d{3,}px)/.test(css), 'nada que la obligue a una línea o a un ancho fijo');
+    ok(!/@media[^{]*orientation/.test(css), 'sin excepciones por orientación');
+    ok(/\.bright\{display:flex;align-items:center;gap:8px;flex-shrink:0;margin-left:auto\}/.test(css), 'el bloque de la derecha sigue entero (⚙, idioma, reloj) y a la derecha');
+  });
+
   // ── Ejecutor ─────────────────────────────────────────────────────────
   (async () => {
     let pass = 0, fail = 0;

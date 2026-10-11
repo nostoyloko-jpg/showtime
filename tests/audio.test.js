@@ -1011,7 +1011,7 @@
     const css = D.src('control.css');
     ok(/\.mt-al\{[^}]*position:relative\}/.test(css) && /\.mt-fresh\{position:absolute;[^}]*pointer-events:none\}/.test(css) && !/\.mt-fresh\{[^}]*(animation|transition)/.test(css), 'superpuesto, sin mover nada, sin animación');
     const cj = D.src('control.js');
-    ok((cj.match(/mtFreshOff\(/g) || []).length === 3 && /addEventListener\('pointerover'[^\n]*\n[^\n]*\n\s*const al = [^\n]*mtFreshOff\(al\.dataset\.id, al\)/.test(cj) && /mtFreshOff\(t\.al\.dataset\.id, t\.al\);\n  \}\);/.test(cj), 'solo hover (ratón) y el ciclo completo de un toque lo quitan');
+    ok((cj.match(/mtFreshOff\(/g) || []).length === 3 && /addEventListener\('pointerover'[^\n]*\n[^\n]*\n\s*const al = [^\n]*mtFreshOff\(al\.dataset\.id, al\)/.test(cj) && /mtFreshOff\(t\.id, al\);\n  \}\);/.test(cj), 'solo hover (ratón) y el ciclo completo de un toque lo quitan');
     ok(!/addEventListener\('click', e => \{\n\s*if \(!e\.target\.closest \|\| e\.target\.closest\('button, a'\)\) return;\n\s*const al = e\.target\.closest\('\.mt-al'\)/.test(cj), 'ya no depende del «click» (en tablet no llegaba)');
     ok(!/setTimeout[^\n]*mtFreshOff|mtFreshOff[^\n]*setTimeout/.test(cj) && !/MT_TAP[^\n]*(Date\.now|performance|clientX -|Math\.hypot)/.test(cj), 'sin temporizador ni umbrales de tiempo o distancia');
     const AK = 'showtime.meteoAck', snap = () => [AK, 'showtime.log', 'showtime.meteo', 'showtime.config', 'showtime.festival'].map(k => m.t.env.storage.get(k)).join('|');
@@ -1049,6 +1049,57 @@
     m.t.env.fire('document', 'click', { target: { closest: q => q === '[data-act="mt-ack"]' ? { dataset: { k: 'rain' } } : null } });
     ok(m.t.env.storage.get(AK) !== s0.split('|')[0], '«Visto» sí guarda');
     eq(m.t.env.errors.length, 0, 'sin errores');
+  });
+
+  test('37c · Meteo «!» en tablet: baja dentro y suelta FUERA de #v-meteo → conserva «!», limpia el estado y el siguiente toque vale; «Visto» aparte', () => {
+    const m = mtDash({}); m.set({ rain: 8 });
+    eq(m.t.T.mtNew().join(), 'rain');
+    const V = m.t.env.getEl('v-meteo'), caps = [], rel = [];
+    V.setPointerCapture = id => caps.push(id); V.hasPointerCapture = id => caps.indexOf(id) >= 0 && rel.indexOf(id) < 0; V.releasePointerCapture = id => rel.push(id);
+    let removed = 0; const al = { dataset: { id: 'rain' }, querySelector: q => q === '.mt-fresh' ? { remove() { removed++; } } : null, getBoundingClientRect: () => ({ left: 0, right: 200, top: 0, bottom: 20 }) };
+    const inAl = { closest: q => q === 'button, a' ? null : q === '.mt-al' ? al : null };
+    const outside = { closest: () => null };   // un nodo fuera del árbol de #v-meteo (otra tarjeta, la tabla…)
+    const st = () => m.t.T.mtTapState();
+    // 1) Sin captura del navegador (lápiz, o un navegador que no la aplica): el up llega solo a la ventana, fuera de la tarjeta
+    m.t.env.fire('v-meteo', 'pointerdown', { pointerType: 'touch', pointerId: 21, clientX: 50, clientY: 10, target: inAl });
+    eq(caps.join(), '21', 'al bajar sobre el aviso con «!», la tarjeta captura el puntero');
+    ok(st().tap && st().tap.cap && st().touch.join() === '21', 'candidato en curso');
+    m.t.env.fire('window', 'pointerup', { pointerType: 'touch', pointerId: 21, clientX: 900, clientY: 700, target: outside });
+    eq(m.t.T.mtNew().join(), 'rain', 'soltar fuera: el «!» se queda'); eq(removed, 0);
+    eq(JSON.stringify(st()), JSON.stringify({ touch: [], tap: null }), 'el respaldo global limpia: ningún pointerId colgado');
+    eq(rel.join(), '21', 'y libera la captura');
+    m.t.env.fire('v-meteo', 'lostpointercapture', { pointerId: 21 }); eq(JSON.stringify(st()), JSON.stringify({ touch: [], tap: null }), 'limpieza idempotente');
+    // 2) Con captura: el up llega a la tarjeta, pero con el dedo fuera del aviso
+    m.t.env.fire('v-meteo', 'pointerdown', { pointerType: 'touch', pointerId: 22, clientX: 50, clientY: 10, target: inAl });
+    m.t.env.fire('v-meteo', 'pointerup', { pointerType: 'touch', pointerId: 22, clientX: 900, clientY: 700, target: V });
+    m.t.env.fire('window', 'pointerup', { pointerType: 'touch', pointerId: 22, target: V }); m.t.env.fire('v-meteo', 'lostpointercapture', { pointerId: 22 });
+    eq(m.t.T.mtNew().join(), 'rain', 'capturado pero soltado fuera: se queda'); eq(JSON.stringify(st()), JSON.stringify({ touch: [], tap: null }));
+    // 3) Se pierde la captura a mitad (el sistema la retira): cancela y limpia
+    m.t.env.fire('v-meteo', 'pointerdown', { pointerType: 'touch', pointerId: 23, clientX: 50, clientY: 10, target: inAl });
+    m.t.env.fire('v-meteo', 'lostpointercapture', { pointerId: 23 });
+    m.t.env.fire('v-meteo', 'pointerup', { pointerType: 'touch', pointerId: 23, clientX: 50, clientY: 10, target: V });
+    eq(m.t.T.mtNew().join(), 'rain', 'captura perdida antes de soltar: no cuenta');
+    // 4) El siguiente toque válido (texto o fondo del aviso): quita SOLO el «!»
+    const AK = 'showtime.meteoAck', ack0 = m.t.env.storage.get(AK), log0 = m.t.env.storage.get('showtime.log');
+    m.t.env.fire('v-meteo', 'pointerdown', { pointerType: 'pen', pointerId: 24, clientX: 120, clientY: 12, target: inAl });
+    m.t.env.fire('v-meteo', 'pointerup', { pointerType: 'pen', pointerId: 24, clientX: 120, clientY: 12, target: V });
+    m.t.env.fire('window', 'pointerup', { pointerType: 'pen', pointerId: 24, target: V });
+    eq(removed, 1, 'el siguiente toque válido funciona'); eq(m.t.T.mtNew().length, 0);
+    eq(JSON.stringify(st()), JSON.stringify({ touch: [], tap: null }), 'y no deja nada');
+    eq(m.t.env.storage.get(AK), ack0, 'no es «Visto»'); eq(m.t.env.storage.get('showtime.log'), log0, 'ni log');
+    ok(m.kinds().indexOf('rain') >= 0 && /class="mt-al new"[^>]*data-id="rain"[\s\S]*?data-act="mt-ack" data-k="rain"/.test(m.last()), 'el aviso sigue, pendiente, con su «Visto»');
+    // 5) Botones y enlaces: ni capturan ni cuentan («Visto» recibe su clic)
+    m.t.adv(60000); m.set({ rain: 8, temp: 38 }); eq(m.t.T.mtNew().join(), 'heat');
+    const btn = { closest: q => q === 'button, a' ? {} : q === '.mt-al' ? { dataset: { id: 'heat' } } : null }; caps.length = 0;
+    m.t.env.fire('v-meteo', 'pointerdown', { pointerType: 'touch', pointerId: 25, clientX: 5, clientY: 5, target: btn });
+    m.t.env.fire('v-meteo', 'pointerup', { pointerType: 'touch', pointerId: 25, clientX: 5, clientY: 5, target: btn });
+    eq(caps.length, 0, 'tocar «Visto» no captura'); eq(m.t.T.mtNew().join(), 'heat', 'ni quita el «!»');
+    m.t.env.fire('document', 'click', { target: { closest: q => q === '[data-act="mt-ack"]' ? { dataset: { k: 'rain' } } : null } });
+    ok(m.t.env.storage.get(AK) !== ack0 && /Visto: Lluvia/.test(m.t.env.storage.get('showtime.log') || ''), '«Visto» confirma como siempre (guarda y apunta)');
+    ok(/class="mt-al"[^>]*data-id="rain"[\s\S]*?<small>visto<\/small>/.test(m.last()), 'y el aviso queda «visto»');
+    eq(m.t.env.errors.length, 0, 'sin errores');
+    const cj = D.src('control.js');
+    ok(/MT_V\.setPointerCapture\(e\.pointerId\)/.test(cj) && /addEventListener\('lostpointercapture'/.test(cj) && /window\.addEventListener\('pointerup', e => mtTapEnd\(e\.pointerId\)\);/.test(cj), 'captura explícita, lostpointercapture y respaldo global que solo limpia');
   });
 
   // ── Dec. 153 · cronología Meteo guardada solo en este navegador, por evento + fuente ──────────

@@ -454,8 +454,10 @@ td.est.live .estt b:last-child{animation:estlive 1.2s ease-in-out infinite}
 .dw-t tr.kept td{opacity:.75}
 .led.sm{width:auto;height:auto;margin-right:6px;vertical-align:1px;cursor:default}
 .errbox .ic{width:14px;height:14px;vertical-align:-2px;margin-right:6px}
-/* Barra en una sola línea: el nombre del evento se recorta antes que nada */
-.bar{flex-wrap:nowrap}
+/* Barra en una sola línea mientras quepa (el nombre del evento se recorta antes que nada). Dec. 154: si ni así cabe (tablet en
+   vertical), pasa a otra fila en vez de desbordar: un contenido más ancho que la pantalla hace que el navegador amplíe y aleje
+   la página entera (la tarjeta de inicio quedaba a la izquierda). */
+.bar{flex-wrap:wrap;row-gap:6px}
 #fest-name{max-width:260px}
 .fest{flex:0 1 auto;min-width:60px}
 /* Portátil (dec. 127): menús del centro solo con icono y LED, para que el nombre del evento y la esquina derecha quepan */

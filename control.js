@@ -2662,27 +2662,46 @@
     if (e.pointerType !== 'mouse') return;
     const al = e.target.closest && e.target.closest('.mt-al'); if (al && al.dataset.id) mtFreshOff(al.dataset.id, al);
   });
+  // Dec. 154: al bajar sobre un aviso con «!» la tarjeta CAPTURA el puntero (setPointerCapture): el up llega aquí aunque se
+  // suelte fuera. Limpieza idempotente en pointerup, pointercancel y lostpointercapture, y un respaldo global (window) que
+  // solo limpia, nunca confirma: ningún pointerId queda colgado y el siguiente toque válido funciona.
+  // Botones y enlaces («Visto», AEMET) no se capturan ni cuentan: su clic sigue llegando a ellos.
+  const MT_V = $('v-meteo');
   const MT_TOUCH = new Set();   // dedos apoyados ahora mismo sobre la tarjeta
-  let MT_TAP = null;            // { pid, al } candidato a toque
+  let MT_TAP = null;            // { pid, id, al, cap } candidato a toque
   function mtTapOff() { MT_TAP = null; }
-  $('v-meteo').addEventListener('pointerdown', e => {
+  /** Fin del ciclo de un puntero (up, cancel, pérdida de captura o respaldo global). Se puede llamar varias veces. */
+  function mtTapEnd(pid) {
+    MT_TOUCH.delete(pid);
+    const t = MT_TAP; if (!t || t.pid !== pid) return;
+    MT_TAP = null;
+    try { if (t.cap && MT_V.hasPointerCapture && MT_V.hasPointerCapture(pid)) MT_V.releasePointerCapture(pid); } catch (e) {}
+  }
+  /** El aviso con ese data-id tal y como está pintado AHORA (un repintado durante el toque cambia el elemento). */
+  function mtAlById(id) { const all = MT_V.querySelectorAll ? Array.from(MT_V.querySelectorAll('.mt-al')) : []; return all.find(x => x.dataset && x.dataset.id === id) || null; }
+  MT_V.addEventListener('pointerdown', e => {
     if (e.pointerType === 'mouse') return;
     MT_TOUCH.add(e.pointerId);
     if (MT_TOUCH.size > 1) { MT_TAP = null; return; }   // multitáctil (pellizco): nada
     const al = e.target.closest && !e.target.closest('button, a') && e.target.closest('.mt-al');
-    MT_TAP = al && al.dataset && al.dataset.id && MT_NEW.has(al.dataset.id) ? { pid: e.pointerId, al } : null;
+    if (!(al && al.dataset && al.dataset.id && MT_NEW.has(al.dataset.id))) { MT_TAP = null; return; }
+    MT_TAP = { pid: e.pointerId, id: al.dataset.id, al, cap: false };
+    try { if (MT_V.setPointerCapture) { MT_V.setPointerCapture(e.pointerId); MT_TAP.cap = true; } } catch (err) {}
   });
-  $('v-meteo').addEventListener('pointerup', e => {
+  MT_V.addEventListener('pointerup', e => {
     if (e.pointerType === 'mouse') return;
-    const t = MT_TAP, solo = MT_TOUCH.size === 1;
-    MT_TOUCH.delete(e.pointerId); MT_TAP = null;
+    const t = MT_TAP, solo = MT_TOUCH.size === 1 && MT_TOUCH.has(e.pointerId);
+    mtTapEnd(e.pointerId);
     if (!t || !solo || t.pid !== e.pointerId) return;
-    const r = t.al.getBoundingClientRect ? t.al.getBoundingClientRect() : null;
-    if (r && !(e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom)) return;   // soltó fuera: arrastre
-    mtFreshOff(t.al.dataset.id, t.al);
+    const al = mtAlById(t.id) || t.al, r = al.getBoundingClientRect ? al.getBoundingClientRect() : null;
+    if (!r || !(e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom)) return;   // soltó fuera: arrastre
+    mtFreshOff(t.id, al);
   });
-  $('v-meteo').addEventListener('pointercancel', e => { MT_TOUCH.delete(e.pointerId); mtTapOff(); });
-  $('v-meteo').addEventListener('scroll', mtTapOff, true);   // la lista se mueve entre down y up: era un scroll
+  MT_V.addEventListener('pointercancel', e => { mtTapEnd(e.pointerId); mtTapOff(); });
+  MT_V.addEventListener('lostpointercapture', e => mtTapEnd(e.pointerId));
+  window.addEventListener('pointerup', e => mtTapEnd(e.pointerId));       // respaldo: solo limpia (va después del de la tarjeta)
+  window.addEventListener('pointercancel', e => { mtTapEnd(e.pointerId); mtTapOff(); });
+  MT_V.addEventListener('scroll', mtTapOff, true);   // la lista se mueve entre down y up: era un scroll
   window.addEventListener('scroll', mtTapOff, true);
 
   // Configuración › Meteo
@@ -3850,5 +3869,5 @@
   });
   window.ShowtimePanel = { reload: () => { loadState(); renderAll(); }, _test: { winState: () => Array.from(WIN.entries()).map(([id, x]) => ({ id, name: x.name, vista: x.vista, zona: x.zona, filas: x.filas || null, standby: !!x.standby, fs: x.fs })), setWinVista, setWinRows, resetWinLayout, setWinStandby, closeLive, openGestor, gestorVisible, emProdMessage, emRegenProd, hitoChips, emUrl, prodBigTitle, fileKind, handleFile, emCommand, importSummary, hidesSome, tipoPill, setWake, wakeState: () => ({ on: wakeOn, lock: !!wakeLock }), showSplash, hideSplash, setStandby, standbyOn, room: () => emRoom,
     emSnapshot, emCloseDay, emDay, qrDevices, rmZones, setRmZone: z => { RM_ZONE = z; renderCast(); }, setRoom: r => { emRoom = r; }, fakeEm: (em, st) => { EM = em; EMST = st; }, emStateHtml, renderCastBar, renderHubLed, mtIn, mtOut, cfSimState, renderCfSim, cfSim: () => CFSIM,
-    dayStep, monthLabel, spotItems, spotDays, spotEntries, fmtDayFull, refreshStale, net: () => NET, setNet: o => { NET = netNorm(o); }, netNorm, emLink, emBrokers, emUrl, netHtml, renderCast, audioTick, fillAudioCfg, saveAudioCfg, audioPreview, audioConfirm, audioRearm, audioUrgentAnswered, sendChat, fitMtAlerts, mtJump, mtFreshOff, mtRearm, mtAnchorSave, mtAnchorApply, mtAnchor: () => MT_ANCHOR, setAppLang, mtNew: () => Array.from(MT_NEW), mtIds, mtOrder: () => MT_ORDER && MT_ORDER.map(e => Object.assign({}, e)), auMuteBtn, renderChat, callEditFix, applyEdit, undo, loadNew, impDoImport } };   // _test: solo para tests/control.test.js
+    dayStep, monthLabel, spotItems, spotDays, spotEntries, fmtDayFull, refreshStale, net: () => NET, setNet: o => { NET = netNorm(o); }, netNorm, emLink, emBrokers, emUrl, netHtml, renderCast, audioTick, fillAudioCfg, saveAudioCfg, audioPreview, audioConfirm, audioRearm, audioUrgentAnswered, sendChat, fitMtAlerts, mtJump, mtFreshOff, mtRearm, mtAnchorSave, mtAnchorApply, mtAnchor: () => MT_ANCHOR, mtTapState: () => ({ touch: Array.from(MT_TOUCH), tap: MT_TAP && { pid: MT_TAP.pid, id: MT_TAP.id, cap: MT_TAP.cap } }), setAppLang, mtNew: () => Array.from(MT_NEW), mtIds, mtOrder: () => MT_ORDER && MT_ORDER.map(e => Object.assign({}, e)), auMuteBtn, renderChat, callEditFix, applyEdit, undo, loadNew, impDoImport } };   // _test: solo para tests/control.test.js
 })();
