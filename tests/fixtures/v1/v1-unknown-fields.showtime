@@ -1,0 +1,214 @@
+{
+  "format": "showtime-document",
+  "formatVersion": 1,
+  "festivalId": "550e8400-e29b-41d4-a716-446655440000",
+  "festival": {
+    "project": {
+      "event": {
+        "name": "Festival Norte",
+        "startDate": "2027-07-10",
+        "endDate": "2027-07-11",
+        "timeZone": "Europe/Madrid",
+        "dayCutoff": "06:00",
+        "callMinutes": 15,
+        "xEvent": {
+          "n": 1
+        },
+        "branding": {
+          "xBranding": "b"
+        }
+      },
+      "stages": [
+        {
+          "id": "main",
+          "name": "Principal",
+          "color": "#38BDF8",
+          "position": 0,
+          "xStage": "s"
+        },
+        {
+          "id": "carpa",
+          "name": "Carpa",
+          "color": "#a78bfa",
+          "position": 1,
+          "changeoverMinutes": 20
+        }
+      ],
+      "entries": [
+        {
+          "id": "show-001",
+          "kind": "show",
+          "name": "Luz Solar",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-10",
+            "start": "22:00",
+            "end": "23:00",
+            "call": "21:40",
+            "notes": "",
+            "xPlan": [
+              "p"
+            ]
+          },
+          "rules": {
+            "delayMode": "category",
+            "linkedEntryId": "sc-001"
+          },
+          "xEntry": "e"
+        },
+        {
+          "id": "sc-001",
+          "kind": "soundcheck",
+          "name": "Luz Solar",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-10",
+            "start": "17:00",
+            "end": "17:30"
+          }
+        },
+        {
+          "id": "show-002",
+          "kind": "show",
+          "name": "Noche Larga",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-10",
+            "start": "00:15",
+            "end": "01:30"
+          }
+        },
+        {
+          "id": "task-001",
+          "kind": "task",
+          "name": "Montaje",
+          "plan": {
+            "date": "2027-07-10",
+            "start": "10:00",
+            "end": "12:00",
+            "notes": "grúa"
+          },
+          "actual": {
+            "startedAt": "2027-07-10T08:05:00Z",
+            "xActual": "a"
+          }
+        },
+        {
+          "id": "mk-001",
+          "kind": "marker",
+          "name": "Puertas",
+          "plan": {
+            "date": "2027-07-10",
+            "start": "20:00"
+          }
+        }
+      ],
+      "delays": [
+        {
+          "id": "d1",
+          "kind": "delay",
+          "occurredAt": "2027-07-10T18:00:00Z",
+          "festivalDay": "2027-07-10",
+          "minutes": 10,
+          "scope": {
+            "xScope": 1
+          },
+          "fromAt": "2027-07-10T18:00:00Z",
+          "blockPolicy": {
+            "all": {
+              "show": false,
+              "soundcheck": false,
+              "task": false,
+              "marker": true
+            },
+            "stages": {},
+            "xBlock": "k"
+          },
+          "xDelay": "d"
+        }
+      ],
+      "xProject": true
+    },
+    "configuration": {
+      "xConf": 1,
+      "screens": {
+        "xScreens": [
+          3,
+          2,
+          1
+        ],
+        "confidence": {
+          "xConfidence": "c"
+        }
+      },
+      "weather": {
+        "xWeather": {
+          "deep": {
+            "deeper": 1
+          }
+        },
+        "thresholds": {
+          "xTh": 0
+        }
+      }
+    },
+    "xFestival": "f"
+  },
+  "eventLog": {
+    "logVersion": 1,
+    "snapshots": [
+      {
+        "festivalDay": "2027-07-10",
+        "capturedAt": "2027-07-10T04:00:00Z",
+        "xSnap": 1,
+        "entries": [
+          {
+            "entryId": "show-001",
+            "kind": "show",
+            "name": "Luz Solar",
+            "plan": {
+              "stageId": "main",
+              "date": "2027-07-10",
+              "start": "22:00",
+              "xSnapPlan": 1
+            },
+            "xSnapEntry": 2
+          }
+        ]
+      }
+    ],
+    "entries": [
+      {
+        "id": "log-1",
+        "sequence": 1,
+        "occurredAt": "2027-07-10T08:05:00Z",
+        "festivalDay": "2027-07-10",
+        "type": "actual-start",
+        "entryId": "task-001",
+        "data": {
+          "startedAt": "2027-07-10T08:05:00Z",
+          "xData": 1
+        },
+        "xEntryLog": "x"
+      }
+    ],
+    "nextSequence": 2,
+    "xLog": "l"
+  },
+  "xRoot": {
+    "a": [
+      1,
+      2,
+      {
+        "b": null
+      }
+    ]
+  },
+  "protectedAccess": {
+    "cipher": "AES-GCM",
+    "blob": "b3BhY28=",
+    "meta": {
+      "v": 7
+    }
+  }
+}

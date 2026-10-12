@@ -1,0 +1,103 @@
+{
+  "format": "showtime-document",
+  "formatVersion": 2,
+  "festivalId": "550e8400-e29b-41d4-a716-446655440000",
+  "festival": {
+    "project": {
+      "event": {
+        "name": "Festival Norte",
+        "startDate": "2027-07-10",
+        "endDate": "2027-07-11",
+        "timeZone": "Europe/Madrid",
+        "dayCutoff": "06:00",
+        "callMinutes": 15
+      },
+      "stages": [
+        {
+          "id": "main",
+          "name": "Principal",
+          "color": "#38BDF8",
+          "position": 0
+        },
+        {
+          "id": "carpa",
+          "name": "Carpa",
+          "color": "#a78bfa",
+          "position": 1,
+          "changeoverMinutes": 20
+        }
+      ],
+      "entries": [
+        {
+          "id": "show-001",
+          "kind": "show",
+          "name": "Luz Solar",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-10",
+            "start": "22:00",
+            "end": "23:00",
+            "call": "21:40",
+            "notes": ""
+          },
+          "rules": {
+            "delayMode": "category"
+          }
+        },
+        {
+          "id": "sc-001",
+          "kind": "soundcheck",
+          "name": "Luz Solar",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-10",
+            "start": "17:00",
+            "end": "17:30"
+          }
+        },
+        {
+          "id": "show-002",
+          "kind": "show",
+          "name": "Noche Larga",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-10",
+            "start": "00:15",
+            "end": "01:30"
+          }
+        },
+        {
+          "id": "task-001",
+          "kind": "task",
+          "name": "Montaje",
+          "plan": {
+            "date": "2027-07-10",
+            "start": "10:00",
+            "end": "12:00",
+            "notes": "grúa"
+          }
+        },
+        {
+          "id": "mk-001",
+          "kind": "marker",
+          "name": "Puertas",
+          "plan": {
+            "date": "2027-07-10",
+            "start": "20:00"
+          }
+        }
+      ],
+      "delays": []
+    },
+    "configuration": {}
+  },
+  "eventLog": {
+    "logVersion": 1,
+    "snapshots": [],
+    "entries": [],
+    "nextSequence": 1
+  },
+  "xFuture": {
+    "keep": true
+  }
+}

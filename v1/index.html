@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Showtime Document v1</title>
+<meta name="theme-color" content="#07080a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="top">
+  <h1>Showtime Document v1</h1>
+  <p class="lead">Crea, abre, guarda y duplica festivales en el formato <b>Showtime Document v1</b>. Esta versión es independiente de la web anterior: <b>no abre ni migra sus JSON</b> y no lee ni toca sus datos guardados.</p>
+</header>
+<main>
+  <div id="msg" class="msg" role="alert" hidden></div>
+  <div id="warn" class="msg warn" role="status" hidden></div>
+
+  <section id="current" class="card" hidden aria-labelledby="cur-h">
+    <h2 id="cur-h">Festival abierto</h2>
+    <dl id="cur-info" class="info"></dl>
+    <div class="row">
+      <button type="button" id="btn-save" class="primary">Descargar .showtime</button>
+      <button type="button" id="btn-dup">Duplicar festival</button>
+      <button type="button" id="btn-close">Cerrar</button>
+    </div>
+    <form id="tz-form" class="row tz" autocomplete="off">
+      <label>Zona horaria (IANA) <input id="tz-zone" type="text" required spellcheck="false"></label>
+      <label>Corte de jornada <input id="tz-cut" type="text" inputmode="numeric" pattern="([01][0-9]|2[0-3]):[0-5][0-9]" required></label>
+      <button type="submit" id="tz-apply">Cambiar</button>
+      <p id="tz-lock" class="hint" hidden>Este festival ya tiene historia: la zona horaria y el corte de jornada no se pueden cambiar.</p>
+    </form>
+  </section>
+
+  <section class="card" aria-labelledby="new-h">
+    <h2 id="new-h">Nuevo festival v1</h2>
+    <form id="new-form" class="grid" autocomplete="off">
+      <label>Nombre <input id="new-name" type="text" required></label>
+      <label>Primera jornada <input id="new-start" type="date" required></label>
+      <label>Última jornada <input id="new-end" type="date"></label>
+      <label>Zona horaria (IANA) <input id="new-tz" type="text" value="Europe/Madrid" required spellcheck="false" list="tz-list"></label>
+      <datalist id="tz-list"><option value="Europe/Madrid"><option value="Europe/Lisbon"><option value="Europe/London"><option value="Atlantic/Canary"><option value="Europe/Paris"><option value="America/Mexico_City"><option value="America/Bogota"><option value="America/Argentina/Buenos_Aires"><option value="UTC"></datalist>
+      <div class="row"><button type="submit" class="primary">Crear festival</button></div>
+    </form>
+  </section>
+
+  <section class="card" aria-labelledby="open-h">
+    <h2 id="open-h">Abrir</h2>
+    <p class="hint">Archivos <code>.showtime</code> (o <code>.json</code> con contenido v1). Se valida entero antes de abrir: si no es válido, el festival abierto no cambia.</p>
+    <input id="open-file" type="file" accept=".showtime,.json,application/json,application/vnd.showtime+json">
+  </section>
+</main>
+<script src="time.js"></script>
+<script src="document.js"></script>
+<script src="storage.js"></script>
+<script src="session.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

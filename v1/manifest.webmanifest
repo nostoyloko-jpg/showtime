@@ -1,0 +1,17 @@
+{
+  "name": "Showtime Document v1",
+  "short_name": "Showtime v1",
+  "description": "Showtime Document v1: crear, abrir, guardar y duplicar festivales en el formato v1. No abre ni migra JSON anteriores.",
+  "lang": "es",
+  "id": "./",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#07080a",
+  "theme_color": "#07080a",
+  "icons": [
+    { "src": "../icons/icon.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "../icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "../icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

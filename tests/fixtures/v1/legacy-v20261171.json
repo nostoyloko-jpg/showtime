@@ -1,0 +1,22 @@
+{
+  "event": {
+    "nombre": "Viejo",
+    "fechaInicio": "2026-07-10",
+    "fechaFin": "2026-07-10"
+  },
+  "escenarios": [
+    {
+      "id": "e1",
+      "nombre": "Principal"
+    }
+  ],
+  "artists": [
+    {
+      "id": 1,
+      "nombre": "Banda A",
+      "inicio": "22:00",
+      "fin": "23:00"
+    }
+  ],
+  "showtimeRetrasos": []
+}

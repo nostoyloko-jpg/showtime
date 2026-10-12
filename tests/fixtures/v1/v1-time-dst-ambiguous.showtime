@@ -1,0 +1,54 @@
+{
+  "format": "showtime-document",
+  "formatVersion": 1,
+  "festivalId": "550e8400-e29b-41d4-a716-446655440000",
+  "festival": {
+    "project": {
+      "event": {
+        "name": "Festival Norte",
+        "startDate": "2027-10-30",
+        "endDate": "2027-10-30",
+        "timeZone": "Europe/Madrid",
+        "dayCutoff": "06:00",
+        "callMinutes": 15
+      },
+      "stages": [
+        {
+          "id": "main",
+          "name": "Principal",
+          "color": "#38BDF8",
+          "position": 0
+        },
+        {
+          "id": "carpa",
+          "name": "Carpa",
+          "color": "#a78bfa",
+          "position": 1,
+          "changeoverMinutes": 20
+        }
+      ],
+      "entries": [
+        {
+          "id": "amb",
+          "kind": "show",
+          "name": "Hora repetida",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-10-30",
+            "start": "02:30",
+            "end": "03:10",
+            "call": "02:10"
+          }
+        }
+      ],
+      "delays": []
+    },
+    "configuration": {}
+  },
+  "eventLog": {
+    "logVersion": 1,
+    "snapshots": [],
+    "entries": [],
+    "nextSequence": 1
+  }
+}
