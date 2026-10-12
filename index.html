@@ -13,8 +13,8 @@
 <meta name="apple-mobile-web-app-title" content="Showtime">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
-<link rel="stylesheet" href="control.css?v=20261170">
-<link rel="stylesheet" href="marca.css?v=20261170">
+<link rel="stylesheet" href="control.css?v=20261171">
+<link rel="stylesheet" href="marca.css?v=20261171">
 </head>
 <body>
 <div id="splash" class="splash" hidden></div>
@@ -86,12 +86,11 @@
       <button class="mbtn" aria-haspopup="true" aria-expanded="false" data-i18n>Archivo<svg class="ic chev"><use href="#i-chev"/></svg></button>
       <div class="mpanel" role="menu">
         <button id="btn-new" class="mitem" role="menuitem" data-i18n><svg class="ic"><use href="#i-plus"/></svg>Nuevo evento</button>
+        <button id="btn-paste" class="mitem" role="menuitem" title="Pegar un horario de Excel, Numbers, Sheets, PDF o WhatsApp, o abrir un .csv / .tsv" data-i18n data-i18n-title><svg class="ic"><use href="#i-paste"/></svg>Pegar horario</button>
         <button id="btn-open" class="mitem" role="menuitem" title="Abrir un evento guardado (.json de Showtime o de Synapse)" data-i18n data-i18n-title><svg class="ic"><use href="#i-in"/></svg>Abrir JSON</button>
         <button id="btn-export" class="mitem" role="menuitem" title="Guardar el evento como archivo .json (copia de seguridad)" data-i18n data-i18n-title><svg class="ic"><use href="#i-out"/></svg>Exportar JSON</button>
         <button id="btn-log" class="mitem" role="menuitem" title="Informe de la jornada: el horario previsto y, a su hora, lo que ha pasado (PDF, TXT o CSV)" data-i18n data-i18n-title><svg class="ic"><use href="#i-log"/></svg>Exportar log del evento…</button>
         <button id="btn-print" class="mitem" role="menuitem" title="Hoja de ruta imprimible (tabla por jornada, una A4 por día)" data-i18n data-i18n-title><svg class="ic"><use href="#i-print"/></svg>Imprimir / Hoja de ruta…</button>
-        <div class="msep"></div>
-        <button id="btn-paste" class="mitem" role="menuitem" title="Pegar un horario de Excel, Numbers, Sheets, PDF o WhatsApp, o abrir un .csv / .tsv" data-i18n data-i18n-title><svg class="ic"><use href="#i-paste"/></svg>Pegar horario</button>
         <div class="msep"></div>
         <button id="btn-about" class="mitem" role="menuitem" title="Versión y créditos" data-i18n data-i18n-title><svg class="ic"><use href="#i-st"/></svg>Acerca de Showtime…</button>
       </div>
@@ -525,7 +524,7 @@
     </div>
     <div class="mcard imp-card imp-mapcard"><div class="mcard-h" data-i18n>Columnas del archivo</div><div id="imp-map" class="imp-map"></div></div>
     <div class="mcard imp-card imp-prevcard"><div class="imp-prevhead"><div class="mcard-h" data-i18n>Vista previa</div><span id="imp-sortnote" class="imp-sortnote" role="status" aria-live="polite"></span><button id="imp-colreset" class="linkbtn imp-colreset" type="button" data-i18n>Restablecer columnas</button><span id="imp-edhint" class="sr-only" data-i18n>Intro confirma. El texto sigue siendo de una sola línea.</span></div><div id="imp-prevwrap" class="imp-prevwrap"><table id="imp-prev" class="imp-prev"></table></div></div>
-    <!-- v20261170 · Líneas no incluidas: «Necesitan revisión» (tienen horas, pero no son una entrada segura) y, plegadas, las ignoradas -->
+    <!-- Líneas no incluidas (desde la versión 1170): «Necesitan revisión» (tienen horas, pero no son una entrada segura) y, plegadas, las ignoradas -->
     <section id="imp-lines" class="mcard imp-card imp-linescard" aria-labelledby="imp-lines-h" hidden>
       <div class="mcard-h" id="imp-lines-h" data-i18n>Líneas no incluidas</div>
       <div id="imp-rev" class="imp-rev" hidden><h3 id="imp-rev-h" class="imp-rev-h"></h3><ul id="imp-rev-list" class="imp-rev-list" aria-labelledby="imp-rev-h"></ul></div>
@@ -554,21 +553,21 @@
 <datalist id="zones-dl"></datalist>
 <div id="toast" class="toast" hidden></div>
 
-<script src="i18n.js?v=20261170"></script>
-<script src="core.js?v=20261170"></script>
-<script src="meteo.js?v=20261170"></script>
-<script src="datos.js?v=20261170"></script>
-<script src="importar.js?v=20261170"></script>
-<script src="xlsx.js?v=20261170"></script>
-<script src="qr.js?v=20261170"></script>
-<script src="emision.js?v=20261170"></script>
-<script src="mando.js?v=20261170"></script>
-<script src="vistas.js?v=20261170"></script>
-<script src="log.js?v=20261170"></script>
-<script src="print.js?v=20261170"></script>
-<script src="marca.js?v=20261170"></script>
-<script src="audio.js?v=20261170"></script>
-<script src="control.js?v=20261170"></script>
-<script src="pwa.js?v=20261170"></script>
+<script src="i18n.js?v=20261171"></script>
+<script src="core.js?v=20261171"></script>
+<script src="meteo.js?v=20261171"></script>
+<script src="datos.js?v=20261171"></script>
+<script src="importar.js?v=20261171"></script>
+<script src="xlsx.js?v=20261171"></script>
+<script src="qr.js?v=20261171"></script>
+<script src="emision.js?v=20261171"></script>
+<script src="mando.js?v=20261171"></script>
+<script src="vistas.js?v=20261171"></script>
+<script src="log.js?v=20261171"></script>
+<script src="print.js?v=20261171"></script>
+<script src="marca.js?v=20261171"></script>
+<script src="audio.js?v=20261171"></script>
+<script src="control.js?v=20261171"></script>
+<script src="pwa.js?v=20261171"></script>
 </body>
 </html>

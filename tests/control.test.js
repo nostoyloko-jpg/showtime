@@ -2059,6 +2059,11 @@
     eq(sp.className, 'splash about'); ok(!sp.classList.contains('out'));
     ok(/Clic o Esc para cerrar/.test(ultimo(t, 'splash')) && /stm-ver/.test(ultimo(t, 'splash')));
     ok(/<button id="btn-about" class="mitem"[^>]*>.*Acerca de Showtime…<\/button>/.test(D.src('index.html')), 'en el menú Archivo');
+    // v20261171: «Pegar horario» justo debajo de «Nuevo evento» (mismo botón: id, título y handler de siempre)
+    const fm = D.src('index.html'), menu = fm.slice(fm.indexOf('<div class="menu" id="m-file">'), fm.indexOf('</nav>', fm.indexOf('<div class="menu" id="m-file">')));
+    eq((menu.match(/<button id="[^"]+" class="mitem"/g) || []).map(x => /id="([^"]+)"/.exec(x)[1]).join(' · '), 'btn-new · btn-paste · btn-open · btn-export · btn-log · btn-print · btn-about', 'orden del menú Archivo');
+    ok(/<button id="btn-print"[\s\S]*?<\/button>\s*<div class="msep"><\/div>\s*<button id="btn-about"/.test(menu) && (menu.match(/class="msep"/g) || []).length === 1, 'una sola separación, antes de Acerca de');
+    ok(/<button id="btn-paste" class="mitem" role="menuitem" title="Pegar un horario de Excel, Numbers, Sheets, PDF o WhatsApp, o abrir un \.csv \/ \.tsv"><svg class="ic"><use href="#i-paste"\/><\/svg>Pegar horario<\/button>/.test(menu), 'el mismo botón, intacto');
   });
   test('Live ▾ › Standby: estado del evento para TODAS las Confidence (Mac y QR): se guarda, va a las Live y en la emisión', async () => {
     const t = panel();
