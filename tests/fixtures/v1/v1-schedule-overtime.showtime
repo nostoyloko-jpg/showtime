@@ -1,0 +1,175 @@
+{
+  "format": "showtime-document",
+  "formatVersion": 1,
+  "festivalId": "7d3f1c2a-9b8e-4f6d-a1c2-3e4f5a6b7c8d",
+  "festival": {
+    "project": {
+      "event": {
+        "name": "Tiempo extra y Bis",
+        "startDate": "2027-07-10",
+        "endDate": "2027-07-11",
+        "timeZone": "Europe/Madrid",
+        "dayCutoff": "06:00",
+        "callMinutes": 15,
+        "changeoverMinutes": 15
+      },
+      "stages": [
+        {
+          "id": "main",
+          "name": "Principal",
+          "color": "#38bdf8",
+          "position": 0
+        },
+        {
+          "id": "carpa",
+          "name": "Carpa",
+          "color": "#a78bfa",
+          "position": 1,
+          "changeoverMinutes": 30
+        }
+      ],
+      "entries": [
+        {
+          "id": "o1",
+          "kind": "show",
+          "name": "Banda abierta",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-10",
+            "start": "20:00",
+            "end": "21:00"
+          },
+          "actual": {
+            "startedAt": "2027-07-10T18:00:00Z"
+          }
+        },
+        {
+          "id": "o2",
+          "kind": "show",
+          "name": "Siguiente",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-10",
+            "start": "21:30",
+            "end": "22:30"
+          }
+        },
+        {
+          "id": "ot",
+          "kind": "task",
+          "name": "Tarea tras la banda",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-10",
+            "start": "21:10",
+            "end": "21:20"
+          }
+        },
+        {
+          "id": "o3",
+          "kind": "show",
+          "name": "Tercera",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-10",
+            "start": "23:00",
+            "end": "00:00"
+          }
+        },
+        {
+          "id": "p1",
+          "kind": "show",
+          "name": "Bis cerrado",
+          "plan": {
+            "stageId": "carpa",
+            "date": "2027-07-10",
+            "start": "20:00",
+            "end": "21:00"
+          },
+          "actual": {
+            "startedAt": "2027-07-10T18:00:00Z",
+            "endedAt": "2027-07-10T19:50:00Z"
+          }
+        },
+        {
+          "id": "p2",
+          "kind": "show",
+          "name": "Carpa siguiente",
+          "plan": {
+            "stageId": "carpa",
+            "date": "2027-07-10",
+            "start": "21:40",
+            "end": "22:40"
+          }
+        },
+        {
+          "id": "p3",
+          "kind": "show",
+          "name": "Carpa empieza antes",
+          "plan": {
+            "stageId": "carpa",
+            "date": "2027-07-10",
+            "start": "23:00",
+            "end": "00:00"
+          },
+          "actual": {
+            "startedAt": "2027-07-10T21:05:00Z"
+          }
+        },
+        {
+          "id": "p4",
+          "kind": "show",
+          "name": "Carpa última",
+          "plan": {
+            "stageId": "carpa",
+            "date": "2027-07-10",
+            "start": "00:30",
+            "end": "01:30"
+          }
+        }
+      ],
+      "delays": [
+        {
+          "id": "ov1",
+          "kind": "overtime",
+          "occurredAt": "2027-07-10T18:55:00Z",
+          "festivalDay": "2027-07-10",
+          "fromEntryId": "o1",
+          "blockPolicy": {
+            "all": {
+              "show": false,
+              "soundcheck": false,
+              "task": false,
+              "marker": false
+            },
+            "stages": {}
+          }
+        },
+        {
+          "id": "bi1",
+          "kind": "bis",
+          "occurredAt": "2027-07-10T19:05:00Z",
+          "festivalDay": "2027-07-10",
+          "minutes": 5,
+          "fromEntryId": "p1",
+          "blockPolicy": {
+            "all": {
+              "show": false,
+              "soundcheck": false,
+              "task": false,
+              "marker": false
+            },
+            "stages": {}
+          }
+        }
+      ]
+    },
+    "configuration": {}
+  },
+  "eventLog": {
+    "logVersion": 1,
+    "snapshots": [],
+    "entries": [],
+    "nextSequence": 1
+  }
+}

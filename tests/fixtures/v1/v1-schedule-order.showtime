@@ -1,0 +1,141 @@
+{
+  "format": "showtime-document",
+  "formatVersion": 1,
+  "festivalId": "7d3f1c2a-9b8e-4f6d-a1c2-3e4f5a6b7c8d",
+  "festival": {
+    "project": {
+      "event": {
+        "name": "Orden de aplicación",
+        "startDate": "2027-07-10",
+        "endDate": "2027-07-11",
+        "timeZone": "Europe/Madrid",
+        "dayCutoff": "06:00",
+        "callMinutes": 15,
+        "changeoverMinutes": 15
+      },
+      "stages": [
+        {
+          "id": "main",
+          "name": "Principal",
+          "color": "#38bdf8",
+          "position": 0
+        },
+        {
+          "id": "carpa",
+          "name": "Carpa",
+          "color": "#a78bfa",
+          "position": 1,
+          "changeoverMinutes": 30
+        }
+      ],
+      "entries": [
+        {
+          "id": "A",
+          "kind": "show",
+          "name": "A",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-10",
+            "start": "20:00",
+            "end": "21:00"
+          },
+          "actual": {
+            "startedAt": "2027-07-10T18:00:00Z",
+            "endedAt": "2027-07-10T19:50:00Z"
+          }
+        },
+        {
+          "id": "B",
+          "kind": "show",
+          "name": "B",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-10",
+            "start": "21:30",
+            "end": "22:30"
+          }
+        },
+        {
+          "id": "C",
+          "kind": "show",
+          "name": "Ce",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-10",
+            "start": "23:00",
+            "end": "00:00"
+          }
+        },
+        {
+          "id": "SC",
+          "kind": "soundcheck",
+          "name": "Ce",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-10",
+            "start": "00:30",
+            "end": "01:00"
+          }
+        },
+        {
+          "id": "CC",
+          "kind": "show",
+          "name": "Ce",
+          "plan": {
+            "stageId": "carpa",
+            "date": "2027-07-10",
+            "start": "23:00",
+            "end": "00:00"
+          }
+        }
+      ],
+      "delays": [
+        {
+          "id": "ovA",
+          "kind": "overtime",
+          "occurredAt": "2027-07-10T18:55:00Z",
+          "festivalDay": "2027-07-10",
+          "fromEntryId": "A",
+          "blockPolicy": {
+            "all": {
+              "show": false,
+              "soundcheck": false,
+              "task": false,
+              "marker": false
+            },
+            "stages": {}
+          }
+        },
+        {
+          "id": "dA",
+          "kind": "delay",
+          "occurredAt": "2027-07-10T19:10:00Z",
+          "festivalDay": "2027-07-10",
+          "minutes": 10,
+          "scope": {
+            "stageIds": [
+              "main"
+            ]
+          },
+          "fromAt": "2027-07-10T19:00:00Z",
+          "blockPolicy": {
+            "all": {
+              "show": false,
+              "soundcheck": false,
+              "task": false,
+              "marker": false
+            },
+            "stages": {}
+          }
+        }
+      ]
+    },
+    "configuration": {}
+  },
+  "eventLog": {
+    "logVersion": 1,
+    "snapshots": [],
+    "entries": [],
+    "nextSequence": 1
+  }
+}

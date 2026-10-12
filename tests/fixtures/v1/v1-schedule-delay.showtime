@@ -1,0 +1,246 @@
+{
+  "format": "showtime-document",
+  "formatVersion": 1,
+  "festivalId": "7d3f1c2a-9b8e-4f6d-a1c2-3e4f5a6b7c8d",
+  "festival": {
+    "project": {
+      "event": {
+        "name": "Delay ordinario",
+        "startDate": "2027-07-10",
+        "endDate": "2027-07-11",
+        "timeZone": "Europe/Madrid",
+        "dayCutoff": "06:00",
+        "callMinutes": 15,
+        "changeoverMinutes": 15
+      },
+      "stages": [
+        {
+          "id": "main",
+          "name": "Principal",
+          "color": "#38bdf8",
+          "position": 0
+        },
+        {
+          "id": "carpa",
+          "name": "Carpa",
+          "color": "#a78bfa",
+          "position": 1,
+          "changeoverMinutes": 30
+        }
+      ],
+      "entries": [
+        {
+          "id": "a1",
+          "kind": "show",
+          "name": "Uno",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-10",
+            "start": "20:00",
+            "end": "21:00"
+          }
+        },
+        {
+          "id": "a2",
+          "kind": "show",
+          "name": "Dos",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-10",
+            "start": "21:30",
+            "end": "23:00",
+            "call": "21:00"
+          }
+        },
+        {
+          "id": "a3",
+          "kind": "show",
+          "name": "Tres (fija)",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-10",
+            "start": "23:00",
+            "end": "00:00"
+          },
+          "rules": {
+            "delayMode": "fixed"
+          }
+        },
+        {
+          "id": "a4",
+          "kind": "show",
+          "name": "Cuatro (libre)",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-10",
+            "start": "00:30",
+            "end": "01:30"
+          },
+          "rules": {
+            "delayMode": "free"
+          }
+        },
+        {
+          "id": "b1",
+          "kind": "show",
+          "name": "Carpa uno",
+          "plan": {
+            "stageId": "carpa",
+            "date": "2027-07-10",
+            "start": "21:00",
+            "end": "22:00"
+          }
+        },
+        {
+          "id": "t1",
+          "kind": "task",
+          "name": "Tarea sin zona",
+          "plan": {
+            "date": "2027-07-10",
+            "start": "21:00",
+            "end": "21:30"
+          }
+        },
+        {
+          "id": "k1",
+          "kind": "marker",
+          "name": "Marcador sin zona",
+          "plan": {
+            "date": "2027-07-10",
+            "start": "22:00"
+          }
+        },
+        {
+          "id": "t2",
+          "kind": "task",
+          "name": "Tarea principal",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-10",
+            "start": "22:00"
+          }
+        },
+        {
+          "id": "n1",
+          "kind": "show",
+          "name": "Jornada siguiente",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-11",
+            "start": "20:00",
+            "end": "21:00"
+          }
+        },
+        {
+          "id": "a0",
+          "kind": "show",
+          "name": "Cero (ya empezada)",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-10",
+            "start": "19:00",
+            "end": "19:45"
+          },
+          "actual": {
+            "startedAt": "2027-07-10T17:02:00Z"
+          }
+        },
+        {
+          "id": "b0",
+          "kind": "show",
+          "name": "Carpa cero",
+          "plan": {
+            "stageId": "carpa",
+            "date": "2027-07-10",
+            "start": "20:30",
+            "end": "20:50"
+          }
+        },
+        {
+          "id": "t3",
+          "kind": "task",
+          "name": "Tarea carpa",
+          "plan": {
+            "stageId": "carpa",
+            "date": "2027-07-10",
+            "start": "20:55",
+            "end": "21:05"
+          }
+        },
+        {
+          "id": "k3",
+          "kind": "marker",
+          "name": "Marcador principal",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-10",
+            "start": "21:15"
+          }
+        }
+      ],
+      "delays": [
+        {
+          "id": "d1",
+          "kind": "delay",
+          "occurredAt": "2027-07-10T17:30:00Z",
+          "festivalDay": "2027-07-10",
+          "minutes": 10,
+          "scope": {},
+          "fromAt": "2027-07-10T17:00:00Z",
+          "blockPolicy": {
+            "all": {
+              "show": false,
+              "soundcheck": false,
+              "task": false,
+              "marker": true
+            },
+            "stages": {
+              "main": {
+                "show": false,
+                "soundcheck": false,
+                "task": true,
+                "marker": false
+              }
+            }
+          }
+        },
+        {
+          "id": "d2",
+          "kind": "delay",
+          "occurredAt": "2027-07-10T18:10:00Z",
+          "festivalDay": "2027-07-10",
+          "minutes": 5,
+          "scope": {
+            "stageIds": [
+              "carpa"
+            ],
+            "includeUnzoned": true
+          },
+          "fromAt": "2027-07-10T19:00:00Z",
+          "blockPolicy": {
+            "all": {
+              "show": false,
+              "soundcheck": false,
+              "task": false,
+              "marker": false
+            },
+            "stages": {},
+            "unzoned": {
+              "show": false,
+              "soundcheck": false,
+              "task": true,
+              "marker": false
+            }
+          }
+        }
+      ]
+    },
+    "configuration": {}
+  },
+  "eventLog": {
+    "logVersion": 1,
+    "snapshots": [],
+    "entries": [],
+    "nextSequence": 1
+  }
+}

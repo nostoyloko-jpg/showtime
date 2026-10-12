@@ -1,0 +1,108 @@
+{
+  "format": "showtime-document",
+  "formatVersion": 1,
+  "festivalId": "7d3f1c2a-9b8e-4f6d-a1c2-3e4f5a6b7c8d",
+  "festival": {
+    "project": {
+      "event": {
+        "name": "Hechos reales",
+        "startDate": "2027-07-10",
+        "endDate": "2027-07-11",
+        "timeZone": "Europe/Madrid",
+        "dayCutoff": "06:00",
+        "callMinutes": 15,
+        "changeoverMinutes": 15
+      },
+      "stages": [
+        {
+          "id": "main",
+          "name": "Principal",
+          "color": "#38bdf8",
+          "position": 0
+        }
+      ],
+      "entries": [
+        {
+          "id": "r1",
+          "kind": "show",
+          "name": "Empieza antes y acaba antes",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-10",
+            "start": "20:00",
+            "end": "21:00"
+          },
+          "actual": {
+            "startedAt": "2027-07-10T17:55:00Z",
+            "endedAt": "2027-07-10T18:50:00Z"
+          }
+        },
+        {
+          "id": "r2",
+          "kind": "show",
+          "name": "Empieza tarde y se pasa",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-10",
+            "start": "21:30",
+            "end": "22:30"
+          },
+          "actual": {
+            "startedAt": "2027-07-10T19:40:00Z",
+            "endedAt": "2027-07-10T20:50:00Z"
+          }
+        },
+        {
+          "id": "r3",
+          "kind": "show",
+          "name": "Empieza antes, sin ■",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-10",
+            "start": "23:00",
+            "end": "00:00"
+          },
+          "actual": {
+            "startedAt": "2027-07-10T20:50:00Z"
+          }
+        },
+        {
+          "id": "tk",
+          "kind": "task",
+          "name": "Tarea con hechos",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-10",
+            "start": "21:00",
+            "end": "21:20"
+          },
+          "actual": {
+            "startedAt": "2027-07-10T19:05:00Z",
+            "endedAt": "2027-07-10T19:30:00Z"
+          }
+        },
+        {
+          "id": "tk2",
+          "kind": "task",
+          "name": "Tarea tarde sin fin",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-10",
+            "start": "22:00"
+          },
+          "actual": {
+            "startedAt": "2027-07-10T20:10:00Z"
+          }
+        }
+      ],
+      "delays": []
+    },
+    "configuration": {}
+  },
+  "eventLog": {
+    "logVersion": 1,
+    "snapshots": [],
+    "entries": [],
+    "nextSequence": 1
+  }
+}

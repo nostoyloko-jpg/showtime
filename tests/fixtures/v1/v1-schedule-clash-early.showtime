@@ -1,0 +1,107 @@
+{
+  "format": "showtime-document",
+  "formatVersion": 1,
+  "festivalId": "7d3f1c2a-9b8e-4f6d-a1c2-3e4f5a6b7c8d",
+  "festival": {
+    "project": {
+      "event": {
+        "name": "Choque por ▶ adelantado",
+        "startDate": "2027-07-10",
+        "endDate": "2027-07-11",
+        "timeZone": "Europe/Madrid",
+        "dayCutoff": "06:00",
+        "callMinutes": 15,
+        "changeoverMinutes": 15
+      },
+      "stages": [
+        {
+          "id": "main",
+          "name": "Principal",
+          "color": "#38bdf8",
+          "position": 0
+        }
+      ],
+      "entries": [
+        {
+          "id": "tarea",
+          "kind": "task",
+          "name": "Tarea",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-10",
+            "start": "21:10",
+            "end": "21:40"
+          }
+        },
+        {
+          "id": "B",
+          "kind": "show",
+          "name": "B",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-10",
+            "start": "22:00",
+            "end": "23:00"
+          },
+          "actual": {
+            "startedAt": "2027-07-10T19:20:00Z"
+          }
+        },
+        {
+          "id": "C",
+          "kind": "show",
+          "name": "C",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-10",
+            "start": "23:30",
+            "end": "00:30"
+          },
+          "actual": {
+            "startedAt": "2027-07-10T19:25:00Z"
+          }
+        },
+        {
+          "id": "dentro",
+          "kind": "task",
+          "name": "Tarea ya dentro de B en el plan",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-10",
+            "start": "22:10",
+            "end": "22:20"
+          }
+        },
+        {
+          "id": "mk",
+          "kind": "marker",
+          "name": "Marcador",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-10",
+            "start": "21:30"
+          }
+        },
+        {
+          "id": "libre",
+          "kind": "task",
+          "name": "Tarea sin pisar",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-10",
+            "start": "20:00",
+            "end": "20:30"
+          }
+        }
+      ],
+      "delays": []
+    },
+    "configuration": {}
+  },
+  "eventLog": {
+    "logVersion": 1,
+    "snapshots": [],
+    "entries": [],
+    "nextSequence": 1
+  }
+}

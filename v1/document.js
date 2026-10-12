@@ -295,6 +295,10 @@
         if ((k === 'overtime' || k === 'bis')) {
           if (openPerEntry.has(id)) fail(p, 'Como máximo un overtime o bis por entrada (' + q(id) + ').');
           openPerEntry.set(id, true);
+          // Retraso antes; Tiempo extra/Bis durante (decisión de L.A., precisión de §5.6.2 para la próxima revisión canónica):
+          // la banda tiene que haber dado ▶ no después de que se aplicara el ajuste.
+          if (began === null) fail(p, 'Un ' + k + ' solo se aplica a una banda que ya ha empezado: ' + q(id) + ' no tiene ▶ (actual.startedAt).');
+          if (began > at) fail(p, 'El ▶ de ' + q(id) + ' es posterior a este ' + k + ': un ' + k + ' solo existe con la banda ya empezada.');
           if (en !== null && !(en > at)) fail(p, 'El ■ de ' + q(id) + ' debe ser posterior a este ajuste.');
         }
         if (k === 'changeover-stretch' && began !== null && began <= at) fail(p, 'No se estira el cambio de una banda que ya había empezado.');

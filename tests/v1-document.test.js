@@ -594,3 +594,23 @@ test('R3 · Log: marcas UTC de actual-* con segundos, confirmedBy.name y fromEnt
   const m = D.parseDocument(mutate('v1-log-shapes.showtime', o => { o.eventLog.entries[9].data.text = '  hola  '; }));
   assert.equal(m.doc.eventLog.entries[9].data.text, '  hola  ');
 });
+
+// ── R2 revisado · retraso antes; Tiempo extra/Bis durante ─────────────────
+test('R2-A · overtime/bis exigen una banda con ▶ anterior o igual a su occurredAt; rechazo no destructivo', () => {
+  const P = o => o.festival.project;
+  invalid('v1-schedule-overtime.showtime', o => { delete P(o).entries[0].actual; }, /delays\[0\].*overtime solo se aplica a una banda que ya ha empezado.*«o1» no tiene ▶/);
+  invalid('v1-schedule-overtime.showtime', o => { delete P(o).entries[4].actual; }, /delays\[1\].*bis solo se aplica a una banda que ya ha empezado.*«p1» no tiene ▶/);
+  invalid('v1-schedule-overtime.showtime', o => { P(o).entries[0].actual.startedAt = '2027-07-10T18:56:00Z'; }, /delays\[0\].*▶ de «o1» es posterior a este overtime/);
+  invalid('v1-schedule-overtime.showtime', o => { P(o).entries[4].actual.startedAt = '2027-07-10T19:06:00Z'; }, /delays\[1\].*▶ de «p1» es posterior a este bis/);
+  invalid('v1-schedule-overtime.showtime', o => { P(o).entries[0].actual = { startedAt: null }; }, /no tiene ▶/);
+  // ▶ igual a occurredAt y ▶ anterior: válidos
+  const eq = D.parseDocument(mutate('v1-schedule-overtime.showtime', o => { P(o).entries[0].actual.startedAt = P(o).delays[0].occurredAt; }));
+  assert.ok(eq.ok, eq.message);
+  assert.ok(D.parseDocument(FX('v1-schedule-overtime.showtime')).ok);
+  // Los fixtures con Tiempo extra/Bis legítimos siguen validando
+  fs.readdirSync(path.join(__dirname, 'fixtures', 'v1')).filter(f => /^v1-(schedule-|history|log-shapes)/.test(f)).forEach(f => {
+    const r = D.parseDocument(FX(f)); assert.ok(r.ok, f + ': ' + r.message);
+  });
+  // Un delay sí puede aplicarse a una banda sin ▶ (retraso antes): sin cambio
+  assert.ok(D.parseDocument(FX('v1-schedule-delay.showtime')).ok);
+});

@@ -1,0 +1,128 @@
+{
+  "format": "showtime-document",
+  "formatVersion": 1,
+  "festivalId": "7d3f1c2a-9b8e-4f6d-a1c2-3e4f5a6b7c8d",
+  "festival": {
+    "project": {
+      "event": {
+        "name": "Cruce de corte",
+        "startDate": "2027-07-10",
+        "endDate": "2027-07-11",
+        "timeZone": "Europe/Madrid",
+        "dayCutoff": "06:00",
+        "callMinutes": 15,
+        "changeoverMinutes": 15
+      },
+      "stages": [
+        {
+          "id": "main",
+          "name": "Principal",
+          "color": "#38bdf8",
+          "position": 0
+        },
+        {
+          "id": "carpa",
+          "name": "Carpa",
+          "color": "#a78bfa",
+          "position": 1,
+          "changeoverMinutes": 30
+        }
+      ],
+      "entries": [
+        {
+          "id": "x1",
+          "kind": "show",
+          "name": "Cierre de noche",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-10",
+            "start": "23:00",
+            "end": "00:30"
+          },
+          "actual": {
+            "startedAt": "2027-07-10T21:10:00Z"
+          }
+        },
+        {
+          "id": "x2",
+          "kind": "show",
+          "name": "Mañana principal",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-11",
+            "start": "08:00",
+            "end": "09:00"
+          }
+        },
+        {
+          "id": "y1",
+          "kind": "show",
+          "name": "Mañana carpa",
+          "plan": {
+            "stageId": "carpa",
+            "date": "2027-07-11",
+            "start": "08:00",
+            "end": "09:00"
+          }
+        },
+        {
+          "id": "u1",
+          "kind": "task",
+          "name": "Mañana sin zona",
+          "plan": {
+            "date": "2027-07-11",
+            "start": "08:00",
+            "end": "08:30"
+          }
+        }
+      ],
+      "delays": [
+        {
+          "id": "g1",
+          "kind": "delay",
+          "occurredAt": "2027-07-10T20:00:00Z",
+          "festivalDay": "2027-07-10",
+          "minutes": 10,
+          "scope": {
+            "stageIds": [
+              "main"
+            ]
+          },
+          "fromAt": "2027-07-10T20:00:00Z",
+          "blockPolicy": {
+            "all": {
+              "show": false,
+              "soundcheck": false,
+              "task": false,
+              "marker": false
+            },
+            "stages": {}
+          }
+        },
+        {
+          "id": "ox",
+          "kind": "overtime",
+          "occurredAt": "2027-07-10T22:35:00Z",
+          "festivalDay": "2027-07-10",
+          "fromEntryId": "x1",
+          "blockPolicy": {
+            "all": {
+              "show": false,
+              "soundcheck": false,
+              "task": false,
+              "marker": false
+            },
+            "stages": {}
+          }
+        }
+      ]
+    },
+    "configuration": {}
+  },
+  "eventLog": {
+    "logVersion": 1,
+    "snapshots": [],
+    "entries": [],
+    "nextSequence": 1
+  }
+}

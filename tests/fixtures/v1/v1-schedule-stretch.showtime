@@ -1,0 +1,172 @@
+{
+  "format": "showtime-document",
+  "formatVersion": 1,
+  "festivalId": "7d3f1c2a-9b8e-4f6d-a1c2-3e4f5a6b7c8d",
+  "festival": {
+    "project": {
+      "event": {
+        "name": "Changeover-stretch",
+        "startDate": "2027-07-10",
+        "endDate": "2027-07-11",
+        "timeZone": "Europe/Madrid",
+        "dayCutoff": "06:00",
+        "callMinutes": 15,
+        "changeoverMinutes": 15
+      },
+      "stages": [
+        {
+          "id": "main",
+          "name": "Principal",
+          "color": "#38bdf8",
+          "position": 0
+        },
+        {
+          "id": "carpa",
+          "name": "Carpa",
+          "color": "#a78bfa",
+          "position": 1,
+          "changeoverMinutes": 30
+        }
+      ],
+      "entries": [
+        {
+          "id": "s1",
+          "kind": "show",
+          "name": "Antes",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-10",
+            "start": "20:00",
+            "end": "21:00"
+          }
+        },
+        {
+          "id": "s2",
+          "kind": "show",
+          "name": "Destino",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-10",
+            "start": "21:30",
+            "end": "22:30"
+          }
+        },
+        {
+          "id": "tk",
+          "kind": "task",
+          "name": "Dentro del cambio",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-10",
+            "start": "21:00",
+            "end": "21:20"
+          }
+        },
+        {
+          "id": "mk",
+          "kind": "marker",
+          "name": "Marcador del cambio",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-10",
+            "start": "21:15"
+          }
+        },
+        {
+          "id": "s3",
+          "kind": "show",
+          "name": "Fija",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-10",
+            "start": "23:00",
+            "end": "00:00"
+          },
+          "rules": {
+            "delayMode": "fixed"
+          }
+        },
+        {
+          "id": "tk2",
+          "kind": "task",
+          "name": "Después",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-10",
+            "start": "22:40"
+          }
+        },
+        {
+          "id": "s4",
+          "kind": "show",
+          "name": "Otra zona",
+          "plan": {
+            "stageId": "carpa",
+            "date": "2027-07-10",
+            "start": "21:30",
+            "end": "22:30"
+          }
+        },
+        {
+          "id": "s5",
+          "kind": "show",
+          "name": "Otra jornada",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-11",
+            "start": "21:30",
+            "end": "22:30"
+          }
+        },
+        {
+          "id": "s6",
+          "kind": "show",
+          "name": "Empate con la fija",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-10",
+            "start": "23:00",
+            "end": "23:30"
+          }
+        },
+        {
+          "id": "s2b",
+          "kind": "show",
+          "name": "Empate con el destino",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-10",
+            "start": "21:30",
+            "end": "21:45"
+          }
+        }
+      ],
+      "delays": [
+        {
+          "id": "x1",
+          "kind": "changeover-stretch",
+          "occurredAt": "2027-07-10T19:10:00Z",
+          "festivalDay": "2027-07-10",
+          "minutes": 10,
+          "fromEntryId": "s2",
+          "blockPolicy": {
+            "all": {
+              "show": false,
+              "soundcheck": false,
+              "task": false,
+              "marker": false
+            },
+            "stages": {}
+          }
+        }
+      ]
+    },
+    "configuration": {}
+  },
+  "eventLog": {
+    "logVersion": 1,
+    "snapshots": [],
+    "entries": [],
+    "nextSequence": 1
+  }
+}
