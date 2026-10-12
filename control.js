@@ -2317,7 +2317,8 @@
     IMP = { text: text || '', mode: CONFIG.mode === 'sc' ? 'sc' : 'show', fresh: !FEST, base: FEST, jorTouched: false,
       defJor: FEST && CONFIG.day !== 'all' ? CONFIG.day : days.length === 1 ? days[0] : '', defEsc: stg.length === 1 ? stg[0].nombre : '',
       header: undefined, map: null, create: {}, extend: true, include: {}, edits: {}, read: null, pv: null, name: '',
-      manual: [], mInc: {}, mEdits: {}, mSeq: 0, nPaste: 0 };   // dec. 155: filas manuales del borrador (solo en memoria)
+      manual: [], mInc: {}, mEdits: {}, mSeq: 0, nPaste: 0,   // dec. 155: filas manuales del borrador (solo en memoria)
+      lineDec: {}, manFor: null };   // v20261170: decisiones sobre las líneas no incluidas (solo este borrador) y la que se está añadiendo a mano
     $('imp-notice').hidden = !notice; $('imp-notice').textContent = notice || '';
     impManShow(false); impManClear();
     $('imp-text').value = IMP.text;
@@ -2336,6 +2337,8 @@
   function closeImport() { $('imp').hidden = true; IMP = null; IMP_DRAG = null; IMP_ED = null; IMP_EDPEND = null; impColCtlClose(false); impManShow(false); impManClear(); errPopHide(); cellPopHide(); impColApply(); }
 
   function impResetRows() { IMP.include = {}; IMP.edits = {}; }
+  /** Cambió el texto fuente, el mapeo o la cabecera: las decisiones sobre líneas no incluidas (Ignorar / Añadida a mano) se reinician. */
+  function impResetLines() { IMP.lineDec = {}; IMP.manFor = null; }
 
   function impRecompute() {
     if (!IMP) return;
@@ -2369,6 +2372,84 @@
     impRender();
   }
 
+  // ── v20261170 · Líneas no incluidas ─────────────────────────────────
+  // «Necesitan revisión»: tienen horas pero no son una entrada segura (I.read → review). «Ignoradas»: sin horario o apartadas a mano.
+  // Nada bloquea Importar. Ignorar y Añadir manualmente son decisiones de ESTE borrador: no tocan el texto, lo guardado ni el evento.
+  const IMP_REV_WHY = { 'varias horas': 'Tiene varias horas: no se sabe cuál es la de la entrada', aviso: 'Es un aviso con horas: no se convierte solo en una entrada' };
+  const IMP_IGN_WHY = { 'sin hora': 'Sin horario', 'sin nombre ni hora': 'Sin nombre ni horario', 'sección': 'Título de sección', zona: 'Cabecera de zona',
+    jornada: 'Cabecera de jornada', 'cabecera repetida': 'Cabecera repetida', 'título': 'Título encima de la cabecera' };
+  const impRevWhy = w => tx(IMP_REV_WHY[w] || 'Tiene horas, pero no se puede convertir con seguridad en una entrada');
+  function impIgnWhy(w) {
+    const m = /^sin hora \((.*)\)$/.exec(w || '');
+    return m ? tx('Hora por confirmar ({x})', { x: m[1] }) : tx(IMP_IGN_WHY[w] || 'Sin horario');
+  }
+  /** Identidad estable de cada línea para revisar: su número + su orden entre las de ese número (dos líneas iguales no se confunden). */
+  function impLineKeys(list) { const seen = {}; return list.map(l => l.n + ':' + (seen[l.n] = (seen[l.n] || 0) + 1)); }
+  function impLines() {
+    const rv = (IMP && IMP.read && IMP.read.review) || [], keys = impLineKeys(rv), dec = (IMP && IMP.lineDec) || {};
+    return rv.map((l, i) => ({ l, k: keys[i], d: dec[keys[i]] || '' }));
+  }
+  function impLinesRender() {
+    if (!IMP) return;
+    const all = impLines(), pend = all.filter(x => !x.d), done = all.filter(x => x.d), ign = (IMP.read && IMP.read.ignored) || [];
+    $('imp-lines').hidden = !all.length && !ign.length;
+    $('imp-rev').hidden = !pend.length;
+    $('imp-rev-h').textContent = tx('Necesitan revisión ({n})', { n: pend.length });   // rótulo fijo de la sección (también con 1)
+    const html = pend.map(p => '<li class="imp-revl" data-line="' + esc(p.k) + '"><p class="imp-revt"><span class="imp-revn">' + esc(tx('Línea {n}', { n: p.l.n })) + '</span> ' + esc(p.l.line) + '</p>' +
+      '<p class="imp-revwhy">' + esc(impRevWhy(p.l.why)) + '</p><div class="imp-revacts">' +
+      '<button type="button" class="btn imp-revb" data-lign="' + esc(p.k) + '" aria-label="' + esc(tx('Ignorar la línea {n}', { n: p.l.n })) + '">' + esc(tx('Ignorar')) + '</button>' +
+      '<button type="button" class="btn imp-revb" data-lman="' + esc(p.k) + '" aria-label="' + esc(tx('Añadir manualmente la línea {n}', { n: p.l.n })) + '">' + esc(tx('Añadir manualmente')) + '</button></div></li>').join('');
+    if (IMP.revHtml !== html) { IMP.revHtml = html; $('imp-rev-list').innerHTML = html; }   // sin cambios no se rehace (un clic en curso no se pierde)
+    // Plegadas: las ignoradas (sin horario) y las ya decididas (ignoradas por ti o añadidas a mano), en el orden del texto
+    const items = ign.map(l => ({ n: l.n, line: l.line, why: impIgnWhy(l.why), c: '' }))
+      .concat(done.map(p => ({ n: p.l.n, line: p.l.line, why: tx(p.d === 'man' ? 'Añadida a mano al borrador' : 'Ignorada por ti'), c: p.d === 'man' ? 'man' : 'dec', k: p.k })))
+      .sort((a, b) => a.n - b.n);
+    const nM = done.filter(p => p.d === 'man').length, nI = items.length - nM, box = $('imp-ign');
+    box.hidden = !items.length;
+    const sm = box.querySelector('summary'), ul = box.querySelector('ul');
+    if (sm) sm.textContent = [nI ? tx(nI === 1 ? '{n} línea ignorada' : '{n} líneas ignoradas', { n: nI }) : '', nM ? tx(nM === 1 ? '{n} añadida a mano' : '{n} añadidas a mano', { n: nM }) : ''].filter(Boolean).join(' · ');
+    // Solo las «Ignorada por ti» llevan Restaurar (las ignoradas por no tener horario no lo necesitan)
+    // (texto a la izquierda; Restaurar a la derecha, en la misma columna que Ignorar / Añadir manualmente; las demás no reservan hueco)
+    const ignTxt = x => tx('Línea {n}: {l}', { n: x.n, l: esc(x.line) }) + ' <span class="imp-ignwhy">— ' + esc(x.why) + '</span>';
+    if (ul) ul.innerHTML = items.map(x => x.c === 'dec'
+      ? '<li class="imp-ign-dec"><div class="imp-ignrow"><span class="imp-igntxt">' + ignTxt(x) + '</span><button type="button" class="btn imp-revb imp-res" data-lres="' + esc(x.k) + '" aria-label="' + esc(tx('Restaurar la línea {n}', { n: x.n })) + '">' + esc(tx('Restaurar')) + '</button></div></li>'
+      : '<li' + (x.c ? ' class="imp-ign-' + x.c + '"' : '') + '>' + ignTxt(x) + '</li>').join('');
+  }
+  /** Ignorar: decisión explícita de este borrador. El foco pasa a la siguiente pendiente (o al plegable) para seguir con el teclado. */
+  function impLineIgnore(k) {
+    if (!IMP) return;
+    const pend = impLines().filter(x => !x.d), at = pend.findIndex(x => x.k === k);
+    if (at < 0) return;
+    IMP.lineDec[k] = 'ign'; if (IMP.manFor === k) IMP.manFor = null;
+    impLinesRender();
+    const rest = impLines().filter(x => !x.d), to = rest[Math.min(at, rest.length - 1)];
+    const b = to ? $('imp-rev-list').querySelector('[data-lign="' + to.k + '"]') : $('imp-ign').querySelector('summary');
+    if (b && b.focus) b.focus();
+  }
+  /** Restaurar una «Ignorada por ti»: vuelve a «Necesitan revisión» en su sitio (el orden del texto) y el foco va a su Ignorar. */
+  function impLineRestore(k) {
+    if (!IMP || IMP.lineDec[k] !== 'ign') return;
+    delete IMP.lineDec[k];
+    impLinesRender();
+    const b = $('imp-rev-list').querySelector('[data-lign="' + k + '"]');
+    if (b && b.focus) b.focus();
+  }
+  /** Añadir manualmente: la ficha manual de siempre con el texto original en Nombre; nada más (ni tipo, zona, jornada ni horas).
+   *  La línea solo queda resuelta si la fila se añade de verdad al borrador. */
+  function impLineManual(k) {
+    if (!IMP) return;
+    const it = impLines().find(x => x.k === k && !x.d);
+    if (!it) return;
+    impManClear(); $('imp-m-nombre').value = it.l.line;
+    impManShow(true); IMP.manFor = k;
+  }
+  $('imp-lines').addEventListener('click', e => {
+    const b = e.target.closest && e.target.closest('[data-lign], [data-lman], [data-lres]');
+    if (!b || !IMP) return;
+    if (b.dataset.lres) impLineRestore(b.dataset.lres);
+    else if (b.dataset.lign) impLineIgnore(b.dataset.lign); else impLineManual(b.dataset.lman);
+  });
+
   // ── Dec. 155 · fila manual dentro del importador ─────────────────────
   /** Lo escrito en la ficha → registro como los del texto pegado (las horas se leen igual) y ediciones iniciales (tipo y nombre tal cual). */
   function impManRecord() {
@@ -2380,6 +2461,10 @@
   }
   function impManShow(on) {
     $('imp-man').hidden = !on; $('imp-man-open').setAttribute('aria-expanded', String(!!on));
+    if (!on && IMP && IMP.manFor) {   // ficha oculta o cancelada: la línea de la que venía sigue pendiente y el foco vuelve a su botón
+      const k = IMP.manFor, b = $('imp-rev-list').querySelector('[data-lman="' + k + '"]');
+      IMP.manFor = null; if (b && b.focus) b.focus();
+    }
     if (on) {
       impManJor(); $('imp-m-err').textContent = '';
       try { $('imp-man').scrollIntoView({ block: 'nearest' }); } catch (e) {}   // la ficha está encima del pie: que se vea entera al abrirla (scroll-padding: el pie fijo no la tapa)
@@ -2406,6 +2491,7 @@
     if (one.status === 'err') { $('imp-m-err').textContent = one.errs.map(back).join(' · '); return false; }
     const uid = 'm' + (++IMP.mSeq);
     IMP.manual.push({ uid, rec }); IMP.mEdits[uid] = ed;
+    if (IMP.manFor) { IMP.lineDec[IMP.manFor] = 'man'; IMP.manFor = null; }   // v20261170: solo ahora la línea queda resuelta (añadida de verdad)
     impManClear(); impRecompute();   // tipo y jornada se quedan: listas de filas seguidas
     // La fila nueva es la última de la vista previa: su scroll interno baja hasta ella para que se vea el resultado
     // Con orden activo aparece en su sitio ordenado: el scroll de la vista previa va hasta ella por su id estable
@@ -2958,16 +3044,7 @@
     impColApply(); impSortNote();
     // El foco sigue en el mismo control (rehecho); si la fila se recoloca al confirmar, el scroll la acompaña
     if (fkey) { const n = $('imp-prev').querySelector(fkey); if (n && n !== act && n.focus) { try { n.focus({ preventScroll: !(release && /data-row/.test(fkey)) }); } catch (e) { n.focus(); } } }
-    // Líneas ignoradas (texto libre)
-    const ign = rd.ignored || [];
-    $('imp-ign').hidden = !ign.length;
-    if (ign.length) {
-      const impIgn = $('imp-ign');
-      const summary = impIgn ? impIgn.querySelector('summary') : null;
-      const ul = impIgn ? impIgn.querySelector('ul') : null;
-      if (summary) summary.textContent = tx(ign.length === 1 ? '{n} línea sin hora ignorada' : '{n} líneas sin hora ignoradas', { n: ign.length });
-      if (ul) ul.innerHTML = ign.map(l => '<li>' + tx('Línea {n}: {l}', { n: l.n, l: esc(l.line) }) + '</li>').join('');
-    }
+    impLinesRender();   // v20261170: líneas no incluidas (para revisar · ignoradas)
     // Filas manuales en el borrador (dec. 155)
     const nm = IMP.manual.length;
     $('imp-man-n').textContent = nm ? tx(nm === 1 ? '{n} fila manual en el borrador' : '{n} filas manuales en el borrador', { n: nm }) : '';
@@ -3071,7 +3148,7 @@
   }
   function setImportText(t, msg) {
     if (!IMP) openImport('');
-    IMP.text = t; IMP.map = null; IMP.header = undefined; impResetRows();
+    IMP.text = t; IMP.map = null; IMP.header = undefined; impResetRows(); impResetLines();
     $('imp-text').value = IMP.text;
     $('imp-notice').hidden = true;
     impRecompute();
@@ -3105,7 +3182,7 @@
   });
   $('imp-text').addEventListener('input', () => {
     clearTimeout(impTimer);
-    impTimer = setTimeout(() => { if (!IMP) return; IMP.text = $('imp-text').value; IMP.map = null; IMP.header = undefined; impResetRows(); impRecompute(); }, 250);
+    impTimer = setTimeout(() => { if (!IMP) return; IMP.text = $('imp-text').value; IMP.map = null; IMP.header = undefined; impResetRows(); impResetLines(); impRecompute(); }, 250);
   });
   document.querySelectorAll('#imp [data-imode]').forEach(b => b.addEventListener('click', () => { IMP.mode = b.dataset.imode; impResetRows(); impRecompute(); }));
   $('imp-jor').addEventListener('change', e => { IMP.defJor = e.target.value; IMP.jorTouched = true; impRecompute(); });
@@ -3114,10 +3191,10 @@
   const impSetZone = v => { if (!IMP) return; v = String(v || '').replace(/\s+/g, ' ').trim(); if (v === IMP.defEsc) return; IMP.defEsc = v; impRecompute(); };
   $('imp-esc').addEventListener('input', e => { clearTimeout(impZoneTimer); impZoneTimer = setTimeout(() => impSetZone(e.target.value), 300); });
   $('imp-esc').addEventListener('change', e => { clearTimeout(impZoneTimer); impSetZone(e.target.value); });
-  $('imp-head').addEventListener('change', e => { IMP.header = e.target.checked; IMP.map = null; impResetRows(); impRecompute(); });
+  $('imp-head').addEventListener('change', e => { IMP.header = e.target.checked; IMP.map = null; impResetRows(); impResetLines(); impRecompute(); });
   $('imp-map').addEventListener('change', e => {
     const s = e.target.closest('select[data-col]'); if (!s) return;
-    IMP.map = IMP.read.map.slice(); IMP.map[+s.dataset.col] = s.value; impResetRows(); impRecompute();
+    IMP.map = IMP.read.map.slice(); IMP.map[+s.dataset.col] = s.value; impResetRows(); impResetLines(); impRecompute();
   });
   $('imp-new').addEventListener('input', e => { if (IMP && e.target.id === 'imp-name') IMP.name = e.target.value; });
   $('imp-new').addEventListener('keydown', e => { if (e.target.id === 'imp-name' && e.key === 'Enter') { e.preventDefault(); impDoImport(); } });

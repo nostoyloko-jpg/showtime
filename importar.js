@@ -920,7 +920,24 @@
   }
 
   /** Atajo: texto → { kind, sep?, rows?, map?, header?, records, ignored } */
-  function read(text, ctx, forced) { return markProduction(read0(text, ctx, forced)); }
+  function read(text, ctx, forced) { return markProduction(splitReview(read0(text, ctx, forced))); }
+  /** v20261170 · Líneas NO incluidas que SÍ tienen horas: no se esconden entre las ignoradas ni se convierten a ciegas en una entrada.
+   *  - Una entrada cuyo nombre, ya leída la hora, aún contiene otra hora («Curfew de sonido hasta las 14:00 y entre las 16:00 y las
+   *    18:00») no se puede convertir con seguridad: sale de las filas y queda «para revisar».
+   *  - Una línea apartada (aviso entre ***, sección…) que contiene horas, también «para revisar».
+   *  - Lo demás apartado (sin ninguna hora) sigue en «ignored».
+   *  review: [{ n, line, why }] en el orden del texto. No se inventa nada: el texto va tal cual. */
+  function splitReview(rd) {
+    const review = [], keep = [], ign = [];
+    (rd.records || []).forEach(r => {
+      if (r.banda && findTimes(r.banda).length) review.push({ n: typeof r.src === 'number' ? r.src + 1 : 0, line: r.raw || r.banda, why: 'varias horas' });
+      else keep.push(r);
+    });
+    (rd.ignored || []).forEach(x => { if (findTimes(x.line || '').length) review.push({ n: x.n, line: x.line, why: x.why || 'aviso' }); else ign.push(x); });
+    review.sort((a, b) => a.n - b.n);
+    rd.records = keep; rd.ignored = ign; rd.review = review;
+    return rd;
+  }
   function read0(text, ctx, forced) {
     text = joinQuotedLines(text);
     const d = detect(text);

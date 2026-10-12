@@ -196,6 +196,20 @@
     eq(r.records.length, 1); eq(r.records[0].jornada, '2026-07-10'); eq(r.ignored.length, 1);
   });
 
+  test('v20261170 · líneas con horas que no son una entrada segura → review (no se convierten a ciegas ni se llaman «sin hora»)', () => {
+    const CUR = 'Curfew de sonido hasta las 14:00 y entre las 16:00 y las 18:00';
+    const t = ['SÁBADO 11 JULIO 2026', '10:00 Montaje', CUR, 'Equipo local', '12:00-13:00 Prueba', CUR, '*** Aviso: hasta las 14:00 sin PA ***', '*** sin pirotecnia ***', '21:00-22:00 Show final'].join('\n');
+    const r = I.read(t, CTX);
+    deq(r.records.map(x => x.banda), ['Montaje', 'Prueba', 'Show final'], 'las filas reconocidas, igual y en su orden');
+    deq(r.review, [{ n: 3, line: CUR, why: 'varias horas' }, { n: 6, line: CUR, why: 'varias horas' }, { n: 7, line: '*** Aviso: hasta las 14:00 sin PA ***', why: 'aviso' }], 'dos iguales: cada una con su número');
+    deq(r.ignored, [{ n: 4, line: 'Equipo local' }, { n: 8, line: '*** sin pirotecnia ***' }], 'ignoradas: solo lo que no tiene ninguna hora');
+    // tabla: el curfew en la celda de actividad
+    const tb = I.read('Hora\tActividad\tZona\n10:00\tMontaje\tPrincipal\n\t' + CUR + '\t\n12:00\tPrueba\tPrincipal', CTX);
+    deq(tb.records.map(x => x.banda), ['Montaje', 'Prueba']); deq(tb.review.map(x => [x.n, x.line, x.why]), [[2, CUR, 'varias horas']]);
+    // Una línea normal no se toca
+    const ok1 = I.read('20:00-21:00 Banda Uno\n21:30 Banda Dos', CTX);
+    deq(ok1.review, []); deq(ok1.records.map(x => x.banda), ['Banda Uno', 'Banda Dos']);
+  });
   test('hoja de ruta en PDF: columnas de notas, paréntesis, avisos *** y palabras de tarea/hito', () => {
     const txt = 'VIERNES 10 JULIO\n11:30                Llegada y descarga Omega                     Crew de artista + 4 hands\n' +
       '13:00 - 14:00        Linecheck monitores Uno\n14:30 - 15:30        Parada para comer técnicos locales (por turnos)\n' +
@@ -209,7 +223,8 @@
     eq(pv.rows[2].notas, 'por turnos'); eq(pv.rows[2].escenario, S.escenarios[0].nombre, 'un paréntesis cualquiera no es un escenario: va la «Zona por defecto»');
     eq(pv.rows[3].banda, 'Omega'); eq(pv.rows[3].notas, 'con Kiki y Antonio');
     eq(pv.rows[5].banda, 'OMEGA 30.º ANIVERSARIO'); eq(pv.rows[5].notas, '1 set * 105 min');
-    ok(r.ignored.some(l => /Restricciones/.test(l.line)), 'el aviso *** se ignora (y se lista)');
+    // v20261170: el aviso *** con horas no es «sin hora»: no es una entrada, pero queda PARA REVISAR (no entre las ignoradas)
+    ok(!r.ignored.some(l => /Restricciones/.test(l.line)) && r.review.some(l => /Restricciones de PA hasta las 14:00 y entre las 16:00 y las 18:00/.test(l.line) && l.why === 'aviso'), 'el aviso *** con horas queda para revisar');
   });
 
   // ── Tablas reales de festival (ES / EN): celdas combinadas, turnos de regiduría, horas de prueba y de concierto ──

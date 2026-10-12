@@ -707,6 +707,143 @@
   // ── Dec. 155 · fila manual dentro de «Pegar horario completo» (borrador único, se aplica entero con «Importar») ──
   const manFill = (t, o) => { ['tipo', 'nombre', 'zona', 'jor', 'ini', 'fin', 'call', 'notas'].forEach(k => { t.env.getEl('imp-m-' + k).value = o[k] !== undefined ? o[k] : (k === 'tipo' ? 'show' : ''); }); };
   const dump = t => { const o = {}; t.env.storage.forEach((v, k) => { o[k] = v; }); return JSON.stringify(o); };
+  // ── v20261170 · Líneas no incluidas: «Necesitan revisión» (con horas, sin entrada segura) e «Ignoradas» (sin horario) ──
+  const deq = (a, b, m) => eq(JSON.stringify(a), JSON.stringify(b), m);
+  const LIN_TXT = ['SÁBADO 11 JULIO 2026', '10:00 Montaje', 'Curfew de sonido hasta las 14:00 y entre las 16:00 y las 18:00', 'Equipo local', '12:00-13:00 Prueba de sonido',
+    'Curfew de sonido hasta las 14:00 y entre las 16:00 y las 18:00', '*** Restricciones de PA hasta las 14:00 y entre las 16:00 y las 18:00 ***', '*** sin pirotecnia ***'].join('\n');
+  const linBtn = (t, attr, k) => t.env.fire('imp-lines', 'click', { target: { closest: q => /data-lign|data-lman/.test(q) ? { dataset: { [attr]: k } } : null } });
+  const revLis = t => (ultimo(t, 'imp-rev-list').match(/<li class="imp-revl" data-line="[^"]+">/g) || []).map(x => /data-line="([^"]+)"/.exec(x)[1]);
+  test('Importador v20261170 · el curfew con horas NO es «línea sin hora ignorada»: necesita revisión, con su texto entero, el motivo y Ignorar / Añadir manualmente', () => {
+    const t = panel(), T = t.env.win.ShowtimePanel._test;
+    t.env.fire('document', 'paste', pasteEv(LIN_TXT));
+    eq(t.env.getEl('imp-lines').hidden, false); eq(t.env.getEl('imp-rev').hidden, false);
+    eq(t.env.getEl('imp-rev-h').textContent, 'Necesitan revisión (3)');
+    const rev = ultimo(t, 'imp-rev-list');
+    deq(revLis(t), ['3:1', '6:1', '7:1'], 'las dos líneas iguales se revisan por separado (identidad propia) y el aviso *** con horas también');
+    ok(rev.indexOf('Curfew de sonido hasta las 14:00 y entre las 16:00 y las 18:00</p>') > 0, 'el texto original completo');
+    ok(/Tiene varias horas: no se sabe cuál es la de la entrada/.test(rev) && /Es un aviso con horas: no se convierte solo en una entrada/.test(rev), 'motivo breve y claro');
+    ok(/data-lign="3:1" aria-label="Ignorar la línea 3">Ignorar<\/button><button type="button" class="btn imp-revb" data-lman="3:1" aria-label="Añadir manualmente la línea 3">Añadir manualmente<\/button>/.test(rev), 'dos botones con nombre accesible');
+    ok(!/sin hora\b/i.test(rev + ultimo(t, 'imp-ign') + t.env.getEl('imp-ign').textContent), 'nunca «sin hora» («Sin horario» solo en las que no tienen ninguna hora)');
+    // Ignoradas de verdad (sin ninguna hora), plegadas
+    eq(t.env.getEl('imp-ign').hidden, false); eq(t.env.getEl('imp-ign').textContent, '2 líneas ignoradas');
+    ok(/Línea 4: Equipo local <span class="imp-ignwhy">— Sin horario<\/span>/.test(ultimo(t, 'imp-ign')) && /Línea 8: \*\*\* sin pirotecnia \*\*\*/.test(ultimo(t, 'imp-ign')));
+    // Las filas reconocidas, como siempre y sin bloqueo
+    const pv = ultimo(t, 'imp-prev');
+    ok(/value="Montaje"/.test(pv) && /value="Prueba de sonido"/.test(pv) && !/Curfew/.test(pv), 'la vista previa solo trae lo que SÍ se importa');
+    ok(pv.indexOf('value="Montaje"') < pv.indexOf('value="Prueba de sonido"'), 'en su orden');
+    eq(t.env.getEl('imp-go').title, 'Importar: 2 filas', 'las pendientes no bloquean Importar');
+    eq(t.env.errors.length, 0, t.env.errors.join(' | '));
+  });
+  test('Importador v20261170 · Ignorar y Añadir manualmente: decisiones solo del borrador; cancelar deja la línea pendiente; añadir de verdad la resuelve; cambiar texto, mapeo o cabecera las reinicia', () => {
+    const t = panel(), T = t.env.win.ShowtimePanel._test;
+    const s0 = (() => { const o = {}; t.env.storage.forEach((v, k) => { o[k] = v; }); return JSON.stringify(o); })();
+    t.env.fire('document', 'paste', pasteEv(LIN_TXT));
+    // Ignorar la PRIMERA de dos líneas iguales: la otra sigue pendiente
+    linBtn(t, 'lign', '3:1');
+    deq(revLis(t), ['6:1', '7:1'], 'solo esa'); eq(t.env.getEl('imp-rev-h').textContent, 'Necesitan revisión (2)');
+    ok(/Línea 3: Curfew de sonido hasta las 14:00 y entre las 16:00 y las 18:00 <span class="imp-ignwhy">— Ignorada por ti<\/span>/.test(ultimo(t, 'imp-ign')), 'pasa a Ignoradas como decisión tuya');
+    eq(t.env.getEl('imp-ign').textContent, '3 líneas ignoradas');
+    eq(t.env.getEl('imp-text').value, LIN_TXT, 'el texto fuente, intacto');
+    // Añadir manualmente: ficha de siempre con el texto en Nombre y nada inventado
+    linBtn(t, 'lman', '6:1');
+    eq(t.env.getEl('imp-man').hidden, false, 'abre la ficha manual');
+    eq(t.env.getEl('imp-m-nombre').value, 'Curfew de sonido hasta las 14:00 y entre las 16:00 y las 18:00', 'texto original en Nombre');
+    ['zona', 'ini', 'fin', 'call', 'notas'].forEach(k => eq(t.env.getEl('imp-m-' + k).value, '', k + ': sin inventar'));
+    // Ocultar la ficha: la línea sigue pendiente
+    t.env.fire('imp-m-hide', 'click', {});
+    eq(t.env.getEl('imp-man').hidden, true); deq(revLis(t), ['6:1', '7:1'], 'cancelada: sigue pendiente');
+    // Una fila que no vale (hora imposible) no se añade: sigue pendiente
+    linBtn(t, 'lman', '6:1'); t.env.getEl('imp-m-ini').value = '99:99'; t.env.fire('imp-m-add', 'click', {});
+    ok(t.env.getEl('imp-m-err').textContent, 'error visible'); deq(revLis(t), ['6:1', '7:1'], 'sin añadir: sigue pendiente');
+    // Abrir la ficha desde el pie (sin línea): añadir NO resuelve ninguna línea
+    t.env.fire('imp-m-hide', 'click', {}); t.env.fire('imp-man-open', 'click', {});
+    manFill(t, { nombre: 'Otra cosa', ini: '15:00' }); t.env.fire('imp-m-add', 'click', {});
+    deq(revLis(t), ['6:1', '7:1'], 'una fila manual cualquiera no resuelve líneas');
+    // Añadir de verdad desde la línea: resuelta y marcada como manual (no parece duplicada)
+    t.env.fire('imp-m-hide', 'click', {}); linBtn(t, 'lman', '6:1'); t.env.getEl('imp-m-ini').value = '14:00'; t.env.fire('imp-m-add', 'click', {});
+    eq(t.env.getEl('imp-m-err').textContent, ''); deq(revLis(t), ['7:1'], 'resuelta');
+    ok(/Línea 6: Curfew de sonido hasta las 14:00 y entre las 16:00 y las 18:00 <span class="imp-ignwhy">— Añadida a mano al borrador<\/span>/.test(ultimo(t, 'imp-ign')), 'marcada como añadida a mano');
+    eq(t.env.getEl('imp-ign').textContent, '3 líneas ignoradas · 1 añadida a mano');
+    eq(t.env.getEl('imp-rev-h').textContent, 'Necesitan revisión (1)');
+    eq(t.env.getEl('imp-man-n').textContent, '2 filas manuales en el borrador');
+    eq(t.env.getEl('imp-go').title, 'Importar: 4 filas', 'Montaje, Prueba y las dos manuales');
+    // Cambiar Show/Soundcheck no toca las decisiones
+    ok(/IMP\.mode = b\.dataset\.imode; impResetRows\(\); impRecompute\(\);/.test(D.src('control.js')), 'cambiar Show / Soundcheck no reinicia las decisiones');
+    // Nada guardado hasta Importar
+    const s1 = (() => { const o = {}; t.env.storage.forEach((v, k) => { o[k] = v; }); return JSON.stringify(o); })();
+    eq(s1, s0, 'ni texto fuente, ni persistencia, ni evento');
+    // Cambiar el texto fuente: decisiones reiniciadas (las filas manuales ya añadidas siguen en el borrador)
+    T.setImportText(LIN_TXT + '\n');
+    deq(revLis(t), ['3:1', '6:1', '7:1'], 'todo pendiente otra vez'); eq(t.env.getEl('imp-ign').textContent, '2 líneas ignoradas');
+    // Importar: lo reconocido y lo manual entran; las pendientes no bloquean
+    t.env.fire('imp-go', 'click', {});
+    const s = t.read('showtime.festival');
+    ok(s, 'importado'); deq(s.artists.map(a => a.nombre).sort(), ['Curfew de sonido hasta las 14:00 y entre las 16:00 y las 18:00', 'Montaje', 'Otra cosa', 'Prueba de sonido'].sort());
+    eq(t.env.errors.length, 0, t.env.errors.join(' | '));
+  });
+  test('Importador v20261170 · Restaurar: solo en «Ignorada por ti»; vuelve a «Necesitan revisión» en su sitio, con contadores y foco en su acción', () => {
+    const t = panel();
+    const st = () => { const o = {}; t.env.storage.forEach((v, k) => { o[k] = v; }); return JSON.stringify(o); }, s0 = st();
+    t.env.fire('document', 'paste', pasteEv(LIN_TXT));
+    // una manual añadida desde la línea 3 (no debe moverse al restaurar otra)
+    linBtn(t, 'lman', '3:1'); t.env.getEl('imp-m-ini').value = '14:00'; t.env.fire('imp-m-add', 'click', {});
+    linBtn(t, 'lign', '6:1'); linBtn(t, 'lign', '7:1');
+    deq(revLis(t), [], 'nada pendiente'); eq(t.env.getEl('imp-rev').hidden, true);
+    const ign = ultimo(t, 'imp-ign');
+    deq((ign.match(/data-lres="[^"]+"/g) || []), ['data-lres="6:1"', 'data-lres="7:1"'], 'Restaurar solo en las ignoradas por ti');
+    ok(/Línea 4: Equipo local <span class="imp-ignwhy">— Sin horario<\/span><\/li>/.test(ign) && /Añadida a mano al borrador<\/span><\/li>/.test(ign), 'sin Restaurar en las automáticas ni en la añadida a mano');
+    ok(/data-lres="6:1" aria-label="Restaurar la línea 6">Restaurar<\/button>/.test(ign), 'botón con nombre accesible');
+    ok(/<li class="imp-ign-dec"><div class="imp-ignrow"><span class="imp-igntxt">Línea 6: [^<]*<span class="imp-ignwhy">— Ignorada por ti<\/span><\/span><button type="button" class="btn imp-revb imp-res" data-lres="6:1"/.test(ign), 'texto a la izquierda y Restaurar detrás, en su propia columna');
+    ok(/<li>Línea 4: Equipo local <span class="imp-ignwhy">— Sin horario<\/span><\/li>/.test(ign), 'las automáticas: sin fila de acciones ni hueco reservado');
+    const cssR = D.src('control.css');
+    ok(/\.imp-ignrow\{display:flex;flex-wrap:wrap;align-items:center;/.test(cssR) && /\.imp-ignrow \.imp-res\{flex:none;margin-left:auto\}/.test(cssR), 'Restaurar a la derecha, también si baja de línea');
+    ok(/@media \(max-width:700px\)\{ \.imp-revl\{grid-template-columns:minmax\(0,1fr\)\} \.imp-revacts\{grid-column:1;grid-row:auto;justify-content:flex-end\} \}/.test(cssR), 'en estrecho, Ignorar / Añadir manualmente también bajan a la derecha (misma columna que Restaurar)');
+    eq(t.env.getEl('imp-ign').textContent, '4 líneas ignoradas · 1 añadida a mano');
+    // Restaurar la 6: vuelve a su sitio y el foco va a su Ignorar
+    let foco = ''; t.env.getEl('imp-rev-list').querySelector = q => ({ focus() { foco = q; } });
+    linBtn(t, 'lres', '6:1');
+    deq(revLis(t), ['6:1'], 'pendiente otra vez'); eq(foco, '[data-lign="6:1"]', 'foco en la acción de esa línea');
+    eq(t.env.getEl('imp-rev-h').textContent, 'Necesitan revisión (1)'); eq(t.env.getEl('imp-ign').textContent, '3 líneas ignoradas · 1 añadida a mano');
+    // Restaurar la 7: queda DESPUÉS de la 6 (orden original del texto), no al final de la lista
+    linBtn(t, 'lres', '7:1'); deq(revLis(t), ['6:1', '7:1']); eq(t.env.getEl('imp-rev-h').textContent, 'Necesitan revisión (2)');
+    // en medio: ignorar la 6 y restaurarla la deja antes de la 7
+    linBtn(t, 'lign', '6:1'); linBtn(t, 'lres', '6:1'); deq(revLis(t), ['6:1', '7:1'], 'en su posición original');
+    // Restaurar no hace nada sobre una añadida a mano ni sobre una pendiente
+    linBtn(t, 'lres', '3:1'); deq(revLis(t), ['6:1', '7:1']); ok(/Línea 3: [^<]*<span class="imp-ignwhy">— Añadida a mano al borrador/.test(ultimo(t, 'imp-ign')));
+    delete t.env.getEl('imp-rev-list').querySelector;
+    // Ni texto fuente, ni filas manuales, ni importación, ni persistencia
+    eq(t.env.getEl('imp-text').value, LIN_TXT); eq(t.env.getEl('imp-man-n').textContent, '1 fila manual en el borrador');
+    eq(t.env.getEl('imp-go').title, 'Importar: 3 filas'); eq(st(), s0);
+    ok(/"Restaurar la línea \{n\}": "Restore line \{n\}"/.test(D.src('i18n.js')), 'EN');
+    eq(t.env.errors.length, 0, t.env.errors.join(' | '));
+  });
+  test('Importador v20261170 · tabla: el curfew en la columna de actividad necesita revisión; cambiar el mapeo o la cabecera reinicia Ignorar', () => {
+    const t = panel(), T = t.env.win.ShowtimePanel._test;
+    const TAB = 'Hora\tActividad\tZona\n10:00\tMontaje\tPrincipal\n\tCurfew de sonido hasta las 14:00 y entre las 16:00 y las 18:00\t\n12:00\tPrueba\tPrincipal';
+    t.env.fire('document', 'paste', pasteEv(TAB));
+    deq(revLis(t), ['2:1']); ok(/Curfew de sonido hasta las 14:00 y entre las 16:00 y las 18:00<\/p>/.test(ultimo(t, 'imp-rev-list')));
+    ok(/value="Montaje"/.test(ultimo(t, 'imp-prev')) && /value="Prueba"/.test(ultimo(t, 'imp-prev')) && !/Curfew/.test(ultimo(t, 'imp-prev')));
+    linBtn(t, 'lign', '2:1'); deq(revLis(t), [], 'ignorada'); eq(t.env.getEl('imp-rev').hidden, true);
+    t.env.fire('imp-map', 'change', { target: { closest: () => ({ dataset: { col: '2' }, value: 'notas' }) } });
+    deq(revLis(t), ['2:1'], 'mapeo cambiado: vuelve a estar pendiente');
+    linBtn(t, 'lign', '2:1'); deq(revLis(t), []);
+    t.env.fire('imp-head', 'change', { target: { checked: true } });
+    deq(revLis(t), ['2:1'], 'cabecera cambiada: vuelve a estar pendiente');
+    eq(t.env.errors.length, 0, t.env.errors.join(' | '));
+  });
+  test('Importador v20261170 · bloque de líneas no incluidas: debajo de la vista previa y antes de la ficha manual y el pie; ES/EN; táctil; sin «sin hora»', () => {
+    const html = srcRaw('index.html'), css = D.src('control.css'), js = D.src('control.js'), i18n = D.src('i18n.js');
+    const a = html.indexOf('id="imp-prevwrap"'), b = html.indexOf('id="imp-lines"'), c = html.indexOf('id="imp-man"'), d = html.indexOf('class="imp-foot"');
+    ok(a < b && b < c && c < d, 'tabla · líneas no incluidas · ficha manual · pie');
+    ok(/<section id="imp-lines" class="mcard imp-card imp-linescard" aria-labelledby="imp-lines-h" hidden>[\s\S]*?<details id="imp-ign" class="imp-ign" hidden>/.test(html), 'ignoradas en un plegable');
+    ok(/\.imp-rev-list\{[^}]*max-height:min\(40vh,320px\);overflow:auto\}/.test(css), 'muchas pendientes: la lista se desplaza por dentro');
+    ok(/\.imp-revb\{min-height:32px;/.test(css), 'botones de 32 px (táctil)');
+    ok(!/sin hora ignorad/.test(js + i18n), 'el texto «sin hora ignorada» desaparece');
+    ok(/"Necesitan revisión \(\{n\}\)": "Pending review \(\{n\}\)"/.test(i18n) && !/Necesita revisión/.test(js + i18n), 'rótulo fijo «Necesitan revisión (n)» / «Pending review (n)», también con 1');
+    ['Líneas no incluidas', 'Necesitan revisión ({n})', 'Ignorar', 'Añadir manualmente', 'Ignorar la línea {n}', 'Añadir manualmente la línea {n}', 'Tiene varias horas: no se sabe cuál es la de la entrada',
+      'Es un aviso con horas: no se convierte solo en una entrada', 'Tiene horas, pero no se puede convertir con seguridad en una entrada', 'Sin horario', 'Ignorada por ti', 'Añadida a mano al borrador',
+      '{n} línea ignorada', '{n} líneas ignoradas', '{n} añadida a mano', '{n} añadidas a mano', 'Hora por confirmar ({x})'].forEach(k => ok(i18n.indexOf('"' + k + '": "') > 0, 'EN: ' + k));
+  });
   test('Importador sin evento: pegar + fila manual en línea → nada se guarda hasta «Importar»; vista previa conjunta; se importa todo junto', () => {
     const t = panel(), T = t.env.win.ShowtimePanel._test;
     const s0 = dump(t), undo0 = t.env.getEl('btn-undo').disabled;
@@ -3332,7 +3469,7 @@ const miss = [...found].filter(k => !I.txHas(k) && !/^(OK|CALL|SC|Live|Raycast|S
     ok(css.indexOf(':where(body:not([data-ps="stage"])) :is(.modal-box,.imp-box) :is(input[type=text],input[type=number],input[type=date],input[type=time],input[type=search],input:not([type]),select,textarea):where(:not(:disabled)){background-color:#08090c;border:1px solid rgba(255,255,255,.12)}') >= 0, 'campos: fondo #08090c y borde nítido (background-color, dec. 112); Stage conserva su negro y amarillo');
     ok(/,select,textarea\):focus\{outline:none;border-color:rgba\(255,255,255,\.42\);box-shadow:0 0 0 3px rgba\(255,255,255,\.07\)\}/.test(css), 'halo blanco al escribir');
     const imp = html.slice(html.indexOf('<div id="imp"'), html.indexOf('<datalist id="zones-dl"'));
-    eq((imp.match(/<div class="mcard-h"[^>]*>([^<]+)<\/div>/g) || []).map(x => x.replace(/<[^>]+>/g, '')).join(' · '), 'Horario a importar · Opciones de importación · Columnas del archivo · Vista previa · Fila manual', 'Pegar horario: 4 tarjetas en orden y, debajo de la vista previa, la ficha manual (plegada hasta pedirla)');
+    eq((imp.match(/<div class="mcard-h"[^>]*>([^<]+)<\/div>/g) || []).map(x => x.replace(/<[^>]+>/g, '')).join(' · '), 'Horario a importar · Opciones de importación · Columnas del archivo · Vista previa · Líneas no incluidas · Fila manual', 'Pegar horario: 4 tarjetas en orden y, debajo de la vista previa, las líneas no incluidas (v20261170, oculto si no hay) y la ficha manual (plegada hasta pedirla)');
     ok(/class="mcard imp-card imp-srccard">[\s\S]*id="imp-text"/.test(imp) && /class="mcard imp-card imp-prevcard"><div class="imp-prevhead"><div class="mcard-h"[^>]*>Vista previa<\/div>[\s\S]*?<\/div><div id="imp-prevwrap" class="imp-prevwrap"><table id="imp-prev"/.test(imp), 'texto y vista previa en su tarjeta; los id no cambian');
     ok(/\.imp-prevcard\{flex:1 0 auto;display:flex;flex-direction:column\}/.test(css) && /\.imp-prevwrap\{flex:1;min-height:120px;/.test(css), 'la vista previa ocupa el alto que sobra y nunca baja de su mínimo (dec. 155)');
     ok(/\.imp-box\{[^}]*overflow:auto;scroll-padding-bottom:128px\}/.test(css) && /\.imp-foot\{[^}]*position:sticky;bottom:calc\(-1 \* var\(--imp-pad,20px\)\);/.test(css), 'si no cabe, la ventana hace scroll y el pie queda a la vista');

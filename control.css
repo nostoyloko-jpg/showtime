@@ -393,6 +393,26 @@ body[data-ps="stage"] .imp-errpop{background-color:#000;box-shadow:inset 0 0 0 1
 .imp-prev td.vacio{padding:18px;color:var(--dim)}
 .imp-ign{font-size:12px;color:var(--muted)}
 .imp-ign ul{margin:6px 0 0 18px}
+/* v20261170 · Líneas no incluidas: las que necesitan revisión, visibles (con su texto entero, el motivo y dos botones); las ignoradas,
+   plegadas. Con muchas pendientes, la lista se desplaza por dentro: el importador no se convierte en una pared */
+.imp-linescard[hidden]{display:none}
+.imp-rev[hidden]{display:none}
+.imp-rev-h{margin:2px 0 6px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--call)}
+.imp-rev-list{list-style:none;margin:0 0 8px;padding:0;max-height:min(40vh,320px);overflow:auto}
+.imp-revl{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 12px;align-items:center;padding:8px 0;border-top:1px solid var(--hair)}
+.imp-revl:first-child{border-top:0}
+.imp-revt{grid-column:1;margin:0;font-size:13px;color:var(--text);white-space:normal;overflow-wrap:anywhere}
+.imp-revn{color:var(--muted);font-variant-numeric:tabular-nums;margin-right:4px}
+.imp-revwhy{grid-column:1;margin:0;font-size:12px;color:var(--muted)}
+.imp-revacts{grid-column:2;grid-row:1 / span 2;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.imp-revb{min-height:32px;padding:0 10px;font-size:12px;touch-action:manipulation}
+.imp-ignwhy{color:var(--dim,var(--muted))}
+.imp-ign-man{color:var(--ok)}
+.imp-ign li{line-height:1.5}
+.imp-ignrow{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;padding:2px 0}
+.imp-igntxt{flex:1 1 240px;min-width:0;overflow-wrap:anywhere}
+.imp-ignrow .imp-res{flex:none;margin-left:auto}   /* a la derecha (misma columna que Ignorar / Añadir manualmente); si baja de línea, sigue a la derecha */
+@media (max-width:700px){ .imp-revl{grid-template-columns:minmax(0,1fr)} .imp-revacts{grid-column:1;grid-row:auto;justify-content:flex-end} }   /* estrecho: las acciones bajan, a la derecha (como Restaurar) */
 /* Dec. 155: pie fijo en dos niveles. Arriba, el resumen a todo el ancho (discreto, con una raya fina); debajo, a la izquierda
    «+ Añadir fila manual» (secundaria) y a la derecha, juntas, Cancelar · Importar (la única primaria). En tablet el resumen puede
    partirse; las dos acciones finales bajan juntas y siguen a la vista */

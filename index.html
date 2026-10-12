@@ -13,8 +13,8 @@
 <meta name="apple-mobile-web-app-title" content="Showtime">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
-<link rel="stylesheet" href="control.css?v=20261169">
-<link rel="stylesheet" href="marca.css?v=20261169">
+<link rel="stylesheet" href="control.css?v=20261170">
+<link rel="stylesheet" href="marca.css?v=20261170">
 </head>
 <body>
 <div id="splash" class="splash" hidden></div>
@@ -525,7 +525,12 @@
     </div>
     <div class="mcard imp-card imp-mapcard"><div class="mcard-h" data-i18n>Columnas del archivo</div><div id="imp-map" class="imp-map"></div></div>
     <div class="mcard imp-card imp-prevcard"><div class="imp-prevhead"><div class="mcard-h" data-i18n>Vista previa</div><span id="imp-sortnote" class="imp-sortnote" role="status" aria-live="polite"></span><button id="imp-colreset" class="linkbtn imp-colreset" type="button" data-i18n>Restablecer columnas</button><span id="imp-edhint" class="sr-only" data-i18n>Intro confirma. El texto sigue siendo de una sola línea.</span></div><div id="imp-prevwrap" class="imp-prevwrap"><table id="imp-prev" class="imp-prev"></table></div></div>
-    <details id="imp-ign" class="imp-ign" hidden><summary></summary><ul></ul></details>
+    <!-- v20261170 · Líneas no incluidas: «Necesitan revisión» (tienen horas, pero no son una entrada segura) y, plegadas, las ignoradas -->
+    <section id="imp-lines" class="mcard imp-card imp-linescard" aria-labelledby="imp-lines-h" hidden>
+      <div class="mcard-h" id="imp-lines-h" data-i18n>Líneas no incluidas</div>
+      <div id="imp-rev" class="imp-rev" hidden><h3 id="imp-rev-h" class="imp-rev-h"></h3><ul id="imp-rev-list" class="imp-rev-list" aria-labelledby="imp-rev-h"></ul></div>
+      <details id="imp-ign" class="imp-ign" hidden><summary></summary><ul></ul></details>
+    </section>
     <!-- Dec. 155: fila manual DENTRO del importador (sin otro modal), DEBAJO de la vista previa y encima del pie. Se abre desde el pie;
          cada fila se suma al final del borrador y solo entra con «Importar» -->
     <div id="imp-man" class="mcard imp-card imp-mancard" hidden>
@@ -549,21 +554,21 @@
 <datalist id="zones-dl"></datalist>
 <div id="toast" class="toast" hidden></div>
 
-<script src="i18n.js?v=20261169"></script>
-<script src="core.js?v=20261169"></script>
-<script src="meteo.js?v=20261169"></script>
-<script src="datos.js?v=20261169"></script>
-<script src="importar.js?v=20261169"></script>
-<script src="xlsx.js?v=20261169"></script>
-<script src="qr.js?v=20261169"></script>
-<script src="emision.js?v=20261169"></script>
-<script src="mando.js?v=20261169"></script>
-<script src="vistas.js?v=20261169"></script>
-<script src="log.js?v=20261169"></script>
-<script src="print.js?v=20261169"></script>
-<script src="marca.js?v=20261169"></script>
-<script src="audio.js?v=20261169"></script>
-<script src="control.js?v=20261169"></script>
-<script src="pwa.js?v=20261169"></script>
+<script src="i18n.js?v=20261170"></script>
+<script src="core.js?v=20261170"></script>
+<script src="meteo.js?v=20261170"></script>
+<script src="datos.js?v=20261170"></script>
+<script src="importar.js?v=20261170"></script>
+<script src="xlsx.js?v=20261170"></script>
+<script src="qr.js?v=20261170"></script>
+<script src="emision.js?v=20261170"></script>
+<script src="mando.js?v=20261170"></script>
+<script src="vistas.js?v=20261170"></script>
+<script src="log.js?v=20261170"></script>
+<script src="print.js?v=20261170"></script>
+<script src="marca.js?v=20261170"></script>
+<script src="audio.js?v=20261170"></script>
+<script src="control.js?v=20261170"></script>
+<script src="pwa.js?v=20261170"></script>
 </body>
 </html>
