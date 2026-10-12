@@ -3246,7 +3246,7 @@ const miss = [...found].filter(k => !I.txHas(k) && !/^(OK|CALL|SC|Live|Raycast|S
     const html = D.src('index.html'), css = D.src('control.css'), i18n = D.src('i18n.js');
     const head = html.slice(html.indexOf('<table id="tbl">'), html.indexOf('</thead>'));
     eq((head.match(/data-dgrip=/g) || []).length, 3, 'tres tiradores'); eq((head.match(/data-dreset=/g) || []).length, 3, 'tres ↶');
-    ['zona', 'nombre', 'notas'].forEach(k => ok(new RegExp('data-dwk="' + k + '"><span class="dwl"><span>[A-Za-z]+</span></span><button type="button" class="dw-reset" data-dreset="' + k + '" hidden></button><button type="button" class="dw-grip" data-dgrip="' + k + '" aria-expanded="false" aria-controls="dash-colctl"></button></th>').test(head), k + ': ↶ (oculto) antes del tirador'));
+    ['zona', 'nombre', 'notas'].forEach(k => ok(new RegExp('data-dwk="' + k + '"><span class="dwl"><span>[^<]+</span></span><button type="button" class="dw-reset" data-dreset="' + k + '" hidden></button><button type="button" class="dw-grip" data-dgrip="' + k + '" aria-expanded="false" aria-controls="dash-colctl"></button></th>').test(head), k + ': ↶ (oculto) antes del tirador'));
     ok(/<th class="mo"><\/th>\s*<\/tr>/.test(head), 'la última cabecera (acciones) sigue vacía');
     ok(!/Restablecer columnas/.test(head) && !/dw-reset[^>]*data-dreset="all"/.test(html), 'sin botón global');
     ok(/<div id="dash-colctl" class="imp-colctl" role="group" hidden><button type="button" class="imp-colstep" data-dstep="-1">−<\/button><output id="dash-colw" class="imp-colw" aria-live="polite"><\/output><button type="button" class="imp-colstep" data-dstep="1">\+<\/button><\/div>/.test(html), 'microcontrol propio, como el del importador');
@@ -3315,7 +3315,7 @@ const miss = [...found].filter(k => !I.txHas(k) && !/^(OK|CALL|SC|Live|Raycast|S
 
   test('Dec. 125: «NOMBRE» alineado en Foco, flechas de día en un control agrupado y píldoras cortas en ⌘K', () => {
     const css = D.src('control.css'), js = D.src('control.js'), html = D.src('index.html');
-    ok(/<th class="c-name[ "][^>]*><span class="dwl"><span>Nombre<\/span><\/span><button/.test(html) && /body\.focus #tbl thead th\.c-name\{padding-left:128px\}/.test(css), 'cabecera NOMBRE sobre el texto (128 px medidos: píldora 106 + hueco + relleno)');
+    ok(/<th class="c-name[ "][^>]*><span class="dwl"><span>Nombre \/ Acción<\/span><\/span><button/.test(html) && /body\.focus #tbl thead th\.c-name\{padding-left:128px\}/.test(css), 'cabecera NOMBRE sobre el texto (128 px medidos: píldora 106 + hueco + relleno)');
     ok(/\.dstep\{display:inline-flex;align-items:stretch;border:1px solid var\(--hair2\);border-radius:8px;background:var\(--field\)\}/.test(css), 'grupo con borde y fondo');
     ok(!/\.dstep\{[^}]*overflow:hidden/.test(css), 'sin overflow:hidden: el menú de días no se recorta');
     ok(/\.dstep-b\.prev\{border-right:1px solid var\(--hair2\);/.test(css) && /\.dstep-b\.next\{border-left:1px solid var\(--hair2\);/.test(css), 'separadores');
@@ -3539,6 +3539,311 @@ const miss = [...found].filter(k => !I.txHas(k) && !/^(OK|CALL|SC|Live|Raycast|S
     ok(!/\.bar\{[^}]*flex-wrap:nowrap/.test(css) && !/\.bar\{[^}]*(min-width:\s*\d|width:\s*\d{3,}px)/.test(css), 'nada que la obligue a una línea o a un ancho fijo');
     ok(!/@media[^{]*orientation/.test(css), 'sin excepciones por orientación');
     ok(/\.bright\{display:flex;align-items:center;gap:8px;flex-shrink:0;margin-left:auto\}/.test(css), 'el bloque de la derecha sigue entero (⚙, idioma, reloj) y a la derecha');
+  });
+
+  // ── Cambio de Tipo (v20261172): selector de 4 tipos reales, bloqueo desde ▶, un paso de Deshacer y un hecho en el Log ──
+  function tipoFest() {
+    let s = C.newFestival({ nombre: 'Tipos', fechaInicio: JOR, fechaFin: JOR, dayCutoff: '06:00', coMin: 15 }).state;
+    s = C.addStage(s, 'Principal').state; const Z = s.escenarios[0].id;
+    s = C.addArtist(s, 'show', { jornada: JOR, nombre: 'Banda A', escenarioId: Z, inicio: '23:00', fin: '23:50', call: '22:30' }).state;   // id 1: show + prueba
+    s = C.editArtist(s, 1, 'sc', 'jornada', JOR).state; s = C.editArtist(s, 1, 'sc', 'inicio', '18:00').state;
+    s = C.editArtist(s, 1, 'sc', 'fin', '18:30').state; s = C.editArtist(s, 1, 'sc', 'call', '17:45').state;
+    s = C.addArtist(s, 'show', { jornada: JOR, nombre: 'Solo Show', escenarioId: Z, inicio: '21:00', fin: '22:00', call: '20:30' }).state;   // id 2
+    return s;
+  }
+  function tipoPanel(s, extra) {
+    const t = panel(Object.assign({ 'showtime.festival': JSON.stringify(s), 'showtime.original': JSON.stringify(s) }, extra || {}));
+    t.env.win.CSS = { escape: x => String(x) };
+    return t;
+  }
+  const tipoEl = (id, mode, orig, value) => ({ dataset: { k: 'tipo', orig }, value, classList: { add() {}, remove() {} }, title: '', blur() {}, closest: () => ({ dataset: { id: String(id), mode } }) });
+  const logOf = t => ((t.read('showtime.log') || {}).entries || []);
+  const blkKey = (s, id, kind) => { const b = C.buildBlocks(s, { mode: 'all', day: 'all' }).find(x => String(x.id) === String(id) && x.kind === kind); return b && C.callKey(b); };
+
+  test('Tipo · el selector ofrece los 4 tipos reales (Show, Soundcheck, Tarea, Marcador) con el de la fila marcado; bloqueado desde ▶', () => {
+    let s = tipoFest(); s = JSON.parse(JSON.stringify(s));
+    s.artists.find(a => a.id === 1).showtimeRealSC = { i: Date.now() - 3600e3, f: Date.now() - 1800e3 };   // prueba hecha (▶ y ■)
+    const t = tipoPanel(s, { 'showtime.config': JSON.stringify({ mode: 'all' }) }), h = ultimo(t, 'tbody');
+    const sels = h.match(/<select data-k="tipo"[^>]*>[\s\S]*?<\/select>/g) || [];
+    ok(sels.length >= 3, 'un selector por fila: ' + sels.length);
+    sels.forEach(x => eq((x.match(/<option value="(show|sc|tarea|hito)"/g) || []).join(','), '<option value="show",<option value="sc",<option value="tarea",<option value="hito"', 'cuatro tipos, en orden'));
+    ok(sels.some(x => /data-orig="sc"[^>]*disabled/.test(x) && /value="sc" selected/.test(x)), 'la prueba ya empezada: bloqueada (también tras ■)');
+    ok(sels.some(x => /data-orig="show"/.test(x) && !/disabled/.test(x.split('>')[0]) && /value="show" selected/.test(x)), 'el show sin empezar: libre');
+    eq(t.env.errors.length, 0, t.env.errors.join(' | '));
+  });
+
+  test('Tipo · Show → Tarea con Prueba hermana desde el Dashboard: entrada propia, la Prueba sigue; 1 hecho en el Log y 1 Deshacer (con el OK de CALL)', () => {
+    const s = tipoFest(), key = blkKey(s, 1, 'show'), keySc = blkKey(s, 1, 'sc');
+    const t = tipoPanel(s, { 'showtime.callDone': JSON.stringify([key, keySc]) });
+    const n0 = logOf(t).length;
+    t.T.applyEdit(tipoEl(1, 'show', 'show', 'tarea'));
+    const f = t.read('showtime.festival'), keys = C.buildBlocks(f, { mode: 'all', day: 'all' }).map(b => b.kind + ' ' + b.name + ' ' + C.fmtHM(b.psi)).sort();
+    ok(keys.indexOf('sc Banda A 18:00') >= 0, 'la Prueba hermana sigue visible: ' + keys.join(' | '));
+    ok(keys.indexOf('tarea Banda A 23:00') >= 0, 'la fila tocada es ahora una tarea: ' + keys.join(' | '));
+    eq(f.artists.length, 3, 'entrada nueva, nada fusionado ni borrado');
+    const nl = logOf(t).slice(n0);
+    eq(nl.length, 1, 'un único hecho: ' + nl.map(e => e.type + ':' + e.text).join(' | '));
+    eq(nl[0].type, 'edit'); ok(/^Banda A: tipo Show → Tarea · entrada propia; su Soundcheck sigue igual · se quita: CALL 22:30/.test(nl[0].text), nl[0].text);
+    const cd = t.read('showtime.callDone') || [];
+    ok(cd.indexOf(key) < 0 && cd.indexOf(keySc) >= 0, 'el OK del show sale con él; el de la Prueba no se toca');
+    t.T.undo();
+    const u = t.read('showtime.festival');
+    eq(JSON.stringify(u.artists), JSON.stringify(s.artists), 'un solo Deshacer devuelve el estado entero');
+    const cd2 = t.read('showtime.callDone') || [];
+    ok(cd2.indexOf(key) >= 0 && cd2.indexOf(keySc) >= 0, 'y el OK de CALL vuelve en el mismo paso');
+    eq(t.env.errors.length, 0, t.env.errors.join(' | '));
+  });
+
+  test('Tipo · Show ↔ Soundcheck y Tarea ↔ Marcador desde el Dashboard; regresión: convertir nunca oculta a la hermana', () => {
+    const s = tipoFest(), t = tipoPanel(s);
+    t.T.applyEdit(tipoEl(2, 'show', 'show', 'sc'));
+    let f = t.read('showtime.festival'), a = f.artists.find(x => x.id === 2);
+    eq([a.soundcheckInicio, a.soundcheckFin, a.soundcheckCall].join(), '21:00,22:00,20:30', 'el horario pasa a la Prueba');
+    t.T.applyEdit(tipoEl(1, 'sc', 'sc', 'hito'));
+    f = t.read('showtime.festival');
+    const kinds = C.buildBlocks(f, { mode: 'all', day: 'all' }).filter(b => b.name === 'Banda A').map(b => b.kind).sort().join();
+    eq(kinds, 'hito,show', 'el show hermano sigue; la prueba es ahora un marcador aparte');
+    const m = f.artists.find(x => x.showtimeTipo === 'hito');
+    t.T.applyEdit(tipoEl(m.id, 'show', 'hito', 'tarea'));
+    eq(t.read('showtime.festival').artists.find(x => x.id === m.id).showtimeTipo, 'tarea', 'Marcador → Tarea');
+    eq(t.env.errors.length, 0, t.env.errors.join(' | '));
+  });
+
+  test('Tipo · ▶ bloquea: el Dashboard rechaza el cambio, no escribe nada y no apunta nada', () => {
+    let s = JSON.parse(JSON.stringify(tipoFest()));
+    s.artists.find(a => a.id === 2).showtimeReal = { i: Date.now() - 600e3 };
+    const t = tipoPanel(s), n0 = logOf(t).length, el = tipoEl(2, 'show', 'show', 'tarea');
+    t.T.applyEdit(el);
+    eq(el.value, 'show', 'el selector vuelve a su valor');
+    eq(JSON.stringify(t.read('showtime.festival').artists), JSON.stringify(s.artists), 'nada cambia');
+    eq(logOf(t).length, n0, 'nada en el Log');
+    ok(/Ya empezó/.test(t.env.getEl('toast').textContent), t.env.getEl('toast').textContent);
+  });
+
+  test('Tipo · colisión de CALL: nombre provisional inequívoco, aviso para renombrar y el OK ajeno no se hereda', () => {
+    let s = tipoFest();
+    s = C.addArtist(s, 'all', { tipo: 'tarea', nombre: 'Solo Show', escenarioId: s.escenarios[0].id, jornada: JOR, inicio: '21:00', fin: '21:30' }).state;
+    const tid = s.artists[s.artists.length - 1].id, key = blkKey(s, 2, 'show');
+    const t = tipoPanel(s, { 'showtime.callDone': JSON.stringify([key]) }), n0 = logOf(t).length;
+    t.T.applyEdit(tipoEl(tid, 'show', 'tarea', 'show'));
+    const f = t.read('showtime.festival'), a = f.artists.find(x => x.id === tid);
+    eq(a.nombre, 'Solo Show (2)', 'nombre provisional');
+    ok(blkKey(f, tid, 'show') !== key, 'claves de CALL distintas');
+    const nl = logOf(t).slice(n0); eq(nl.length, 1);
+    ok(/nombre provisional «Solo Show \(2\)»[\s\S]*renómbrala/.test(nl[0].text), nl[0].text);
+    eq((t.read('showtime.callDone') || []).filter(x => x === blkKey(f, tid, 'show')).length, 0, 'sin OK heredado');
+  });
+
+  const rowOf = (h, id) => (h.match(new RegExp('<tr[^>]*data-id="' + id + '"[\\s\\S]*?</tr>', 'g')) || []).join('');
+  const hasNueva = (h, id) => />NUEVA</.test(rowOf(h, id));
+
+  test('Tipo · la separación automática no muestra NUEVA (ni al repintar ni al recargar); el alta manual sí; sigue contando como cambio sin exportar', () => {
+    const s = tipoFest();
+    let cur = C.addArtist(s, 'all', { tipo: 'tarea', nombre: 'Catering', jornada: JOR, inicio: '13:00' }).state;   // alta manual: no está en la referencia
+    const manual = cur.artists[cur.artists.length - 1].id;
+    const t = panel({ 'showtime.festival': JSON.stringify(cur), 'showtime.original': JSON.stringify(s), 'showtime.config': JSON.stringify({ mode: 'all' }) });
+    t.env.win.CSS = { escape: x => String(x) };
+    ok(hasNueva(ultimo(t, 'tbody'), manual), 'el alta manual lleva NUEVA');
+    t.T.applyEdit(tipoEl(1, 'show', 'show', 'tarea'));
+    const f = t.read('showtime.festival'), split = f.artists.find(a => a.showtimeSplitOf === 1);
+    ok(split, 'la fila tocada pasó a una entrada propia');
+    let h = ultimo(t, 'tbody');
+    ok(rowOf(h, split.id), 'la fila convertida se ve'); ok(!hasNueva(h, split.id), 'sin NUEVA en la fila convertida');
+    ok(!/class="[^"]*\bnueva\b/.test(rowOf(h, split.id)), 'ni la clase nueva');
+    ok(hasNueva(h, manual), 'el alta manual conserva NUEVA');
+    eq(t.env.getEl('mods').hidden, false, 'sigue habiendo cambios sin exportar');
+    // Repintar (otra edición) y recargar (la referencia sigue en el almacenamiento)
+    t.T.applyEdit(tipoEl(2, 'show', 'show', 'sc'));
+    h = ultimo(t, 'tbody'); ok(!hasNueva(h, split.id) && hasNueva(h, manual), 'tras repintar, igual');
+    t.env.win.ShowtimePanel.reload();
+    h = ultimo(t, 'tbody'); ok(!hasNueva(h, split.id) && hasNueva(h, manual), 'tras recargar, igual');
+    eq(t.env.errors.length, 0, t.env.errors.join(' | '));
+  });
+
+  test('Tipo · Tarea con fin, CALL, hora real, base, Standby y Tiempo extra → Marcador desde el Dashboard: un hecho que lo enumera todo y un Deshacer que lo devuelve', () => {
+    let s = tipoFest();
+    s = C.addArtist(s, 'all', { tipo: 'tarea', nombre: 'Montaje', escenarioId: s.escenarios[0].id, jornada: JOR, inicio: '10:00', fin: '12:00', notas: 'grúa' }).state;
+    const id = s.artists[s.artists.length - 1].id, ta = s.artists.find(a => a.id === id);
+    Object.assign(ta, { showtimeCall: '09:30', showtimeReal: { i: C.toAbs(JOR, '10:05'), f: C.toAbs(JOR, '11:50') }, showtimeBase: 600, showtimeStandby: true, showtimeAlargar: true });
+    const t = tipoPanel(s), n0 = logOf(t).length;
+    t.T.applyEdit(tipoEl(id, 'show', 'tarea', 'hito'));
+    const a = t.read('showtime.festival').artists.find(x => x.id === id);
+    eq(a.showtimeTipo, 'hito');
+    eq(JSON.stringify([a.fecha, a.inicio, a.notas]), JSON.stringify([JOR, '10:00', 'grúa']), 'fecha, inicio y notas');
+    ok(!a.fin && !a.showtimeCall && a.showtimeReal === undefined && a.showtimeBase === undefined && a.showtimeStandby === undefined && a.showtimeAlargar === undefined, 'todo lo incompatible fuera');
+    const nl = logOf(t).slice(n0);
+    eq(nl.length, 1, 'un único hecho: ' + nl.map(e => e.text).join(' | '));
+    eq(nl[0].text, 'Montaje: tipo Tarea → Marcador · se quita: fin 12:00, CALL 09:30, hora real 10:05–11:50, retraso acumulado, Standby, Tiempo extra · se ve en Jornada completa');
+    t.T.undo();
+    eq(JSON.stringify(t.read('showtime.festival').artists), JSON.stringify(s.artists), 'un Deshacer lo devuelve todo');
+    eq(t.env.errors.length, 0, t.env.errors.join(' | '));
+  });
+
+  test('Tipo · Show con CALL OK → Marcador: se quitan fin, CALL, base, Standby y Tiempo extra, sale el OK de CALL y un Deshacer lo devuelve todo', () => {
+    const s = JSON.parse(JSON.stringify(tipoFest())), sh = s.artists.find(a => a.id === 2);
+    Object.assign(sh, { showtimeBase: 1260, showtimeStandby: true, showtimeAlargar: true });
+    const key = blkKey(s, 2, 'show');
+    const t = tipoPanel(s, { 'showtime.callDone': JSON.stringify([key]) }), n0 = logOf(t).length;
+    t.T.applyEdit(tipoEl(2, 'show', 'show', 'hito'));
+    const nl = logOf(t).slice(n0); eq(nl.length, 1);
+    eq(nl[0].text, 'Solo Show: tipo Show → Marcador · se quita: fin 22:00, CALL 20:30, retraso acumulado, Standby, Tiempo extra · se ve en Jornada completa');
+    ok((t.read('showtime.callDone') || []).indexOf(key) < 0, 'el OK de CALL sale con la banda');
+    t.T.undo();
+    eq(JSON.stringify(t.read('showtime.festival').artists), JSON.stringify(s.artists), 'datos devueltos');
+    ok((t.read('showtime.callDone') || []).indexOf(key) >= 0, 'y el OK de CALL vuelve en el mismo paso');
+  });
+
+  test('Tipo · resumen de cambios sin exportar: la separación es «Cambio de Tipo sin exportar», nunca «banda nueva»; el alta manual sigue siendo nueva; Deshacer no deja residuo', () => {
+    const mods = t => t.env.getEl('mods');
+    // 1) Solo conversión con separación (Show + Soundcheck → Tarea, y otra → Marcador)
+    const s = tipoFest();
+    const a = tipoPanel(s);
+    eq(mods(a).hidden, true, 'recién abierto: sin cambios');
+    a.T.applyEdit(tipoEl(1, 'show', 'show', 'tarea'));
+    eq(mods(a).hidden, false, 'hay cambio pendiente de exportar');
+    ok(/Cambio de Tipo sin exportar/.test(mods(a).title), mods(a).title);
+    ok(!/nueva|nuevo/i.test(mods(a).title), 'nada de «banda nueva»: ' + mods(a).title);
+    a.T.applyEdit(tipoEl(1, 'sc', 'sc', 'hito'));   // la Prueba que quedó sola pasa a Marcador sin separar
+    ok(/ · Cambio de Tipo sin exportar · /.test(mods(a).title) && !/cambios de Tipo|nueva/i.test(mods(a).title), 'sigue siendo una sola separación: ' + mods(a).title);
+    // 4) Deshacer: el resumen vuelve atrás sin residuo
+    a.T.undo();
+    ok(/Cambio de Tipo sin exportar/.test(mods(a).title) && !/nueva/i.test(mods(a).title), 'un Deshacer: ' + mods(a).title);
+    a.T.undo();
+    eq(mods(a).hidden, true, 'dos Deshacer: sin cambios pendientes'); eq(mods(a).title, '');
+    // 2) Alta manual: NUEVA y contador de nueva
+    let cur = C.addArtist(s, 'all', { tipo: 'tarea', nombre: 'Catering', jornada: JOR, inicio: '13:00' }).state;
+    const manual = cur.artists[cur.artists.length - 1].id;
+    const b = panel({ 'showtime.festival': JSON.stringify(cur), 'showtime.original': JSON.stringify(s), 'showtime.config': JSON.stringify({ mode: 'all' }) });
+    b.env.win.CSS = { escape: x => String(x) };
+    ok(/(^| · )1 entrada nueva( · |$)/.test(mods(b).title) && !/Cambio de Tipo/.test(mods(b).title), mods(b).title);
+    ok(hasNueva(ultimo(b, 'tbody'), manual), 'el alta manual lleva NUEVA');
+    // 3) Mixto: alta manual + conversión automática, conceptos separados
+    b.T.applyEdit(tipoEl(1, 'show', 'show', 'tarea'));
+    ok(/(^| · )1 entrada nueva( · |$)/.test(mods(b).title), 'la conversión no suma al contador de altas: ' + mods(b).title);
+    ok(/Cambio de Tipo sin exportar/.test(mods(b).title), mods(b).title);
+    ok(hasNueva(ultimo(b, 'tbody'), manual), 'el alta manual sigue con NUEVA');
+    b.T.undo();
+    ok(/(^| · )1 entrada nueva( · |$)/.test(mods(b).title) && !/Cambio de Tipo/.test(mods(b).title), 'Deshacer: solo queda el alta: ' + mods(b).title);
+    // En inglés, el mismo concepto
+    const e = tipoPanel(s, { 'showtime.config': JSON.stringify({ lang: 'en' }) });
+    e.T.applyEdit(tipoEl(1, 'show', 'show', 'tarea'));
+    ok(/Unexported type change/.test(mods(e).title) && !/new band/i.test(mods(e).title), mods(e).title);
+    [a, b, e].forEach(x => eq(x.env.errors.length, 0, x.env.errors.join(' | ')));
+  });
+
+  // ── R4: cada alta manual es independiente; «Nombre / Acción» ──
+  function addVia(t, tipo, v) {
+    t.env.fire('btn-new-row', 'click', {});
+    t.env.getEl('add-tipo').value = tipo; t.env.fire('addrow', 'change', { target: t.env.getEl('add-tipo') });
+    ['nombre', 'escenario', 'inicio', 'fin', 'call', 'notas'].forEach(k => { t.env.getEl('add-' + k).value = v[k] || ''; });
+    t.env.getEl('add-jornada').value = v.jornada || JOR;
+    t.env.fire('btn-add', 'click', {});
+  }
+  test('R4 · Añadir Show y Añadir Soundcheck con el mismo Nombre / Acción, zona y horas: dos entradas independientes, sin vínculo ni fusión', () => {
+    const F = fest(), t = panel({ 'showtime.festival': JSON.stringify(F.s), 'showtime.original': JSON.stringify(F.s), 'showtime.config': JSON.stringify({ mode: 'all' }) });
+    t.env.win.CSS = { escape: x => String(x) };
+    const n0 = F.s.artists.length;
+    addVia(t, 'show', { nombre: 'Los Iguales', escenario: 'Principal', inicio: '21:00', fin: '22:00' });
+    addVia(t, 'sc', { nombre: 'Los Iguales', escenario: 'Principal', inicio: '18:00', fin: '18:30' });
+    const s = t.read('showtime.festival'), mine = s.artists.filter(a => a.nombre === 'Los Iguales');
+    eq(s.artists.length, n0 + 2, 'dos altas, dos entradas'); eq(mine.length, 2);
+    const [a, b] = mine; ok(a.id !== b.id, 'ids distintos');
+    ok(a.inicio === '21:00' && !a.soundcheckInicio, 'el Show solo tiene su horario');
+    ok(b.soundcheckInicio === '18:00' && !b.inicio, 'el Soundcheck solo el suyo: no se ha metido en el Show');
+    ok(mine.every(x => x.showtimeSplitOf === undefined), 'sin marca de separación');
+    const blocks = C.buildBlocks(s, { mode: 'all', day: 'all' }).filter(x => x.name === 'Los Iguales');
+    eq(blocks.map(x => x.kind + ':' + x.id).sort().join(), ['show:' + a.id, 'sc:' + b.id].sort().join(), 'dos filas, cada una de su entrada');
+    const h = ultimo(t, 'tbody'); ok(hasNueva(h, a.id) && hasNueva(h, b.id), 'las dos son altas: NUEVA');
+    ok(/(^| · )2 entradas nuevas( · |$)/.test(t.env.getEl('mods').title) && !/Cambio de Tipo/.test(t.env.getEl('mods').title), t.env.getEl('mods').title);
+    // Convertir una no toca la otra: no hay hermano, no hay separación
+    const r = C.convertEntryType(s, a.id, 'show', 'tarea'); ok(r.ok && !r.split, 'sin hermano: no se separa');
+    eq(JSON.stringify(r.state.artists.find(x => x.id === b.id)), JSON.stringify(b), 'el Soundcheck no cambia');
+    eq(t.env.errors.length, 0, t.env.errors.join(' | '));
+  });
+  test('R4 · textos: cabecera y campo «Nombre / Acción», placeholder «Introduce texto» en los cuatro tipos; sin «Nombre de la banda» en Añadir', () => {
+    const H = D.src('index.html');
+    ok(/data-dwk="nombre"><span class="dwl"><span>Nombre \/ Acción<\/span>/.test(H), 'cabecera de la columna');
+    ok(/<label for="add-nombre">Nombre \/ Acción<\/label><input id="add-nombre" data-f="nombre" type="text" placeholder="Introduce texto"/.test(H), 'campo de Añadir');
+    const addrow = H.slice(H.indexOf('id="addrow"'), H.indexOf('id="add-err"'));
+    ok(addrow.length > 100 && !/Nombre de la banda|Nombre de artista/.test(addrow), 'nada de «Nombre de la banda» en Añadir');
+    ok(!/Nombre de la banda|Pon el nombre de la banda/.test((D.src('core.js') + D.src('control.js')).replace(/\/\*[\s\S]*?\*\//g, '')), 'ni en el código de core/control');
+    const F = fest(), t = panel({ 'showtime.festival': JSON.stringify(F.s) });
+    t.env.fire('btn-new-row', 'click', {});
+    ['show', 'sc', 'tarea', 'hito'].forEach(k => {
+      t.env.getEl('add-tipo').value = k; t.env.fire('addrow', 'change', { target: t.env.getEl('add-tipo') });
+      eq(t.env.getEl('add-nombre').placeholder, 'Introduce texto', k);
+    });
+    t.T.setAppLang('en'); t.env.getEl('add-tipo').value = 'show'; t.env.fire('addrow', 'change', { target: t.env.getEl('add-tipo') });
+    eq(t.env.getEl('add-nombre').placeholder, 'Enter text', 'en inglés');
+    const I = require('../i18n.js');
+    eq(I.txBack('Nombre / Acción', 'en'), 'Name / Action'); eq(I.txBack('Introduce texto', 'en'), 'Enter text');
+    eq(I.txBack('Introduce un nombre o acción.', 'en'), 'Enter a name or action.');
+  });
+  test('R4 · Añadir sin Nombre / Acción: se rechaza con el aviso neutral y el placeholder sigue siendo «Introduce texto»', () => {
+    const F = fest(), t = panel({ 'showtime.festival': JSON.stringify(F.s) });
+    ['show', 'sc', 'tarea', 'hito'].forEach(k => {
+      addVia(t, k, { nombre: '   ', escenario: 'Principal', inicio: '21:00' });
+      eq(t.env.getEl('add-err').textContent, 'Introduce un nombre o acción.', k);
+      ok(!/banda/i.test(t.env.getEl('add-err').textContent), 'neutral');
+      eq(t.env.getEl('add-nombre').placeholder, 'Introduce texto');
+    });
+    eq(t.read('showtime.festival') ? t.read('showtime.festival').artists.length : F.s.artists.length, F.s.artists.length, 'no se añade nada');
+    ['banda', 'tarea', 'hito'].forEach(tp => eq(C.addArtist(F.s, 'show', { tipo: tp, nombre: '', jornada: F.s.event.fechaInicio, inicio: '10:00' }).error, 'Introduce un nombre o acción.', 'core ' + tp));
+  });
+  test('R4 · una pareja antigua/importada Show + Soundcheck se sigue convirtiendo con separación, sin mezclarse con un Soundcheck manual del mismo nombre', () => {
+    let s = tipoFest();   // id 1: Banda A con Show y Soundcheck en la misma entrada (como un JSON antiguo o importado)
+    s = C.addArtist(s, 'sc', { nombre: 'Banda A', escenarioId: s.escenarios[0].id, jornada: JOR, inicio: '15:00', fin: '15:30' }).state;   // alta manual independiente
+    const manual = s.artists[s.artists.length - 1];
+    const t = tipoPanel(s, { 'showtime.config': JSON.stringify({ mode: 'all' }) });
+    t.T.applyEdit(tipoEl(1, 'show', 'show', 'tarea'));
+    const f = t.read('showtime.festival'), legacy = f.artists.find(a => a.id === 1), split = f.artists.find(a => a.showtimeSplitOf === 1);
+    ok(split && C.tipoOf(split) === 'tarea' && split.inicio === '23:00', 'la fila tocada pasa a su entrada propia');
+    ok(legacy.soundcheckInicio === '18:00' && !legacy.inicio, 'su Soundcheck hermano sigue en la entrada original');
+    eq(JSON.stringify(f.artists.find(a => a.id === manual.id)), JSON.stringify(manual), 'el Soundcheck manual del mismo nombre no se toca');
+    ok(/Cambio de Tipo sin exportar/.test(t.env.getEl('mods').title), t.env.getEl('mods').title);
+    t.T.undo(); eq(JSON.stringify(t.read('showtime.festival').artists), JSON.stringify(s.artists), 'Deshacer en un paso');
+  });
+
+  test('Resumen sin exportar · altas: «1 entrada nueva» / «{n} entradas nuevas» (EN «1 new entry» / «{n} new entries»), distinto de «Cambio de Tipo sin exportar»; aria-label = tooltip', () => {
+    const s = tipoFest();
+    const add = (st, nm, h) => C.addArtist(st, 'all', { tipo: 'tarea', nombre: nm, jornada: JOR, inicio: h }).state;
+    const one = add(s, 'Catering', '13:00'), two = add(one, 'Prensa', '14:00');
+    const open = (cur, lang) => {
+      const t = panel({ 'showtime.festival': JSON.stringify(cur), 'showtime.original': JSON.stringify(s), 'showtime.config': JSON.stringify(Object.assign({ mode: 'all' }, lang ? { lang } : {})) });
+      t.env.win.CSS = { escape: x => String(x) };
+      const el = t.env.getEl('mods'); el.setAttribute = (k, v) => { el['_' + k] = v; };   // el stub del DOM no guarda atributos: se capturan
+      t.env.win.ShowtimePanel.reload();
+      return t;
+    };
+    const parts = t => t.env.getEl('mods').title.split(' · ');
+    const aria = t => t.env.getEl('mods')['_aria-label'];
+    // 1) una alta
+    let t = open(one);
+    ok(parts(t).indexOf('1 entrada nueva') >= 0 && !/banda/i.test(t.env.getEl('mods').title), t.env.getEl('mods').title);
+    eq(aria(t), t.env.getEl('mods').title, 'aria-label = tooltip');
+    ok(hasNueva(ultimo(t, 'tbody'), one.artists[one.artists.length - 1].id), 'la alta conserva NUEVA');
+    let e = open(one, 'en');
+    ok(parts(e).indexOf('1 new entry') >= 0 && !/band/i.test(e.env.getEl('mods').title), e.env.getEl('mods').title);
+    eq(aria(e), e.env.getEl('mods').title);
+    // 2) dos altas
+    t = open(two);
+    ok(parts(t).indexOf('2 entradas nuevas') >= 0, t.env.getEl('mods').title); eq(aria(t), t.env.getEl('mods').title);
+    e = open(two, 'en');
+    ok(parts(e).indexOf('2 new entries') >= 0, e.env.getEl('mods').title); eq(aria(e), e.env.getEl('mods').title);
+    // 3) mixto: alta manual + separación automática, conceptos distintos
+    t = open(one);
+    t.T.applyEdit(tipoEl(1, 'show', 'show', 'tarea'));
+    const p = parts(t);
+    ok(p.indexOf('1 entrada nueva') >= 0 && p.indexOf('Cambio de Tipo sin exportar') >= 0, t.env.getEl('mods').title);
+    ok(p.indexOf('2 entradas nuevas') < 0, 'la separación no suma a las altas');
+    eq(aria(t), t.env.getEl('mods').title, 'aria-label = tooltip tras la conversión');
+    const split = t.read('showtime.festival').artists.find(a => a.showtimeSplitOf === 1);
+    ok(!hasNueva(ultimo(t, 'tbody'), split.id), 'la separación sigue sin NUEVA');
+    e = open(one, 'en');
+    e.T.applyEdit(tipoEl(1, 'show', 'show', 'tarea'));
+    ok(parts(e).indexOf('1 new entry') >= 0 && parts(e).indexOf('Unexported type change') >= 0, e.env.getEl('mods').title);
+    eq(aria(e), e.env.getEl('mods').title);
+    ok(!/banda\(s\)|band\(s\)/.test(D.src('control.js') + D.src('i18n.js')), 'sin el texto antiguo');
   });
 
   // ── Ejecutor ─────────────────────────────────────────────────────────

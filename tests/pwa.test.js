@@ -140,18 +140,18 @@
     eq(Array.from(s.stores.keys()).sort().join(), ['otra-app', 'showtime-' + s.VERSION].sort().join());
     eq(s.log.claim, 1);
   });
-  test('v20261171: versión, caché nueva (la de la 20261170 se borra), «?v=», BUILD y URLs de QR coherentes', async () => {
+  test('v20261172: versión, caché nueva (la de la 20261171 se borra), «?v=», BUILD y URLs de QR coherentes', async () => {
     const s = sw({ net: 'on' });
-    eq(s.VERSION, '20261171', 'Service Worker');
-    await s.caches.open('showtime-20261170');
+    eq(s.VERSION, '20261172', 'Service Worker');
+    await s.caches.open('showtime-20261171');
     await s.lifecycle('install'); await s.lifecycle('activate');
-    ok(!s.stores.has('showtime-20261170') && s.stores.has('showtime-20261171'), 'caché «showtime-20261171», distinta; la de la 20261170 se borra al activar');
-    PAGES.forEach(p => { const vs = src(p).match(/\?v=\d+/g) || []; ok(vs.length > 0 && vs.every(x => x === '?v=20261171'), p + ': todo a ?v=20261171'); });
-    ok(!PAGES.concat(['sw.js', 'emision.js']).some(p => /20261170/.test(src(p))), 'ni rastro de 20261170');
-    const E = require('../emision.js'); eq(E.BUILD, '20261171', 'BUILD');
+    ok(!s.stores.has('showtime-20261171') && s.stores.has('showtime-20261172'), 'caché «showtime-20261172», distinta; la de la 20261171 se borra al activar');
+    PAGES.forEach(p => { const vs = src(p).match(/\?v=\d+/g) || []; ok(vs.length > 0 && vs.every(x => x === '?v=20261172'), p + ': todo a ?v=20261172'); });
+    ok(!PAGES.concat(['sw.js', 'emision.js']).some(p => /20261171/.test(src(p))), 'ni rastro de 20261171');
+    const E = require('../emision.js'); eq(E.BUILD, '20261172', 'BUILD');
     const room = E.withProdKey(E.withCmdKey(await E.newRoom()));
     [E.staffUrl(room, 'https://x/', { vista: 'backstage' }), E.remoteUrl(room, 'https://x/'), E.productionUrl(room, 'https://x/', 'prod_001')]
-      .forEach(u => ok(/[?&]b=20261171[&#]/.test(u), 'QR con la versión nueva: ' + u.split('#')[0]));
+      .forEach(u => ok(/[?&]b=20261172[&#]/.test(u), 'QR con la versión nueva: ' + u.split('#')[0]));
   });
   test('SW · con red: lo último de la red (y se guarda copia, también con «?v=»)', async () => {
     const s = sw({ net: 'on' });

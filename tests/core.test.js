@@ -649,15 +649,20 @@
     eq(sc.state.artists[0].soundcheckInicio, '16:00', 'en Jornada completa, modo elegido: soundcheck');
   });
   test('editArtist tipo: explícito, y desde la fila de soundcheck se lleva su horario', () => {
+    // v20261172: con show y soundcheck, la fila tocada se separa (la otra no se pierde); antes el show arrastraba la banda entera
     const r = C.editArtist(DIA, 1, 'show', 'tipo', 'tarea');
-    ok(r.ok && r.changed); eq(r.state.artists[0].showtimeTipo, 'tarea');
-    eq(C.editArtist(r.state, 1, 'show', 'tipo', 'banda').state.artists[0].showtimeTipo, undefined);
-    ok(!C.editArtist(DIA, 1, 'sc', 'tipo', 'tarea').ok, 'con show y soundcheck: desde la fila del show');
+    ok(r.ok && r.changed && r.split); eq(r.state.artists[0].showtimeTipo, undefined, 'la banda sigue siendo banda');
+    eq(r.state.artists[0].soundcheckInicio, '16:00', 'con su soundcheck'); const nu = r.state.artists.find(x => x.id === r.id); ok(nu && nu.id !== 1); eq(nu.showtimeTipo, 'tarea', 'el show tocado es ahora una tarea propia'); eq(nu.inicio, DIA.artists[0].inicio);
+    const sp = C.editArtist(DIA, 1, 'sc', 'tipo', 'tarea'); ok(sp.ok && sp.split, 'también desde la fila del soundcheck (sin asimetría)');
+    eq(sp.state.artists[0].inicio, DIA.artists[0].inicio, 'el show hermano, intacto');
     const s = JSON.parse(JSON.stringify(DIA)); s.artists[0].inicio = ''; s.artists[0].fin = '';
     const r2 = C.editArtist(s, 1, 'sc', 'tipo', 'tarea'); ok(r2.ok, r2.error);
     const a = r2.state.artists[0]; eq(a.inicio, '16:00'); eq(a.fin, '16:45'); eq(a.soundcheckInicio, undefined);
     ok(!C.editArtist(DIA, 1, 'show', 'tipo', 'otro').ok);
-    eq(C.diffSummary(DIA, r.state).fields, 1, 'el tipo cuenta como cambio');
+    const solo = JSON.parse(JSON.stringify(DIA)); ['soundcheckInicio', 'soundcheckFin', 'soundcheckCall', 'soundcheckFecha'].forEach(k => delete solo.artists[0][k]);
+    const r3 = C.editArtist(solo, 1, 'show', 'tipo', 'tarea'); ok(r3.ok && !r3.split); eq(r3.state.artists[0].showtimeTipo, 'tarea');
+    eq(C.editArtist(r3.state, 1, 'show', 'tipo', 'banda').state.artists[0].showtimeTipo, undefined);
+    ok(C.diffSummary(solo, r3.state).fields >= 1, 'el tipo cuenta como cambio');
   });
 
   test('stripLabels: por estado; las tareas no corren puestos', () => {
@@ -870,6 +875,167 @@
     eq(s.escenarios[0].color, '#38bdf8', 'la primera, azul'); eq(s.escenarios[1].color, '#818cf8');
     eq(C.addStage(s, 'Otra', '#e94560').state.escenarios[2].color, '#e94560', 'un color elegido a mano se respeta');
   });
+
+  // ── v20261172 · cambio de Tipo: C.convertEntryType (Show · Soundcheck · Tarea · Marcador) ──
+  const CV = (() => {
+    let s = C.newFestival({ nombre: 'Tipos', fechaInicio: '2026-07-10', fechaFin: '2026-07-10', dayCutoff: '06:00' }).state;
+    s = C.addStage(s, 'Principal').state; const Z = s.escenarios[0].id;
+    s = C.addArtist(s, 'show', { nombre: 'Banda A', escenarioId: Z, jornada: '2026-07-10', inicio: '22:00', fin: '23:00', call: '21:30', notas: 'show' }).state;   // id 1: show + sc
+    s = C.editArtist(s, 1, 'sc', 'jornada', '2026-07-10').state; s = C.editArtist(s, 1, 'sc', 'inicio', '17:00').state;
+    s = C.editArtist(s, 1, 'sc', 'fin', '17:30').state; s = C.editArtist(s, 1, 'sc', 'call', '16:45').state;
+    s = C.addArtist(s, 'show', { nombre: 'Solo Show', escenarioId: Z, jornada: '2026-07-10', inicio: '20:00', fin: '21:00', call: '19:30' }).state;   // id 2
+    s = C.addArtist(s, 'sc', { nombre: 'Solo Prueba', escenarioId: Z, jornada: '2026-07-10', inicio: '15:00', fin: '15:30', call: '14:40' }).state;   // id 3
+    s = C.addArtist(s, 'all', { tipo: 'tarea', nombre: 'Montaje', escenarioId: Z, jornada: '2026-07-10', inicio: '10:00', fin: '12:00' }).state;      // id 4
+    s = C.addArtist(s, 'all', { tipo: 'hito', nombre: 'Puertas', jornada: '2026-07-10', inicio: '18:30' }).state;                                     // id 5
+    return { s, Z };
+  })();
+  const keysOf = s => C.buildBlocks(s, { mode: 'all', day: 'all' }).map(b => b.key + ' ' + b.name + ' ' + C.fmtHM(b.psi) + (b.psf !== null ? '-' + C.fmtHM(b.psf) : '') + (b.call ? ' call ' + b.call : '')).sort();
+  const frozen = s => JSON.stringify(s);
+  test('Tipo (v20261172) · Show ↔ Soundcheck antes de ▶: el horario pasa de una modalidad a la otra (sin hermano: la misma entrada)', () => {
+    const s0 = frozen(CV.s);
+    const r = C.convertEntryType(CV.s, 2, 'show', 'sc');
+    ok(r.ok && r.changed && !r.split, r.error); eq(r.id, 2); eq(r.key, '2:sc');
+    const a = r.state.artists.find(x => x.id === 2);
+    deq([a.soundcheckInicio, a.soundcheckFin, a.soundcheckCall, a.soundcheckFecha], ['20:00', '21:00', '19:30', '2026-07-10'], 'el horario del show, ahora de soundcheck');
+    ok(!a.inicio && !a.fin && !a.showtimeCall, 'y el show queda vacío (no hay dos horarios)');
+    ok(keysOf(r.state).indexOf('2:sc Solo Show 20:00-21:00 call 19:30') >= 0 && !keysOf(r.state).some(k => /^2:show/.test(k)));
+    const back = C.convertEntryType(CV.s, 3, 'sc', 'show'); ok(back.ok && !back.split);
+    const b = back.state.artists.find(x => x.id === 3); deq([b.inicio, b.fin, b.showtimeCall, b.fecha], ['15:00', '15:30', '14:40', '2026-07-10'], 'simétrico');
+    ok(!b.soundcheckInicio && !b.soundcheckCall);
+    eq(frozen(CV.s), s0, 'operación pura: el estado de entrada no cambia');
+    const same = C.convertEntryType(CV.s, 2, 'show', 'show'); ok(same.ok && !same.changed && same.state === CV.s, 'mismo tipo: nada');
+    ok(!C.convertEntryType(CV.s, 2, 'tarea', 'show').ok, 'la fila tiene que ser del tipo indicado');
+    ok(!C.convertEntryType(CV.s, 2, 'show', 'banda').ok && !C.convertEntryType(CV.s, 999, 'show', 'sc').ok);
+  });
+  test('Tipo (v20261172) · Show / Soundcheck con ▶ quedan bloqueados para siempre (también tras ■ y con ■ solo); Tarea ↔ Marcador no', () => {
+    const at = C.toAbs('2026-07-10', '20:02');
+    const s1 = C.setReal(CV.s, 2, 'show', 'i', at).state;
+    ['sc', 'tarea', 'hito'].forEach(t => { const r = C.convertEntryType(s1, 2, 'show', t); ok(!r.ok && r.locked, 'en directo → ' + t); ok(!r.state, 'sin estado nuevo'); });
+    const s2 = C.setReal(s1, 2, 'show', 'f', at + 60);
+    ['sc', 'tarea', 'hito'].forEach(t => ok(C.convertEntryType(s2.state, 2, 'show', t).locked, 'terminado → ' + t));
+    const sOnlyEnd = C.setReal(CV.s, 3, 'sc', 'f', C.toAbs('2026-07-10', '15:30')).state;
+    ok(C.convertEntryType(sOnlyEnd, 3, 'sc', 'show').locked, '■ (sin ▶) también es un hecho');
+    ok(C.typeLocked(s1.artists.find(a => a.id === 2), 'show') && !C.typeLocked(CV.s.artists.find(a => a.id === 2), 'show'));
+    // La fila hermana que NO empezó sí se puede convertir (la que empezó queda intacta)
+    const sb = C.setReal(CV.s, 1, 'show', 'i', C.toAbs('2026-07-10', '22:00')).state;
+    const r = C.convertEntryType(sb, 1, 'sc', 'tarea'); ok(r.ok && r.split);
+    deq(r.state.artists.find(a => a.id === 1).showtimeReal, sb.artists.find(a => a.id === 1).showtimeReal, 'el ▶ del show, intacto');
+    // Tarea con hora real: sigue pudiendo pasar a Marcador durante la jornada
+    const st = C.setReal(CV.s, 4, 'show', 'i', C.toAbs('2026-07-10', '10:05')).state;
+    ok(C.convertEntryType(st, 4, 'tarea', 'hito').ok, 'Tarea → Marcador con ▶');
+  });
+  test('Tipo (v20261172) · Show + Soundcheck en la misma banda: la fila tocada cambia y la hermana no se oculta, ni se borra, ni se fusiona', () => {
+    const before = keysOf(CV.s);
+    [['show', 'tarea'], ['show', 'hito'], ['show', 'sc'], ['sc', 'show'], ['sc', 'tarea'], ['sc', 'hito']].forEach(([from, to]) => {
+      const r = C.convertEntryType(CV.s, 1, from, to);
+      ok(r.ok && r.split, from + ' → ' + to + ': ' + r.error);
+      const sib = from === 'show' ? 'sc' : 'show', orig = r.state.artists.find(a => a.id === 1), nu = r.state.artists.find(a => a.id === r.id);
+      ok(r.id !== 1 && nu, 'entrada nueva con id propio'); eq(nu.nombre, 'Banda A'); eq(nu.escenarioId, CV.Z, 'misma zona');
+      ok(C.entriesOf(r.state, 'all').some(e => e.a.id === 1 && e.kind === sib), from + ' → ' + to + ': el ' + sib + ' hermano sigue visible');
+      ok(!C.entriesOf(r.state, 'all').some(e => e.a.id === 1 && e.kind === from), 'la banda ya no tiene la fila convertida');
+      const ks = keysOf(r.state);
+      ok(ks.indexOf(before.find(k => k.indexOf('1:' + sib + ' ') === 0)) >= 0, 'el hermano, idéntico (horas y CALL)');
+      eq(ks.length, before.length, 'ni se pierde ni se duplica ninguna fila');
+      ok(ks.some(k => k.indexOf(r.id + ':' + to + ' Banda A') === 0), 'la fila convertida aparece con su tipo nuevo');
+    });
+  });
+  test('Tipo (v20261172) · regresión: Show → Tarea / Marcador ya no puede ocultar el Soundcheck hermano (ni desde editArtist)', () => {
+    ['tarea', 'hito'].forEach(t => {
+      const r = C.editArtist(CV.s, 1, 'show', 'tipo', t); ok(r.ok && r.split);
+      ok(C.entriesOf(r.state, 'sc').some(e => e.a.id === 1), t + ': el soundcheck sigue en la vista Soundchecks');
+      eq(C.tipoOf(r.state.artists.find(a => a.id === 1)), 'banda');
+    });
+  });
+  test('Tipo (v20261172) · clave de CALL repetida (misma zona, nombre y hora): nombre provisional inequívoco, nunca un CALL compartido', () => {
+    let s = C.addArtist(CV.s, 'all', { tipo: 'tarea', nombre: 'Solo Show', escenarioId: CV.Z, jornada: '2026-07-10', inicio: '20:00', fin: '20:30' }).state;   // id 6
+    const r = C.convertEntryType(s, 6, 'tarea', 'show');
+    ok(r.ok); eq(r.renamed, 'Solo Show (2)');
+    const bands = C.buildBlocks(r.state, { mode: 'all', day: 'all' }).filter(b => b.kind === 'show' || b.kind === 'sc');
+    const keys = bands.map(C.callKey); eq(new Set(keys).size, keys.length, 'cada banda, su clave de CALL');
+    // Show + Soundcheck a la misma hora: al separar, la nueva entrada no comparte clave con su hermano
+    let t = C.editArtist(CV.s, 1, 'sc', 'inicio', '22:00').state; t = C.editArtist(t, 1, 'sc', 'fin', '23:00').state;
+    const r2 = C.convertEntryType(t, 1, 'show', 'sc'); ok(r2.ok && r2.split && r2.renamed === 'Banda A (2)');
+    const k2 = C.buildBlocks(r2.state, { mode: 'all', day: 'all' }).filter(b => b.kind === 'sc').map(C.callKey);
+    eq(new Set(k2).size, k2.length);
+    ok(!C.convertEntryType(CV.s, 2, 'show', 'sc').renamed, 'sin choque, el nombre no cambia');
+  });
+  test('Tipo (v20261172) · Tarea ↔ Marcador: hacia Marcador se quitan fin, CALL, hora real, base, Tiempo extra y Standby (y se devuelven para el Log)', () => {
+    let s = C.setReal(CV.s, 4, 'show', 'i', C.toAbs('2026-07-10', '10:05')).state;
+    s.artists.find(a => a.id === 4).showtimeBase = 600; s.artists.find(a => a.id === 4).notas = 'grúa';
+    const r = C.convertEntryType(s, 4, 'tarea', 'hito'); ok(r.ok && !r.split);
+    const a = r.state.artists.find(x => x.id === 4);
+    eq(a.showtimeTipo, 'hito'); deq([a.fecha, a.inicio, a.notas], ['2026-07-10', '10:00', 'grúa'], 'fecha, inicio y notas se conservan');
+    ok(!a.fin && !a.showtimeReal && a.showtimeBase === undefined, 'sin fin, real ni base (nada muerto escondido)');
+    deq(r.dropped.map(d => d.k).sort(), ['base', 'fin', 'real'], 'lo quitado queda para el Log');
+    const back = C.convertEntryType(r.state, 4, 'hito', 'tarea'); ok(back.ok); eq(back.state.artists.find(x => x.id === 4).showtimeTipo, 'tarea'); deq(back.dropped, []);
+    // Show sin hermano → Marcador: quita fin y CALL
+    const m = C.convertEntryType(CV.s, 2, 'show', 'hito'); ok(m.ok && !m.split); deq(m.dropped.map(d => d.k).sort(), ['call', 'fin']);
+    const ma = m.state.artists.find(x => x.id === 2); ok(!ma.fin && !ma.showtimeCall && ma.inicio === '20:00');
+  });
+  test('Tipo (v20261172) · Tarea / Marcador → Show o Soundcheck: reglas de banda por defecto y zona obligatoria si hay zonas', () => {
+    let s = C.setDelayFlag(CV.s, 4, 'lock').state;
+    const r = C.convertEntryType(s, 4, 'tarea', 'show'); ok(r.ok, r.error);
+    const a = r.state.artists.find(x => x.id === 4);
+    eq(C.tipoOf(a), 'banda'); ok(!a.showtimeFija && !a.showtimeLibre, 'el LED vuelve a seguir a su categoría');
+    deq([a.inicio, a.fin], ['10:00', '12:00']);
+    const sc = C.convertEntryType(CV.s, 4, 'tarea', 'sc'); ok(sc.ok);
+    const b = sc.state.artists.find(x => x.id === 4); deq([b.soundcheckInicio, b.soundcheckFin, b.soundcheckFecha], ['10:00', '12:00', '2026-07-10']); ok(!b.inicio, 'el horario va a la modalidad elegida');
+    const noZone = C.convertEntryType(CV.s, 5, 'hito', 'show'); ok(!noZone.ok && /zona/.test(noZone.error), 'Puertas sin zona: pide zona');
+    const z = C.editArtist(CV.s, 5, 'show', 'escenario', CV.Z).state;
+    const ok5 = C.convertEntryType(z, 5, 'hito', 'sc'); ok(ok5.ok); eq(ok5.state.artists.find(x => x.id === 5).soundcheckInicio, '18:30');
+    let nz = C.newFestival({ nombre: 'Sin zonas', fechaInicio: '2026-07-10' }).state;
+    nz = C.addArtist(nz, 'all', { tipo: 'hito', nombre: 'Curfew', jornada: '2026-07-10', inicio: '23:00' }).state;
+    ok(C.convertEntryType(nz, 1, 'hito', 'show').ok, 'un festival sin zonas no las exige');
+  });
+
+  test('Tipo (v20261172) · Tarea con TODO lo incompatible → Marcador: se quitan fin, CALL, hora real, base, Standby y Tiempo extra; quedan fecha, inicio y notas', () => {
+    const s = JSON.parse(JSON.stringify(CV.s)), t = s.artists.find(a => a.id === 4);
+    Object.assign(t, { fin: '12:00', showtimeCall: '09:30', showtimeReal: { i: C.toAbs('2026-07-10', '10:05'), f: C.toAbs('2026-07-10', '11:50') }, showtimeBase: 600, showtimeStandby: true, showtimeAlargar: true, notas: 'grúa' });
+    const s0 = JSON.stringify(s);
+    const r = C.convertEntryType(s, 4, 'tarea', 'hito'); ok(r.ok && !r.split, r.error);
+    const a = r.state.artists.find(x => x.id === 4);
+    eq(a.showtimeTipo, 'hito');
+    deq([a.fecha, a.inicio, a.notas], ['2026-07-10', '10:00', 'grúa'], 'fecha, inicio y notas válidos');
+    ['showtimeReal', 'showtimeBase', 'showtimeStandby', 'showtimeAlargar'].forEach(k => eq(a[k], undefined, k + ' eliminado'));
+    eq(a.fin, '', 'sin fin (casilla de texto vacía, como en un alta)'); eq(a.showtimeCall, '', 'sin CALL (casilla vacía)');
+    deq(r.dropped.map(d => d.k).sort(), ['alargar', 'base', 'call', 'fin', 'real', 'standby'], 'los seis, devueltos para el Log');
+    eq(JSON.stringify(s), s0, 'operación pura');
+    const b = C.buildBlocks(r.state, { mode: 'all', day: 'all' }).find(x => String(x.id) === '4');
+    ok(b && b.kind === 'hito' && C.fmtHM(b.psi) === '10:00', 'el Marcador sigue en la escaleta a su hora');
+  });
+  test('Tipo (v20261172) · separación automática sin etiqueta NUEVA: showtimeSplitOf, shownNewArtistIds y altas manuales intactas', () => {
+    const ref = CV.s;
+    const r = C.convertEntryType(ref, 1, 'show', 'tarea'); ok(r.ok && r.split);
+    const nw = r.state.artists.find(x => x.id === r.id);
+    eq(nw.showtimeSplitOf, 1, 'la entrada separada recuerda de cuál sale');
+    ok(r.state.artists.find(x => x.id === 1).showtimeSplitOf === undefined, 'la banda original no lleva marca');
+    deq(C.newArtistIds(ref, r.state), [r.id], 'sigue siendo una entrada nueva para «cambios sin exportar»');
+    const ds = C.diffSummary(ref, r.state);
+    deq([ds.added, ds.typeChanges], [0, 1], 'diffSummary: cambio de Tipo, no alta nueva');
+    ok(ds.total >= 1, 'sigue siendo un cambio sin exportar');
+    deq(C.shownNewArtistIds(ref, r.state), [], 'pero no lleva etiqueta NUEVA');
+    // Alta manual: NUEVA como siempre; también la copia (Duplicar) de una entrada separada
+    let m = C.addArtist(r.state, 'all', { tipo: 'tarea', nombre: 'Catering', jornada: '2026-07-10', inicio: '13:00' });
+    const manual = m.state.artists[m.state.artists.length - 1].id;
+    const d = C.duplicateArtist(m.state, r.id, 'show', { jornada: '2026-07-10', inicio: '14:00' }); ok(d.ok, d.error);
+    const dup = d.state.artists[d.state.artists.length - 1];
+    ok(dup.showtimeSplitOf === undefined, 'Duplicar no copia la marca');
+    deq(C.shownNewArtistIds(ref, d.state).map(String).sort(), [String(manual), String(dup.id)].sort(), 'las altas del regidor sí son NUEVA');
+    deq([C.diffSummary(ref, d.state).added, C.diffSummary(ref, d.state).typeChanges], [2, 1], 'mixto: altas y cambio de Tipo por separado');
+    // Si la entrada original tampoco estaba en la referencia (alta nueva), la separada hereda su condición de NUEVA
+    let n = C.addArtist(ref, 'show', { nombre: 'Banda Nueva', escenarioId: CV.Z, jornada: '2026-07-10', inicio: '21:00', fin: '21:40' }).state;
+    const nid = n.artists[n.artists.length - 1].id;
+    n = C.editArtist(n, nid, 'sc', 'jornada', '2026-07-10').state; n = C.editArtist(n, nid, 'sc', 'inicio', '16:00').state;
+    const rn = C.convertEntryType(n, nid, 'sc', 'tarea'); ok(rn.ok && rn.split);
+    deq(C.shownNewArtistIds(ref, rn.state).map(String).sort(), [String(nid), String(rn.id)].sort(), 'origen nuevo → las dos NUEVA');
+    deq([C.diffSummary(ref, rn.state).added, C.diffSummary(ref, rn.state).typeChanges], [2, 0], 'origen nuevo → dos altas');
+    // Dos separaciones de entradas que ya estaban: dos cambios de Tipo, ninguna alta
+    let two = C.editArtist(ref, 2, 'sc', 'jornada', '2026-07-10').state; two = C.editArtist(two, 2, 'sc', 'inicio', '16:00').state;
+    const r1 = C.convertEntryType(two, 1, 'show', 'tarea'), r2 = C.convertEntryType(r1.state, 2, 'sc', 'hito'); ok(r1.split && r2.split);
+    const d2 = C.diffSummary(two, r2.state); deq([d2.added, d2.typeChanges], [0, 2]);
+    const u = C.diffSummary(two, r1.state); deq([u.added, u.typeChanges], [0, 1], 'quitar una (Deshacer) no deja residuo');
+  });
+
   let pass = 0; const fails = [];
   tests.forEach(([name, fn]) => {
     try { fn(); pass++; } catch (e) { fails.push([name, e.message]); }

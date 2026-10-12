@@ -142,13 +142,14 @@
   }
 
   /**
-   * Un cambio del festival hecho por el regidor. ctx: { t, src, ev: [entradas propias de la orden], noTimes, skip }
+   * Un cambio del festival hecho por el regidor. ctx: { t, src, ev: [entradas propias de la orden], noTimes, skip, only: [en lugar del diff] }
    * Primero la foto (con el estado de ANTES), luego lo que cambió y luego la orden (retraso, desborde…).
    */
   function commit(log, prev, next, ctx) {
     const c = ctx || {};
     let lg = ensureFoto(log, prev || next, c.t);
     if (c.skip) return lg;
+    if (c.only) return record(lg, c.only, c, next || prev);   // una orden que se describe a sí misma en UN hecho (p. ej. cambio de tipo)
     return record(lg, diff(prev, next, { noTimes: !!c.noTimes, noReal: !!c.noReal }).concat(c.ev || []), c, next || prev);
   }
 

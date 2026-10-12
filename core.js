@@ -558,18 +558,14 @@
       before = a.color || '';
       if (value) a.color = value; else delete a.color;
     } else if (key === 'tipo') {
+      // v20261172: el cambio de tipo es una conversión de dominio (convertEntryType), con las mismas reglas desde cualquier fila
       value = String(raw || '').trim();
-      if (TIPOS.indexOf(value) < 0) return { ok: false, error: 'Tipo no válido.' };
+      if (TIPOS.indexOf(value) < 0 && ROW_KINDS.indexOf(value) < 0) return { ok: false, error: 'Tipo no válido.' };
       before = tipoOf(a);
-      if (value === before) return { ok: true, state: state, changed: false, value: value, before: before };
-      // Desde la fila de soundcheck, una tarea/hito se lleva ese horario (si no hay horario de show que pisar).
-      if (value !== 'banda' && isSC(mode)) {
-        if (a.inicio || a.fin) return { ok: false, error: 'Tiene también horario de show: cambia el tipo desde la fila del show.' };
-        const S = FIELDS.sc;
-        a.fecha = a[S.fecha] || a.fecha || ''; a.inicio = a[S.inicio] || ''; a.fin = a[S.fin] || ''; a.notas = a[S.notas] || a.notas || '';
-        [S.fecha, S.inicio, S.fin, S.call, S.notas, S.standby].forEach(k => { delete a[k]; });
-      }
-      if (value === 'banda') delete a.showtimeTipo; else a.showtimeTipo = value;
+      const src = before === 'banda' ? modeKey(mode) : before;
+      const dst = value === 'banda' ? (before === 'banda' ? src : modeKey(mode)) : value;
+      const r = convertEntryType(state, id, src, dst);
+      return r.ok ? Object.assign({}, r, { value: value, before: before }) : r;
     } else if (key === 'jornada') {
       value = String(raw || '').trim();
       if (dayIndex(value) === null) return { ok: false, error: 'Elige la jornada.' };
@@ -598,6 +594,110 @@
     if ((key === 'inicio' || key === 'fecha' || key === 'jornada') && a[F.base] !== undefined) delete a[F.base];
 
     return { ok: true, state: next, changed: JSON.stringify(state.artists[i]) !== JSON.stringify(a), value: value, before: before };
+  }
+
+  // ── Cambio de Tipo de una entrada (v20261172) ─────────────────────────
+  // Tipos de FILA: show · sc (Prueba / Soundcheck) · tarea · hito (Marcador). Show y Prueba son dos horarios de una misma banda.
+  const ROW_KINDS = ['show', 'sc', 'tarea', 'hito'];
+  const SLICE_KEYS = ['fecha', 'inicio', 'fin', 'call', 'notas', 'standby', 'real', 'base', 'alargar'];
+  const isBandKind = k => k === 'show' || k === 'sc';
+  /** Horario de una fila (sus campos de modo), tal cual. La fecha de la Prueba cae a la del show si no tiene propia. */
+  function sliceOf(a, kind) {
+    const F = FIELDS[kind === 'sc' ? 'sc' : 'show'], s = {};
+    SLICE_KEYS.forEach(k => { const v = a[F[k]]; if (v !== undefined && v !== null && v !== '' && v !== false) s[k] = clone(v); });
+    if (kind === 'sc' && !s.fecha && (s.inicio || s.call) && a.fecha) s.fecha = a.fecha;
+    return s;
+  }
+  function hasSlice(a, kind) {
+    if (kind === 'sc') return !!(a.soundcheckInicio || a.soundcheckCall);
+    return !!(a.inicio || a.fin);
+  }
+  function clearSlice(a, kind) { const F = FIELDS[kind === 'sc' ? 'sc' : 'show']; SLICE_KEYS.forEach(k => { delete a[F[k]]; }); }
+  function writeSlice(a, kind, s) {
+    const F = FIELDS[kind === 'sc' ? 'sc' : 'show'];
+    SLICE_KEYS.forEach(k => { if (s[k] === undefined) delete a[F[k]]; else a[F[k]] = clone(s[k]); });
+    ['fecha', 'inicio', 'fin', 'call', 'notas'].forEach(k => { if (a[F[k]] === undefined) a[F[k]] = ''; });   // como addArtist: campos de texto presentes
+  }
+  /** Lo que el tipo destino no admite: se quita del horario y se devuelve para dejarlo escrito en el Log. */
+  function dropIncompatible(s, target) {
+    const drop = target === 'hito' ? ['fin', 'call', 'real', 'base', 'standby', 'alargar'] : target === 'tarea' ? ['call', 'standby', 'alargar'] : [];
+    const out = [];
+    drop.forEach(k => { if (s[k] !== undefined) { out.push({ k, v: s[k] }); delete s[k]; } });
+    return out;
+  }
+  /** ¿Ya ocurrió? Un Show o una Prueba con ▶ (o ■) registrado no cambia de tipo nunca más. */
+  function startedRow(a, kind) { const r = isBandKind(kind) ? a[FIELDS[kind].real] : null; return !!(r && (Number.isFinite(r.i) || Number.isFinite(r.f))); }
+
+  /**
+   * Convierte la FILA `sourceKind` de la entrada `id` al tipo `targetKind` (show · sc · tarea · hito). Operación pura: no toca `state`.
+   * - Show / Prueba con ▶ (o ■): bloqueado, sin modificar nada.
+   * - Show ↔ Prueba: el horario pasa de una modalidad a la otra.
+   * - Si la banda tiene el horario hermano (Show y Prueba) o el tipo destino ya existe en ella, la fila tocada se separa en una
+   *   entrada NUEVA (id propio) con su horario, nombre, zona, color y reglas; la banda original conserva el hermano intacto.
+   * - Hacia Tarea / Marcador se quitan los datos que ese tipo no admite (devueltos en `dropped`).
+   * - Hacia Show / Prueba: reglas de banda por defecto (LED según su categoría) y zona obligatoria si el festival tiene zonas.
+   * - Si la entrada convertida comparte clave de CALL (zona + nombre + hora) con otra banda, se renombra provisionalmente.
+   * → { ok, state, changed, id (entrada que muestra la fila), key, split, dropped, renamed, from, to, name } o { ok:false, error, locked? }
+   */
+  function convertEntryType(state, id, sourceKind, targetKind) {
+    const i = findArtistIndex(state, id);
+    if (i < 0) return { ok: false, error: 'Entrada no encontrada.' };
+    if (ROW_KINDS.indexOf(sourceKind) < 0 || ROW_KINDS.indexOf(targetKind) < 0) return { ok: false, error: 'Tipo no válido.' };
+    const a0 = state.artists[i], t0 = tipoOf(a0);
+    if (t0 === 'banda' ? !isBandKind(sourceKind) : sourceKind !== t0) return { ok: false, error: 'La fila no corresponde a ese tipo.' };
+    if (sourceKind === targetKind) return { ok: true, state: state, changed: false, id: a0.id, key: a0.id + ':' + sourceKind, split: false, dropped: [], renamed: null, from: sourceKind, to: targetKind, name: a0.nombre || '' };
+    if (startedRow(a0, sourceKind)) return { ok: false, locked: true, error: 'Ya empezó (▶): lo que ha ocurrido no cambia de tipo.' };
+    const sibling = sourceKind === 'show' ? 'sc' : sourceKind === 'sc' ? 'show' : null;
+    const hasSib = t0 === 'banda' && sibling && hasSlice(a0, sibling);
+    if (t0 === 'banda' && hasSib && !hasSlice(a0, sourceKind)) return { ok: false, error: 'Esta fila no tiene horario que convertir.' };
+    const next = clone(state), a = next.artists[i];
+    const slice = t0 === 'banda' ? sliceOf(a, sourceKind) : sliceOf(a, 'show');   // tareas y marcadores: campos del show
+    const dropped = dropIncompatible(slice, targetKind);
+    const toBand = isBandKind(targetKind);
+    let target = a, split = false;
+    if (hasSib) {
+      // La banda conserva el horario hermano tal cual; la fila tocada pasa a una entrada propia
+      if (sourceKind === 'show' && !a.soundcheckFecha) a.soundcheckFecha = fieldValue(a, 'sc', 'fecha');   // la Prueba no pierde su fecha
+      clearSlice(a, sourceKind);
+      if (sourceKind === 'show') ['fecha', 'inicio', 'fin', 'notas'].forEach(k => { a[FIELDS.show[k]] = ''; });
+      const ids = next.artists.map(x => Number(x.id)).filter(Number.isFinite);
+      target = { id: (ids.length ? Math.max.apply(null, ids) : 0) + 1, nombre: a.nombre, escenarioId: a.escenarioId || '' };
+      target.showtimeSplitOf = a.id;   // separación automática: no es un alta del regidor (sin etiqueta NUEVA, ver shownNewArtistIds)
+      // Mismo color que se veía (el de una banda sin color propio depende de su posición: se fija)
+      const col = a.color || (toBand ? artistColor(state, a0) : '');
+      if (col) target.color = col;
+      if (a.showtimeFija) target.showtimeFija = true;
+      if (a.showtimeLibre) target.showtimeLibre = true;
+      next.artists.push(target);
+      split = true;
+    } else if (t0 === 'banda') clearSlice(a, sourceKind);
+    else clearSlice(a, 'show');
+    if (toBand) {
+      delete target.showtimeTipo;
+      if (t0 !== 'banda') { delete target.showtimeFija; delete target.showtimeLibre; }   // reglas de banda por defecto: el LED sigue a su categoría
+      if ((next.escenarios || []).length && !target.escenarioId) return { ok: false, error: 'Elige primero la zona: los shows y las pruebas van en una zona.' };
+      writeSlice(target, targetKind, slice);
+      if (!split && targetKind === 'sc' && !target.inicio && !target.fin) ['fecha', 'inicio', 'fin', 'notas'].forEach(k => { target[FIELDS.show[k]] = target[FIELDS.show[k]] || ''; });
+    } else {
+      target.showtimeTipo = targetKind;
+      writeSlice(target, 'show', slice);
+    }
+    // Clave de CALL repetida (otra banda con la misma zona, nombre y hora): etiqueta provisional inequívoca, nunca OK compartido
+    let renamed = null;
+    if (toBand) {
+      const blocks = rawBlocks(next).filter(b => b.kind === 'show' || b.kind === 'sc');
+      const mine = blocks.find(b => String(b.id) === String(target.id) && b.kind === targetKind);
+      if (mine && blocks.some(b => b !== mine && callKey(b) === callKey(mine))) {
+        const base = normName(target.nombre) || '—';
+        for (let n = 2; n < 100; n++) {
+          const nm = normName(base + ' (' + n + ')');
+          const clash = blocks.some(b => b !== mine && callKey(b) === callKey(Object.assign({}, mine, { name: nm })));
+          if (!clash) { target.nombre = nm; renamed = nm; break; }
+        }
+      }
+    }
+    return { ok: true, state: next, changed: true, id: target.id, key: target.id + ':' + targetKind, split, dropped, renamed,
+      from: sourceKind, to: targetKind, name: a0.nombre || '' };
   }
 
   /** Marca (o quita) STANDBY en el hueco ANTES de este artista. Solo lo hace el regidor. */
@@ -775,7 +875,7 @@
     const tipo = TIPOS.indexOf(d.tipo) >= 0 ? d.tipo : 'banda';
     if (tipo !== 'banda' || isAll(mode)) mode = (tipo === 'banda' && isSC(d.modo)) ? 'sc' : 'show';   // tareas e hitos: campos del show
     const nombre = normName(d.nombre);
-    if (!nombre) return { ok: false, error: tipo === 'banda' ? 'Pon el nombre de la banda.' : 'Pon el nombre (p. ej. ' + (tipo === 'hito' ? 'Puertas' : 'Comida técnicos') + ').', field: 'nombre' };
+    if (!nombre) return { ok: false, error: 'Introduce un nombre o acción.', field: 'nombre' };   // neutral: un alta no presupone una banda
     const esc = String(d.escenarioId || '');
     if (esc && !getEscenario(state, esc)) return { ok: false, error: 'Esa zona no existe.', field: 'escenario' };
     if (tipo === 'banda' && (state.escenarios || []).length && !esc) return { ok: false, error: 'Elige la zona.', field: 'escenario' };
@@ -1118,14 +1218,25 @@
     if (!original || !current) return [];
     return (current.artists || []).filter(a => findArtistIndex(original, a.id) < 0).map(a => a.id);
   }
+  /** Los que llevan la etiqueta NUEVA: las altas nuevas, salvo las que salen de separar al cambiar de Tipo una entrada que ya
+   *  estaba en la referencia (showtimeSplitOf). Esas siguen contando como cambio sin exportar (newArtistIds, diffSummary). */
+  function shownNewArtistIds(original, current) {
+    if (!original || !current) return [];
+    return newArtistIds(original, current).filter(id => !isAutoSplit(original, current.artists[findArtistIndex(current, id)]));
+  }
+  /** ¿Entrada nacida de separar, al cambiar de Tipo, una entrada que ya estaba en la referencia? (cambio de Tipo, no alta) */
+  function isAutoSplit(original, a) {
+    const from = a && a.showtimeSplitOf;
+    return from !== undefined && from !== null && findArtistIndex(original, from) >= 0;
+  }
 
   /** Resumen de cambios: { fields, added, removed, festival, total }. */
   function diffSummary(original, current) {
-    const r = { fields: 0, added: 0, removed: 0, festival: 0, total: 0 };
+    const r = { fields: 0, added: 0, typeChanges: 0, removed: 0, festival: 0, total: 0 };   // typeChanges: separaciones al cambiar de Tipo (no son altas)
     if (!original || !current) return r;
     (current.artists || []).forEach(a => {
       const j = findArtistIndex(original, a.id);
-      if (j < 0) { r.added++; return; }
+      if (j < 0) { if (isAutoSplit(original, a)) r.typeChanges++; else r.added++; return; }
       const o = original.artists[j];
       SHARED_KEYS.forEach(k => { if (fieldValue(o, 'show', k) !== fieldValue(a, 'show', k)) r.fields++; });
       ['show', 'sc'].forEach(m => MODE_KEYS.forEach(k => { if (fieldValue(o, m, k) !== fieldValue(a, m, k)) r.fields++; }));
@@ -1134,7 +1245,7 @@
     if (JSON.stringify(original.event || {}) !== JSON.stringify(current.event || {})) r.festival++;
     if (JSON.stringify(original.escenarios || []) !== JSON.stringify(current.escenarios || [])) r.festival++;
     if (JSON.stringify(original.showtimeRetrasos || []) !== JSON.stringify(current.showtimeRetrasos || [])) r.festival++;
-    r.total = r.fields + r.added + r.removed + r.festival;
+    r.total = r.fields + r.added + r.typeChanges + r.removed + r.festival;
     return r;
   }
 
@@ -1211,9 +1322,9 @@
     getEscenario, artistColor, callAbsFor, buildBlocks,
     blockEnd, isPlaying, playingNow, nextPerStage, progress, changeoverBefore, changeoversNow, gapIdle, nextBandIn, callKey, callAt, callList,
     pickBlocks, stripLabel, stripLabels, validateProject,
-    demoFestival, FIELDS, normHM, fieldValue, editArtist, setStandby, modifiedFields, countModified,
+    demoFestival, FIELDS, normHM, fieldValue, editArtist, convertEntryType, ROW_KINDS, typeLocked: startedRow, setStandby, modifiedFields, countModified,
     fechaFor, jornadaOf, eventDays, checkEvent, newFestival, updateEvent, STAGE_COLORS,
-    addStage, updateStage, moveStage, removeStage, stageUse, addArtist, removeArtist, duplicateArtist, nextJornadaAfter, newArtistIds, diffSummary
+    addStage, updateStage, moveStage, removeStage, stageUse, addArtist, removeArtist, duplicateArtist, nextJornadaAfter, newArtistIds, shownNewArtistIds, diffSummary
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = API;

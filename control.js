@@ -259,7 +259,7 @@
     $('mods').hidden = !d.total;
     // Indicador binario (dec. 128): solo un punto ámbar; qué ha cambiado, al pasar el ratón y para lectores de pantalla
     $('mods').textContent = '';
-    $('mods').title = d.total ? [tx('Cambios sin exportar a JSON (⌘S)'), tx('{n} sin exportar', { n: d.total }), d.added && tx('{n} banda(s) nueva(s)', { n: d.added }), d.removed && tx('{n} borrada(s)', { n: d.removed }), d.fields && tx('{n} casilla(s) cambiada(s)', { n: d.fields }), d.festival && tx('datos del evento o zonas')].filter(Boolean).join(' · ') : '';
+    $('mods').title = d.total ? [tx('Cambios sin exportar a JSON (⌘S)'), tx('{n} sin exportar', { n: d.total }), d.added && (d.added === 1 ? tx('1 entrada nueva') : tx('{n} entradas nuevas', { n: d.added })), d.typeChanges && (d.typeChanges === 1 ? tx('Cambio de Tipo sin exportar') : tx('{n} cambios de Tipo sin exportar', { n: d.typeChanges })), d.removed && tx('{n} borrada(s)', { n: d.removed }), d.fields && tx('{n} casilla(s) cambiada(s)', { n: d.fields }), d.festival && tx('datos del evento o zonas')].filter(Boolean).join(' · ') : '';
     $('mods').setAttribute('aria-label', $('mods').title);
     renderTools();
     renderWarn();
@@ -353,11 +353,14 @@
       opts.sort().map(d => '<option value="' + d + '"' + (d === value ? ' selected' : '') + '>' + esc(fmtDay(d)) + '</option>').join('') + '</select>';
   }
 
-  /** Selector de tipo de una fila: en una banda, la opción «banda» se llama Show o Soundcheck según la fila. */
+  /** Selector de tipo de una fila (v20261172): los cuatro tipos reales — Show, Soundcheck (Prueba), Tarea y Marcador.
+   *  Un Show o un Soundcheck que ya empezó (▶) no cambia de tipo nunca más: el selector queda bloqueado y lo explica. */
+  const ROW_KIND_TXT = { show: 'Show', sc: 'Soundcheck', tarea: 'Tarea', hito: 'Marcador' };
+  function rowKindOf(a, mode) { const t = C.tipoOf(a); return t === 'banda' ? (mode === 'sc' ? 'sc' : 'show') : t; }
   function tipoSelect(a, mode, attrs) {
-    const t = C.tipoOf(a);
-    const lbl = { banda: tx(mode === 'sc' ? 'Soundcheck' : 'Show'), tarea: tx('Tarea'), hito: tx('Marcador') };
-    return '<select ' + attrs + ' class="tipo tipo-' + (t === 'banda' ? mode : t) + '">' + C.TIPOS.map(x => '<option value="' + x + '"' + (x === t ? ' selected' : '') + '>' + lbl[x] + '</option>').join('') + '</select>';
+    const k = rowKindOf(a, mode), locked = C.typeLocked(a, k);
+    return '<select ' + attrs + ' class="tipo tipo-' + k + '"' + (locked ? ' disabled title="' + esc(tx('Ya empezó (▶): lo que ha ocurrido no cambia de tipo.')) + '"' : '') + '>' +
+      C.ROW_KINDS.map(x => '<option value="' + x + '"' + (x === k ? ' selected' : '') + '>' + tx(ROW_KIND_TXT[x]) + '</option>').join('') + '</select>';
   }
 
   /** «1 entrada movida» / «3 entradas movidas». */
@@ -540,7 +543,7 @@
       td('inicio', 't ti', inp('inicio')) +
       td('fin', 't', tipo === 'hito' ? off : inp('fin', '—')) +
       estCell(b) +
-      td('tipo', 'tp', tipoSelect(a, mode, 'data-k="tipo" data-orig="' + tipo + '"')) +
+      td('tipo', 'tp', tipoSelect(a, mode, 'data-k="tipo" data-orig="' + rowKindOf(a, mode) + '"')) +
       td('escenario', 'stage', '<input type="text" list="zones-dl" data-k="zona" value="' + esc(esc0 ? esc0.nombre : '') + '" data-orig="' + esc(esc0 ? esc0.nombre : '') + '" placeholder="' + tx(band ? '— zona —' : '— ninguna —') + '" style="--sc:' + scol + '" title="' + tx('Elige una zona o escribe una nueva para crearla') + '" aria-label="' + tx('Zona') + ': ' + tx('Elige una zona o escribe una nueva para crearla') + '" autocomplete="off" spellcheck="false">' +
         (esc0 && esc0.nombre ? '<span class="ntip ntip-l" aria-hidden="true">' + esc(esc0.nombre) + '</span>' : '')) +   // nombre entero si se corta (v20261169)
       '<td class="name' + (isMod('nombre') || isMod('color') ? ' mod' : '') + '"><div class="nm">' + tipoPill(band ? mode : tipo) +
@@ -564,7 +567,7 @@
     pendingRender = false;
     const mode = CONFIG.mode;
     const mods = ORIG ? { show: C.modifiedFields(ORIG, FEST, 'show'), sc: C.modifiedFields(ORIG, FEST, 'sc') } : {};
-    const nuevas = new Set((ORIG ? C.newArtistIds(ORIG, FEST) : []).map(String));
+    const nuevas = new Set((ORIG ? C.shownNewArtistIds(ORIG, FEST) : []).map(String));   // la separación automática al cambiar de Tipo no es NUEVA
     zonesDatalist();
     $('list-title').textContent = tx(viewOf().title) + (CONFIG.day === 'all' ? ' · ' + tx('todas las jornadas') : ' · ' + fmtDay(CONFIG.day));
     // v20261169: Zona con ancho base compacto y estable (--escw: 112 px en control.css), sin crecer con la zona más larga del evento:
@@ -600,7 +603,8 @@
   }
 
   const ADD_LABEL = { show: 'show', sc: 'soundcheck', tarea: 'tarea', hito: 'hito' };
-  const ADD_PH = { show: 'Nombre de la banda', sc: 'Nombre de la banda', tarea: 'Tarea (p. ej. Comida técnicos)', hito: 'Marcador (p. ej. Puertas, Curfew)' };
+  // Cada alta es una entrada independiente: el texto no presupone una banda (ni un Show con su Soundcheck)
+  const ADD_PH = { show: 'Introduce texto', sc: 'Introduce texto', tarea: 'Introduce texto', hito: 'Introduce texto' };
   /** Hito: sin fin ni CALL. Tarea: sin CALL. Las casillas que no aplican se desactivan. */
   function syncAddTipo() {
     const t = $('add-tipo').value;
@@ -865,8 +869,8 @@
       if (then) { const t = document.querySelector('tr[data-id="' + CSS.escape(then.id) + '"] [data-k="' + then.k + '"]'); if (t) t.focus(); }
       return;
     }
+    if (k === 'tipo') { applyTipo(el, id, rmode, then); return; }
     const r = C.editArtist(FEST, id, rmode, k, el.value);
-    if (!r.ok && k === 'tipo') el.value = el.dataset.orig;
     if (!r.ok) { el.classList.add('bad'); el.title = back(r.error); toast(r.error, true); return; }
     el.classList.remove('bad'); el.title = '';
     if (!r.changed) { el.value = el.dataset.orig; return; }
@@ -887,6 +891,46 @@
       const t = document.querySelector('tr[data-id="' + CSS.escape(then.id) + '"] [data-k="' + then.k + '"]');
       if (t) t.focus();
     }
+  }
+  /** Cambio de Tipo (v20261172): una conversión de dominio (C.convertEntryType), un solo paso de Deshacer y UN hecho en el Log.
+   *  Show / Soundcheck con ▶: bloqueado sin tocar nada. Con Show y Soundcheck en la misma banda, la fila tocada pasa a una entrada
+   *  propia y la otra sigue intacta. Hacia Tarea / Marcador, lo que ese tipo no admite se quita y queda escrito en el Log; el OK de
+   *  CALL de esa fila se va con ella (Deshacer lo devuelve). */
+  function convTxt(r, L) {
+    const kt = k => L(ROW_KIND_TXT[k]);
+    const drop = d => d.k === 'fin' ? L('fin {h}', { h: d.v }) : d.k === 'call' ? L('CALL {h}', { h: d.v }) : d.k === 'notas' ? '' :
+      d.k === 'real' ? L('hora real {h}', { h: [d.v.i, d.v.f].filter(Number.isFinite).map(C.fmtHM).join('–') }) :
+      d.k === 'base' ? L('retraso acumulado') : d.k === 'alargar' ? L('Tiempo extra') : d.k === 'standby' ? L('Standby') : '';
+    const parts = [L('{name}: tipo {de} → {a}', { name: r.name, de: kt(r.from), a: kt(r.to) })];
+    if (r.split) parts.push(L('entrada propia; su {otro} sigue igual', { otro: kt(r.from === 'show' ? 'sc' : 'show') }));
+    const dl = r.dropped.map(drop).filter(Boolean);
+    if (dl.length) parts.push(L('se quita: {lista}', { lista: dl.join(', ') }));
+    if (r.renamed) parts.push(L('nombre provisional «{n}» (la misma zona, nombre y hora ya tenían CALL): renómbrala', { n: r.renamed }));
+    return parts.join(' · ');
+  }
+  function applyTipo(el, id, rmode, then) {
+    const a = (FEST.artists || []).find(x => String(x.id) === String(id));
+    if (!a) return;
+    const src = rowKindOf(a, rmode), r = C.convertEntryType(FEST, id, src, el.value);
+    if (!r.ok) { el.value = el.dataset.orig; toast(r.error, true); return; }
+    if (!r.changed) { el.value = el.dataset.orig; return; }
+    el.dataset.orig = el.value;
+    if (document.activeElement && document.activeElement.closest && document.activeElement.closest('#tbody, #tbody-sin')) document.activeElement.blur();
+    // El OK de CALL va con su fila: si deja de ser banda, sus claves (y sellos) salen; Deshacer las devuelve en el mismo paso
+    CALL_UNDO = null;
+    const old = callBlk(FEST, id, src);
+    if (old && C.isBand(old) && !(r.to === 'show' || r.to === 'sc')) {
+      const key = C.callKey(old), keys = Dt.getCallDone().filter(x => x === key || String(x).indexOf(key + '~') === 0);
+      if (keys.length) { CALL_UNDO = { add: keys.slice(), del: [] }; Dt.unmarkCallDone(keys); keys.forEach(x => CALL_LOGGED.delete(x)); }
+    }
+    const nb = callBlk(r.state, r.id, r.to);
+    const jors = [old && old.jornada, nb && nb.jornada].filter(Boolean);
+    const viewOk = CONFIG.mode === 'all' || (C.isKindMode(CONFIG.mode) ? r.to === CONFIG.mode : ((CONFIG.mode === 'sc' || CONFIG.mode === 'soundcheck') ? r.to === 'sc' : r.to === 'show'));
+    const es = convTxt(r, txEs) + (viewOk ? '' : ' · ' + txEs('se ve en Jornada completa')), ui = convTxt(r, tx) + (viewOk ? '' : ' · ' + tx('se ve en Jornada completa'));
+    commitFestival(r.state, { es, ui }, { only: [{ type: 'edit', key: r.key, jors, amber: !!(r.dropped.length || r.renamed), text: es }] });
+    const row = document.querySelector('#tbody tr[data-key="' + CSS.escape(r.key) + '"], #tbody-sin tr[data-id="' + CSS.escape(String(r.id)) + '"]');
+    if (row) { row.classList.add('flash'); row.scrollIntoView({ block: 'nearest' }); }
+    if (then) { const t = document.querySelector('tr[data-id="' + CSS.escape(then.id) + '"] [data-k="' + then.k + '"]'); if (t) t.focus(); }
   }
   function focusTarget(rel) {
     if (!rel || !rel.closest || !rel.dataset || !rel.dataset.k) return null;
@@ -2063,7 +2107,7 @@
   // DW_TOQUE px de temblor horizontal es toque limpio (abre al soltar); más es arrastre (no abre); un gesto claramente vertical no hace
   // nada. No se usa el «click» del navegador: se decide en pointerup, una sola vez. Gesto cancelado: no abre; si ya arrastraba, se
   // queda el último ancho válido. ↶ de cada columna: solo si ESA cambió; la devuelve a su ancho inicial y desaparece.
-  const DCOLS = [{ k: 'zona', l: 'Zona' }, { k: 'nombre', l: 'Nombre' }, { k: 'notas', l: 'Notas' }];
+  const DCOLS = [{ k: 'zona', l: 'Zona' }, { k: 'nombre', l: 'Nombre / Acción' }, { k: 'notas', l: 'Notas' }];
   const DW = { zona: null, nombre: null, notas: null };   // px (borde a borde de la cabecera) o null = ancho inicial
   const DW_PASO = 16, DW_TOQUE = 6;   // − / + de 16 px (como el importador); 6 px de temblor (decisión de L.A.)
   let DW_FRZ = false, DW_G = null;   // DW_G: gesto en curso sobre un tirador

@@ -175,14 +175,14 @@
     eq(fixed.filter(k => !I.txHas(k)).join(' | '), '', 'sin traducción');
     // 2) mensajes con datos: se traducen enteros y los datos (nombres, horas) se quedan
     const B = s => I.txBack(s, 'en');
-    eq(B('Pon el nombre de la banda.'), 'Enter the band name.');
+    eq(B('Introduce un nombre o acción.'), 'Enter a name or action.');
     eq(B('Tiene 2 bandas. Muévelas a otra zona o bórralas antes.'), 'It has 2 bands. Move them to another stage or delete them first.');
     eq(B('La zona «Carpa Norte» no existe (marca «crear» o cámbiala)'), 'Stage “Carpa Norte” doesn’t exist (tick “create” or change it)');
     eq(B('Ya hay una entrada igual en esta jornada (marcador 19:30): ¿pegada dos veces?'), 'There is already an identical entry on this day (key time 19:30): pasted twice?');
     eq(B('25:30 se lee como 01:30 (madrugada)'), '25:30 is read as 01:30 (early morning)');
     eq(B('OMEGA: Esa zona no existe.'), 'OMEGA: That stage doesn’t exist.', 'error de una fila al importar');
     eq(B('Prueba de sonido'), 'Prueba de sonido', 'sin comodines: un texto cualquiera no se destroza');
-    eq(I.txBack('Pon el nombre de la banda.', 'es'), 'Pon el nombre de la banda.');
+    eq(I.txBack('Introduce un nombre o acción.', 'es'), 'Introduce un nombre o acción.');
     // 3) un horario real con problemas: todos sus avisos y errores salen en inglés
     const C = require('../core.js'), Im = require('../importar.js');
     let st = C.newFestival({ nombre: 'X', fechaInicio: '2026-07-10', fechaFin: '2026-07-10' }).state;
