@@ -117,7 +117,8 @@
               "main"
             ]
           },
-          "fromAt": "2027-07-10T19:00:00Z",
+          "fromEntryId": "B",
+          "fromAt": "2027-07-10T19:30:00Z",
           "blockPolicy": {
             "all": {
               "show": false,

@@ -551,8 +551,10 @@
         "data": {
           "delayId": "d-old2",
           "kind": "delay",
-          "minutes": 5
-        }
+          "minutes": 5,
+          "fromEntryName": "Prueba sin zona antigua"
+        },
+        "entryId": "old-002"
       },
       {
         "id": "log-16",
@@ -577,8 +579,11 @@
         "data": {
           "delayId": "d-old4",
           "kind": "changeover-stretch",
-          "minutes": 4
-        }
+          "minutes": 4,
+          "fromEntryName": "Noche Larga"
+        },
+        "entryId": "show-002",
+        "stageId": "main"
       }
     ],
     "nextSequence": 18

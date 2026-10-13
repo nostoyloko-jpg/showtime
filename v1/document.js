@@ -23,7 +23,7 @@
   const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
   const COLOR_RE = /^#[0-9a-fA-F]{6}$/;
   const PERSON_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
-  const ENTRY_LOG_TYPES = ['entry-added', 'entry-updated', 'entry-deleted', 'actual-start', 'actual-end', 'standby-started', 'standby-ended', 'call-confirmed'];
+  const ENTRY_LOG_TYPES = ['entry-added', 'entry-updated', 'entry-deleted', 'actual-start', 'actual-end', 'actual-end-retracted', 'standby-started', 'standby-ended', 'call-confirmed', 'delay-applied', 'delay-removed'];
 
   // ── Errores ───────────────────────────────────────────────────────────
   /** Error de validación: el documento entero se rechaza. path: dónde; message: qué regla, en español, sin volcar datos. */
@@ -284,13 +284,19 @@
         if (has(d, 'scope')) fail(p + '.scope', 'Un ' + k + ' no lleva scope (es la zona de su entrada).');
         if (has(d, 'fromAt')) fail(p + '.fromAt', 'Un ' + k + ' no lleva fromAt.');
       }
-      // fromEntryId
-      if (has(d, 'fromEntryId') || k !== 'delay') {
+      // fromEntryId (R4.4): todo ajuste, también un delay, lleva una banda destino show/soundcheck existente
+      {
+        if (!has(d, 'fromEntryId')) fail(p + '.fromEntryId', 'Un ' + k + ' necesita su banda destino (fromEntryId): un show o un soundcheck.');
         const id = ident(d.fromEntryId, p + '.fromEntryId');
         const e = ctx.entries.get(id);
         if (!e) fail(p + '.fromEntryId', 'La entrada ' + q(id) + ' no existe.');
-        if (e.plan.date !== o.festivalDay) fail(p + '.fromEntryId', 'La entrada ' + q(id) + ' es de otra jornada.');
-        if (k !== 'delay' && e.kind !== 'show' && e.kind !== 'soundcheck') fail(p + '.fromEntryId', 'Un ' + k + ' solo se aplica a un show o un soundcheck.');
+        if (e.kind !== 'show' && e.kind !== 'soundcheck') fail(p + '.fromEntryId', 'Un ' + k + ' solo se aplica a un show o un soundcheck (' + q(id) + ' es ' + e.kind + ').');
+        // Jornada: delay y changeover-stretch, exactamente la del ajuste. overtime/bis admiten además la jornada inmediatamente
+        // anterior (banda abierta que cruza el corte, R4.4): el ▶ ≤ occurredAt y el ■ > occurredAt de abajo son lo que la hace «abierta».
+        if (e.plan.date !== o.festivalDay) {
+          const transcut = (k === 'overtime' || k === 'bis') && e.plan.date === T.addDays(o.festivalDay, -1);
+          if (!transcut) fail(p + '.fromEntryId', 'La entrada ' + q(id) + ' es de otra jornada (' + e.plan.date + '; el ajuste es de ' + o.festivalDay + ').');
+        }
         const act = e.actual || {}, began = act.startedAt ? T.parseUTC(act.startedAt) : null, en = act.endedAt ? T.parseUTC(act.endedAt) : null;
         if ((k === 'overtime' || k === 'bis')) {
           if (openPerEntry.has(id)) fail(p, 'Como máximo un overtime o bis por entrada (' + q(id) + ').');
@@ -464,6 +470,7 @@
     unique(out.snapshots, s => s.festivalDay, P + '.snapshots', 'Snapshot de la jornada');
     // Entradas
     let prevSeq = 0;
+    const endsById = new Map();   // actual-end ya normalizados (id → { entryId, endedAt }): solo para validar actual-end-retracted; no persiste
     out.entries = reqArr(l.entries, P + '.entries').map((e, i) => {
       const p = P + '.entries[' + i + ']' + (isObj(e) && isInt(e.sequence) ? ' (sequence ' + e.sequence + ')' : '');
       reqObj(e, p);
@@ -481,7 +488,8 @@
       if (has(e, 'entryId')) o.entryId = ident(e.entryId, p + '.entryId');
       else if (ENTRY_LOG_TYPES.indexOf(e.type) >= 0) fail(p + '.entryId', 'Un ' + e.type + ' necesita entryId.');
       if (has(e, 'stageId')) o.stageId = ident(e.stageId, p + '.stageId');   // historia: no tiene que existir hoy
-      o.data = checkLogData(o, reqObj(e.data, p + '.data'), p + '.data', ctx);
+      o.data = checkLogData(o, reqObj(e.data, p + '.data'), p + '.data', ctx, endsById);
+      if (o.type === 'actual-end') endsById.set(o.id, { entryId: o.entryId, endedAt: o.data.endedAt });
       return o;
     });
     unique(out.entries, e => e.id, P + '.entries', 'id de Log');
@@ -492,7 +500,7 @@
 
   /** Devuelve una copia de data con las estructuras conocidas del tipo validadas y normalizadas; el resto de claves
    *  (y todo el data de un tipo desconocido, §7.2) se conserva tal cual (§3.1). */
-  function checkLogData(e, src, p, ctx) {
+  function checkLogData(e, src, p, ctx, endsById) {
     const d = clone(src);
     // entry-added / entry-deleted: { kind, name, plan } completo, plan histórico (§7.1)
     const full = (x, pp) => {
@@ -535,11 +543,29 @@
         if (k === 'overtime') { if (has(src, 'minutes')) fail(p + '.minutes', 'Un overtime no lleva minutes.'); }
         else if (k === 'bis') int(src.minutes, p + '.minutes', 0, 15);
         else int(src.minutes, p + '.minutes', 1, 600);
-        if (has(e, 'entryId')) d.fromEntryName = text(src.fromEntryName, p + '.fromEntryName');
+        d.fromEntryName = text(src.fromEntryName, p + '.fromEntryName');   // R4.4: foto legible de la banda destino, siempre
         break;
       }
-      case 'actual-start': d.startedAt = T.formatUTC(utc(src.startedAt, p + '.startedAt')); break;   // §3.2: se guarda con segundos
-      case 'actual-end': d.endedAt = T.formatUTC(utc(src.endedAt, p + '.endedAt')); break;
+      case 'actual-start':
+        d.startedAt = T.formatUTC(utc(src.startedAt, p + '.startedAt'));   // §3.2: se guarda con segundos
+        if (has(src, 'previousStartedAt')) d.previousStartedAt = T.formatUTC(utc(src.previousStartedAt, p + '.previousStartedAt'));   // corrección (R4.4)
+        break;
+      case 'actual-end':
+        d.endedAt = T.formatUTC(utc(src.endedAt, p + '.endedAt'));
+        if (has(src, 'previousEndedAt')) d.previousEndedAt = T.formatUTC(utc(src.previousEndedAt, p + '.previousEndedAt'));
+        break;
+      case 'actual-end-retracted': {
+        // R4.4: deshace un ■ ya registrado. Cita por id un actual-end ANTERIOR en el Log de la misma entrada (el índice se construye
+        // en orden de secuencia, así que una referencia a una entrada posterior, inexistente, de otra entrada o de otro tipo no resuelve).
+        const ref = ident(src.undoneLogId, p + '.undoneLogId');
+        if (!endsById || !endsById.has(ref)) fail(p + '.undoneLogId', 'Debe citar un actual-end anterior del Log (' + q(ref) + ' no lo es).');
+        const undone = endsById.get(ref);
+        if (undone.entryId !== e.entryId) fail(p + '.undoneLogId', 'El actual-end ' + q(ref) + ' es de otra entrada.');
+        d.endedAt = T.formatUTC(utc(src.endedAt, p + '.endedAt'));
+        // R4.4-7.4-5 / R4.4-8: endedAt es la hora que se retira, exactamente la registrada en el actual-end citado
+        if (d.endedAt !== undone.endedAt) fail(p + '.endedAt', 'Debe coincidir con la hora del actual-end retirado ' + q(ref) + ' (' + undone.endedAt + ').');
+        break;
+      }
       case 'call-confirmed': {
         const c = reqObj(src.confirmedBy, p + '.confirmedBy');
         if (typeof c.personId !== 'string' || !PERSON_ID_RE.test(c.personId)) fail(p + '.confirmedBy.personId', 'personId no válido.');

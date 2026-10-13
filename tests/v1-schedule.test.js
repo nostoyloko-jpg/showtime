@@ -47,13 +47,13 @@ test('1 · pureza: no muta el documento ni activeLiveEntryIds; misma entrada →
 test('2 · delay: scope {}, por zonas, includeUnzoned, fromAt, foto blockPolicy, free, fixed y ya empezada', () => {
   const r = run(J('v1-schedule-delay.showtime'), '10 20:00');
   table(r, [
-    ['a0', '10 19:02', '10 19:45', '10 18:47'],   // ▶ 19:02 antes de d1 (19:30): no se mueve; su CALL va con su ▶
+    ['a0', '10 19:02', '10 19:45', '10 18:47'],   // ▶ 19:02 antes de d1 (19:30) y antes de su «desde» (a1, 20:00): no se mueve; su CALL va con su ▶
     ['a1', '10 20:10', '10 21:10', '10 19:55'],   // d1 +10
     ['a2', '10 21:40', '10 23:10', '10 21:10'],   // d1 +10; CALL escrito 21:00 se mueve con la entrada
     ['a3', '10 23:00', '11 00:00', '10 22:45'],   // fixed
     ['a4', '11 00:40', '11 01:40', '11 00:25'],   // free (y de la jornada del 10 aunque sea el día civil 11)
     ['b0', '10 20:40', '10 21:00', '10 20:25'],   // d1 +10; queda antes del fromAt de d2
-    ['t3', '10 21:10', '10 21:20', null],         // 20:55 + d1 = 21:05 ≥ fromAt de d2 → +5
+    ['t3', '10 21:05', '10 21:15', null],         // 20:55 + d1 = 21:05, establemente ANTES de b1 (21:10, fromAt de d2): d2 no la alcanza (R4.4-1.5)
     ['b1', '10 21:15', '10 22:15', '10 21:00'],   // d1 +10, d2 +5
     ['t1', '10 21:10', '10 21:40', null],         // d1 +10; d2 la bloquea su máscara unzoned
     ['k1', '10 22:05', null, null],               // d1 bloqueado por all.marker; d2 +5 (unzoned.marker false)
@@ -61,10 +61,17 @@ test('2 · delay: scope {}, por zonas, includeUnzoned, fromAt, foto blockPolicy,
     ['t2', '10 22:00', '10 23:00', null],         // stages.main.task true; sin fin → 60 min estimados
     ['n1', '11 20:00', '11 21:00', '11 19:45']    // otra jornada: ningún delay de la del 10 la alcanza
   ], 'delay');
-  assert.deepEqual(held(r, 'a0'), ['d1:started']);
+  assert.deepEqual(held(r, 'a0'), [], 'R4.4: d1 va «desde a1» (20:00); a0 (19:00) queda fuera del alcance, no retenida');
+  // Lo empezado no se mueve (§5.6.3-2), con la B de R4.4: si a1 ya había dado ▶ cuando se dio d1, queda retenida y lo demás sigue
+  const begun = J('v1-schedule-delay.showtime'); begun.festival.project.entries[0].actual = { startedAt: L('10 19:20') };
+  const q = run(begun, '10 20:00');
+  assert.deepEqual(held(q, 'a1'), ['d1:started']); assert.equal(q.byId('a1').effective.start, L('10 19:20'));
+  assert.deepEqual(contrib(q, 'a2'), ['d1:10']);
   assert.deepEqual(held(r, 'a3'), ['d1:fixed']);
   assert.deepEqual(contrib(r, 'a4'), ['d1:10']);
   assert.deepEqual(contrib(r, 'b1'), ['d1:10', 'd2:5']);
+  assert.deepEqual(contrib(r, 't3'), ['d1:10'], 't3 no recibe d2: queda antes de la posición estable de b1');
+  assert.deepEqual(held(r, 't3'), [], 'y no es un bloqueo: simplemente no pertenece al delay');
   assert.deepEqual(held(r, 't1'), ['d2:blocked']);
   assert.equal(r.byId('t2').planned.endEstimated, true);
   assert.equal(r.byId('a2').planned.callAuto, false); assert.equal(r.byId('a1').planned.callAuto, true);

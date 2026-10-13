@@ -521,7 +521,7 @@ test('R2-3 · Log entry-updated: solo kind/name/plan cambiados, mismo conjunto d
   assert.ok(D.parseDocument(ok).ok);
 });
 
-test('R2-4 · Log delay-applied / delay-removed: delayId, kind, minutes según tipo y fromEntryName si hay entryId', () => {
+test('R2-4 · Log delay-applied / delay-removed: delayId, kind, minutes según tipo y fromEntryName', () => {
   const r = D.parseDocument(FX('v1-log-shapes.showtime')); assert.ok(r.ok, r.message);
   const DL = (i, fn, re) => invalid('v1-log-shapes.showtime', o => fn(o.eventLog.entries[i], o.eventLog.entries[i].data), re);
   DL(14, (e, d) => { delete d.minutes; }, /entries\[14\].*data\.minutes.*entero de 1 a 600/);        // delay-removed · delay
@@ -537,8 +537,8 @@ test('R2-4 · Log delay-applied / delay-removed: delayId, kind, minutes según t
   DL(14, (e, d) => { d.kind = 'retraso'; }, /data\.kind/);
   DL(13, (e, d) => { d.minutes = 16; }, /0 a 15/);
   DL(14, (e, d) => { d.minutes = '5'; }, /data\.minutes/);
-  // Sin entryId, fromEntryName no es obligatorio; los tipos desconocidos siguen aceptando cualquier data
-  assert.equal(r.doc.eventLog.entries[14].entryId, undefined);
+  // R4.4: todo delay-applied / delay-removed lleva entryId y fromEntryName (ver prueba C1-3); los tipos desconocidos siguen aceptando cualquier data
+  assert.equal(r.doc.eventLog.entries[14].entryId, 'old-002');
   assert.deepEqual(r.doc.eventLog.entries[8].data, { lo: 'que sea' });
 });
 
@@ -613,4 +613,122 @@ test('R2-A · overtime/bis exigen una banda con ▶ anterior o igual a su occurr
   });
   // Un delay sí puede aplicarse a una banda sin ▶ (retraso antes): sin cambio
   assert.ok(D.parseDocument(FX('v1-schedule-delay.showtime')).ok);
+});
+
+// ══ C1 · R4.4: destino de todo ajuste, excepción transcut y Log estructurado ═══════════════════════════════════════════
+const C1FX = 'v1-schedule-delay.showtime';   // d1: delay desde a1 (show, 20:00) · d2: delay desde b1 (carpa) · zonas main/carpa · a0…n1
+const C1P = o => o.festival.project;
+
+test('C1-1 · delay: fromEntryId obligatorio y banda show/soundcheck de la misma jornada; scope {} no exime; rechazo no destructivo', () => {
+  invalid(C1FX, o => { delete C1P(o).delays[0].fromEntryId; }, /delays\[0\].*fromEntryId.*necesita su banda destino/);
+  invalid(C1FX, o => { C1P(o).delays[0].fromEntryId = 'nadie'; }, /delays\[0\].*fromEntryId.*no existe/);
+  invalid(C1FX, o => { C1P(o).delays[0].fromEntryId = 't2'; }, /delays\[0\].*fromEntryId.*solo se aplica a un show o un soundcheck.*es task/);
+  invalid(C1FX, o => { C1P(o).delays[0].fromEntryId = 'k3'; }, /solo se aplica a un show o un soundcheck.*es marker/);
+  invalid(C1FX, o => { C1P(o).delays[0].fromEntryId = 'n1'; }, /delays\[0\].*fromEntryId.*otra jornada \(2027-07-11; el ajuste es de 2027-07-10\)/);
+  // scope {} («Todos») con destino válido sigue siendo válido; sin destino, no
+  const all = D.parseDocument(FX(C1FX)); assert.ok(all.ok, all.message); assert.deepEqual(all.doc.festival.project.delays[0].scope, {});
+  invalid(C1FX, o => { C1P(o).delays[0].scope = {}; delete C1P(o).delays[0].fromEntryId; }, /necesita su banda destino/);
+  // changeover-stretch: mismo destino obligatorio, misma jornada
+  invalid('v1-schedule-stretch.showtime', o => { C1P(o).delays[0].fromEntryId = 's5'; }, /delays\[0\].*otra jornada/);
+  invalid('v1-schedule-stretch.showtime', o => { delete C1P(o).delays[0].fromEntryId; }, /changeover-stretch necesita su banda destino/);
+  // fromAt sigue siendo obligatorio y UTC; C1 no comprueba su igualdad con la posición estable (eso es D2)
+  invalid(C1FX, o => { delete C1P(o).delays[0].fromAt; }, /delays\[0\].*fromAt/);
+  const shifted = D.parseDocument(mutate(C1FX, o => { C1P(o).delays[0].fromAt = '2027-07-10T18:30Z'; }));
+  assert.ok(shifted.ok, shifted.message); assert.equal(shifted.doc.festival.project.delays[0].fromAt, '2027-07-10T18:30:00Z');
+});
+
+// Transcut: banda de la jornada del 10 (x1, 23:00 locales, ▶ 23:10) que sigue abierta pasado el corte (06:00 del 11 = 04:00Z)
+const TRANSCUT = (kind, extra) => mutate('v1-schedule-overtime-crosses-cutoff.showtime', o => {
+  C1P(o).delays = C1P(o).delays.filter(d => d.kind === 'delay');   // queda g1 (jornada del 10)
+  C1P(o).delays.push(Object.assign({ id: 'tc', kind, occurredAt: '2027-07-11T04:10:00Z', festivalDay: '2027-07-11', fromEntryId: 'x1',
+    blockPolicy: { all: { show: false, soundcheck: false, task: false, marker: false }, stages: {} } }, extra || {}));
+  if (extra && extra.mutate) extra.mutate(o);
+});
+
+test('C1-2 · transcut: overtime/bis tras el corte para una show/soundcheck abierta de la jornada inmediatamente anterior; delay y stretch no', () => {
+  const ov = D.parseDocument(TRANSCUT('overtime')); assert.ok(ov.ok, ov.message);
+  const tc = ov.doc.festival.project.delays.find(d => d.id === 'tc');
+  assert.deepEqual([tc.festivalDay, tc.occurredAt, ov.doc.festival.project.entries[0].plan.date], ['2027-07-11', '2027-07-11T04:10:00Z', '2027-07-10'], 'festivalDay real de la jornada nueva; la banda es del 10');
+  const bi = D.parseDocument(TRANSCUT('bis', { minutes: 3 })); assert.ok(bi.ok, bi.message);
+  // El motor publicado la calcula sin cambios: exceso creciente con directo activo
+  const r = require('../v1/schedule.js').compute(ov.doc, { now: '2027-07-11T05:00:00Z', activeLiveEntryIds: ['x1'] });
+  assert.equal(r.byId('x1').overrun.state, 'growing');
+  // Soundcheck abierto de la jornada anterior: igual
+  const sc = D.parseDocument(TRANSCUT('overtime', { mutate: o => { C1P(o).entries[0].kind = 'soundcheck'; } })); assert.ok(sc.ok, sc.message);
+  // Solo la jornada inmediatamente anterior
+  rejectsIntact(TRANSCUT('overtime', { mutate: o => { C1P(o).event.startDate = '2027-07-09'; C1P(o).entries[0].plan.date = '2027-07-09';
+    C1P(o).entries[0].actual.startedAt = '2027-07-09T21:10:00Z'; C1P(o).delays[0].occurredAt = '2027-07-09T20:00:00Z'; C1P(o).delays[0].festivalDay = '2027-07-09'; C1P(o).delays[0].fromAt = '2027-07-09T21:00:00Z'; } }),
+    'invalid', /delays\[1\].*otra jornada \(2027-07-09; el ajuste es de 2027-07-11\)/);
+  // Solo si estaba abierta: sin ▶, con ▶ posterior al ajuste o con ■ anterior, se rechaza como siempre
+  rejectsIntact(TRANSCUT('overtime', { mutate: o => { delete C1P(o).entries[0].actual; } }), 'invalid', /no tiene ▶/);
+  rejectsIntact(TRANSCUT('overtime', { mutate: o => { C1P(o).entries[0].actual.startedAt = '2027-07-11T04:20:00Z'; } }), 'invalid', /▶ de «x1» es posterior/);
+  rejectsIntact(TRANSCUT('overtime', { mutate: o => { C1P(o).entries[0].actual.endedAt = '2027-07-11T04:05:00Z'; } }), 'invalid', /■ de «x1» debe ser posterior/);
+  // delay y changeover-stretch transcut: inválidos
+  rejectsIntact(TRANSCUT('delay', { minutes: 5, scope: {}, fromAt: '2027-07-10T21:00:00Z' }), 'invalid', /delays\[1\].*fromEntryId.*otra jornada \(2027-07-10; el ajuste es de 2027-07-11\)/);
+  rejectsIntact(TRANSCUT('changeover-stretch', { minutes: 5, mutate: o => { delete C1P(o).entries[0].actual; } }), 'invalid', /delays\[1\].*fromEntryId.*otra jornada/);
+  // overtime + bis sobre la misma entrada: rechazo, también usando la excepción transcut
+  invalid('v1-schedule-overtime.showtime', o => { C1P(o).delays.push(Object.assign({}, C1P(o).delays[0], { id: 'dup', kind: 'bis', minutes: 2, occurredAt: '2027-07-10T19:10:00Z' })); }, /un overtime o bis por entrada \(«o1»\)/);
+  rejectsIntact(TRANSCUT('overtime', { mutate: o => { C1P(o).delays.push(Object.assign({}, C1P(o).delays[1], { id: 'tc2', kind: 'bis', minutes: 1, occurredAt: '2027-07-11T04:11:00Z' })); } }), 'invalid', /un overtime o bis por entrada \(«x1»\)/);
+});
+
+test('C1-3 · Log delay-applied / delay-removed: entryId y fromEntryName obligatorios; los cuatro kind conservan la foto', () => {
+  const r = D.parseDocument(FX('v1-log-shapes.showtime')); assert.ok(r.ok, r.message);
+  const E = r.doc.eventLog.entries;
+  const byKind = {}; E.filter(e => /^delay-/.test(e.type)).forEach(e => { byKind[e.data.kind] = e; });
+  assert.deepEqual(Object.keys(byKind).sort(), ['bis', 'changeover-stretch', 'delay', 'overtime']);
+  Object.keys(byKind).forEach(k => { assert.ok(byKind[k].entryId, k + ' con entryId'); assert.match(byKind[k].data.fromEntryName, /\S/, k + ' con fromEntryName'); });
+  assert.deepEqual([E[14].type, E[14].entryId, E[14].data.fromEntryName], ['delay-removed', 'old-002', 'Prueba sin zona antigua']);
+  assert.deepEqual([E[16].type, E[16].entryId, E[16].data.fromEntryName], ['delay-applied', 'show-002', 'Noche Larga']);
+  const LG = (fn, re) => invalid('v1-log-shapes.showtime', o => fn(o.eventLog.entries), re);
+  LG(l => { delete l[2].entryId; }, /entries\[2\].*delay-applied necesita entryId/);
+  LG(l => { delete l[14].entryId; }, /entries\[14\].*delay-removed necesita entryId/);
+  LG(l => { delete l[2].data.fromEntryName; }, /entries\[2\].*data\.fromEntryName.*Texto obligatorio/);
+  LG(l => { delete l[14].data.fromEntryName; }, /entries\[14\].*data\.fromEntryName/);
+  LG(l => { l[16].data.fromEntryName = '  '; }, /entries\[16\].*data\.fromEntryName/);
+  // Las validaciones previas no se rebajan
+  LG(l => { delete l[2].data.delayId; }, /data\.delayId/);
+  LG(l => { l[2].data.kind = 'retraso'; }, /data\.kind/);
+  LG(l => { delete l[2].data.minutes; }, /data\.minutes/);
+  LG(l => { l[4].data.minutes = 3; }, /overtime no lleva minutes/);
+});
+
+// Log con un ■ y su retractación: base v1-history (show-001 ▶ 20:03Z · ■ 21:10Z en el Log, sequence 6, id log-6)
+const RETRACT = fn => mutate('v1-history.showtime', o => {
+  const L = o.eventLog;
+  L.entries.push({ id: 'log-11', sequence: 11, occurredAt: '2027-07-10T21:12:00Z', festivalDay: '2027-07-10', type: 'actual-end-retracted', entryId: 'show-001', stageId: 'main',
+    data: { undoneLogId: 'log-6', endedAt: '2027-07-10T21:10Z', xRet: { keep: true } } });
+  L.nextSequence = 12;
+  if (fn) fn(o, L.entries[L.entries.length - 1]);
+});
+
+test('C1-4 · actual-end-retracted: cita un actual-end anterior de la misma entrada; endedAt UTC con segundos; extensiones conservadas', () => {
+  const r = D.parseDocument(RETRACT()); assert.ok(r.ok, r.message);
+  const E = r.doc.eventLog.entries, ret = E[10];
+  assert.deepEqual([ret.type, ret.entryId, ret.data.undoneLogId, ret.data.endedAt, ret.data.xRet], ['actual-end-retracted', 'show-001', 'log-6', '2027-07-10T21:10:00Z', { keep: true }]);
+  assert.deepEqual([E[5].type, E[5].data.endedAt], ['actual-end', '2027-07-10T21:10:00Z'], 'el actual-end original se conserva, no se reescribe');
+  assert.equal(E.length, 11); assert.equal(r.doc.eventLog.nextSequence, 12);
+  const again = D.parseDocument(D.serializeDocument(r.doc).text); assert.ok(again.ok); assert.deepEqual(again.doc.eventLog, r.doc.eventLog);
+  // previousStartedAt / previousEndedAt en actual-start / actual-end: se validan y normalizan sin exigir la operación
+  const corr = D.parseDocument(mutate('v1-history.showtime', o => { o.eventLog.entries[3].data.previousStartedAt = '2027-07-10T20:00Z'; o.eventLog.entries[5].data.previousEndedAt = '2027-07-10T21:05Z'; }));
+  assert.ok(corr.ok, corr.message);
+  assert.equal(corr.doc.eventLog.entries[3].data.previousStartedAt, '2027-07-10T20:00:00Z'); assert.equal(corr.doc.eventLog.entries[5].data.previousEndedAt, '2027-07-10T21:05:00Z');
+  invalid('v1-history.showtime', o => { o.eventLog.entries[3].data.previousStartedAt = '2027-07-10 20:00'; }, /data\.previousStartedAt/);
+  invalid('v1-history.showtime', o => { o.eventLog.entries[5].data.previousEndedAt = 5; }, /data\.previousEndedAt/);
+});
+
+test('C1-5 · actual-end-retracted inválidos: sin undoneLogId, sin endedAt, id inexistente, referencia futura, de otra entrada, de otro tipo, sin entryId', () => {
+  const R = (fn, re) => rejectsIntact(RETRACT(fn), 'invalid', re);
+  R((o, e) => { delete e.data.undoneLogId; }, /entries\[10\].*data\.undoneLogId.*Identificador/);
+  R((o, e) => { delete e.data.endedAt; }, /entries\[10\].*data\.endedAt.*Marca de tiempo/);
+  R((o, e) => { e.data.undoneLogId = 'log-99'; }, /data\.undoneLogId.*actual-end anterior.*«log-99»/);
+  R((o, e) => { e.data.undoneLogId = 'log-12'; o.eventLog.entries.push({ id: 'log-12', sequence: 12, occurredAt: '2027-07-10T21:20:00Z', festivalDay: '2027-07-10', type: 'actual-end', entryId: 'show-001', data: { endedAt: '2027-07-10T21:20:00Z' } }); o.eventLog.nextSequence = 13; }, /data\.undoneLogId.*actual-end anterior/);
+  R((o, e) => { e.entryId = 'sc-001'; }, /data\.undoneLogId.*es de otra entrada/);
+  R((o, e) => { e.data.undoneLogId = 'log-4'; }, /data\.undoneLogId.*actual-end anterior.*«log-4»/);   // log-4 es un actual-start
+  R((o, e) => { delete e.entryId; }, /entries\[10\].*actual-end-retracted necesita entryId/);
+  R((o, e) => { e.data.endedAt = '2027-07-10T21:10:00+02:00'; }, /data\.endedAt/);
+  // C1-R1: la hora retirada debe ser exactamente la del actual-end citado (log-6: 21:10:00Z)
+  R((o, e) => { e.data.endedAt = '2027-07-10T21:11:00Z'; }, /entries\[10\].*data\.endedAt.*coincidir con la hora del actual-end retirado «log-6» \(2027-07-10T21:10:00Z\)/);
+  R((o, e) => { e.data.endedAt = '2027-07-10T21:09:59Z'; }, /data\.endedAt.*coincidir/);
+  const same = D.parseDocument(RETRACT((o, e) => { e.data.endedAt = '2027-07-10T21:10Z'; }));   // sin segundos: misma hora tras normalizar → válido
+  assert.ok(same.ok, same.message); assert.equal(same.doc.eventLog.entries[10].data.endedAt, '2027-07-10T21:10:00Z'); assert.deepEqual(same.doc.eventLog.entries[10].data.xRet, { keep: true });
 });

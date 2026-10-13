@@ -186,7 +186,8 @@
           "festivalDay": "2027-07-10",
           "minutes": 10,
           "scope": {},
-          "fromAt": "2027-07-10T17:00:00Z",
+          "fromEntryId": "a1",
+          "fromAt": "2027-07-10T18:00:00Z",
           "blockPolicy": {
             "all": {
               "show": false,
@@ -216,7 +217,8 @@
             ],
             "includeUnzoned": true
           },
-          "fromAt": "2027-07-10T19:00:00Z",
+          "fromEntryId": "b1",
+          "fromAt": "2027-07-10T19:10:00Z",
           "blockPolicy": {
             "all": {
               "show": false,

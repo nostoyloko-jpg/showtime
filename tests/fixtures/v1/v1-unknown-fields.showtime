@@ -113,7 +113,8 @@
           "scope": {
             "xScope": 1
           },
-          "fromAt": "2027-07-10T18:00:00Z",
+          "fromEntryId": "show-001",
+          "fromAt": "2027-07-10T20:00:00Z",
           "blockPolicy": {
             "all": {
               "show": false,

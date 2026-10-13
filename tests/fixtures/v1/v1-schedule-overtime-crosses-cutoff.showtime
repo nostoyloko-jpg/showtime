@@ -88,7 +88,8 @@
               "main"
             ]
           },
-          "fromAt": "2027-07-10T20:00:00Z",
+          "fromEntryId": "x1",
+          "fromAt": "2027-07-10T21:00:00Z",
           "blockPolicy": {
             "all": {
               "show": false,
