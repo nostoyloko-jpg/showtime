@@ -66,7 +66,9 @@ test('2 · delay: scope {}, por zonas, includeUnzoned, fromAt, foto blockPolicy,
   const begun = J('v1-schedule-delay.showtime'); begun.festival.project.entries[0].actual = { startedAt: L('10 19:20') };
   const q = run(begun, '10 20:00');
   assert.deepEqual(held(q, 'a1'), ['d1:started']); assert.equal(q.byId('a1').effective.start, L('10 19:20'));
-  assert.deepEqual(contrib(q, 'a2'), ['d1:10']);
+  // C2 (R4.4-4): a1 es la B de d1 y empezó antes de su base (20:00) → retraso real 0 → d1 queda con residual 0 para todas sus afectadas
+  assert.deepEqual(contrib(q, 'a2'), ['d1:0']); assert.equal(q.byId('a2').effective.start, L('10 21:30'));
+  assert.deepEqual(q.byId('a2').contributions[0].recoveredMinutes, 10);
   assert.deepEqual(held(r, 'a3'), ['d1:fixed']);
   assert.deepEqual(contrib(r, 'a4'), ['d1:10']);
   assert.deepEqual(contrib(r, 'b1'), ['d1:10', 'd2:5']);
@@ -275,13 +277,16 @@ test('10 · nada calculado se guarda: serializar después de calcular deja el do
 // ── 11 ── zona del proceso ──────────────────────────────────────────────
 test('11 · los mismos UTC con cualquier zona del proceso (TZ=UTC, Pacific/Kiritimati, America/Los_Angeles)', () => {
   const code = 'const S=require(' + JSON.stringify(path.join(__dirname, '..', 'v1', 'schedule.js')) + ');const fs=require("fs");' +
-    'const out=["v1-schedule-delay.showtime","v1-schedule-overtime.showtime","v1-schedule-overtime-crosses-cutoff.showtime"].map(f=>' +
-    'S.compute(JSON.parse(fs.readFileSync(' + JSON.stringify(path.join(__dirname, 'fixtures', 'v1')) + '+"/"+f,"utf8")),{now:"2027-07-11T07:00:00Z",activeLiveEntryIds:["o1","x1"]}).entries);' +
+    'const out=["v1-schedule-delay.showtime","v1-schedule-overtime.showtime","v1-schedule-overtime-crosses-cutoff.showtime","v1-schedule-recovery.showtime"].map(f=>{' +
+    'const d=JSON.parse(fs.readFileSync(' + JSON.stringify(path.join(__dirname, 'fixtures', 'v1')) + '+"/"+f,"utf8"));' +
+    'if(f==="v1-schedule-recovery.showtime")d.festival.project.entries[2].actual={startedAt:"2027-07-10T20:07:00Z"};' +
+    'const r=S.compute(d,{now:"2027-07-11T07:00:00Z",activeLiveEntryIds:["o1","x1"]});return [r.entries,r.adjustments]});' +
     'process.stdout.write(JSON.stringify(out))';
   const outs = ['UTC', 'Pacific/Kiritimati', 'America/Los_Angeles'].map(tz => execFileSync(process.execPath, ['-e', code], { env: Object.assign({}, process.env, { TZ: tz }) }).toString());
   assert.equal(outs[1], outs[0]); assert.equal(outs[2], outs[0]);
-  const x = JSON.parse(outs[0])[2].find(e => e.id === 'x2');
+  const x = JSON.parse(outs[0])[2][0].find(e => e.id === 'x2');
   assert.equal(x.effective.start, L('11 09:15'));
+  assert.equal(JSON.parse(outs[0])[3][1].find(a => a.delayId === 'd1').residualMinutes, 7, 'recuperación FIFO igual en cualquier TZ');
 });
 
 test('12 · el motor no construye fechas locales implícitas ni lee el reloj', () => {
@@ -449,4 +454,155 @@ test('R2-B · choque por intersección efectiva nueva: una banda con ▶ adelant
   assert.equal(q.byId('dentro').clash, null);
   assert.deepEqual(q.byId('tarea').clash, { withEntryId: 'B' });
   assert.equal(JSON.stringify(doc), before, 'nada se guarda en el documento');
+});
+
+// ══ C2 · recuperación derivada por ▶ de B (R4.4-1.5, R4.4-4) ═══════════════════════════════════════════════════════
+// v1-schedule-recovery: main A 20:00 · T1 21:30 · B 22:00–23:00 · T2 23:10 · C 23:30 ; carpa Y 20:30 · X 22:30.
+// delays[]: d1 delay +10 desde B (main+carpa, fromAt 22:00) · s1 stretch +5 antes de B · dC delay +5 desde C (main, fromAt 23:45).
+// Sin ▶: B 22:15 · T2 23:25 · C 23:50 · X 22:40 · T1/A/Y fuera (establemente antes de B). Base de B = 22:00 (plan).
+const REC = 'v1-schedule-recovery.showtime';
+const withStart = (id, hm, extra) => { const d = J(REC); d.festival.project.entries.find(e => e.id === id).actual = { startedAt: L(hm) }; if (extra) extra(d); return d; };
+const adjOf = (r, id) => r.adjustments.find(a => a.delayId === id);
+const resid = r => r.adjustments.filter(a => a.residualMinutes !== undefined).map(a => a.delayId + ':' + a.residualMinutes).join(' ');
+
+test('C2-0 · sin ▶ de B: los ajustes aplican sus minutos declarados y no hay recuperación', () => {
+  const r = run(J(REC), '10 21:50');
+  table(r, [['B', '10 22:15', '10 23:15', '10 22:00'], ['T2', '10 23:25', '10 23:35', null], ['C', '10 23:50', '11 00:50', '10 23:35'], ['X', '10 22:40', '10 23:40', '10 22:25'], ['T1', '10 21:30', '10 21:40', null], ['Y', '10 20:30', '10 21:15', '10 20:15']], 'sin ▶');
+  assert.equal(resid(r), 'd1:10 s1:5 dC:5');
+  assert.equal(adjOf(r, 'd1').recovery, null); assert.equal(adjOf(r, 'd1').recoveredMinutes, 0);
+  assert.ok(r.entries.every(e => e.contributions.every(c => c.recoveredMinutes === undefined)), 'sin recuperación no hay recoveredMinutes');
+});
+
+test('C2-1 · recuperación total: B empieza en su base o antes → residual 0 de d1 y s1 en todas sus afectadas; el delay sigue declarado', () => {
+  ['10 22:00', '10 21:55'].forEach(hm => {
+    const doc = withStart('B', hm), before = JSON.stringify(doc);
+    const r = run(doc, '10 22:30');
+    table(r, [['B', hm, hm === '10 22:00' ? '10 23:00' : '10 22:55', hm === '10 22:00' ? '10 21:45' : '10 21:40'], ['T2', '10 23:10', '10 23:20', null], ['C', '10 23:35', '11 00:35', '10 23:20'], ['X', '10 22:30', '10 23:30', '10 22:15']], '▶ ' + hm);
+    assert.equal(resid(r), 'd1:0 s1:0 dC:5');
+    assert.deepEqual(adjOf(r, 'd1').recovery, { baseStart: L('10 22:00'), realDelayMinutes: 0, totalDeclaredMinutes: 15 });
+    assert.deepEqual(r.byId('X').contributions, [{ delayId: 'd1', kind: 'delay', minutes: 0, recoveredMinutes: 10 }], 'X pertenece a d1 (carpa en scope) y recupera los 10');
+    assert.equal(JSON.stringify(doc), before, 'minutes declarados y documento intactos');
+    assert.deepEqual(doc.festival.project.delays.map(d => d.minutes), [10, 5, 5]);
+  });
+});
+
+test('C2-2 · recuperación parcial FIFO mixta: delay +10 y stretch +5, base 22:00, ▶ 22:07 → residual d1 = 7, s1 = 0', () => {
+  const r = run(withStart('B', '10 22:07'), '10 22:30');
+  assert.equal(resid(r), 'd1:7 s1:0 dC:5');
+  assert.deepEqual([adjOf(r, 'd1').recoveredMinutes, adjOf(r, 's1').recoveredMinutes, adjOf(r, 's1').recovery.realDelayMinutes], [3, 5, 7]);
+  table(r, [['B', '10 22:07', '10 23:07', '10 21:52'], ['T2', '10 23:17', '10 23:27', null], ['C', '10 23:42', '11 00:42', '10 23:27'], ['X', '10 22:37', '10 23:37', '10 22:22']], '▶ 22:07');
+  assert.deepEqual(contrib(r, 'C'), ['d1:7', 's1:0', 'dC:5'], 'dC no es de B: conserva su contribución');
+  // El tramo pasa al siguiente ajuste solo cuando el primero está lleno: ▶ 22:12 → d1 10, s1 2
+  const q = run(withStart('B', '10 22:12'), '10 22:30');
+  assert.equal(resid(q), 'd1:10 s1:2 dC:5');
+  table(q, [['T2', '10 23:22', '10 23:32', null], ['C', '10 23:47', '11 00:47', '10 23:32'], ['X', '10 22:40', '10 23:40', '10 22:25']], '▶ 22:12');
+  assert.deepEqual(contrib(q, 'X'), ['d1:10'], 'X no está en el stretch: no le llega su residual');
+});
+
+test('C2-3 · sin recuperación: ▶ de B en o después de su previsión completa (22:15) conserva los +10/+5 declarados', () => {
+  ['10 22:15', '10 22:20'].forEach(hm => {
+    const r = run(withStart('B', hm), '10 22:30');
+    assert.equal(resid(r), 'd1:10 s1:5 dC:5', hm);
+    assert.equal(adjOf(r, 'd1').recovery.realDelayMinutes, 15, 'retraso real limitado al total declarado');
+    table(r, [['B', hm, '10 23:15', hm === '10 22:15' ? '10 22:00' : '10 22:05'], ['T2', '10 23:25', '10 23:35', null], ['C', '10 23:50', '11 00:50', '10 23:35'], ['X', '10 22:40', '10 23:40', '10 22:25']], hm);
+  });
+});
+
+test('C2-4 · scopes distintos e interzona: el delay recupera su afectada de la otra zona; el stretch nunca la toca; cada ajuste solo su residual', () => {
+  const r = run(withStart('B', '10 22:03'), '10 22:30');
+  assert.equal(resid(r), 'd1:3 s1:0 dC:5');
+  assert.deepEqual(contrib(r, 'X'), ['d1:3'], 'carpa: solo d1 (su scope la incluía), con su residual');
+  assert.deepEqual(contrib(r, 'T2'), ['d1:3', 's1:0'], 'main: d1 y el stretch, cada uno con su residual');
+  assert.deepEqual(contrib(r, 'C'), ['d1:3', 's1:0', 'dC:5']);
+  assert.deepEqual(contrib(r, 'Y'), [], 'Y establemente antes de B: fuera de d1 (y fuera del stretch por zona)');
+  assert.deepEqual(contrib(r, 'T1'), [], 'T1 antes de B en main: fuera de d1 y dentro del cambio → fuera del stretch');
+  table(r, [['X', '10 22:33', '10 23:33', '10 22:18'], ['T2', '10 23:13', '10 23:23', null], ['C', '10 23:38', '11 00:38', '10 23:23']], 'interzona');
+  // Un stretch sobre B con la carpa como scope no existe: s1 solo mueve main/jornada aunque d1 incluya carpa
+  const only = J(REC); only.festival.project.delays = only.festival.project.delays.filter(d => d.id !== 'd1'); only.festival.project.entries[2].actual = { startedAt: L('10 22:02') };
+  const q = run(only, '10 22:30');
+  assert.equal(resid(q), 's1:2 dC:5'); assert.deepEqual(contrib(q, 'X'), []); assert.equal(q.byId('T2').effective.start, L('10 23:12'));
+});
+
+test('C2-5 · entradas iniciadas, otras causas y suelos: ▶ no mueve lo iniciado, no toca ajustes ajenos a B y nunca adelanta bajo base/plan', () => {
+  // C ya empezó (▶ 23:50, a su hora prevista con todo) cuando B recupera: C queda fija, T2 y X recuperan
+  const r = run(withStart('B', '10 22:00', d => { d.festival.project.entries.find(e => e.id === 'C').actual = { startedAt: L('10 23:50') }; }), '10 23:55');
+  assert.equal(r.byId('C').effective.start, L('10 23:50')); assert.equal(r.byId('T2').effective.start, L('10 23:10')); assert.equal(r.byId('X').effective.start, L('10 22:30'));
+  assert.equal(adjOf(r, 'dC').residualMinutes, 5, 'dC es de C: con C empezada 20 min tarde respecto a su base (23:30), conserva sus 5');
+  // Dos B citadas a la vez (B ▶ 22:07, C ▶ 23:50): cada base se calcula SIN sus propios ajustes y con los residuales de la otra.
+  // Base de C sin dC = 23:30 + 7 (residual d1) + 0 (s1) = 23:37 → retraso real 13, limitado a los 5 de dC.
+  const two = run(withStart('B', '10 22:07', d => { d.festival.project.entries.find(e => e.id === 'C').actual = { startedAt: L('10 23:50') }; }), '10 23:55');
+  assert.equal(resid(two), 'd1:7 s1:0 dC:5');
+  assert.deepEqual([adjOf(two, 'd1').recovery.baseStart, adjOf(two, 'dC').recovery.baseStart, adjOf(two, 'dC').recovery.realDelayMinutes], [L('10 22:00'), L('10 23:37'), 5]);
+  assert.equal(two.byId('T2').effective.start, L('10 23:17'));
+  // Suelo: con B ▶ muy temprano (21:41, justo tras declararse el stretch) nada baja de su plan ni de su cálculo sin los ajustes de B
+  const q = run(withStart('B', '10 21:41'), '10 22:30');
+  assert.equal(resid(q), 'd1:0 s1:0 dC:5');
+  table(q, [['X', '10 22:30', '10 23:30', '10 22:15'], ['T2', '10 23:10', '10 23:20', null], ['C', '10 23:35', '11 00:35', '10 23:20']], 'suelo');
+  assert.ok(q.entries.every(e => Date.parse(e.effective.start) >= Date.parse(e.planned.start) || e.startedAt !== null), 'solo un ▶ real puede ir antes del plan');
+  // Otra B con su propio delay no cambia por la recuperación de B: dC conserva +5 aunque B recupere todo
+  assert.deepEqual(contrib(q, 'C'), ['d1:0', 's1:0', 'dC:5']);
+});
+
+test('C2-6 · corrección de inicio: cambiar actual.startedAt y recalcular solo cambia el residual derivado; nada se serializa ni muta', () => {
+  const doc = withStart('B', '10 22:07');
+  const r1 = run(doc, '10 22:30'); assert.equal(resid(r1), 'd1:7 s1:0 dC:5');
+  doc.festival.project.entries.find(e => e.id === 'B').actual.startedAt = L('10 22:03');
+  const snapshot = JSON.stringify(doc);
+  const r2 = run(doc, '10 22:30'); assert.equal(resid(r2), 'd1:3 s1:0 dC:5');
+  assert.equal(r2.byId('T2').effective.start, L('10 23:13')); assert.equal(r2.byId('X').effective.start, L('10 22:33'));
+  assert.equal(JSON.stringify(doc), snapshot, 'compute no muta');
+  const text = D.serializeDocument(D.parseDocument(JSON.stringify(doc)).doc).text;
+  const keys = new Set(); JSON.parse(text, (k, v) => { keys.add(k); return v; });
+  ['residualMinutes', 'recoveredMinutes', 'recovery', 'declaredMinutes', 'baseStart', 'realDelayMinutes', 'adjustments'].forEach(k => assert.ok(!keys.has(k), 'no se serializa ' + k));
+  assert.deepEqual(JSON.parse(text).festival.project.delays.map(d => d.minutes), [10, 5, 5], 'minutes declarados intactos');
+});
+
+test('C2-7 · pertenencia estable frente a Tiempo extra: C establemente anterior a B no entra en el delay de B aunque el arrastre de A la sitúe después', () => {
+  const doc = withStart('A', '10 20:00', d => {
+    d.festival.project.delays.unshift({ id: 'ov', kind: 'overtime', occurredAt: L('10 20:55'), festivalDay: '2027-07-10', fromEntryId: 'A', blockPolicy: { all: { show: false, soundcheck: false, task: false, marker: false }, stages: {} } });
+  });
+  const r = run(doc, '10 22:30', ['A']);   // A lleva 90 min de exceso: T1 (tarea tras A) recibe 60 → 22:30, después de B estable (22:00)
+  assert.equal(r.byId('A').overrun.excessMinutes, 90);
+  assert.equal(r.byId('T1').effective.start, L('10 22:30'));
+  assert.deepEqual(contrib(r, 'T1'), ['ov:60'], 'T1 es establemente anterior a B (21:30 < fromAt 22:00): d1 no la alcanza');
+  assert.deepEqual(contrib(r, 'B'), ['ov:45', 'd1:10', 's1:5']);
+  assert.equal(r.byId('B').effective.start, L('10 23:00'));
+  // La regresión C1-R1 de t3 se conserva: establemente antes de b1, no recibe d2
+  const t3 = run(J('v1-schedule-delay.showtime'), '10 20:00');
+  assert.deepEqual(contrib(t3, 't3'), ['d1:10']); assert.equal(t3.byId('t3').effective.start, L('10 21:05'));
+});
+
+test('C2-8 · pureza y salida: el documento y activeLiveEntryIds no mutan; adjustments y recoveredMinutes son solo salida', () => {
+  const doc = withStart('B', '10 22:07'), before = JSON.stringify(doc), act = new Set(['B']);
+  const r = Sch.compute(doc, { now: L('10 22:30'), activeLiveEntryIds: act });
+  assert.equal(JSON.stringify(doc), before); assert.deepEqual(Array.from(act), ['B']);
+  assert.deepEqual(r.adjustments.map(a => a.delayId), ['d1', 's1', 'dC'], 'en el orden de delays[]');
+  assert.deepEqual(adjOf(r, 'd1'), { delayId: 'd1', kind: 'delay', fromEntryId: 'B', declaredMinutes: 10, residualMinutes: 7, recoveredMinutes: 3, recovery: { baseStart: L('10 22:00'), realDelayMinutes: 7, totalDeclaredMinutes: 15 } });
+  assert.deepEqual(JSON.parse(JSON.stringify(Sch.compute(doc, { now: L('10 22:30'), activeLiveEntryIds: ['B'] }))), JSON.parse(JSON.stringify(r)), 'determinista');
+});
+
+test('C2-R1 · la base de B no depende de su propio ▶: una A anterior cerrada en Tiempo extra deja la base en 22:45 sea cual sea el ▶ de B', () => {
+  // A ▶ 20:00 · ■ 22:30 · overtime a las 20:55 (exceso 90, colchón hasta B 45 → +45): sin d1/s1 y sin ▶ de B, B queda a las 22:45
+  const mk = bStart => withStart('A', '10 20:00', d => {
+    d.festival.project.entries.find(e => e.id === 'A').actual.endedAt = L('10 22:30');
+    if (bStart) d.festival.project.entries.find(e => e.id === 'B').actual = { startedAt: L(bStart) };
+    d.festival.project.delays.unshift({ id: 'ov', kind: 'overtime', occurredAt: L('10 20:55'), festivalDay: '2027-07-10', fromEntryId: 'A', blockPolicy: { all: { show: false, soundcheck: false, task: false, marker: false }, stages: {} } });
+  });
+  const none = run(mk(null), '10 23:00');
+  assert.deepEqual(contrib(none, 'B'), ['ov:45', 'd1:10', 's1:5']); assert.equal(none.byId('B').effective.start, L('10 23:00'));
+  const r40 = run(mk('10 22:40'), '10 23:00'), r50 = run(mk('10 22:50'), '10 23:00');
+  assert.equal(adjOf(r40, 'd1').recovery.baseStart, L('10 22:45'), '▶ 22:40: la base conserva la causa de A');
+  assert.equal(adjOf(r50, 'd1').recovery.baseStart, L('10 22:45'), '▶ 22:50: misma base');
+  assert.equal(adjOf(r40, 'd1').recovery.baseStart, adjOf(r50, 'd1').recovery.baseStart, 'el ▶ de B no cambia baseStart');
+  assert.equal(resid(r40), 'd1:0 s1:0 dC:5'); assert.deepEqual([adjOf(r40, 'd1').recovery.realDelayMinutes], [0]);
+  assert.equal(resid(r50), 'd1:5 s1:0 dC:5'); assert.deepEqual([adjOf(r50, 'd1').recovery.realDelayMinutes], [5]);
+  // B conserva su ▶; A (ya iniciada y cerrada) sigue fija; X solo recibe el residual de d1
+  [[r40, '10 22:40', '10 22:30'], [r50, '10 22:50', '10 22:35']].forEach(([r, b, x]) => {
+    assert.equal(r.byId('B').effective.start, L(b)); assert.deepEqual([r.byId('A').effective.start, r.byId('A').effective.end], [L('10 20:00'), L('10 22:30')]);
+    assert.equal(r.byId('X').effective.start, L(x)); assert.equal(r.byId('T2').effective.start, L('10 23:15'));
+  });
+  // Nada se muta ni se serializa
+  const doc = mk('10 22:50'), before = JSON.stringify(doc); run(doc, '10 23:00'); assert.equal(JSON.stringify(doc), before);
+  const text = D.serializeDocument(D.parseDocument(before).doc).text; const keys = new Set(); JSON.parse(text, (k, v) => { keys.add(k); return v; });
+  ['residualMinutes', 'recoveredMinutes', 'recovery', 'baseStart', 'adjustments'].forEach(k => assert.ok(!keys.has(k), 'no se serializa ' + k));
 });

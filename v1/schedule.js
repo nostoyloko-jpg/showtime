@@ -13,6 +13,11 @@
  *    tiene directo activo). El colchón se mide hasta la siguiente banda de la zona tal como está en ese momento; lo que sobra
  *    se arrastra a todo lo cronológicamente posterior de la zona, también de la jornada siguiente (R4.1). ▶ manda: una banda
  *    que empezó antes de su estimado pasa menos arrastre, nunca por debajo de su horario previo a ese ajuste.
+ *  - Pertenencia a un `delay` (R4.4-1.5): se compara `fromAt` con la POSICIÓN ESTABLE de cada entrada (plan + delay/stretch
+ *    anteriores con sus minutos declarados), nunca con el arrastre dinámico de overtime/bis.
+ *  - Recuperación por ▶ de B (R4.4-4): cuando la banda destino B de un delay/stretch tiene ▶, esos ajustes aplican solo su
+ *    residual: retraso real = min(total declarado, ▶ − inicio base de B sin esos ajustes), repartido FIFO en el orden de delays[].
+ *    Es derivado: minutes declarados, Log y documento no cambian.
  * Después se calcula el horario efectivo final y los choques (pisada en el efectivo y no en el plan).
  * La movilidad de cada entrada se decide por ajuste: `fixed` nunca, `free` siempre, `category` con la máscara de la foto
  * `blockPolicy` de ESE ajuste (zona → sin zona → all, sin mezclar campos); lo empezado antes del ajuste no se mueve.
@@ -58,6 +63,7 @@
    *   now, timeZone,
    *   entries: [ ...una por entrada, en el orden de entries[] (nunca reordenado) ],
    *   zones:   [{ stageId|null, order: [entryId…] }]   orden cronológico efectivo por zona/grupo sin zona,
+   *   adjustments: [{ delayId, kind, fromEntryId, declaredMinutes?, residualMinutes?, recoveredMinutes?, recovery? }]   en el orden de delays[]
    *   byId(id) → entrada calculada
    * }
    * Cada entrada: { id, kind, index, stageId, festivalDay, delayMode,
@@ -65,7 +71,7 @@
    *   effective: { start, end, call },
    *   startedAt, endedAt,                    hechos reales del documento
    *   shiftMinutes, startDeltaMinutes,       minutos sumados por ajustes · efectivo − planificado
-   *   contributions: [{ delayId, kind, minutes }],   ajustes que la movieron (los de arrastre, con lo recibido)
+   *   contributions: [{ delayId, kind, minutes, recoveredMinutes? }],   ajustes que la movieron (minutos vigentes; recoveredMinutes si hubo recuperación)
    *   held: [{ delayId, kind, reason: 'fixed'|'blocked'|'started' }],   ajustes que la alcanzaban y no la movieron
    *   clash: null | { withEntryId },        no se movió y queda pisada por la banda anterior de su zona (solo se marca)
    *   overrun: null | { delayId, kind, state: 'closed'|'growing'|'idle', excessMinutes, endWithoutOverrun,
@@ -95,7 +101,7 @@
         S0: r.start, E0: end, endEstimated: !marker && r.end === null, C0: r.call, callAuto: r.callAuto,
         dur: marker ? 0 : end - r.start,
         startedAt: a.startedAt ? T.parseUTC(a.startedAt) : null, endedAt: a.endedAt ? T.parseUTC(a.endedAt) : null,
-        off: 0, contributions: [], held: [], clash: null, overrun: null
+        off: 0, offStable: 0, contributions: [], held: [], clash: null, overrun: null
       };
     });
     const byId = new Map(E.map(e => [e.id, e]));
@@ -126,46 +132,90 @@
       e.off += ms; addContrib(e, adj, ms); return true;
     };
     const overrunAdj = new Map();
+    // Posición estable (R4.4 §A, §R4.4-1.5): plan + delay/changeover-stretch anteriores con sus minutos DECLARADOS;
+    // sin hechos actual, sin residual, sin arrastre de overtime/bis. Es lo que se compara con fromAt.
+    const stable = e => e.S0 + e.offStable;
+    const isStatic = adj => adj.kind === 'delay' || adj.kind === 'changeover-stretch';
+    const declared = adj => adj.minutes * MIN;
 
-    // ── Ajustes en el orden de delays[] (§5.6.1): cada uno ve el horario que dejaron los anteriores ──
-    adjs.forEach(adj => {
-      if (adj.kind === 'delay') {
-        const sc = adj.scope, ids = sc.stageIds || null, unz = ids ? sc.includeUnzoned === true : true;
-        E.forEach(e => {
-          if (e.day !== adj.festivalDay) return;                                         // nunca otra jornada
-          if (e.stageId === null ? !unz : (ids && ids.indexOf(e.stageId) < 0)) return;    // fuera de scope
-          if (est(e) < adj.fromAtMs) return;                                            // empieza antes de «desde» (tras los ajustes anteriores)
-          move(e, adj, adj.minutes * MIN);
-        });
-      } else if (adj.kind === 'changeover-stretch') {
-        const t = byId.get(adj.fromEntryId);
-        const group = E.filter(e => sameGroup(e, t)).sort((a, b) => orderKey(a, b, est(a), est(b)));
-        group.slice(group.indexOf(t)).forEach(e => move(e, adj, adj.minutes * MIN));   // la banda destino y lo posterior
-      } else {
-        // overtime / bis: exceso de la banda frente a su fin sin este ajuste, con el horario aplicado hasta ahora
-        const X = byId.get(adj.fromEntryId);
-        overrunAdj.set(X.id, adj);
-        const endX = endNoOverrun(X), O = excessOf(X, endX).O;
-        const list = zoneOrder(X.stageId), after = list.slice(list.indexOf(X) + 1);      // cronológico, transjornada (R4.1)
-        let carry = null, cushion = null;    // null = aún no se ha llegado a la siguiente banda
-        after.forEach(e => {
-          if (isBand(e.kind)) {
-            if (carry === null) {            // colchón hasta la siguiente banda, tal como está ahora
-              cushion = Math.max(0, (cur(e) - endX) - coMinOf(X.stageId));
-              carry = Math.max(0, O - cushion);
+    /** Una pasada completa por delays[] en su orden (§5.6.1). minutesOf(adj) = ms que aplica ese ajuste (declarados o residual). */
+    function applyAdjustments(minutesOf) {
+      E.forEach(e => { e.off = 0; e.offStable = 0; e.contributions = []; e.held = []; e.cushionMs = undefined; });
+      overrunAdj.clear();
+      const moveStatic = (e, adj) => { if (move(e, adj, minutesOf(adj))) e.offStable += declared(adj); };
+      adjs.forEach(adj => {
+        if (adj.kind === 'delay') {
+          const sc = adj.scope, ids = sc.stageIds || null, unz = ids ? sc.includeUnzoned === true : true;
+          E.forEach(e => {
+            if (e.day !== adj.festivalDay) return;                                         // nunca otra jornada
+            if (e.stageId === null ? !unz : (ids && ids.indexOf(e.stageId) < 0)) return;    // fuera de scope
+            if (stable(e) < adj.fromAtMs) return;                                         // establemente antes de «desde» (R4.4-1.5)
+            moveStatic(e, adj);
+          });
+        } else if (adj.kind === 'changeover-stretch') {
+          const t = byId.get(adj.fromEntryId);
+          const group = E.filter(e => sameGroup(e, t)).sort((a, b) => orderKey(a, b, stable(a), stable(b)));
+          group.slice(group.indexOf(t)).forEach(e => moveStatic(e, adj));              // la banda destino y lo posterior
+        } else {
+          // overtime / bis: exceso de la banda frente a su fin sin este ajuste, con el horario aplicado hasta ahora
+          const X = byId.get(adj.fromEntryId);
+          overrunAdj.set(X.id, adj);
+          const endX = endNoOverrun(X), O = excessOf(X, endX).O;
+          const list = zoneOrder(X.stageId), after = list.slice(list.indexOf(X) + 1);      // cronológico, transjornada (R4.1)
+          let carry = null, cushion = null;    // null = aún no se ha llegado a la siguiente banda
+          after.forEach(e => {
+            if (isBand(e.kind)) {
+              if (carry === null) {            // colchón hasta la siguiente banda, tal como está ahora
+                cushion = Math.max(0, (cur(e) - endX) - coMinOf(X.stageId));
+                carry = Math.max(0, O - cushion);
+              }
+              const base = est(e);
+              const moved = carry > 0 && move(e, adj, carry);
+              // ▶ manda: si empezó antes de su estimado, pasa menos arrastre (nunca por debajo de su horario previo)
+              if (e.startedAt !== null && e.startedAt < base + (moved ? carry : 0)) carry = Math.max(0, Math.min(carry, e.startedAt - base));
+            } else {
+              const ms = carry === null ? Math.max(0, O - Math.max(0, cur(e) - endX)) : carry;   // tareas y marcadores
+              if (ms > 0) move(e, adj, ms);
             }
-            const base = est(e);
-            const moved = carry > 0 && move(e, adj, carry);
-            // ▶ manda: si empezó antes de su estimado, pasa menos arrastre (nunca por debajo de su horario previo)
-            if (e.startedAt !== null && e.startedAt < base + (moved ? carry : 0)) carry = Math.max(0, Math.min(carry, e.startedAt - base));
-          } else {
-            const ms = carry === null ? Math.max(0, O - Math.max(0, cur(e) - endX)) : carry;   // tareas y marcadores
-            if (ms > 0) move(e, adj, ms);
-          }
+          });
+          X.cushionMs = cushion;
+        }
+      });
+    }
+
+    // ── Recuperación derivada por ▶ de B (R4.4-4): residual FIFO de los delay/changeover-stretch que citan a una banda empezada ──
+    // Nada de esto se guarda: minutes declarados y Log quedan intactos; el residual se recalcula de los hechos y del orden de delays[].
+    const residual = new Map();                                    // adj.id → ms efectivos (ausente = declarados)
+    const declaredOf = new Map(adjs.filter(isStatic).map(a => [a.id, declared(a)]));
+    const minutesOf = adj => residual.has(adj.id) ? residual.get(adj.id) : declared(adj);
+    const recovery = new Map();                                    // B.id → { base, real, total }
+    const citing = new Map();                                      // B.id → ajustes estáticos que la citan, en orden de delays[]
+    adjs.filter(isStatic).forEach(adj => { const B = byId.get(adj.fromEntryId); if (B && B.startedAt !== null) { if (!citing.has(B.id)) citing.set(B.id, []); citing.get(B.id).push(adj); } });
+    if (citing.size) {
+      // Punto fijo: el inicio base de una B puede depender del residual de otra B' (si un ajuste de B' la alcanza)
+      for (let round = 0; round <= citing.size; round++) {
+        let changed = false;
+        citing.forEach((list, Bid) => {
+          const B = byId.get(Bid), suppressed = new Set(list.map(a => a.id));
+          // Inicio base de B (§A): el horario vigente SIN las contribuciones de los ajustes que citan a B, nunca antes de su plan.
+          // El ▶ de B se ignora durante este cálculo (C2-R1): la base conserva las causas de OTRAS bandas (sus delays, stretches,
+          // overtime/bis y hechos) tal como alcanzarían a una B aún no empezada; el ▶ real solo entra después, en retrasoRealB.
+          const startedAtB = B.startedAt; B.startedAt = null;
+          applyAdjustments(adj => suppressed.has(adj.id) ? 0 : minutesOf(adj));
+          const base = Math.max(B.S0, est(B));
+          B.startedAt = startedAtB;
+          const total = list.reduce((s, a) => s + declared(a), 0);
+          let real = Math.min(total, Math.max(0, startedAtB - base));               // retrasoRealB, limitado al total declarado
+          recovery.set(Bid, { base, real, total });
+          list.forEach(adj => {                                                    // reparto FIFO: del más antiguo al más reciente
+            const take = Math.min(declared(adj), real); real -= take;
+            if (minutesOf(adj) !== take) { residual.set(adj.id, take); changed = true; }
+          });
         });
-        X.cushionMs = cushion;
+        if (!changed) break;
       }
-    });
+    }
+    applyAdjustments(minutesOf);
 
     // ── Horario efectivo final ──
     E.forEach(e => {
@@ -217,12 +267,22 @@
       effective: { start: iso(e.S), end: iso(e.E), call: e.C0 === null ? null : iso(e.C0 + (e.S - e.S0)) },   // el CALL va con su entrada
       startedAt: iso(e.startedAt), endedAt: iso(e.endedAt),
       shiftMinutes: mins(e.contributions.reduce((s, c) => s + c.ms, 0)), startDeltaMinutes: mins(e.S - e.S0),
-      contributions: e.contributions.map(c => ({ delayId: c.delayId, kind: c.kind, minutes: mins(c.ms) })),
+      contributions: e.contributions.map(c => { const o = { delayId: c.delayId, kind: c.kind, minutes: mins(c.ms) }; if (residual.has(c.delayId)) o.recoveredMinutes = mins(declaredOf.get(c.delayId) - c.ms); return o; }),
       held: e.held.map(h => Object.assign({}, h)),
       clash: e.clash, overrun: e.overrun
     }));
     const index = new Map(out.map(x => [x.id, x]));
-    return { now: iso(now), timeZone: ev.timeZone, entries: out, zones: zonesOut, byId: id => index.get(id) || null };
+    // Ajustes con su efecto vigente: residual y recuperación por ▶ de su B (solo salida; §R4.4-4.9)
+    const adjustments = adjs.map(adj => {
+      const o = { delayId: adj.id, kind: adj.kind, fromEntryId: adj.fromEntryId };
+      if (isStatic(adj)) {
+        const rec = recovery.get(adj.fromEntryId) || null;
+        o.declaredMinutes = adj.minutes; o.residualMinutes = mins(minutesOf(adj)); o.recoveredMinutes = adj.minutes - o.residualMinutes;
+        o.recovery = rec ? { baseStart: iso(rec.base), realDelayMinutes: mins(rec.real), totalDeclaredMinutes: mins(rec.total) } : null;
+      }
+      return o;
+    });
+    return { now: iso(now), timeZone: ev.timeZone, entries: out, zones: zonesOut, adjustments, byId: id => index.get(id) || null };
   }
 
   const api = { compute, DEFAULT_DURATION_MINUTES: 60 };

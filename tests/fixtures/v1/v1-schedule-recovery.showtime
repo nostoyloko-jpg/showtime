@@ -1,0 +1,185 @@
+{
+  "format": "showtime-document",
+  "formatVersion": 1,
+  "festivalId": "7d3f1c2a-9b8e-4f6d-a1c2-3e4f5a6b7c8d",
+  "festival": {
+    "project": {
+      "event": {
+        "name": "Recuperación por ▶",
+        "startDate": "2027-07-10",
+        "endDate": "2027-07-11",
+        "timeZone": "Europe/Madrid",
+        "dayCutoff": "06:00",
+        "callMinutes": 15,
+        "changeoverMinutes": 15
+      },
+      "stages": [
+        {
+          "id": "main",
+          "name": "Principal",
+          "color": "#38bdf8",
+          "position": 0
+        },
+        {
+          "id": "carpa",
+          "name": "Carpa",
+          "color": "#a78bfa",
+          "position": 1,
+          "changeoverMinutes": 30
+        }
+      ],
+      "entries": [
+        {
+          "id": "A",
+          "kind": "show",
+          "name": "A",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-10",
+            "start": "20:00",
+            "end": "21:00"
+          }
+        },
+        {
+          "id": "T1",
+          "kind": "task",
+          "name": "Tarea antes de B",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-10",
+            "start": "21:30",
+            "end": "21:40"
+          }
+        },
+        {
+          "id": "B",
+          "kind": "show",
+          "name": "B",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-10",
+            "start": "22:00",
+            "end": "23:00"
+          }
+        },
+        {
+          "id": "T2",
+          "kind": "task",
+          "name": "Tarea tras B",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-10",
+            "start": "23:10",
+            "end": "23:20"
+          }
+        },
+        {
+          "id": "C",
+          "kind": "show",
+          "name": "C",
+          "plan": {
+            "stageId": "main",
+            "date": "2027-07-10",
+            "start": "23:30",
+            "end": "00:30"
+          }
+        },
+        {
+          "id": "X",
+          "kind": "show",
+          "name": "Carpa tras B",
+          "plan": {
+            "stageId": "carpa",
+            "date": "2027-07-10",
+            "start": "22:30",
+            "end": "23:30"
+          }
+        },
+        {
+          "id": "Y",
+          "kind": "show",
+          "name": "Carpa antes de B",
+          "plan": {
+            "stageId": "carpa",
+            "date": "2027-07-10",
+            "start": "20:30",
+            "end": "21:15"
+          }
+        }
+      ],
+      "delays": [
+        {
+          "id": "d1",
+          "kind": "delay",
+          "occurredAt": "2027-07-10T19:35:00Z",
+          "festivalDay": "2027-07-10",
+          "minutes": 10,
+          "scope": {
+            "stageIds": [
+              "main",
+              "carpa"
+            ]
+          },
+          "fromEntryId": "B",
+          "fromAt": "2027-07-10T20:00:00Z",
+          "blockPolicy": {
+            "all": {
+              "show": false,
+              "soundcheck": false,
+              "task": false,
+              "marker": false
+            },
+            "stages": {}
+          }
+        },
+        {
+          "id": "s1",
+          "kind": "changeover-stretch",
+          "occurredAt": "2027-07-10T19:40:00Z",
+          "festivalDay": "2027-07-10",
+          "minutes": 5,
+          "fromEntryId": "B",
+          "blockPolicy": {
+            "all": {
+              "show": false,
+              "soundcheck": false,
+              "task": false,
+              "marker": false
+            },
+            "stages": {}
+          }
+        },
+        {
+          "id": "dC",
+          "kind": "delay",
+          "occurredAt": "2027-07-10T19:45:00Z",
+          "festivalDay": "2027-07-10",
+          "minutes": 5,
+          "scope": {
+            "stageIds": [
+              "main"
+            ]
+          },
+          "fromEntryId": "C",
+          "fromAt": "2027-07-10T21:45:00Z",
+          "blockPolicy": {
+            "all": {
+              "show": false,
+              "soundcheck": false,
+              "task": false,
+              "marker": false
+            },
+            "stages": {}
+          }
+        }
+      ]
+    },
+    "configuration": {}
+  },
+  "eventLog": {
+    "logVersion": 1,
+    "snapshots": [],
+    "entries": [],
+    "nextSequence": 1
+  }
+}
